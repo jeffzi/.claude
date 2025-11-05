@@ -1,0 +1,11 @@
+{
+  "enabledPlugins": {
+    "scientific-packages@claude-scientific-skills": true,
+    "scientific-thinking@claude-scientific-skills": true,
+    "scientific-context-initialization@claude-scientific-skills": true,
+    "get-available-resources@claude-scientific-skills": true,
+    "superpowers@superpowers-marketplace": true,
+    "superpowers-developing-for-claude-code@superpowers-marketplace": true
+  },
+  "alwaysThinkingEnabled": false
+}

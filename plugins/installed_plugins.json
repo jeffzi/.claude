@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "plugins": {
+    "superpowers@superpowers-marketplace": {
+      "version": "3.4.1",
+      "installedAt": "2025-11-04T18:11:10.928Z",
+      "lastUpdated": "2025-11-04T18:11:10.928Z",
+      "installPath": "/Users/jeffzi/.claude/plugins/cache/superpowers",
+      "gitCommitSha": "b187e75a1ee46f54247b6720ed49a47bdcc7eb2f",
+      "isLocal": false
+    },
+    "scientific-packages@claude-scientific-skills": {
+      "version": "unknown",
+      "installedAt": "2025-11-04T22:03:41.249Z",
+      "lastUpdated": "2025-11-04T22:03:41.249Z",
+      "installPath": "/Users/jeffzi/.claude/plugins/marketplaces/claude-scientific-skills/",
+      "gitCommitSha": "63a4293f1a88c9a41afde9ad439ba4d7a6f84daa",
+      "isLocal": true
+    },
+    "scientific-thinking@claude-scientific-skills": {
+      "version": "unknown",
+      "installedAt": "2025-11-04T22:03:41.249Z",
+      "lastUpdated": "2025-11-04T22:03:41.249Z",
+      "installPath": "/Users/jeffzi/.claude/plugins/marketplaces/claude-scientific-skills/",
+      "gitCommitSha": "63a4293f1a88c9a41afde9ad439ba4d7a6f84daa",
+      "isLocal": true
+    },
+    "scientific-context-initialization@claude-scientific-skills": {
+      "version": "unknown",
+      "installedAt": "2025-11-04T22:03:41.249Z",
+      "lastUpdated": "2025-11-04T22:03:41.249Z",
+      "installPath": "/Users/jeffzi/.claude/plugins/marketplaces/claude-scientific-skills/scientific-helpers/scientific-context-initialization",
+      "gitCommitSha": "63a4293f1a88c9a41afde9ad439ba4d7a6f84daa",
+      "isLocal": true
+    },
+    "get-available-resources@claude-scientific-skills": {
+      "version": "unknown",
+      "installedAt": "2025-11-04T22:03:41.249Z",
+      "lastUpdated": "2025-11-04T22:03:41.249Z",
+      "installPath": "/Users/jeffzi/.claude/plugins/marketplaces/claude-scientific-skills/scientific-helpers/get-available-resources",
+      "gitCommitSha": "63a4293f1a88c9a41afde9ad439ba4d7a6f84daa",
+      "isLocal": true
+    },
+    "superpowers-developing-for-claude-code@superpowers-marketplace": {
+      "version": "0.2.0",
+      "installedAt": "2025-11-05T14:27:25.528Z",
+      "lastUpdated": "2025-11-05T14:27:25.528Z",
+      "installPath": "/Users/jeffzi/.claude/plugins/cache/superpowers-developing-for-claude-code",
+      "gitCommitSha": "6ec147331aab70777e3561ce46acb393889d2162",
+      "isLocal": false
+    }
+  }
+}

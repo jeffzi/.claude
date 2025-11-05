@@ -1,0 +1,18 @@
+{
+  "claude-scientific-skills": {
+    "source": {
+      "source": "github",
+      "repo": "K-Dense-AI/claude-scientific-skills"
+    },
+    "installLocation": "/Users/jeffzi/.claude/plugins/marketplaces/claude-scientific-skills",
+    "lastUpdated": "2025-11-04T18:00:39.489Z"
+  },
+  "superpowers-marketplace": {
+    "source": {
+      "source": "github",
+      "repo": "obra/superpowers-marketplace"
+    },
+    "installLocation": "/Users/jeffzi/.claude/plugins/marketplaces/superpowers-marketplace",
+    "lastUpdated": "2025-11-04T18:10:26.072Z"
+  }
+}
