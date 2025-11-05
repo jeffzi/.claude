@@ -1,0 +1,29 @@
+# Claude Code runtime and cache files
+.claude/
+config/notification_states.json
+debug/
+file-history/
+history.jsonl
+ide/ 
+projects/
+session-env/
+shell-snapshots/
+statsig/
+todos/
+
+# Plugin cache (regenerated on plugin install)
+plugins/cache/
+
+# IDE and editor files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Keep these directories
+!skills/
+!plugins/config.json
+!plugins/installed_plugins.json
+!plugins/known_marketplaces.json

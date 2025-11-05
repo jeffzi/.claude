@@ -1,0 +1,22 @@
+default_install_hook_types: [pre-commit]
+default_stages: [pre-commit]
+files: ^skills/
+
+repos:
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.45.0
+    hooks:
+      - id: markdownlint
+        args: ["--fix"]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+        types: [markdown]
+      - id: trailing-whitespace
+        types: [markdown]
+      - id: mixed-line-ending
+        types: [markdown]
+        args: ["--fix=lf"]

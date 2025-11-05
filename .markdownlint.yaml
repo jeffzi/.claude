@@ -1,0 +1,21 @@
+default: true
+
+# MD013/line-length - Line length
+MD013:
+  line_length: 120
+  code_blocks: false
+  tables: false
+
+# MD033/no-inline-html - Allow inline HTML (common in skill docs)
+MD033: true
+
+# MD041/first-line-heading - First line in file should be a top level heading
+MD041: true
+
+# MD046/code-block-style - Code block style
+MD046:
+  style: fenced
+
+# MD024/no-duplicate-heading - Multiple headings with the same content
+MD024:
+  siblings_only: true
