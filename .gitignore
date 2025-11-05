@@ -13,6 +13,10 @@ todos/
 
 # Plugin cache (regenerated on plugin install)
 plugins/cache/
+plugins/marketplaces/
+
+# Marimo docs (too large to track, read locally)
+skills/marimo/marimo-docs/
 
 # IDE and editor files
 .vscode/

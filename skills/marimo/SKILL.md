@@ -1,422 +1,295 @@
 ---
-name: Marimo notebook assistant
-description: Create data science notebooks using marimo. I focus on creating clear, efficient, and reproducible data analysis workflows with marimo's reactive programming model.
+name: marimo-notebooks
+description: Create reactive Python notebooks with automatic execution and interactive data dashboards. Use when building data analysis workflows, migrating from Jupyter, or working with reactive UIs. Covers marimo's DAG-based reactivity, UI elements (sliders, dropdowns, dataframes), polars/altair integration, and resolving circular dependencies, variable redeclaration, and mutation tracking errors.
 ---
 
-# Marimo notebook assistant
+# Marimo Reactive Notebooks
 
-I am a specialized AI assistant designed to help create data science notebooks using marimo. I focus on creating
-clear, efficient, and reproducible data analysis workflows with marimo's reactive programming model.
+## Overview
 
-<assistant_info>
+Marimo is a reactive Python notebook where cells form a directed acyclic graph (DAG) and automatically re-execute
+when dependencies change. Unlike Jupyter, variables cannot be redeclared, and execution order is determined by the
+dependency graph, not cell position.
 
-- I specialize in data science and analytics using marimo notebooks
-- I provide complete, runnable code that follows best practices
-- I emphasize reproducibility and clear documentation
-- I focus on creating interactive data visualizations and analysis
-- I understand marimo's reactive programming model
-  </assistant_info>
+**Core principle:** Write declarative, idempotent cells that react to changes instead of imperative code with manual execution.
 
-## Marimo Fundamentals
+## When to Use
 
-Marimo is a reactive notebook that differs from traditional notebooks in key ways:
+Use when:
+
+- Creating interactive data analysis dashboards
+- Building reproducible data science workflows
+- Migrating from Jupyter notebooks
+- Need automatic reactivity without callbacks
+- Working with real-time data that requires UI updates
+
+Don't use when:
+
+- Need notebooks with side effects and manual execution order
+- Require variable redeclaration across cells
+- Working with codebases that rely on implicit state
+
+## Quick Reference
+
+| Task | Pattern |
+|------|---------|
+| Import modules | First cell: `import marimo as mo`, `import polars as pl`, `import altair as alt` |
+| Create UI element | One cell: `slider = mo.ui.slider(0, 100)` |
+| Access UI value | Different cell: `value = slider.value` |
+| Display output | Last expression in cell (auto-displayed) |
+| Stop execution | `mo.stop(condition, output=None)` |
+| Layout elements | `mo.hstack([...])`, `mo.vstack([...])`, `mo.tabs({...})` |
+| Run SQL | `result = mo.sql(f"""SELECT * FROM table""")` |
+| Local variables | Prefix with `_`: `_temp = ...` (not accessible to other cells) |
+| Run as script | `python notebook.py` (CLI execution) |
+| Check notebook | `uv run marimo check --fix notebook.py` |
+| Test notebook | `uv run pytest notebook.py` |
+
+## Core Concepts
+
+### Reactivity and the DAG
 
 - Cells execute automatically when their dependencies change
-- Variables cannot be redeclared across cells
-- The notebook forms a directed acyclic graph (DAG)
-- The last expression in a cell is automatically displayed
-- UI elements are reactive and update the notebook automatically
+- No manual "Run All" needed - changes propagate automatically
+- Dependency graph prevents circular references
+- UI elements trigger re-execution without explicit callbacks
 
-## Preferred Tools and Libraries
+### Variable Scoping
 
-**Always use these tools and libraries by default unless the user explicitly requests alternatives:**
+- **Global variables:** Declared once, accessed by any cell
+- **Local variables:** Prefixed with `_`, scoped to single cell
+- **Cannot redeclare:** Each variable name can only be assigned in one cell
+- **Mutations not tracked:** Create new objects instead of mutating
+- **Module auto-reload:** Import helper modules; marimo reloads them automatically on change
 
-- **uv** for package management (instead of pip or conda)
-- **polars** for dataframe operations and data manipulation
-- **altair** for interactive visualizations
-
-## Code Requirements
-
-1. All code must be complete and runnable
-2. Follow consistent coding style throughout
-3. Include descriptive variable names and helpful comments
-4. Import all modules in the first cell, always including `import marimo as mo`
-5. Always import polars (`import polars as pl`) and altair (`import altair as alt`) in the first cell unless the
-   user specifically requests different libraries
-6. Never redeclare variables across cells
-7. Ensure no cycles in notebook dependency graph
-8. The last expression in a cell is automatically displayed, just like in Jupyter notebooks.
-9. Don't include comments in markdown cells
-10. Don't include comments in SQL cells
-11. Never define anything using `global`.
-
-## Reactivity
-
-Marimo's reactivity means:
-
-- When a variable changes, all cells that use that variable automatically re-execute
-- UI elements trigger updates when their values change without explicit callbacks
-- UI element values are accessed through `.value` attribute
-- You cannot access a UI element's value in the same cell where it's defined
-- Cells prefixed with an underscore (e.g. \_my_var) are local to the cell and cannot be accessed by other cells
-
-## Best Practices
-
-**Editing cells:** When editing notebooks, only modify the contents inside `@app.cell` functions. Marimo
-automatically handles parameters and return statements.
-
-**Python version:** Use modern Python idioms (3.13+):
-
-- Type hints with `|` union syntax (e.g., `str | None` instead of `Optional[str]`)
-- `match` statements for pattern matching
-- New type parameter syntax (e.g., `def func[T](x: T) -> T`)
-- f-strings for all string formatting
-- Structural pattern matching where appropriate
-
-**Variables:**
-
-- Use descriptive names, especially for global variables
-- Prefix variables with `_` to make them local to a cell (e.g., `_tmp = ...`)
-- Keep global variables minimal to avoid name collisions
-- Use functions to encapsulate logic and avoid polluting the global namespace
-
-**Mutations:** Marimo doesn't track mutations. Mutate objects only in the cell that creates them, or create new objects instead:
-
-```python
-# Good: Create new variable
-extended_list = original_list + [new_item]
-
-# Avoid: Mutating in a separate cell
-original_list.append(new_item)  # Won't trigger reactivity
-```
-
-**Reactivity:**
-
-- Don't use `on_change` handlers - use marimo's built-in reactive execution
-- Write idempotent cells (same inputs → same outputs)
-- Use `mo.stop()` to conditionally stop expensive cells from executing
-
-**Code organization:**
-
-- Use Python modules for complex logic, marimo will auto-reload them
-- Split long notebooks into helper modules
-
-**Data handling:**
-
-- Use polars for data manipulation (`pl.read_csv()`, `pl.col()`, etc.)
-- A variable in the last expression is automatically displayed as a table
-- Implement proper validation and handle missing values
-
-**Visualizations:**
-
-- Default to altair for all charts
-- Return chart object as last expression
-- Add tooltips for interactivity (`tooltip=['column1', 'column2']`)
-- Pass polars dataframes directly to altair
-
-**UI elements:**
-
-- Access values with `.value` attribute (e.g., `slider.value`)
-- Create UI in one cell, reference in later cells
-- Use `mo.hstack()`, `mo.vstack()`, `mo.tabs()` for layouts
-- Rely on reactive execution, not callbacks
-
-**SQL:**
-
-- Use `mo.sql(f"""query""")` for DuckDB
-- Don't add comments in SQL cells
-
-## Troubleshooting
-
-Common issues and solutions:
-
-- Circular dependencies: Reorganize code to remove cycles in the dependency graph
-- UI element value access: Move access to a separate cell from definition
-- Visualization not showing: Ensure the visualization object is the last expression
-
-After generating or editing a notebook, run `marimo check --fix` to catch and
-automatically resolve common formatting issues and detect common pitfalls. See the
-Testing and Validation section below for comprehensive testing strategies.
-
-## Testing and Validation
-
-### Linting with `marimo check`
-
-**Commands:**
-
-```bash
-uv run marimo check .              # Check all notebooks
-uv run marimo check --fix .        # Auto-fix safe issues
-uv run marimo check --fix --unsafe-fixes .  # Fix all (may change behavior)
-```
-
-**Key lint rules:**
-
-- 🚨 MB001-MB005: Breaking (prevent execution) - syntax errors, multiple definitions, cycles
-- ⚠️ MR001: Runtime issues - self-import
-- ✨ MF001-MF007: Formatting - auto-fixable style issues
-
-### Ruff Integration (LSP)
-
-```bash
-uv add "marimo[lsp]"
-```
-
-```toml
-[tool.marimo.language_servers.pylsp]
-enabled = true
-enable_ruff = true    # Python linting
-enable_mypy = true    # Type checking
-```
-
-**marimo check** handles notebook-specific issues; **Ruff** handles general Python code quality.
-
-### Testing
-
-**Reactive testing (in-notebook):** Test functions/classes starting with `test_`/`Test` auto-run when pytest is
-installed. Test cells must contain ONLY test code.
+### Cell Structure
 
 ```python
 @app.cell
-def __(inc):
-    def test_sanity():
-        assert inc(3) == 4
-    return
+def __(dependencies):
+    # Cell code here
+    return (outputs,)
 ```
 
-**Command-line:** `uv run pytest notebook.py`
+**Important:** Only modify code inside `@app.cell` functions. Marimo manages parameters and return statements.
 
-**Doctest:** Use standard Python docstrings with `>>>` examples.
+## Default Stack
 
-**Disable reactive testing:** Set `runtime.reactive_test = false` in config.
+Always use unless explicitly requested otherwise:
 
-### Validation Workflow
+- **uv** for package management
+- **polars** for dataframes
+- **altair** for visualizations
 
-```bash
-uv run marimo check --fix notebook.py  # Lint
-uv run pytest notebook.py              # Test
-uv run python notebook.py              # Validate execution
-```
+## Runtime Modes
 
-## Available UI elements
+**Automatic (default):** Cells run automatically when dependencies change
+**Lazy:** Cells marked as stale instead of running; run manually with Run button
 
-- `mo.ui.altair_chart(altair_chart)`
-- `mo.ui.button(value=None, kind='primary')`
-- `mo.ui.run_button(label=None, tooltip=None, kind='primary')`
-- `mo.ui.checkbox(label='', value=False)`
-- `mo.ui.date(value=None, label=None, full_width=False)`
-- `mo.ui.dropdown(options, value=None, label=None, full_width=False)`
-- `mo.ui.file(label='', multiple=False, full_width=False)`
-- `mo.ui.number(value=None, label=None, full_width=False)`
-- `mo.ui.radio(options, value=None, label=None, full_width=False)`
-- `mo.ui.refresh(options: List[str], default_interval: str)`
-- `mo.ui.slider(start, stop, value=None, label=None, full_width=False, step=None)`
-- `mo.ui.range_slider(start, stop, value=None, label=None, full_width=False, step=None)`
-- `mo.ui.table(data, columns=None, on_select=None, sortable=True, filterable=True)`
-- `mo.ui.text(value='', label=None, full_width=False)`
-- `mo.ui.text_area(value='', label=None, full_width=False)`
-- `mo.ui.data_explorer(df)`
-- `mo.ui.dataframe(df)`
-- `mo.ui.plotly(plotly_figure)`
-- `mo.ui.tabs(elements: dict[str, mo.ui.Element])`
-- `mo.ui.array(elements: list[mo.ui.Element])`
-- `mo.ui.form(element: mo.ui.Element, label='', bordered=True)`
+For expensive notebooks, configure lazy mode or use `mo.stop()` to prevent expensive cells from running until ready.
 
-## Layout and utility functions
+## Common Patterns
 
-- `mo.md(text)` - display markdown
-- `mo.stop(predicate, output=None)` - stop execution conditionally
-- `mo.output.append(value)` - append to the output when it is not the last expression
-- `mo.output.replace(value)` - replace the output when it is not the last expression
-- `mo.Html(html)` - display HTML
-- `mo.image(image)` - display an image
-- `mo.hstack(elements)` - stack elements horizontally
-- `mo.vstack(elements)` - stack elements vertically
-- `mo.tabs(elements)` - create a tabbed interface
-
-## Examples
-
-### Basic UI with reactivity
+### Basic Reactive UI
 
 ```python
-# Cell 1
-import marimo as mo
-import altair as alt
-import polars as pl
-import numpy as np
-
-# Cell 2
-# Create a slider and display it
-n_points = mo.ui.slider(10, 100, value=50, label="Number of points")
-n_points  # Display the slider
-
-# Cell 3
-# Generate random data based on slider value
-# This cell automatically re-executes when n_points.value changes
-x = np.random.rand(n_points.value)
-y = np.random.rand(n_points.value)
-
-df = pl.DataFrame({"x": x, "y": y})
-
-chart = alt.Chart(df).mark_circle(opacity=0.7).encode(
-    x=alt.X('x', title='X axis'),
-    y=alt.Y('y', title='Y axis')
-).properties(
-    title=f"Scatter plot with {n_points.value} points",
-    width=400,
-    height=300
-)
-
-chart  # Return the chart to display it
-```
-
-### Data explorer
-
-```python
-# Cell 1
-import marimo as mo
-import polars as pl
-from vega_datasets import data
-
-# Cell 2
-# Load and display dataset with interactive explorer
-cars_df = pl.DataFrame(data.cars())
-mo.ui.data_explorer(cars_df)
-```
-
-### Multiple UI elements
-
-```python
-# Cell 1
+# Cell 1: Imports
 import marimo as mo
 import polars as pl
 import altair as alt
 
-# Cell 2
-# Load dataset
-iris = pl.read_csv("hf://datasets/scikit-learn/iris/Iris.csv")
+# Cell 2: Create UI
+slider = mo.ui.slider(10, 100, value=50, label="Points")
+slider
 
-# Cell 3
-# Create UI elements
-species_selector = mo.ui.dropdown(
-    options=["All"] + iris["Species"].unique().to_list(),
-    value="All",
-    label="Species"
-)
-x_feature = mo.ui.dropdown(
-    options=iris.select(pl.col(pl.Float64, pl.Int64)).columns,
-    value="SepalLengthCm",
-    label="X Feature"
-)
-y_feature = mo.ui.dropdown(
-    options=iris.select(pl.col(pl.Float64, pl.Int64)).columns,
-    value="SepalWidthCm",
-    label="Y Feature"
-)
-
-# Display UI elements in a horizontal stack
-mo.hstack([species_selector, x_feature, y_feature])
-
-# Cell 4
-# Filter data based on selection
-filtered_data = iris if species_selector.value == "All" else iris.filter(pl.col("Species") == species_selector.value)
-
-# Create visualization based on UI selections
-chart = alt.Chart(filtered_data).mark_circle().encode(
-    x=alt.X(x_feature.value, title=x_feature.value),
-    y=alt.Y(y_feature.value, title=y_feature.value),
-    color='Species'
-).properties(
-    title=f"{y_feature.value} vs {x_feature.value}",
-    width=500,
-    height=400
-)
-
-chart
+# Cell 3: Use UI value (auto-updates when slider changes)
+data = pl.DataFrame({"x": range(slider.value)})
+alt.Chart(data).mark_line().encode(x="x")
 ```
 
-### Interactive chart with Altair
+### Avoiding Mutations
 
 ```python
-# Cell 1
-import marimo as mo
-import altair as alt
-import polars as pl
+# ❌ Bad: Mutation won't trigger reactivity
+original_list.append(item)
 
-# Cell 2
-# Load dataset
-weather = pl.read_csv("https://raw.githubusercontent.com/vega/vega-datasets/refs/heads/main/data/weather.csv")
-weather_dates = weather.with_columns(
-    pl.col("date").str.strptime(pl.Date, format="%Y-%m-%d")
-)
-_chart = (
-    alt.Chart(weather_dates)
-    .mark_point()
-    .encode(
-        x="date:T",
-        y="temp_max",
-        color="location",
-    )
-)
-
-chart = mo.ui.altair_chart(_chart)
-chart
-
-# Cell 3
-# Display the selection
-chart.value
+# ✅ Good: Create new object
+extended_list = original_list + [item]
 ```
 
-### Run Button Example
+### Conditional Execution
 
 ```python
-# Cell 1
-import marimo as mo
+# Stop expensive cells conditionally
+mo.stop(not data_loaded, mo.md("Load data first"))
 
-# Cell 2
-first_button = mo.ui.run_button(label="Option 1")
-second_button = mo.ui.run_button(label="Option 2")
-[first_button, second_button]
-
-# Cell 3
-if first_button.value:
-    print("You chose option 1!")
-elif second_button.value:
-    print("You chose option 2!")
-else:
-    print("Click a button!")
+# Rest of cell only runs if data_loaded is True
+expensive_computation(data)
 ```
 
 ### SQL with DuckDB
 
 ```python
-# Cell 1
-import marimo as mo
-import polars as pl
-
-# Cell 2
-# Load dataset
-weather = pl.read_csv('https://raw.githubusercontent.com/vega/vega-datasets/refs/heads/main/data/weather.csv')
-
-# Cell 3
-seattle_weather_df = mo.sql(
-    f"""
-    SELECT * FROM weather WHERE location = 'Seattle';
-    """
-)
+# polars DataFrame automatically available to SQL
+result_df = mo.sql(f"""
+    SELECT category, COUNT(*) as count
+    FROM my_dataframe
+    GROUP BY category
+""")
 ```
 
-### Writing LaTeX in markdown
+## Common Mistakes
+
+| Mistake | Why It Fails | Fix |
+|---------|--------------|-----|
+| Redefining variables | `x = 1` in cell 1, `x = 2` in cell 2 | Each variable assigned in exactly one cell |
+| Accessing UI in same cell | `slider = mo.ui.slider(...); print(slider.value)` | Access `.value` in a different cell |
+| Mutations for reactivity | `list.append(x)` doesn't trigger updates | Create new objects: `new_list = list + [x]` |
+| Circular dependencies | Cell A uses B, Cell B uses A | Reorganize to break cycle |
+| Missing last expression | Output not showing | Ensure visualization/data is last expression |
+| Using `global` keyword | Breaks marimo's tracking | Never use `global` |
+| Callbacks for UI | `on_change=handler` | Remove callbacks, rely on reactive execution |
+| Using `mo.state()` | 99% of cases don't need it, can cause bugs | Use UI element `.value` instead |
+
+## Testing and Validation
+
+### Linting
+
+```bash
+uv run marimo check .                # Check all notebooks
+uv run marimo check --fix .          # Auto-fix safe issues
+uv run marimo check --fix --unsafe-fixes .  # Fix all
+```
+
+**Key errors:**
+
+- MB001-MB005: Breaking (syntax, multiple definitions, cycles)
+- MR001: Runtime (self-import)
+- MF001-MF007: Formatting (auto-fixable)
+
+### Testing
+
+**In-notebook reactive testing:**
+
+```python
+@app.cell
+def __(inc):
+    def test_increment():
+        assert inc(3) == 4
+    return
+```
+
+Tests auto-run when pytest installed. Test cells must contain ONLY test code.
+
+**Command-line:**
+
+```bash
+uv run pytest notebook.py      # Run tests
+uv run python notebook.py      # Validate execution
+```
+
+## API Reference
+
+For complete API documentation, see `marimo-docs/docs/api/`:
+
+- `api/index.md` - API overview
+- `api/inputs/` - All UI components (35+ widgets)
+- `api/layouts/` - Layout components (tabs, accordion, sidebar, etc.)
+- `api/plotting.md` - Plotting integrations
+- `api/state.md` - State management with `mo.state()`
+- `api/markdown.md` - Markdown utilities
+
+## UI Elements
+
+**Core inputs:**
+
+- `mo.ui.slider(start, stop, value, label)` - Numeric slider
+- `mo.ui.dropdown(options, value, label)` - Dropdown select
+- `mo.ui.text(value, label)` - Text input
+- `mo.ui.checkbox(label, value)` - Checkbox
+- `mo.ui.button(value, kind)` - Button
+- `mo.ui.run_button(label, tooltip)` - Run button (doesn't auto-execute)
+
+**Data inputs:**
+
+- `mo.ui.dataframe(df)` - Interactive dataframe viewer
+- `mo.ui.data_explorer(df)` - Data exploration interface
+- `mo.ui.table(data, sortable, filterable)` - Interactive table
+- `mo.ui.file(label, multiple)` - File upload
+
+**Layouts:**
+
+- `mo.hstack([...])` - Horizontal stack
+- `mo.vstack([...])` - Vertical stack
+- `mo.tabs({key: element, ...})` - Tabbed interface
+
+**Access values:** All UI elements expose `.value` attribute
+
+## Examples
+
+### Interactive Data Filter
 
 ```python
 # Cell 1
 import marimo as mo
+import polars as pl
+import altair as alt
 
 # Cell 2
-mo.md(r"""
+iris = pl.read_csv("hf://datasets/scikit-learn/iris/Iris.csv")
 
-The quadratic function $f$ is defined as
+# Cell 3
+species = mo.ui.dropdown(
+    options=["All"] + iris["Species"].unique().to_list(),
+    value="All",
+    label="Species"
+)
+species
 
-$$f(x) = x^2.$$
+# Cell 4
+filtered = iris if species.value == "All" else iris.filter(pl.col("Species") == species.value)
+
+alt.Chart(filtered).mark_circle().encode(
+    x="SepalLengthCm",
+    y="SepalWidthCm",
+    color="Species"
+)
+```
+
+### Data Explorer
+
+```python
+import marimo as mo
+import polars as pl
+from vega_datasets import data
+
+cars = pl.DataFrame(data.cars())
+mo.ui.data_explorer(cars)
+```
+
+### SQL Analysis
+
+```python
+import marimo as mo
+import polars as pl
+
+weather = pl.read_csv("https://raw.githubusercontent.com/vega/vega-datasets/refs/heads/main/data/weather.csv")
+
+seattle = mo.sql(f"""
+    SELECT * FROM weather
+    WHERE location = 'Seattle'
+    ORDER BY date
 """)
 ```
+
+## Troubleshooting
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| "Multiple definitions" | Variable assigned in 2+ cells | Move to single cell or rename |
+| "Circular dependency" | Cell cycle in DAG | Break cycle by extracting shared logic |
+| UI value is None | Accessing `.value` in same cell as definition | Move access to different cell |
+| Mutation doesn't update | Changed object in-place | Create new object instead |
+| Cell doesn't re-run | Using local variable `_var` | Remove `_` prefix to make global |
+
+**After changes, always run:** `uv run marimo check --fix notebook.py`
