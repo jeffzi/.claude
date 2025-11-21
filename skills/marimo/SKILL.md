@@ -41,7 +41,7 @@ Don't use when:
 | Layout elements | `mo.hstack([...])`, `mo.vstack([...])`, `mo.tabs({...})` |
 | Run SQL | `result = mo.sql(f"""SELECT * FROM table""")` |
 | Local variables | Prefix with `_`: `_temp = ...` (not accessible to other cells) |
-| Run as script | `python notebook.py` (CLI execution) |
+| Run as script | `uv run notebook.py` (CLI execution) |
 | Check notebook | `uv run marimo check --fix notebook.py` |
 | Test notebook | `uv run pytest notebook.py` |
 
@@ -150,6 +150,42 @@ result_df = mo.sql(f"""
 | Using `global` keyword | Breaks marimo's tracking | Never use `global` |
 | Callbacks for UI | `on_change=handler` | Remove callbacks, rely on reactive execution |
 | Using `mo.state()` | 99% of cases don't need it, can cause bugs | Use UI element `.value` instead |
+| Running `marimo edit` for verification | Opens interactive editor, not validation | Use `uv run notebook.py` only |
+
+## Verification Rules
+
+### Before Completing Any Marimo Notebook Task
+
+**ALWAYS run these marimo-specific verification steps. No exceptions.**
+
+1. **Run marimo check** (always):
+
+   ```bash
+   uv run marimo check --fix notebook.py
+   ```
+
+   Fix all errors. Re-run until no breaking errors (MB001-MB005, MR001).
+
+2. **Validate execution** (always):
+
+   ```bash
+   uv run notebook.py
+   ```
+
+   Notebook must execute without errors. Fix any runtime issues.
+
+**Task is NOT complete until marimo checks pass.**
+
+### What NOT to Do
+
+**NEVER run these commands for verification:**
+
+- ❌ `marimo edit notebook.py` - Opens interactive editor (not for verification)
+- ❌ `marimo run notebook.py` - Starts web server (not for verification)
+- ❌ `uv run marimo edit` - Same as above
+- ❌ `uv run marimo run` - Same as above
+
+**Only verification command:** `uv run notebook.py` (executes as Python script)
 
 ## Testing and Validation
 
@@ -185,7 +221,7 @@ Tests auto-run when pytest installed. Test cells must contain ONLY test code.
 
 ```bash
 uv run pytest notebook.py      # Run tests
-uv run python notebook.py      # Validate execution
+uv run notebook.py             # Validate execution
 ```
 
 ## API Reference
