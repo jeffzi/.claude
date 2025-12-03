@@ -1,6 +1,6 @@
 ---
 name: pythonic-code
-description: Use when writing any Python code to ensure type hints, modern idioms, and best practices are followed. Covers type annotations, dataclasses, pathlib, EAFP principle, comprehensions, avoiding mutable defaults, and common anti-patterns. Apply to all Python code regardless of perceived simplicity or time pressure.
+description: Use when writing any Python code to ensure type hints, modern idioms, and best practices are followed. Apply to all Python code regardless of perceived simplicity or time pressure. Addresses mutable default bugs, import errors, missing type hints, pathlib usage, EAFP pattern, dataclasses, and common anti-patterns.
 ---
 
 # Pythonic Code - Python Best Practices
@@ -18,40 +18,32 @@ Use for ALL Python code, including:
 - "Quick" or "simple" scripts
 - Functions without explicit requirements for type hints
 - Refactoring existing code
-- Data processing, API clients, configuration loading
 - Any code where you think "I'll add types later"
 
-Don't skip because:
-
-- Code seems simple (simple code needs types too)
-- Time pressure (types save debugging time)
-- "Just prototyping" (prototypes become production)
-- "Keeping it simple" (types ARE simple)
+Don't skip because code seems simple, time pressure, "just prototyping", or "keeping it simple".
 
 ## Mandatory Rules
 
 ### No Obvious Comments
 
-**Never add comments that describe what code does.** Assume the reader is an expert developer.
+**Never explain what code does. Only explain WHY for non-obvious business logic.**
 
 ```python
-# ✗ BAD
-total = 0  # Initialize total
-for item in items:  # Loop through items
-    total += item  # Add to total
+# ✗ FORBIDDEN - Obvious comments
+total = 0  # Initialize total to zero
+for item in items:  # Loop through each item
+    total += item  # Add item to total
 
-# ✓ GOOD
+# ✓ CORRECT - Self-documenting code
 total = sum(items)
 ```
-
-**Only comment when explaining WHY, not WHAT:** business logic, workarounds, non-obvious gotchas.
 
 ### Imports at Top of File
 
 **ALWAYS place all imports at the top of the file.** No imports inside functions or conditional blocks (except `if TYPE_CHECKING:`).
 
 ```python
-# ✓ Correct - imports at top
+# ✓ Correct
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -60,16 +52,12 @@ if TYPE_CHECKING:
     from pandas import DataFrame
 
 def my_function():
-    # Code here
     pass
 
 # ✗ Wrong - import inside function
 def my_function():
     import os  # BAD
-    pass
 ```
-
-**Exception:** `if TYPE_CHECKING:` blocks for type-only imports.
 
 ### Type Hints Are Not Optional
 
@@ -84,9 +72,6 @@ def process(items):
 def process(items: list[int]) -> list[int]:
     return [x ** 2 for x in items if x % 2 == 0]
 ```
-
-**Why:** Type hints catch bugs at write-time, improve IDE autocomplete, serve as documentation, and enable
-static type checking with mypy/pyright.
 
 ### Use Modern Python Features
 
@@ -109,12 +94,6 @@ class Point:
         self.x = x
         self.y = y
 
-    def __repr__(self):
-        return f"Point({self.x}, {self.y})"
-
-    def __eq__(self, other):
-        return self.x == other.x and self.y == other.y
-
 # ✓ Dataclass
 from dataclasses import dataclass
 
@@ -124,43 +103,20 @@ class Point:
     y: int
 ```
 
-**Benefits:** Auto-generates `__init__`, `__repr__`, `__eq__`. `frozen=True` makes immutable. `slots=True`
-reduces memory 40-60%.
-
 **When to use alternatives:**
 
 Check `pyproject.toml` for specialized libraries:
 
 - **Pydantic** (if in dependencies): Use for data validation
-
-  ```python
-  from pydantic import BaseModel, Field
-
-  class User(BaseModel):
-      name: str
-      age: int = Field(ge=0, le=120)  # Validates age range
-  ```
-
 - **msgspec** (if in dependencies): Use for fast JSON/MessagePack parsing
-
-  ```python
-  import msgspec
-
-  class User(msgspec.Struct):
-      name: str
-      age: int
-
-  # 10-20x faster than dataclasses for serialization
-  ```
-
-**Use dataclasses** for simple data containers without validation or serialization needs.
+- **dataclasses**: Use for simple data containers
 
 ### EAFP Over LBYL
 
 **Prefer "Easier to Ask Forgiveness than Permission"** over "Look Before You Leap".
 
 ```python
-# ✗ LBYL - Look Before You Leap
+# ✗ LBYL
 from pathlib import Path
 
 def read_file(filepath: str) -> str | None:
@@ -169,18 +125,13 @@ def read_file(filepath: str) -> str | None:
         return path.read_text()
     return None
 
-# ✓ EAFP - Easier to Ask Forgiveness than Permission
-from pathlib import Path
-
+# ✓ EAFP
 def read_file(filepath: str) -> str | None:
     try:
         return Path(filepath).read_text()
     except FileNotFoundError:
         return None
 ```
-
-**Why:** EAFP is more Pythonic, handles race conditions better (file could be deleted between check and
-read), and matches Python's duck-typing philosophy.
 
 ## Quick Reference
 
@@ -230,8 +181,8 @@ def process(data: ExpensiveClass) -> None: ...
 
 | ✗ Never | ✓ Always |
 |---------|----------|
-| `def func(items=[]):` | `def func(items: list[int] \| None = None):` with `items = items or []` |
-| `for i in range(len(items)):` | `for item in items:` or `for i, item in enumerate(items):` |
+| `def func(items=[]):` | `def func(items: list[int] \| None = None):` |
+| `for i in range(len(items)):` | `for item in items:` or `enumerate(items)` |
 | `if value == None:` | `if value is None:` |
 | `result = ''; for s in strings: result += s` | `result = ''.join(strings)` |
 | `open('file.txt')` without context | `with open('file.txt') as f:` |
@@ -270,14 +221,12 @@ path = Path('data') / 'users.csv'
 if path.exists():
     content = path.read_text()
 
-# File writing
 path.write_text("Hello, World!")
 
-# Globbing
 for csv_file in Path('data').glob('*.csv'):
     process(csv_file)
 
-# ✗ Old style with os.path
+# ✗ Old style
 import os
 path = os.path.join('data', 'users.csv')
 if os.path.exists(path):
@@ -287,32 +236,23 @@ if os.path.exists(path):
 
 ## Comprehensions and Generators
 
-### List Comprehensions
-
 ```python
-# ✓ Simple transformations
+# List comprehensions - simple transformations
 squares = [x**2 for x in range(10)]
 evens = [x for x in numbers if x % 2 == 0]
 
-# ✗ Too complex (use regular loop)
-# Avoid nesting >2 levels deep
+# Generator expressions - memory-efficient for large datasets
+total = sum(x**2 for x in huge_list)
 ```
 
-### Generator Expressions
-
-```python
-# ✓ Memory-efficient for large datasets
-total = sum(x**2 for x in huge_list)  # Generator, not list
-```
-
-### When to Use Each
+**When to use:**
 
 - **List comprehension** `[x for x in items]`: Need multiple passes, small dataset
-- **Generator** `(x for x in items)`: Single pass, large dataset, feeding to sum/max/any/all
+- **Generator** `(x for x in items)`: Single pass, large dataset
 
 ## Built-in Functions
 
-Prefer built-in functions over manual loops—they're implemented in C and are faster.
+Prefer built-in functions over manual loops—they're faster.
 
 ```python
 # ✓ Use built-ins
@@ -320,14 +260,7 @@ total = sum(numbers)
 maximum = max(values)
 all_true = all(conditions)
 any_true = any(conditions)
-
-# String joining
-result = ', '.join(words)  # Fast O(n)
-
-# ✗ Manual loops (slower)
-total = 0
-for n in numbers:
-    total += n
+result = ', '.join(words)
 ```
 
 ## Error Handling
@@ -357,49 +290,6 @@ try:
 except ValueError as e:
     raise CustomError("Processing failed") from e
 ```
-
-## Common Mistakes & Fixes
-
-| Mistake | Fix |
-|---------|-----|
-| Obvious comments | Remove them; make code self-documenting |
-| No type hints | Add type hints to ALL function signatures |
-| `for i in range(len(items)):` | `for item in items:` or `enumerate(items)` |
-| Manual class for data | Use `@dataclass` |
-| `os.path.*` | Use `pathlib.Path` |
-| LBYL pattern | Use EAFP (try/except) |
-| Mutable default `[]` | Use `None` and initialize inside function |
-| `if len(items) > 0:` | `if items:` |
-| `if value == None:` | `if value is None:` |
-| Manual dict counting | Use `Counter` or `defaultdict(int)` |
-| Not using context managers | Always use `with` for files/resources |
-
-## Rationalizations That Mean You're About to Fail
-
-| Excuse | Reality |
-|--------|---------|
-| "No type hints - keeping it simple" | Type hints ARE simple. They catch bugs at write-time. |
-| "Would add in production code, but..." | Quick code IS production code. Write it right the first time. |
-| "This is the classic approach" | Classic = outdated. Use modern Python features. |
-| "Felt more natural" | Natural ≠ Pythonic. Follow EAFP and idioms. |
-| "Could use X, but this is simpler" | Simpler for writing ≠ better for maintaining. |
-| "Just prototyping" | Prototypes become production. No shortcuts. |
-
-## Red Flags - Stop and Fix
-
-- Obvious comments that describe what code does
-- Imports not at top of file (except `if TYPE_CHECKING:`)
-- Function without type hints
-- Class that could be a dataclass
-- `os.path` instead of `pathlib`
-- LBYL instead of EAFP
-- `for i in range(len(...))`
-- Mutable default argument
-- Bare `except:`
-- `if value == None:`
-- Completing task without running verification steps
-
-**All of these mean: Fix the code. Use Pythonic patterns.**
 
 ## Async Code Patterns
 
@@ -431,12 +321,9 @@ async def main() -> None:
     async with asyncio.TaskGroup() as tg:
         task1 = tg.create_task(service1())
         task2 = tg.create_task(service2())
-    # All tasks cancelled if any fails; exceptions collected
 ```
 
 ### TYPE_CHECKING for Import Optimization
-
-Eliminate runtime cost for type-only imports:
 
 ```python
 from typing import TYPE_CHECKING
@@ -444,9 +331,51 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pandas import DataFrame  # Not imported at runtime
 
-def process(df: DataFrame) -> DataFrame:  # String annotation
+def process(df: DataFrame) -> DataFrame:
     ...
 ```
+
+## Common Mistakes & Fixes
+
+| Mistake | Fix |
+|---------|-----|
+| Obvious comments | Remove them; make code self-documenting |
+| No type hints | Add type hints to ALL function signatures |
+| `for i in range(len(items)):` | `for item in items:` or `enumerate(items)` |
+| Manual class for data | Use `@dataclass` |
+| `os.path.*` | Use `pathlib.Path` |
+| LBYL pattern | Use EAFP (try/except) |
+| Mutable default `[]` | Use `None` and initialize inside function |
+| `if len(items) > 0:` | `if items:` |
+| `if value == None:` | `if value is None:` |
+| Manual dict counting | Use `Counter` or `defaultdict(int)` |
+| Not using context managers | Always use `with` for files/resources |
+
+## Rationalizations That Mean You're About to Fail
+
+| Excuse | Reality |
+|--------|---------|
+| "No type hints - keeping it simple" | Type hints ARE simple. They catch bugs at write-time. |
+| "Would add in production code, but..." | Quick code IS production code. Write it right the first time. |
+| "This is the classic approach" | Classic = outdated. Use modern Python features. |
+| "Felt more natural" | Natural ≠ Pythonic. Follow EAFP and idioms. |
+| "Just prototyping" | Prototypes become production. No shortcuts. |
+
+## Red Flags - Stop and Fix
+
+- Obvious comments that describe what code does
+- Imports not at top of file (except `if TYPE_CHECKING:`)
+- Function without type hints
+- Class that could be a dataclass
+- `os.path` instead of `pathlib`
+- LBYL instead of EAFP
+- `for i in range(len(...))`
+- Mutable default argument
+- Bare `except:`
+- `if value == None:`
+- Completing task without running verification steps
+
+**All of these mean: Fix the code. Use Pythonic patterns.**
 
 ## Verification Rules
 
@@ -460,7 +389,7 @@ def process(df: DataFrame) -> DataFrame:  # String annotation
    uv run pre-commit run -a
    ```
 
-   Fix all issues. If errors occur, fix them and re-run until clean.
+   Fix all issues and re-run until clean.
 
 2. **Run Ruff linter** (always):
 
@@ -482,47 +411,34 @@ def process(df: DataFrame) -> DataFrame:  # String annotation
 
 ## Tools
 
-### Ruff Linter
-
-Use Ruff via `uv` for automatic enforcement of Python best practices:
+### Ruff
 
 ```bash
 uv run ruff check .              # Check for issues
 uv run ruff check --fix .        # Auto-fix safe issues
 ```
 
-**Key rules Ruff catches:**
+Key rules: B006 (mutable defaults), PERF401 (list comprehensions), TC001-003 (type-only imports), UP006-007 (modern syntax).
 
-- B006: Mutable default arguments
-- PERF401: Manual list append (use comprehension)
-- TC001-003: Type-only imports (reduce import cost)
-- UP006-007: Modern syntax (`list[int]` vs `List[int]`)
-
-### Pre-commit Hooks
-
-If `.pre-commit-config.yaml` exists in the project root:
+### Pre-commit
 
 ```bash
-uv run pre-commit run -a         # Run all hooks on all files
-uv run pre-commit run --files <file>  # Run on specific file
+uv run pre-commit run -a         # Run all hooks
+uv run pre-commit run --files <file>  # Specific file
 ```
-
-Pre-commit typically includes Ruff, markdownlint, trailing whitespace fixes, and other formatters.
 
 ### Pytest
 
-If `tests/` directory exists:
-
 ```bash
 uv run pytest                    # Run all tests
-uv run pytest tests/test_file.py # Run specific test file
+uv run pytest tests/test_file.py # Specific test file
 uv run pytest -v                 # Verbose output
 ```
 
 ## Checklist for Every Function
 
 - [ ] Type hints on signature (parameters and return)
-- [ ] Uses modern Python syntax (`|` for Union, built-in types)
+- [ ] Modern Python syntax (`|` for Union, built-in types)
 - [ ] EAFP for error handling
 - [ ] Pathlib for file operations
 - [ ] Dataclass instead of manual class
