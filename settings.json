@@ -7,5 +7,6 @@
     "superpowers@superpowers-marketplace": true,
     "superpowers-developing-for-claude-code@superpowers-marketplace": true
   },
-  "alwaysThinkingEnabled": false
+  "alwaysThinkingEnabled": true,
+  "includeCoAuthoredBy": false
 }
