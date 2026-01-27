@@ -30,10 +30,6 @@ check_plan_files() {
 	return 0
 }
 
-git_root() {
-	git rev-parse --show-toplevel 2>/dev/null
-}
-
 # Block push operations
 if [[ "$command" =~ git[[:space:]]+push ]]; then
 	echo "Error: Automatic git push is not allowed. Review and push manually." >&2
@@ -51,23 +47,17 @@ if [[ "$command" =~ git[[:space:]]+add ]]; then
 
 	# Block broad adds (git add ., git add -A, git add -a, git add --all) if plan files would be included
 	if [[ "$command" =~ git[[:space:]]+add[[:space:]]+(\.|(-[aA]|--all)) ]]; then
-		root=$(git_root)
-		[[ -n "$root" ]] || exit 0
+		root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 		pending_files=$(git -C "$root" ls-files --others --modified --exclude-standard 2>/dev/null)
-		if ! check_plan_files "$pending_files"; then
-			exit 2
-		fi
+		check_plan_files "$pending_files" || exit 2
 	fi
 fi
 
 # Block commits if plan files are already staged
 if [[ "$command" =~ git[[:space:]]+commit ]]; then
-	root=$(git_root)
-	[[ -n "$root" ]] || exit 0
+	root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 	staged_files=$(git -C "$root" diff --cached --name-only 2>/dev/null)
-	if ! check_plan_files "$staged_files"; then
-		exit 2
-	fi
+	check_plan_files "$staged_files" || exit 2
 fi
 
 exit 0
