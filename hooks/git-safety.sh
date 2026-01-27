@@ -30,8 +30,8 @@ check_plan_files() {
 	return 0
 }
 
-# Block push operations
-if [[ "$command" =~ git[[:space:]]+push ]]; then
+# Block push operations (anchored to start to avoid matching inside commit messages)
+if [[ "$command" =~ ^[[:space:]]*git[[:space:]]+push ]]; then
 	echo "Error: Automatic git push is not allowed. Review and push manually." >&2
 	exit 2
 fi
