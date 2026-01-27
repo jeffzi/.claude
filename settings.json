@@ -9,5 +9,29 @@
     "commit-commands@claude-plugins-official": true,
     "scientific-skills@claude-scientific-skills": true
   },
-  "alwaysThinkingEnabled": true
+  "alwaysThinkingEnabled": true,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/jeffzi/.claude/hooks/git-safety.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/jeffzi/.claude/hooks/marimo-check.sh"
+          }
+        ]
+      }
+    ]
+  }
 }
