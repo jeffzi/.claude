@@ -1,59 +1,14 @@
 ---
 name: preflight
-description: Use before committing code changes or preparing for code review
+description: Use when about to commit changes, before code review, or when preparing a PR for submission
 argument-hint: Optional path (defaults to git diff)
 ---
 
 # Preflight
 
-## Overview
-
 Automated pre-commit review with iterative fix loop.
 
 **Core principle:** High precision over high recall. Only auto-fix verified issues (score ≥75).
-
-## NON-INTERACTIVE EXECUTION
-
-**This skill runs to completion without user interaction.**
-
-- Do NOT stop to show intermediate results
-- Do NOT ask for confirmation between phases
-- Do NOT pause after making changes
-- Do NOT wait for user input at any point
-- The ONLY valid stopping point is after generating the final Summary Report
-
-## Rationalizations That Mean You're About to Stop
-
-| Excuse | Reality |
-|--------|---------|
-| "Let me show the results so far" | Results go in Summary Report ONLY. Keep going. |
-| "Cleanup found these issues" | Cleanup is preparation. Review-Fix Loop is the work. |
-| "Verification passed" | Never say this mid-process. Only in Summary Report. |
-| "No issues in this phase" | Doesn't matter. Next phase starts immediately. |
-| "User might want to see this" | User wants Summary Report. Nothing else. |
-| "I found these issues..." | Proceed to fix/report. Don't stop. |
-
-## Red Flags - You're About to Stop Prematurely
-
-If you're about to output any of these, STOP and continue instead:
-
-- "Here are the results so far..."
-- "Cleanup/vet found the following..."
-- "Let me show you what changed..."
-- "No issues found in [phase]"
-- Any output that isn't the final Summary Report
-
-**All of these mean: Keep going. Don't output anything. Continue to next phase.**
-
-## Common Mistakes
-
-- ❌ **Stopping after cleanup** → cleanup is preparation, the Review-Fix Loop is the actual work
-- ❌ **Showing "verification passed" after vet** → don't pause, immediately start Review-Fix Loop
-- ❌ Fixing score <75 issues → nitpicks, not verified
-- ❌ Sequential agent dispatch → wastes time, use parallel
-- ❌ Fixing pre-existing issues → not in your diff
-- ❌ Auto-fixing linter issues (unused imports, missing type hints) → run `ruff --fix` instead
-- ❌ Skipping files because they "look like tests" → treat all files uniformly
 
 ## When to Use
 
@@ -68,166 +23,119 @@ If you're about to output any of these, STOP and continue instead:
 
 **Announce at start:** "✈️ Preflight check initiated for [files/path]..."
 
-**Create task list at start** using TaskCreate for progress tracking:
+**Silent until Summary:** After the start announcement, output NOTHING until Step 4's Summary
+Report. No progress updates, no tool results, no "verification passed", no "no issues found".
+The spinner shows progress. If you're about to output text, that's a signal to keep working
+silently—user should never need to say "go on".
 
-| Task subject | activeForm (spinner text) |
-| --- | --- |
-| Setup: detect files and conventions | Detecting files and conventions |
-| Cleanup: simplify and review | Running cleanup |
-| Generate summary report | Generating summary |
+## Execution Sequence
 
-**Create iteration tasks dynamically** as the loop progresses:
+**Execute steps 1-4 in order. Only stop after step 4.**
 
-- Before starting iteration N, create task: "Review-Fix Loop (iteration N)"
-  with activeForm "Scanning for issues (iteration N)"
-- Only create the next iteration task if fixes were applied in the current one
+### Task Management (MANDATORY)
 
-Update tasks with TaskUpdate as you progress:
+**At the very start**, use the **TaskCreate** tool to create ALL 4 tasks:
 
-- Set `status: in_progress` when starting (shows spinner with activeForm text)
-- Set `status: completed` when done (shows checkmark)
+| #   | Task subject                        | activeForm                      |
+| --- | ----------------------------------- | ------------------------------- |
+| 1   | Setup: detect files and conventions | Detecting files and conventions |
+| 2   | Cleanup: simplify and review        | Running cleanup                 |
+| 3   | Review-Fix Loop                     | Scanning for issues             |
+| 4   | Generate summary report             | Generating summary              |
 
-**Report when done:**
+**As you work**, use the **TaskUpdate** tool:
 
-- All clear: "✅ All systems go! Cleared for commit."
-- Issues fixed: "🔧 Fixed [N] issues. Ready for takeoff!"
-- Issues remain: "⚠️ [N] issues need attention before departure."
+- Set `status: in_progress` when starting a step
+- Set `status: completed` when finishing a step
 
-## Process
+⚠️ **HARD RULE: You cannot stop while ANY task is incomplete.**
+If tasks 3 or 4 show as pending/in_progress, you are NOT done. Keep going.
 
-```mermaid
-flowchart TB
-    subgraph Setup
-        A[Get target files] --> B[Find CLAUDE.md conventions]
-        B --> C[Detect languages]
-    end
+---
 
-    subgraph Cleanup ["Cleanup (once)"]
-        D[Run runway:code-simplifier] --> E[Run lang-specific review]
-    end
+### Step 1: Setup
 
-    subgraph Loop ["Review-Fix Loop (max 3 iterations)"]
-        F[Bug Scanner + CLAUDE.md Compliance] --> G[Score issues with Haiku]
-        G --> H[Filter: score >= 75]
-        H --> I[Fix with code-fixer]
-        I --> J{Fixes applied?}
-        J -->|yes| K[Run lang-specific review]
-        K --> L{iter <= 3?}
-    end
-
-    C --> D
-    E --> F
-    L -->|yes| F
-    L -->|no| M[Summary report]:::success
-    J -->|no| M
-
-    classDef success fill:#90EE90
-```
-
-**Transitions are mandatory:**
-
-- After Setup → immediately run Cleanup
-- After Cleanup → immediately start Review-Fix Loop
-- Never pause between phases
-
-## Target Files
+- [ ] Get target files (path arg or git diff)
+- [ ] Find CLAUDE.md conventions
+- [ ] Detect languages
 
 | Source        | Method                                                   |
 | ------------- | -------------------------------------------------------- |
 | Path argument | Use directly                                             |
 | No argument   | `git diff --name-only` + `git diff --cached --name-only` |
 
-## CLAUDE.md Locations
-
-Check only:
+**CLAUDE.md Locations** (check only these, do NOT search subdirectories):
 
 - `./CLAUDE.md` (current directory)
 - `<repo-root>/CLAUDE.md`
 - `~/.claude/CLAUDE.md`
 
-Do NOT search subdirectories.
+→ **TaskUpdate** task 1 to `completed`. **TaskUpdate** task 2 to `in_progress`.
 
-## Cleanup Phase
+---
 
-Run once before the review-fix loop:
+### Step 2: Cleanup
 
-1. **`runway:code-simplifier`** - Reduce complexity
-2. **`runway:vet`** - Language-specific idioms and patterns (auto-detects language)
+- [ ] Invoke **Task** tool with `subagent_type: code-distill` - Reduce complexity
+- [ ] Invoke **Skill** tool with `skill: code-vet` - Language-specific idioms and patterns
 
-This cleans up code so the main loop focuses on logic, not style.
+→ **TaskUpdate** task 2 to `completed`. **TaskUpdate** task 3 to `in_progress`. Continue silently.
 
-**MANDATORY TRANSITION:** After cleanup completes:
+---
 
-1. Mark "Cleanup" task as completed
-2. Create task "Review-Fix Loop (iteration 1)"
-3. Mark it in_progress
-4. Launch Bug Scanner + CLAUDE.md Compliance agents
+### Step 3: Review-Fix Loop (max 3 iterations)
 
-**VIOLATION:** Outputting cleanup results = aborting preflight. You must start over.
-
-The cleanup phase is preparation. The real work is the Review-Fix Loop.
-
-**Important:** Treat ALL files as production code regardless of filename or apparent purpose.
-Do not skip simplification for "test files", "examples", or files with intentional issues -
-the preflight process applies uniformly.
-
-## Review-Fix Loop
-
-**This is the core of preflight.** The cleanup phase is just preparation.
+**This is the core of preflight.** Cleanup was just preparation.
 
 Each iteration:
 
-1. Launch review agents in parallel
-2. Collect and score issues with Haiku
-3. Fix issues with score >= 75
-4. If fixes applied → run vet → next iteration (up to 3)
-5. If no fixes → generate Summary Report
+1. **Launch review agents in parallel** using **Task** tool (single message, multiple tool calls):
 
-### Review Agents
+   | Agent                | Focus                                               | When                 |
+   | -------------------- | --------------------------------------------------- | -------------------- |
+   | Bug Scanner          | Null access, off-by-one, leaks, races, logic errors | Always               |
+   | CLAUDE.md Compliance | Convention violations                               | If conventions found |
 
-Launch in parallel (single message, multiple Task calls):
+2. **Score issues with Haiku** (batch all issues together):
 
-| Agent                | Focus                                               | When                 |
-| -------------------- | --------------------------------------------------- | -------------------- |
-| CLAUDE.md Compliance | Convention violations                               | If conventions found |
-| Bug Scanner          | Null access, off-by-one, leaks, races, logic errors | Always               |
+   | Score    | Meaning            | Action       |
+   | -------- | ------------------ | ------------ |
+   | 0        | False positive     | Discard      |
+   | ~25      | Unverified         | Report only  |
+   | ~50      | Minor/nitpick      | Report only  |
+   | **≥ 75** | Verified important | **Auto-fix** |
+   | 100      | Definite, frequent | Auto-fix     |
 
-## Issue Scoring
+3. **Fix issues with score ≥75** using **Task** tool with `subagent_type: code-mend`
 
-Haiku agents score each issue 0-100:
+4. **Decision point:**
+   - If fixes applied AND iterations < 3 → invoke **Skill** tool with `skill: code-vet` → repeat from step 1
+   - If no fixes OR iterations = 3 → proceed to Step 4
 
-> Issues from review agents are collected and batch-scored by a separate Haiku pass.
+**False Positives (score = 0, discard):**
 
-| Score     | Meaning            | Action       |
-| --------- | ------------------ | ------------ |
-| 0         | False positive     | Discard      |
-| ~25       | Unverified         | Report only  |
-| ~50       | Minor/nitpick      | Report only  |
-| **>= 75** | Verified important | **Auto-fix** |
-| 100       | Definite, frequent | Auto-fix     |
-
-## False Positives (Discard)
-
-- Pre-existing issues
+- Pre-existing issues (not in your diff)
 - Linter/typechecker would catch (unused imports, missing type hints, style violations)
 - General quality without CLAUDE.md backing
 - Silenced by ignore comments
-- Intentional functionality changes
 
-## Fix Agents
+⚠️ **CHECKPOINT: Only exit loop when no fixes needed OR 3 iterations done.**
 
-| Agent               | Purpose                    |
-| ------------------- | -------------------------- |
-| `runway:code-fixer` | Fix high-confidence issues |
+→ **TaskUpdate** task 3 to `completed`. **TaskUpdate** task 4 to `in_progress`.
 
-## End-of-Iteration Verification
+---
 
-After each fix pass, re-run `runway:vet` via the Skill tool to catch regressions.
-New issues feed into the next iteration's scoring.
+### Step 4: Summary Report
 
-## Output Format
+Generate the final report. **This is your FIRST text output since the start announcement.**
 
-**Omit empty sections.** If no issues were fixed, omit "Issues Fixed". If no issues to report, omit "Issues Reported".
+**Report status:**
+
+- All clear: "✅ All systems go! Cleared for commit."
+- Issues fixed: "🔧 Fixed [N] issues. Ready for takeoff!"
+- Issues remain: "⚠️ [N] issues need attention before departure."
+
+**Omit empty sections.**
 
 ```markdown
 # ✈️ Preflight Summary
@@ -255,3 +163,14 @@ New issues feed into the next iteration's scoring.
 
 ✅ Cleared for commit / ⚠️ Needs manual review / 🚫 Grounded - issues remain
 ```
+
+→ **TaskUpdate** task 4 to `completed`. **All tasks must now show as completed.**
+
+---
+
+## Common Mistakes
+
+- ❌ Sequential agent dispatch → use parallel (single message, multiple **Task** tool calls)
+- ❌ Auto-fixing linter issues → run `ruff --fix` instead
+- ❌ Skipping "test files" or "examples" → treat all files uniformly
+- ❌ Fixing pre-existing issues → only fix what's in your diff

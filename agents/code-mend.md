@@ -1,5 +1,5 @@
 ---
-name: code-fixer
+name: code-mend
 description: Use when you have identified code issues with file:line references that need surgical fixes
 tools:
   - Read
@@ -8,7 +8,7 @@ tools:
   - Grep
 ---
 
-# Code Fixer
+# Code Mend
 
 Surgical fixes for identified issues. Fix only what's broken, preserve everything else.
 
