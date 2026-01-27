@@ -1,11 +1,6 @@
 # Ignore everything by default
 *
 
-# Exclude junk within tracked directories
-**/.DS_Store
-**/*-docs/
-**/node_modules/
-
 # Allow config files
 !.gitignore
 !.pre-commit-config.yaml
@@ -44,3 +39,8 @@ plugins/*
 # Allow agents
 !agents/
 !agents/**
+
+# Exclude junk (after whitelist so these take precedence)
+.DS_Store
+**/*-docs/
+**/node_modules/
