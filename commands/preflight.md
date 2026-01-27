@@ -22,12 +22,38 @@ Automated pre-commit review with iterative fix loop.
 - Do NOT wait for user input at any point
 - The ONLY valid stopping point is after generating the final Summary Report
 
-**Red flags that you're about to break this rule:**
+## Rationalizations That Mean You're About to Stop
 
-- "Here are the results so far..." → WRONG, keep going
-- "I found these issues..." → WRONG, proceed to fix/report
-- "Verification passed, no issues" → WRONG unless in final summary
-- Showing tool output without immediately continuing → WRONG
+| Excuse | Reality |
+|--------|---------|
+| "Let me show the results so far" | Results go in Summary Report ONLY. Keep going. |
+| "Cleanup found these issues" | Cleanup is preparation. Review-Fix Loop is the work. |
+| "Verification passed" | Never say this mid-process. Only in Summary Report. |
+| "No issues in this phase" | Doesn't matter. Next phase starts immediately. |
+| "User might want to see this" | User wants Summary Report. Nothing else. |
+| "I found these issues..." | Proceed to fix/report. Don't stop. |
+
+## Red Flags - You're About to Stop Prematurely
+
+If you're about to output any of these, STOP and continue instead:
+
+- "Here are the results so far..."
+- "Cleanup/vet found the following..."
+- "Let me show you what changed..."
+- "No issues found in [phase]"
+- Any output that isn't the final Summary Report
+
+**All of these mean: Keep going. Don't output anything. Continue to next phase.**
+
+## Common Mistakes
+
+- ❌ **Stopping after cleanup** → cleanup is preparation, the Review-Fix Loop is the actual work
+- ❌ **Showing "verification passed" after vet** → don't pause, immediately start Review-Fix Loop
+- ❌ Fixing score <75 issues → nitpicks, not verified
+- ❌ Sequential agent dispatch → wastes time, use parallel
+- ❌ Fixing pre-existing issues → not in your diff
+- ❌ Auto-fixing linter issues (unused imports, missing type hints) → run `ruff --fix` instead
+- ❌ Skipping files because they "look like tests" → treat all files uniformly
 
 ## When to Use
 
@@ -137,12 +163,7 @@ This cleans up code so the main loop focuses on logic, not style.
 3. Mark it in_progress
 4. Launch Bug Scanner + CLAUDE.md Compliance agents
 
-**Do NOT:**
-
-- Stop to report what vet/code-simplifier found
-- Show "verification passed" messages
-- Pause to summarize cleanup results
-- Wait for user input
+**VIOLATION:** Outputting cleanup results = aborting preflight. You must start over.
 
 The cleanup phase is preparation. The real work is the Review-Fix Loop.
 
@@ -198,16 +219,6 @@ Haiku agents score each issue 0-100:
 | Agent               | Purpose                    |
 | ------------------- | -------------------------- |
 | `runway:code-fixer` | Fix high-confidence issues |
-
-## Common Mistakes
-
-- ❌ **Stopping after cleanup** → cleanup is preparation, the Review-Fix Loop is the actual work
-- ❌ **Showing "verification passed" after vet** → don't pause, immediately start Review-Fix Loop
-- ❌ Fixing score <75 issues → nitpicks, not verified
-- ❌ Sequential agent dispatch → wastes time, use parallel
-- ❌ Fixing pre-existing issues → not in your diff
-- ❌ Auto-fixing linter issues (unused imports, missing type hints) → run `ruff --fix` instead
-- ❌ Skipping files because they "look like tests" → treat all files uniformly
 
 ## End-of-Iteration Verification
 
