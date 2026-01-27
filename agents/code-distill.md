@@ -1,6 +1,11 @@
 ---
 name: code-distill
 description: Use when code needs cleanup after implementation is complete
+tools:
+  - Read
+  - Edit
+  - Glob
+  - Grep
 ---
 
 # Code Distill
