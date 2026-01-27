@@ -1,0 +1,46 @@
+# Ignore everything by default
+*
+
+# Exclude junk within tracked directories
+**/.DS_Store
+**/*-docs/
+**/node_modules/
+
+# Allow config files
+!.gitignore
+!.pre-commit-config.yaml
+!.markdownlint.yaml
+!settings.json
+!README.md
+
+# Allow GitHub config
+!.github/
+!.github/*
+!.github/workflows/
+!.github/workflows/**
+
+# Allow plugin registry (not caches)
+!plugins/
+plugins/*
+!plugins/installed_plugins.json
+!plugins/known_marketplaces.json
+
+# Allow skills
+!skills/
+!skills/**
+
+# Allow commands
+!commands/
+!commands/**
+
+# Allow hooks
+!hooks/
+!hooks/**
+
+# Allow local marketplace
+!local-marketplace/
+!local-marketplace/**
+
+# Allow agents
+!agents/
+!agents/**
