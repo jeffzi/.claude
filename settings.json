@@ -1,5 +1,4 @@
 {
-  "alwaysThinkingEnabled": true,
   "includeCoAuthoredBy": false,
   "enabledPlugins": {
     "superpowers@superpowers-marketplace": true,
@@ -7,6 +6,8 @@
     "superpowers-developing-for-claude-code@superpowers-marketplace": true,
     "typescript-lsp@claude-plugins-official": true,
     "lua-lsp@claude-plugins-official": true,
-    "commit-commands@claude-plugins-official": true
-  }
+    "commit-commands@claude-plugins-official": true,
+    "scientific-skills@claude-scientific-skills": true
+  },
+  "alwaysThinkingEnabled": true
 }

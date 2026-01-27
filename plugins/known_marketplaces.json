@@ -15,5 +15,14 @@
     },
     "installLocation": "/Users/jeffzi/.claude/plugins/marketplaces/claude-plugins-official",
     "lastUpdated": "2026-01-27T08:46:29.905Z"
+  },
+  "claude-scientific-skills": {
+    "source": {
+      "source": "github",
+      "repo": "K-Dense-AI/claude-scientific-skills"
+    },
+    "installLocation": "/Users/jeffzi/.claude/plugins/marketplaces/claude-scientific-skills",
+    "lastUpdated": "2026-01-27T09:30:40.909Z",
+    "autoUpdate": true
   }
 }
