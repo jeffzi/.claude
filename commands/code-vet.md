@@ -1,10 +1,10 @@
 ---
-name: vet
+name: code-vet
 description: Vet code for best practices and idiomatic patterns
 argument-hint: "[file or directory]"
 ---
 
-# Vet Code
+# Code Vet
 
 ## Process
 
@@ -19,7 +19,10 @@ For directories, detect from file extensions present.
 
 ## Output Rules
 
-**CRITICAL: Minimal output only. Do NOT show passing checks or "clean" tables.**
+**When called from preflight or another workflow:** Output NOTHING. Accumulate findings internally
+for the caller. The parent workflow controls all output.
+
+**When called standalone (direct `/code-vet` invocation):**
 
 - Verification commands: Show name + pass/fail. If skipped, briefly note why.
 - Pitfall violations: List ONLY violations found. Do NOT create tables showing passing checks.
