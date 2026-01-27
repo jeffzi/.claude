@@ -14,7 +14,7 @@ INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_response.filePath // empty')
 
 # Exit silently if no file path
-[[ -z "$FILE_PATH" || "$FILE_PATH" == "null" ]] && exit 0
+[[ -z "$FILE_PATH" ]] && exit 0
 
 # Must be a Python file that exists
 [[ -f "$FILE_PATH" && "$FILE_PATH" == *.py ]] || exit 0
