@@ -8,9 +8,9 @@ argument-hint: "[file or directory]"
 
 ## Process
 
-1. Detect language from file extension (e.g., `.py` → Python, `.lua` → Lua)
+1. Detect language from file extension (e.g., `.py` → Python, `.lua` → Lua, `.sh` → Shell)
    - For `.py` files: check for `import marimo` → use `code-marimo` instead of `code-py`
-2. Load the matching `code-<lang>` skill (e.g., `code-py`, `code-lua`, `code-marimo`)
+2. Load the matching `code-<lang>` skill (e.g., `code-py`, `code-lua`, `code-marimo`, `code-shell`)
 3. Run verification commands from the skill
 4. Check EVERY pitfall in the skill's Pitfalls table
 5. Fix any issues found
