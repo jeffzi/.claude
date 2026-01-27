@@ -19,3 +19,6 @@ MD041: false
 # MD046/code-block-style
 MD046:
   style: fenced
+
+# MD060/table-column-style - Disable overly strict table alignment
+MD060: false
