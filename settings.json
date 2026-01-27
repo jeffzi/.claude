@@ -1,36 +1,39 @@
 {
-  "includeCoAuthoredBy": false,
-  "enabledPlugins": {
-    "superpowers@superpowers-marketplace": true,
-    "elements-of-style@superpowers-marketplace": true,
-    "superpowers-developing-for-claude-code@superpowers-marketplace": true,
-    "typescript-lsp@claude-plugins-official": true,
-    "lua-lsp@claude-plugins-official": true,
-    "commit-commands@claude-plugins-official": true,
-    "scientific-skills@claude-scientific-skills": true
-  },
   "alwaysThinkingEnabled": true,
+  "includeCoAuthoredBy": false,
+  "permissions": {
+    "deny": ["Bash(git push:*)"]
+  },
+  "enabledPlugins": {
+    "commit-commands@claude-plugins-official": true,
+    "elements-of-style@superpowers-marketplace": true,
+    "lua-lsp@claude-plugins-official": true,
+    "scientific-skills@claude-scientific-skills": true,
+    "superpowers-developing-for-claude-code@superpowers-marketplace": true,
+    "superpowers@superpowers-marketplace": true,
+    "typescript-lsp@claude-plugins-official": true
+  },
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/jeffzi/.claude/hooks/git-safety.sh"
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
-        "matcher": "Write|Edit",
         "hooks": [
           {
-            "type": "command",
-            "command": "/Users/jeffzi/.claude/hooks/marimo-check.sh"
+            "command": "/Users/jeffzi/.claude/hooks/marimo-check.sh",
+            "type": "command"
           }
-        ]
+        ],
+        "matcher": "Write|Edit"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "/Users/jeffzi/.claude/hooks/git-safety.sh",
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
       }
     ]
   }
