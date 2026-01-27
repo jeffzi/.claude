@@ -60,6 +60,16 @@
         "lastUpdated": "2026-01-27T08:48:19.833Z",
         "gitCommitSha": "e30768372b4150ca1bc0839d93283e8edc30d60d"
       }
+    ],
+    "scientific-skills@claude-scientific-skills": [
+      {
+        "scope": "user",
+        "installPath": "/Users/jeffzi/.claude/plugins/cache/claude-scientific-skills/scientific-skills/a31cf4dd97e0",
+        "version": "a31cf4dd97e0",
+        "installedAt": "2026-01-27T09:30:44.060Z",
+        "lastUpdated": "2026-01-27T09:30:44.060Z",
+        "gitCommitSha": "a31cf4dd97e0fd3e9d4802f9ebb5ce47ea30b8c0"
+      }
     ]
   }
 }
