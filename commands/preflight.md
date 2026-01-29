@@ -96,6 +96,10 @@ Each iteration:
    | Bug Scanner          | Null access, off-by-one, leaks, races, logic errors | Always               |
    | CLAUDE.md Compliance | Convention violations                               | If conventions found |
 
+   **Review scope depends on input mode:**
+   - **Path argument**: Review entire file(s) - flag any issues found
+   - **No argument (git diff)**: Review only changed lines - flag only issues in diff
+
 2. **Score issues with Haiku** (batch all issues together):
 
    | Score    | Meaning            | Action       |
@@ -114,7 +118,7 @@ Each iteration:
 
 **False Positives (score = 0, discard):**
 
-- Pre-existing issues (not in your diff)
+- Pre-existing issues not in your diff (no-argument mode only)
 - Linter/typechecker would catch (unused imports, missing type hints, style violations)
 - General quality without CLAUDE.md backing
 - Silenced by ignore comments
@@ -173,4 +177,4 @@ Generate the final report. **This is your FIRST text output since the start anno
 - ❌ Sequential agent dispatch → use parallel (single message, multiple **Task** tool calls)
 - ❌ Auto-fixing linter issues → run `ruff --fix` instead
 - ❌ Skipping "test files" or "examples" → treat all files uniformly
-- ❌ Fixing pre-existing issues → only fix what's in your diff
+- ❌ Fixing pre-existing issues → only fix what's in your diff (no-argument mode only)
