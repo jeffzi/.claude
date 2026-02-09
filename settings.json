@@ -1,30 +1,43 @@
 {
   "alwaysThinkingEnabled": true,
   "includeCoAuthoredBy": false,
-  "permissions": {
-    "deny": ["Bash(git push:*)"]
-  },
   "enabledPlugins": {
     "commit-commands@claude-plugins-official": true,
     "elements-of-style@superpowers-marketplace": true,
-    "lua-lsp@claude-plugins-official": true,
-    "scientific-skills@claude-scientific-skills": true,
+    "lua-lsp@claude-plugins-official": false,
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "scientific-skills@claude-scientific-skills": false,
     "superpowers-developing-for-claude-code@superpowers-marketplace": true,
     "superpowers@superpowers-marketplace": true,
-    "typescript-lsp@claude-plugins-official": true
+    "typescript-lsp@claude-plugins-official": false
+  },
+  "permissions": {
+    "allow": [
+      "Bash(busted *)",
+      "Bash(cargo *)",
+      "Bash(git *)",
+      "Bash(llscheck *)",
+      "Bash(luacheck *)",
+      "Bash(mypy *)",
+      "Bash(prek *)",
+      "Bash(pytest *)",
+      "Bash(ruff *)",
+      "Bash(shellcheck *)",
+      "Bash(shfmt *)",
+      "Bash(task *)",
+      "Bash(uv *)",
+      "Glob",
+      "Grep",
+      "Read"
+    ],
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(git clean:*)",
+      "Bash(git reset --hard:*)"
+    ]
   },
   "hooks": {
-    "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "command": "/Users/jeffzi/.claude/hooks/marimo-check.sh",
-            "type": "command"
-          }
-        ],
-        "matcher": "Write|Edit"
-      }
-    ],
     "PreToolUse": [
       {
         "hooks": [
@@ -33,7 +46,16 @@
             "type": "command"
           }
         ],
-        "matcher": "Bash"
+        "matcher": "Bash(git *)"
+      },
+      {
+        "hooks": [
+          {
+            "command": "/Users/jeffzi/.claude/hooks/marimo-check.sh",
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash(git commit*)"
       }
     ]
   }

@@ -1,63 +1,197 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-# Git Safety Hook - Prevents committing plan files and auto-pushing
+# ╭────────────────────────────────────────────────────────────╮
+# │                    Git Safety Hook                         │
+# ╰────────────────────────────────────────────────────────────╯
+# Prevents committing plan files, auto-pushing, and destructive operations
 
 # Check dependencies
 command -v jq >/dev/null || {
-	echo "Error: jq is required" >&2
+	printf "Error: jq is required\n" >&2
 	exit 1
 }
 
 input=$(cat)
-command=$(echo "$input" | jq -r '.tool_input.command // empty')
+full_command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 
 # Exit if no command found
-[[ -z "$command" ]] && exit 0
+[[ -z "$full_command" ]] && exit 0
 
-# Patterns for grep (basic regex)
+# Skip if not in a git repo
+git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+
+# ╭────────────────────────────────────────────────────────────╮
+# │                  Git Command Parsing                       │
+# ╰────────────────────────────────────────────────────────────╯
+
+# Extract git subcommand, handling global options like -C path
+# Usage: subcmd=$(get_git_subcmd "$command")
+get_git_subcmd() {
+	local cmd="$1"
+	local in_git=false
+	local skip_next=false
+
+	for word in $cmd; do
+		if $skip_next; then
+			skip_next=false
+			continue
+		fi
+
+		# Wait for 'git'
+		if ! $in_git; then
+			[[ "$word" == "git" ]] && in_git=true
+			continue
+		fi
+
+		# Handle options that take a separate argument
+		case "$word" in
+		-C | -c | --git-dir | --work-tree | --namespace)
+			skip_next=true
+			continue
+			;;
+		-C* | -c*)
+			# -C and -c can have value attached (-Cpath)
+			continue
+			;;
+		--*=* | -*)
+			# Long option with value or other short option
+			continue
+			;;
+		*)
+			# First non-option word is the subcommand
+			printf '%s' "$word"
+			return 0
+			;;
+		esac
+	done
+	return 1
+}
+
+# Check if command is a git command with specific subcommand
+# Uses global $command variable (set per sub-command in the main loop)
+is_git_subcmd() {
+	local expected="$1"
+	local actual
+	actual=$(get_git_subcmd "$command") || return 1
+	[[ "$actual" == "$expected" ]]
+}
+
+# ╭────────────────────────────────────────────────────────────╮
+# │                  Plan File Protection                      │
+# ╰────────────────────────────────────────────────────────────╯
+
 PLAN_PATTERNS_GREP=('\.claude/plans/' 'docs/plans/')
 
 check_plan_files() {
 	local files="$1"
 	[[ -z "$files" ]] && return 0
 	for pattern in "${PLAN_PATTERNS_GREP[@]}"; do
-		if echo "$files" | grep -q "$pattern"; then
-			echo "Error: Cannot stage/commit plan files matching '$pattern'. These are temporary analysis files." >&2
-			return 1
-		fi
+		printf '%s' "$files" | grep -q "$pattern" || continue
+		printf "Error: Cannot stage/commit plan files matching '%s'. These are temporary analysis files.\n" "$pattern" >&2
+		return 1
 	done
-	return 0
 }
 
-# Block push operations (anchored to start to avoid matching inside commit messages)
-if [[ "$command" =~ ^[[:space:]]*git[[:space:]]+push ]]; then
-	echo "Error: Automatic git push is not allowed. Review and push manually." >&2
+# ╭────────────────────────────────────────────────────────────╮
+# │           Destructive Operations Protection                │
+# ╰────────────────────────────────────────────────────────────╯
+
+block_destructive() {
+	local operation="$1"
+	local reason="$2"
+	printf "BLOCKED: %s — %s\n" "$operation" "$reason" >&2
 	exit 2
-fi
+}
 
-# Block git add with explicit plan file paths
-if [[ "$command" =~ git[[:space:]]+add ]]; then
-	for pattern in "${PLAN_PATTERNS_GREP[@]}"; do
-		if [[ "$command" == *"$pattern"* ]]; then
-			echo "Error: Cannot stage plan files matching '$pattern'. These are temporary analysis files." >&2
-			exit 2
-		fi
-	done
+check_destructive_operations() {
+	# git checkout -- or checkout . (discard changes)
+	is_git_subcmd "checkout" && [[ "$command" =~ [[:space:]](--([[:space:]]|$)|\.([[:space:]]|$)) ]] &&
+		block_destructive "git checkout (discard)" "Discards uncommitted changes permanently."
 
-	# Block broad adds (git add ., git add -A, git add -a, git add --all) if plan files would be included
-	if [[ "$command" =~ git[[:space:]]+add[[:space:]]+(\.|(-[aA]|--all)) ]]; then
-		root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-		pending_files=$(git -C "$root" ls-files --others --modified --exclude-standard 2>/dev/null)
-		check_plan_files "$pending_files" || exit 2
+	# git reset --hard
+	is_git_subcmd "reset" && [[ "$command" =~ --hard ]] &&
+		block_destructive "git reset --hard" "Discards ALL uncommitted changes."
+
+	# git clean -f
+	is_git_subcmd "clean" && [[ "$command" =~ -[fdxn]*f ]] &&
+		block_destructive "git clean -f" "Permanently deletes untracked files."
+
+	# git stash drop/clear
+	is_git_subcmd "stash" && [[ "$command" =~ [[:space:]](drop|clear)([[:space:]]|$) ]] &&
+		block_destructive "git stash drop/clear" "Permanently deletes stashed work."
+
+	# git branch -D
+	is_git_subcmd "branch" && [[ "$command" =~ [[:space:]]-D ]] &&
+		block_destructive "git branch -D" "Force-deletes branch, may lose unmerged commits."
+
+	# git restore without --staged discards changes
+	is_git_subcmd "restore" && [[ ! "$command" =~ --staged ]] &&
+		block_destructive "git restore (discard)" "Discards uncommitted changes to files."
+
+	# git commit --amend rewrites history
+	is_git_subcmd "commit" && [[ "$command" =~ --amend ]] &&
+		block_destructive "git commit --amend" "Rewrites the previous commit. Use with caution on shared branches."
+
+	# git rebase with uncommitted changes
+	if is_git_subcmd "rebase"; then
+		git diff --quiet 2>/dev/null && git diff --cached --quiet 2>/dev/null && return 0
+		block_destructive "git rebase (dirty)" "Rebasing with uncommitted changes risks losing work."
 	fi
-fi
+}
 
-# Block commits if plan files are already staged
-if [[ "$command" =~ git[[:space:]]+commit ]]; then
-	root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-	staged_files=$(git -C "$root" diff --cached --name-only 2>/dev/null)
-	check_plan_files "$staged_files" || exit 2
-fi
+# ╭────────────────────────────────────────────────────────────╮
+# │                    Command Checking                        │
+# ╰────────────────────────────────────────────────────────────╯
+
+# Check a single (sub-)command against all safety rules.
+# Sets global $command so is_git_subcmd and regex checks work.
+check_single_command() {
+	command="$1"
+
+	# Block push operations
+	if is_git_subcmd "push"; then
+		printf "Error: Automatic git push is not allowed. Review and push manually.\n" >&2
+		exit 2
+	fi
+
+	# Block git add with explicit plan file paths
+	if is_git_subcmd "add"; then
+		for pattern in "${PLAN_PATTERNS_GREP[@]}"; do
+			if [[ "$command" == *"$pattern"* ]]; then
+				printf "Error: Cannot stage plan files matching '%s'. These are temporary analysis files.\n" "$pattern" >&2
+				exit 2
+			fi
+		done
+
+		# Block broad adds (git add ., git add -A, git add -a, git add --all) if plan files would be included
+		if [[ "$command" =~ [[:space:]](\.|-[aA]|--all)([[:space:]]|$) ]]; then
+			root=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+			pending_files=$(git -C "$root" ls-files --others --modified --exclude-standard 2>/dev/null)
+			check_plan_files "$pending_files" || exit 2
+		fi
+	fi
+
+	# Block commits if plan files are already staged
+	if is_git_subcmd "commit"; then
+		root=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+		staged_files=$(git -C "$root" diff --cached --name-only 2>/dev/null)
+		check_plan_files "$staged_files" || exit 2
+	fi
+
+	# Check destructive operations
+	check_destructive_operations
+}
+
+# Split chained commands (&&, ||, ;) and check each independently.
+# This prevents bypasses like: git add . && git checkout -- .
+# where only the first git subcommand would otherwise be checked.
+while IFS= read -r subcmd; do
+	# Trim leading/trailing whitespace
+	subcmd="${subcmd#"${subcmd%%[![:space:]]*}"}"
+	subcmd="${subcmd%"${subcmd##*[![:space:]]}"}"
+	[[ -z "$subcmd" ]] && continue
+	check_single_command "$subcmd"
+done <<<"$(printf '%s' "$full_command" | awk '{gsub(/&&/,"\n"); gsub(/\|\|/,"\n"); gsub(/;/,"\n"); print}')"
 
 exit 0
