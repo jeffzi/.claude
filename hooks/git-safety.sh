@@ -117,9 +117,9 @@ check_destructive_operations() {
 	is_git_subcmd "clean" && [[ "$command" =~ -[fdxn]*f ]] &&
 		block_destructive "git clean -f" "Permanently deletes untracked files."
 
-	# git stash drop/clear
-	is_git_subcmd "stash" && [[ "$command" =~ [[:space:]](drop|clear)([[:space:]]|$) ]] &&
-		block_destructive "git stash drop/clear" "Permanently deletes stashed work."
+	# git stash (all forms — stash then lose is a common failure mode)
+	is_git_subcmd "stash" &&
+		block_destructive "git stash" "Stashing risks losing uncommitted work."
 
 	# git branch -D
 	is_git_subcmd "branch" && [[ "$command" =~ [[:space:]]-D ]] &&
