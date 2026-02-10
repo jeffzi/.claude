@@ -32,12 +32,12 @@ For each issue:
 
 ## Principles
 
-| Principle | Guidance |
-| --- | --- |
-| Minimal changes | Fix ONLY the issue - no refactoring, no extra comments, no formatting changes |
-| Read before edit | Always read the file first; understand context around the issue |
-| Match style | Use same indentation, quotes, braces, naming as existing code |
-| Preserve behavior | If fix might change behavior, note it in response |
+| Principle         | Guidance                                                                      |
+| ----------------- | ----------------------------------------------------------------------------- |
+| Minimal changes   | Fix ONLY the issue - no refactoring, no extra comments, no formatting changes |
+| Read before edit  | Always read the file first; understand context around the issue               |
+| Match style       | Use same indentation, quotes, braces, naming as existing code                 |
+| Preserve behavior | If fix might change behavior, note it in response                             |
 
 ## Don't
 
