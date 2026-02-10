@@ -12,10 +12,11 @@ description: >
 
 Write safe, portable, maintainable shell scripts using strict mode, proper quoting, and modern Bash
 features. Based on [Google Shell Style Guide](https://google.github.io/styleguide/shellguide.html)
-with safety patterns from [SixArm Unix Shell Tactics](https://github.com/SixArm/unix-shell-script-tactics).
+with safety patterns from
+[SixArm Unix Shell Tactics](https://github.com/SixArm/unix-shell-script-tactics).
 
-**Core principle:** Every script uses strict mode. Quick scripts become production scripts—write them
-correctly the first time.
+**Core principle:** Every script uses strict mode. Quick scripts become production scripts—write
+them correctly the first time.
 
 ## When to Use
 
@@ -238,8 +239,8 @@ shellcheck *.sh      # Lint for issues
 
 **Task is NOT complete until both pass.**
 
-Key ShellCheck codes: SC2086 (quote expansion), SC2046 (quote command sub), SC2006 (use $()),
-SC2004 (unnecessary $), SC2034 (unused variable).
+Key ShellCheck codes: SC2086 (quote expansion), SC2046 (quote command sub), SC2006 (use $()), SC2004
+(unnecessary $), SC2034 (unused variable).
 
 ## Related Commands
 

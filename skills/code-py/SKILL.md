@@ -8,8 +8,8 @@ description: Use when writing any Python code. Apply regardless of perceived sim
 ## Overview
 
 Write production-quality Python code using type hints, modern features (3.10+), and Pythonic idioms.
-**Core principle:** Every Python function gets type hints. Quick code becomes production code—write it correctly
-the first time.
+**Core principle:** Every Python function gets type hints. Quick code becomes production code—write
+it correctly the first time.
 
 ## Mandatory Rules
 
@@ -29,7 +29,8 @@ total = sum(items)
 
 ### Imports at Top of File
 
-**ALWAYS place all imports at the top of the file.** No imports inside functions or conditional blocks (except `if TYPE_CHECKING:`).
+**ALWAYS place all imports at the top of the file.** No imports inside functions or conditional
+blocks (except `if TYPE_CHECKING:`).
 
 ```python
 # ✓ Correct
@@ -62,8 +63,8 @@ def process(items: list[int]) -> list[int]:
     return [x ** 2 for x in items if x % 2 == 0]
 ```
 
-**Internal functions:** Types + clear names suffice. Add docstrings only for non-obvious logic, side effects,
-or public API.
+**Internal functions:** Types + clear names suffice. Add docstrings only for non-obvious logic, side
+effects, or public API.
 
 ### Use Modern Python Features
 
@@ -299,5 +300,5 @@ uv run pytest                 # If tests/ exists
 
 **Task is NOT complete until all pass.**
 
-Key Ruff rules: B006 (mutable defaults), PERF401 (list comprehensions), TC001-003 (type-only imports),
-UP006-007 (modern syntax).
+Key Ruff rules: B006 (mutable defaults), PERF401 (list comprehensions), TC001-003 (type-only
+imports), UP006-007 (modern syntax).
