@@ -7,6 +7,7 @@
 !.markdownlint.yaml
 !settings.json
 !README.md
+!CLAUDE.md
 
 # Allow GitHub config
 !.github/

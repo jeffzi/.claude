@@ -2,35 +2,48 @@ default_install_hook_types: [pre-commit]
 default_stages: [pre-commit]
 
 repos:
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.47.0
+  # Built-in hooks (fast, native Rust)
+  - repo: builtin
     hooks:
-      - id: markdownlint
-        args: ["--fix"]
-
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
-    hooks:
-      - id: end-of-file-fixer
-        types: [markdown]
-      - id: trailing-whitespace
-        types: [markdown]
-      - id: mixed-line-ending
-        args: ["--fix=lf"]
-        types: [markdown]
-      - id: check-merge-conflict
-      - id: check-yaml
-      - id: check-json
       - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-yaml
+      - id: check-executables-have-shebangs
       - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: trailing-whitespace
 
+  # JSON, YAML, Markdown formatting
+  - repo: local
+    hooks:
+      - id: dprint
+        name: dprint
+        entry: dprint fmt --diff
+        language: system
+        types_or: [json, yaml, markdown]
+
+  # Shell formatting
   - repo: https://github.com/scop/pre-commit-shfmt
     rev: v3.12.0-2
     hooks:
       - id: shfmt
         args: ["-w"]
 
+  # Shell linting
   - repo: https://github.com/shellcheck-py/shellcheck-py
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
+
+  # Markdown linting
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.20.0
+    hooks:
+      - id: markdownlint-cli2
+        args: ["--fix"]
