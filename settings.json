@@ -15,17 +15,23 @@
     "allow": [
       "Bash(busted *)",
       "Bash(cargo *)",
+      "Bash(gh *)",
       "Bash(git *)",
+      "Bash(ls *)",
       "Bash(llscheck *)",
       "Bash(luacheck *)",
+      "Bash(mkdir *)",
       "Bash(mypy *)",
       "Bash(prek *)",
       "Bash(pytest *)",
       "Bash(ruff *)",
+      "Bash(awk *)",
+      "Bash(sed *)",
       "Bash(shellcheck *)",
       "Bash(shfmt *)",
       "Bash(task *)",
       "Bash(uv *)",
+      "Bash(which *)",
       "Glob",
       "Grep",
       "Read"
@@ -34,7 +40,8 @@
       "Bash(git push:*)",
       "Bash(git checkout:*)",
       "Bash(git clean:*)",
-      "Bash(git reset --hard:*)"
+      "Bash(git reset --hard:*)",
+      "Bash(git stash:*)"
     ]
   },
   "hooks": {
