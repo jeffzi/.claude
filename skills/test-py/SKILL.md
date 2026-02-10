@@ -53,8 +53,8 @@ Use `@pytest.mark.parametrize` instead—shows all cases, runs independently.
 
 ### 6. No Classes for Logical Grouping
 
-Use comment section headers to organize tests by topic. Reserve classes only for shared
-`autouse` fixtures or class-scoped setup that can't be a module-level fixture.
+Use comment section headers to organize tests by topic. Reserve classes only for shared `autouse`
+fixtures or class-scoped setup that can't be a module-level fixture.
 
 ```python
 # ✗ Class as a section header
@@ -168,9 +168,11 @@ def test_add(a, b, expected):
 | `responses`                       | HTTP mocking                                                           |
 | `polyfactory`                     | Generate pydantic/dataclass instances (only for complex nested models) |
 
-**Hardcoded data only for**: realistic inputs from production (e.g., actual JSON events, real API responses).
+**Hardcoded data only for**: realistic inputs from production (e.g., actual JSON events, real API
+responses).
 
-**Seeding**: Set ALL sources—`random.seed()`, `np.random.seed()`, `torch.manual_seed()`, `PYTHONHASHSEED`.
+**Seeding**: Set ALL sources—`random.seed()`, `np.random.seed()`, `torch.manual_seed()`,
+`PYTHONHASHSEED`.
 
 ## Rationalizations
 

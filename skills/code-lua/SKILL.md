@@ -43,7 +43,8 @@ end
 
 **Avoid:** third-person (_"Returns"_), articles (_"The first name"_).
 
-**Internal functions:** Types + clear names suffice. Add prose only for non-obvious logic, side effects, or public API.
+**Internal functions:** Types + clear names suffice. Add prose only for non-obvious logic, side
+effects, or public API.
 
 ## Naming Conventions
 

@@ -24,8 +24,8 @@ Automated pre-commit review with iterative fix loop.
 **Announce at start:** "✈️ Preflight check initiated for [files/path]..."
 
 **Silent until Summary:** After the start announcement, output NOTHING until Step 4's Summary
-Report. No progress updates, no tool results, no "verification passed", no "no issues found".
-The spinner shows progress. If you're about to output text, that's a signal to keep working
+Report. No progress updates, no tool results, no "verification passed", no "no issues found". The
+spinner shows progress. If you're about to output text, that's a signal to keep working
 silently—user should never need to say "go on".
 
 ## Execution Sequence
@@ -48,8 +48,8 @@ silently—user should never need to say "go on".
 - Set `status: in_progress` when starting a step
 - Set `status: completed` when finishing a step
 
-⚠️ **HARD RULE: You cannot stop while ANY task is incomplete.**
-If tasks 3 or 4 show as pending/in_progress, you are NOT done. Keep going.
+⚠️ **HARD RULE: You cannot stop while ANY task is incomplete.** If tasks 3 or 4 show as
+pending/in_progress, you are NOT done. Keep going.
 
 ---
 
@@ -115,7 +115,8 @@ Each iteration:
 3. **Fix issues with score ≥75** using **Task** tool with `subagent_type: code-mend`
 
 4. **Decision point:**
-   - If fixes applied AND iterations < 3 → invoke **Skill** tool with `skill: code-vet` → repeat from step 1
+   - If fixes applied AND iterations < 3 → invoke **Skill** tool with `skill: code-vet` → repeat
+     from step 1
    - If no fixes OR iterations = 3 → proceed to Step 4
 
 **False Positives (score = 0, discard):**

@@ -7,11 +7,12 @@ description: Use when creating reactive Python notebooks, building data analysis
 
 ## Overview
 
-Marimo is a reactive Python notebook where cells form a directed acyclic graph (DAG) and automatically re-execute
-when dependencies change. Unlike Jupyter, variables cannot be redeclared, and execution order is determined by the
-dependency graph, not cell position.
+Marimo is a reactive Python notebook where cells form a directed acyclic graph (DAG) and
+automatically re-execute when dependencies change. Unlike Jupyter, variables cannot be redeclared,
+and execution order is determined by the dependency graph, not cell position.
 
-**Core principle:** Write declarative, idempotent cells that react to changes instead of imperative code with manual execution.
+**Core principle:** Write declarative, idempotent cells that react to changes instead of imperative
+code with manual execution.
 
 ## When to Use
 
@@ -75,7 +76,8 @@ def cell_name(dependencies):
 
 **Important:**
 
-- **Always name cells** - Use descriptive function names (e.g., `imports`, `constants`, `load_data`, `filter_ui`)
+- **Always name cells** - Use descriptive function names (e.g., `imports`, `constants`, `load_data`,
+  `filter_ui`)
 - Only modify code inside `@app.cell` functions. Marimo manages parameters and return statements.
 
 ### Notebook Organization
@@ -114,7 +116,8 @@ def defaults():
 Always use unless explicitly requested otherwise:
 
 - **uv** for package management
-- **DuckDB SQL** for data loading, joins, aggregations, complex transformations (via native SQL cells)
+- **DuckDB SQL** for data loading, joins, aggregations, complex transformations (via native SQL
+  cells)
 - **polars** for simple operations (filtering, unique values) or when SQL can't express it (UDFs)
 - **altair** for visualizations
 
@@ -124,10 +127,11 @@ output type. Use polars for simple operations where it's more readable.
 
 ## Runtime Modes
 
-**Automatic (default):** Cells run automatically when dependencies change
-**Lazy:** Cells marked as stale instead of running; run manually with Run button
+**Automatic (default):** Cells run automatically when dependencies change **Lazy:** Cells marked as
+stale instead of running; run manually with Run button
 
-For expensive notebooks, configure lazy mode or use `mo.stop()` to prevent expensive cells from running until ready.
+For expensive notebooks, configure lazy mode or use `mo.stop()` to prevent expensive cells from
+running until ready.
 
 ## Common Patterns
 
@@ -194,7 +198,8 @@ expensive_computation(data)
 - Convert empty cell to SQL via cell context menu
 - Click SQL button at notebook bottom
 
-**SQL output type:** Set to `native` in app config for best performance (lazy DuckDB relations, efficient chaining).
+**SQL output type:** Set to `native` in app config for best performance (lazy DuckDB relations,
+efficient chaining).
 
 ```python
 # Load data directly with SQL (no polars read needed)
@@ -244,8 +249,8 @@ uv run marimo check --fix notebook.py  # Fix lint errors (MB001-MB005, MR001)
 uv run notebook.py                      # Validate execution (runs as script)
 ```
 
-**Task is NOT complete until both pass.** Never use `uv run marimo edit` or `uv run marimo run`
-for verification (they open UI/server, not validation).
+**Task is NOT complete until both pass.** Never use `uv run marimo edit` or `uv run marimo run` for
+verification (they open UI/server, not validation).
 
 ### Linting
 
