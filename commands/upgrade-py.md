@@ -12,14 +12,14 @@ Upgrade all project dependencies while keeping pyproject.toml constraints in syn
 
 **Create task list at start** using TaskCreate for progress tracking:
 
-| Task subject | activeForm (spinner text) |
-| --- | --- |
-| Upgrade lock file | Upgrading dependencies |
+| Task subject                      | activeForm (spinner text)    |
+| --------------------------------- | ---------------------------- |
+| Upgrade lock file                 | Upgrading dependencies       |
 | Update pyproject.toml constraints | Updating version constraints |
-| Upgrade pre-commit hooks | Upgrading pre-commit |
-| Sync pinned versions | Syncing pinned versions |
-| Run pre-commit checks | Running pre-commit |
-| Run tests | Running tests |
+| Upgrade pre-commit hooks          | Upgrading pre-commit         |
+| Sync pinned versions              | Syncing pinned versions      |
+| Run pre-commit checks             | Running pre-commit           |
+| Run tests                         | Running tests                |
 
 Update tasks with TaskUpdate as you progress:
 

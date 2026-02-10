@@ -36,12 +36,12 @@ silently—user should never need to say "go on".
 
 **At the very start**, use the **TaskCreate** tool to create ALL 4 tasks:
 
-| #   | Task subject                        | activeForm                      |
-| --- | ----------------------------------- | ------------------------------- |
-| 1   | Setup: detect files and conventions | Detecting files and conventions |
-| 2   | Cleanup: simplify and review        | Running cleanup                 |
-| 3   | Review-Fix Loop                     | Scanning for issues             |
-| 4   | Generate summary report             | Generating summary              |
+| # | Task subject                        | activeForm                      |
+| - | ----------------------------------- | ------------------------------- |
+| 1 | Setup: detect files and conventions | Detecting files and conventions |
+| 2 | Cleanup: simplify and review        | Running cleanup                 |
+| 3 | Review-Fix Loop                     | Scanning for issues             |
+| 4 | Generate summary report             | Generating summary              |
 
 **As you work**, use the **TaskUpdate** tool:
 
@@ -77,7 +77,9 @@ If tasks 3 or 4 show as pending/in_progress, you are NOT done. Keep going.
 ### Step 2: Cleanup
 
 - [ ] Invoke **Task** tool with `subagent_type: code-distill` - Reduce complexity
-- [ ] Invoke **Skill** tool with `skill: code-vet` - Language-specific idioms and patterns
+- [ ] Invoke **Skill** tools in parallel:
+  - `skill: code-vet` - Language-specific idioms and patterns
+  - `skill: test-vet` - Test file best practices (if test files present)
 
 → **TaskUpdate** task 2 to `completed`. **TaskUpdate** task 3 to `in_progress`. Continue silently.
 

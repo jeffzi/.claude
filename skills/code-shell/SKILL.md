@@ -30,17 +30,17 @@ Don't skip because code seems simple, "just a one-liner", or "I'll fix it later"
 
 ## Quick Reference
 
-| Task | Pattern |
-|------|---------|
-| Shebang | `#!/usr/bin/env bash` |
-| Strict mode | `set -euo pipefail` |
-| Check dependency | `command -v tool >/dev/null \|\| exit 1` |
-| Quote variables | `"$var"` not `$var` |
-| Command substitution | `$(cmd)` not backticks |
-| Test syntax | `[[ ]]` not `[ ]` |
-| Output | `printf "%s\n" "$msg"` not `echo` |
-| Cleanup on exit | `trap cleanup EXIT` |
-| Source file | `. file` not `source file` |
+| Task                 | Pattern                                  |
+| -------------------- | ---------------------------------------- |
+| Shebang              | `#!/usr/bin/env bash`                    |
+| Strict mode          | `set -euo pipefail`                      |
+| Check dependency     | `command -v tool >/dev/null \|\| exit 1` |
+| Quote variables      | `"$var"` not `$var`                      |
+| Command substitution | `$(cmd)` not backticks                   |
+| Test syntax          | `[[ ]]` not `[ ]`                        |
+| Output               | `printf "%s\n" "$msg"` not `echo`        |
+| Cleanup on exit      | `trap cleanup EXIT`                      |
+| Source file          | `. file` not `source file`               |
 
 ## Formatting
 
@@ -72,10 +72,10 @@ Not `#!/bin/bash` (path varies across systems).
 set -euo pipefail
 ```
 
-| Flag | Effect |
-|------|--------|
-| `-e` | Exit on error |
-| `-u` | Error on undefined variables |
+| Flag          | Effect                              |
+| ------------- | ----------------------------------- |
+| `-e`          | Exit on error                       |
+| `-u`          | Error on undefined variables        |
 | `-o pipefail` | Pipeline fails if any command fails |
 
 ### Script Template
@@ -171,30 +171,30 @@ temp_file=$(mktemp)
 
 ## Naming Conventions
 
-| Element | Convention | Example |
-|---------|------------|---------|
-| Variables | `snake_case` | `local file_path` |
-| Constants | `UPPER_CASE` | `readonly MAX_RETRIES=3` |
-| Functions | `snake_case` | `process_file()` |
-| Environment exports | `UPPER_CASE` | `export API_KEY` |
+| Element             | Convention   | Example                  |
+| ------------------- | ------------ | ------------------------ |
+| Variables           | `snake_case` | `local file_path`        |
+| Constants           | `UPPER_CASE` | `readonly MAX_RETRIES=3` |
+| Functions           | `snake_case` | `process_file()`         |
+| Environment exports | `UPPER_CASE` | `export API_KEY`         |
 
 ## Pitfalls
 
-| ✗ Never | ✓ Always |
-|---------|----------|
-| `#!/bin/bash` | `#!/usr/bin/env bash` |
-| No `set -euo pipefail` | Strict mode at top of every script |
-| `echo` with escapes/variables | `printf` for reliable output |
-| `[ ]` for tests | `[[ ]]` |
-| Unquoted `$var` | `"$var"` |
-| Backticks `` `cmd` `` | `$(cmd)` |
-| `source file` | `. file` (POSIX) |
-| `cd dir && ...` | `cd dir \|\| exit 1` |
-| No cleanup on exit | `trap cleanup EXIT` |
-| `==` in `[ ]` | `=` in `[ ]` or `==` in `[[ ]]` |
-| `$?` after pipe | `${PIPESTATUS[@]}` |
-| `for f in $(ls)` | `for f in ./*` |
-| Cat useless use | `< file command` |
+| ✗ Never                       | ✓ Always                           |
+| ----------------------------- | ---------------------------------- |
+| `#!/bin/bash`                 | `#!/usr/bin/env bash`              |
+| No `set -euo pipefail`        | Strict mode at top of every script |
+| `echo` with escapes/variables | `printf` for reliable output       |
+| `[ ]` for tests               | `[[ ]]`                            |
+| Unquoted `$var`               | `"$var"`                           |
+| Backticks `` `cmd` ``         | `$(cmd)`                           |
+| `source file`                 | `. file` (POSIX)                   |
+| `cd dir && ...`               | `cd dir \|\| exit 1`               |
+| No cleanup on exit            | `trap cleanup EXIT`                |
+| `==` in `[ ]`                 | `=` in `[ ]` or `==` in `[[ ]]`    |
+| `$?` after pipe               | `${PIPESTATUS[@]}`                 |
+| `for f in $(ls)`              | `for f in ./*`                     |
+| Cat useless use               | `< file command`                   |
 
 ## Common Patterns
 
@@ -219,13 +219,13 @@ die() {
 
 ## Rationalizations That Mean You're About to Fail
 
-| Excuse | Reality |
-|--------|---------|
-| "Just a quick script" | Quick scripts become production. Use strict mode. |
-| "It works on my machine" | Use `#!/usr/bin/env bash` for portability. |
-| "I'll add error handling later" | You won't. Add `set -euo pipefail` now. |
-| "Quoting is ugly" | Unquoted variables cause bugs. Quote everything. |
-| "echo is simpler" | `printf` is reliable. `echo` behavior varies. |
+| Excuse                          | Reality                                           |
+| ------------------------------- | ------------------------------------------------- |
+| "Just a quick script"           | Quick scripts become production. Use strict mode. |
+| "It works on my machine"        | Use `#!/usr/bin/env bash` for portability.        |
+| "I'll add error handling later" | You won't. Add `set -euo pipefail` now.           |
+| "Quoting is ugly"               | Unquoted variables cause bugs. Quote everything.  |
+| "echo is simpler"               | `printf` is reliable. `echo` behavior varies.     |
 
 ## Verification
 

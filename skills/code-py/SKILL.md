@@ -11,17 +11,6 @@ Write production-quality Python code using type hints, modern features (3.10+), 
 **Core principle:** Every Python function gets type hints. Quick code becomes production code—write it correctly
 the first time.
 
-## When to Use
-
-Use for ALL Python code, including:
-
-- "Quick" or "simple" scripts
-- Functions without explicit requirements for type hints
-- Refactoring existing code
-- Any code where you think "I'll add types later"
-
-Don't skip because code seems simple, time pressure, "just prototyping", or "keeping it simple".
-
 ## Mandatory Rules
 
 ### No Obvious Comments
@@ -73,17 +62,20 @@ def process(items: list[int]) -> list[int]:
     return [x ** 2 for x in items if x % 2 == 0]
 ```
 
+**Internal functions:** Types + clear names suffice. Add docstrings only for non-obvious logic, side effects,
+or public API.
+
 ### Use Modern Python Features
 
 **Python 3.10+ syntax:**
 
-| Instead of | Use |
-| ---------- | --- |
+| Instead of                    | Use                           |
+| ----------------------------- | ----------------------------- |
 | `List[int]`, `Dict[str, int]` | `list[int]`, `dict[str, int]` |
-| `Optional[str]` | `str \| None` |
-| `Union[int, str]` | `int \| str` |
-| `os.path.*` | `pathlib.Path` |
-| Manual class | `@dataclass` |
+| `Optional[str]`               | `str \| None`                 |
+| `Union[int, str]`             | `int \| str`                  |
+| `os.path.*`                   | `pathlib.Path`                |
+| Manual class                  | `@dataclass`                  |
 
 ### Dataclasses Over Manual Classes
 
@@ -137,16 +129,16 @@ def read_file(filepath: str) -> str | None:
 
 ### Common Patterns
 
-| Task | Pythonic Pattern |
-| ---- | ---------------- |
-| Iterate over list | `for item in items:` NOT `for i in range(len(items)):` |
-| List transformation | `[x**2 for x in nums if x % 2 == 0]` |
-| Count occurrences | `from collections import Counter; Counter(items)` |
-| Dict with defaults | `from collections import defaultdict; defaultdict(int)` |
-| Safe dict access | `my_dict.get(key, default)` |
-| File operations | `Path(filepath).read_text()` NOT `open(filepath).read()` |
-| Check None | `if value is None:` NOT `if value == None:` |
-| Check truthiness | `if items:` NOT `if len(items) > 0:` |
+| Task                | Pythonic Pattern                                         |
+| ------------------- | -------------------------------------------------------- |
+| Iterate over list   | `for item in items:` NOT `for i in range(len(items)):`   |
+| List transformation | `[x**2 for x in nums if x % 2 == 0]`                     |
+| Count occurrences   | `from collections import Counter; Counter(items)`        |
+| Dict with defaults  | `from collections import defaultdict; defaultdict(int)`  |
+| Safe dict access    | `my_dict.get(key, default)`                              |
+| File operations     | `Path(filepath).read_text()` NOT `open(filepath).read()` |
+| Check None          | `if value is None:` NOT `if value == None:`              |
+| Check truthiness    | `if items:` NOT `if len(items) > 0:`                     |
 
 ### Type Hints Reference
 
@@ -179,22 +171,22 @@ def process(data: ExpensiveClass) -> None: ...
 
 ### Pitfalls
 
-| ✗ Never | ✓ Always |
-| ------- | -------- |
-| Obvious comments (`# add 1 to x`) | Self-documenting code, or explain WHY not WHAT |
-| Imports inside functions | Imports at top of file (except `if TYPE_CHECKING:`) |
-| `def func(items=[]):` | `def func(items: list[int] \| None = None):` |
-| `for i in range(len(items)):` | `for item in items:` or `enumerate(items)` |
-| `if value == None:` | `if value is None:` |
-| `if len(items) > 0:` | `if items:` |
-| `result += s` in loop | `''.join(strings)` |
-| `open('file.txt')` without `with` | `with open('file.txt') as f:` |
-| Bare `except:` | `except ValueError:` or `except Exception:` |
-| `os.path.*` | `pathlib.Path` |
-| Manual class for data | `@dataclass` |
-| LBYL (check before act) | EAFP (try/except) |
-| No type hints | Type hints on ALL function signatures |
-| Manual dict counting | `Counter` or `defaultdict(int)` |
+| ✗ Never                           | ✓ Always                                            |
+| --------------------------------- | --------------------------------------------------- |
+| Obvious comments (`# add 1 to x`) | Self-documenting code, or explain WHY not WHAT      |
+| Imports inside functions          | Imports at top of file (except `if TYPE_CHECKING:`) |
+| `def func(items=[]):`             | `def func(items: list[int] \| None = None):`        |
+| `for i in range(len(items)):`     | `for item in items:` or `enumerate(items)`          |
+| `if value == None:`               | `if value is None:`                                 |
+| `if len(items) > 0:`              | `if items:`                                         |
+| `result += s` in loop             | `''.join(strings)`                                  |
+| `open('file.txt')` without `with` | `with open('file.txt') as f:`                       |
+| Bare `except:`                    | `except ValueError:` or `except Exception:`         |
+| `os.path.*`                       | `pathlib.Path`                                      |
+| Manual class for data             | `@dataclass`                                        |
+| LBYL (check before act)           | EAFP (try/except)                                   |
+| No type hints                     | Type hints on ALL function signatures               |
+| Manual dict counting              | `Counter` or `defaultdict(int)`                     |
 
 ## Comprehensions and Generators
 
@@ -285,57 +277,15 @@ async def main() -> None:
         task2 = tg.create_task(service2())
 ```
 
-### TYPE_CHECKING for Import Optimization
-
-```python
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pandas import DataFrame  # Not imported at runtime
-
-def process(df: DataFrame) -> DataFrame:
-    ...
-```
-
 ## Rationalizations That Mean You're About to Fail
 
-| Excuse | Reality |
-| ------ | ------- |
-| "No type hints - keeping it simple" | Type hints ARE simple. They catch bugs at write-time. |
+| Excuse                                 | Reality                                                       |
+| -------------------------------------- | ------------------------------------------------------------- |
+| "No type hints - keeping it simple"    | Type hints ARE simple. They catch bugs at write-time.         |
 | "Would add in production code, but..." | Quick code IS production code. Write it right the first time. |
-| "This is the classic approach" | Classic = outdated. Use modern Python features. |
-| "Felt more natural" | Natural ≠ Pythonic. Follow EAFP and idioms. |
-| "Just prototyping" | Prototypes become production. No shortcuts. |
-
-## Test Design
-
-**MVP tests: minimum tests, maximum coverage.**
-
-```python
-# ✗ separate tests for same code path
-def test_rejects_none(): ...
-def test_rejects_empty(): ...
-
-# ✓ merge related validations
-def test_rejects_invalid_input():
-    with pytest.raises(ValueError): fn(None)
-    with pytest.raises(ValueError): fn("")
-
-# ✗ duplicate tests per API
-def test_encode_rejects_none(): ...
-def test_decode_rejects_none(): ...
-
-# ✓ parametrize over APIs
-@pytest.mark.parametrize("func", [encode, decode])
-def test_rejects_none(func: Callable) -> None:
-    with pytest.raises(ValueError): func(None)
-```
-
-| Merge when                          | Keep separate when    |
-| ----------------------------------- | --------------------- |
-| Same code path, different inputs    | Different code paths  |
-| Related edge cases (None, empty, 0) | Complex setup differs |
-| Same behavior across APIs           | Tests need isolation  |
+| "This is the classic approach"         | Classic = outdated. Use modern Python features.               |
+| "Felt more natural"                    | Natural ≠ Pythonic. Follow EAFP and idioms.                   |
+| "Just prototyping"                     | Prototypes become production. No shortcuts.                   |
 
 ## Verification
 

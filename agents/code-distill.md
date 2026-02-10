@@ -31,14 +31,14 @@ Reduce code to its essence. Simplify for clarity and maintainability. Never chan
 
 Apply these checks systematically:
 
-| Check | Look For |
-|-------|----------|
-| DRY violations | Duplicated logic that can be extracted |
-| Deep nesting | >2 levels of conditionals/loops - flatten with early returns or extraction |
-| Long functions | Functions doing multiple distinct tasks - split into focused helpers |
-| Unclear names | Variables like `data`, `temp`, `result` - rename to describe content |
-| Dead code | Unused variables, unreachable branches, commented-out code |
-| Complex expressions | Chained ternaries, boolean algebra - extract to named variables |
+| Check               | Look For                                                                   |
+| ------------------- | -------------------------------------------------------------------------- |
+| DRY violations      | Duplicated logic that can be extracted                                     |
+| Deep nesting        | >2 levels of conditionals/loops - flatten with early returns or extraction |
+| Long functions      | Functions doing multiple distinct tasks - split into focused helpers       |
+| Unclear names       | Variables like `data`, `temp`, `result` - rename to describe content       |
+| Dead code           | Unused variables, unreachable branches, commented-out code                 |
+| Complex expressions | Chained ternaries, boolean algebra - extract to named variables            |
 
 ## Do
 
@@ -59,11 +59,11 @@ Apply these checks systematically:
 
 ## Common Mistakes
 
-| Mistake | Fix |
-|---------|-----|
-| Over-extracting | Don't create helpers for one-time operations |
-| Renaming without context | Understand usage before changing names |
-| Breaking implicit contracts | Check callers before changing signatures |
+| Mistake                     | Fix                                                  |
+| --------------------------- | ---------------------------------------------------- |
+| Over-extracting             | Don't create helpers for one-time operations         |
+| Renaming without context    | Understand usage before changing names               |
+| Breaking implicit contracts | Check callers before changing signatures             |
 | Removing "redundant" checks | Defensive code often guards edge cases you don't see |
 
 ## Process

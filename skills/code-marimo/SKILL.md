@@ -31,21 +31,21 @@ Don't use when:
 
 ## Quick Reference
 
-| Task | Pattern |
-| ---- | ------- |
-| Import modules | First cell: `import marimo as mo`, `import polars as pl`, `import altair as alt` |
-| Create UI element | One cell: `slider = mo.ui.slider(0, 100)` |
-| Access UI value | Different cell: `value = slider.value` |
-| Display output | Last expression in cell (auto-displayed) |
-| Stop execution | `mo.stop(condition, output=None)` |
-| Layout elements | `mo.hstack([...])`, `mo.vstack([...])`, `mo.tabs({...})` |
-| SQL cell | Create via UI or `result = mo.sql(f"""SELECT * FROM table""")` |
-| SQL output type | Set to `native` in app config for best performance |
-| Load CSV/Parquet | SQL: `SELECT * FROM 'data.csv'` or `SELECT * FROM 'data.parquet'` |
-| Local variables | Prefix with `_`: `_temp = ...` (not accessible to other cells) |
-| Run as script | `uv run notebook.py` (CLI execution) |
-| Check notebook | `uv run marimo check --fix notebook.py` |
-| Test notebook | `uv run pytest notebook.py` |
+| Task              | Pattern                                                                          |
+| ----------------- | -------------------------------------------------------------------------------- |
+| Import modules    | First cell: `import marimo as mo`, `import polars as pl`, `import altair as alt` |
+| Create UI element | One cell: `slider = mo.ui.slider(0, 100)`                                        |
+| Access UI value   | Different cell: `value = slider.value`                                           |
+| Display output    | Last expression in cell (auto-displayed)                                         |
+| Stop execution    | `mo.stop(condition, output=None)`                                                |
+| Layout elements   | `mo.hstack([...])`, `mo.vstack([...])`, `mo.tabs({...})`                         |
+| SQL cell          | Create via UI or `result = mo.sql(f"""SELECT * FROM table""")`                   |
+| SQL output type   | Set to `native` in app config for best performance                               |
+| Load CSV/Parquet  | SQL: `SELECT * FROM 'data.csv'` or `SELECT * FROM 'data.parquet'`                |
+| Local variables   | Prefix with `_`: `_temp = ...` (not accessible to other cells)                   |
+| Run as script     | `uv run notebook.py` (CLI execution)                                             |
+| Check notebook    | `uv run marimo check --fix notebook.py`                                          |
+| Test notebook     | `uv run pytest notebook.py`                                                      |
 
 ## Core Concepts
 
@@ -68,12 +68,46 @@ Don't use when:
 
 ```python
 @app.cell
-def __(dependencies):
+def cell_name(dependencies):
     # Cell code here
     return (outputs,)
 ```
 
-**Important:** Only modify code inside `@app.cell` functions. Marimo manages parameters and return statements.
+**Important:**
+
+- **Always name cells** - Use descriptive function names (e.g., `imports`, `constants`, `load_data`, `filter_ui`)
+- Only modify code inside `@app.cell` functions. Marimo manages parameters and return statements.
+
+### Notebook Organization
+
+Every notebook must follow this structure:
+
+1. **First cell: `imports`** - All imports in a single cell at the top
+2. **Second cell: `constants`** - Configuration values, URLs, thresholds, etc.
+3. **Third cell: `defaults`** - Default values for UI elements (only if notebook has UI)
+4. **Remaining cells** - Data loading, transformations, UI elements, visualizations
+
+```python
+@app.cell
+def imports():
+    import marimo as mo
+    import polars as pl
+    import altair as alt
+    return mo, pl, alt
+
+@app.cell
+def constants():
+    DATA_URL = "https://example.com/data.csv"
+    MAX_ROWS = 1000
+    return DATA_URL, MAX_ROWS
+
+@app.cell
+def defaults():
+    # Only include this cell if notebook has UI elements
+    DEFAULT_SLIDER_VALUE = 50
+    DEFAULT_SPECIES = "All"
+    return DEFAULT_SLIDER_VALUE, DEFAULT_SPECIES
+```
 
 ## Default Stack
 
@@ -100,18 +134,36 @@ For expensive notebooks, configure lazy mode or use `mo.stop()` to prevent expen
 ### Basic Reactive UI
 
 ```python
-# Cell 1: Imports
-import marimo as mo
-import polars as pl
-import altair as alt
+@app.cell
+def imports():
+    import marimo as mo
+    import polars as pl
+    import altair as alt
+    return mo, pl, alt
 
-# Cell 2: Create UI
-slider = mo.ui.slider(10, 100, value=50, label="Points")
-slider
+@app.cell
+def constants():
+    MIN_POINTS = 10
+    MAX_POINTS = 100
+    return MIN_POINTS, MAX_POINTS
 
-# Cell 3: Use UI value (auto-updates when slider changes)
-data = pl.DataFrame({"x": range(slider.value)})
-alt.Chart(data).mark_line().encode(x="x")
+@app.cell
+def defaults():
+    DEFAULT_POINTS = 50
+    return (DEFAULT_POINTS,)
+
+@app.cell
+def slider_ui(mo, MIN_POINTS, MAX_POINTS, DEFAULT_POINTS):
+    slider = mo.ui.slider(MIN_POINTS, MAX_POINTS, value=DEFAULT_POINTS, label="Points")
+    slider
+    return (slider,)
+
+@app.cell
+def chart(pl, alt, slider):
+    # Auto-updates when slider changes
+    data = pl.DataFrame({"x": range(slider.value)})
+    alt.Chart(data).mark_line().encode(x="x")
+    return (data,)
 ```
 
 ### Avoiding Mutations
@@ -168,18 +220,18 @@ monthly = mo.sql(f"""
 
 ## Pitfalls
 
-| Issue | Symptom/Error | Fix |
-| ----- | ------------- | --- |
-| Variable in 2+ cells | "Multiple definitions" error | Assign each variable in exactly one cell |
-| Cell A uses B, B uses A | "Circular dependency" error | Break cycle by extracting shared logic |
-| Access `.value` in same cell as UI | UI value is None | Move `.value` access to different cell |
-| Mutating objects in-place | Changes don't trigger re-run | Create new objects: `new_list = list + [x]` |
-| Using `_var` (local variable) | Cell doesn't re-run on changes | Remove `_` prefix to make global |
-| Output not showing | Missing last expression | Ensure visualization/data is last expression |
-| Using `global` keyword | Breaks marimo's tracking | Never use `global` |
-| Using `on_change=handler` | Callbacks unnecessary | Remove callbacks, rely on reactive execution |
-| Using `mo.state()` | Can cause bugs, rarely needed | Use UI element `.value` instead |
-| Naming dataframes `*_df` | Redundant, clutters code | Use descriptive names: `weather`, `filtered` |
+| Issue                              | Symptom/Error                  | Fix                                          |
+| ---------------------------------- | ------------------------------ | -------------------------------------------- |
+| Variable in 2+ cells               | "Multiple definitions" error   | Assign each variable in exactly one cell     |
+| Cell A uses B, B uses A            | "Circular dependency" error    | Break cycle by extracting shared logic       |
+| Access `.value` in same cell as UI | UI value is None               | Move `.value` access to different cell       |
+| Mutating objects in-place          | Changes don't trigger re-run   | Create new objects: `new_list = list + [x]`  |
+| Using `_var` (local variable)      | Cell doesn't re-run on changes | Remove `_` prefix to make global             |
+| Output not showing                 | Missing last expression        | Ensure visualization/data is last expression |
+| Using `global` keyword             | Breaks marimo's tracking       | Never use `global`                           |
+| Using `on_change=handler`          | Callbacks unnecessary          | Remove callbacks, rely on reactive execution |
+| Using `mo.state()`                 | Can cause bugs, rarely needed  | Use UI element `.value` instead              |
+| Naming dataframes `*_df`           | Redundant, clutters code       | Use descriptive names: `weather`, `filtered` |
 
 **After fixing issues, always run:** `uv run marimo check --fix notebook.py && uv run notebook.py`
 
@@ -257,69 +309,106 @@ For complete API documentation, see [docs.marimo.io](https://docs.marimo.io/):
 ### Interactive Data Filter
 
 ```python
-# Cell 1
-import marimo as mo
-import polars as pl
-import altair as alt
+@app.cell
+def imports():
+    import marimo as mo
+    import polars as pl
+    import altair as alt
+    return mo, pl, alt
 
-# Cell 2: Load data with SQL
-iris = mo.sql(f"""
-    SELECT * FROM 'hf://datasets/scikit-learn/iris/Iris.csv'
-""")
+@app.cell
+def constants():
+    IRIS_URL = "hf://datasets/scikit-learn/iris/Iris.csv"
+    return (IRIS_URL,)
 
-# Cell 3: Create UI (polars for simple unique extraction)
-species = mo.ui.dropdown(
-    options=["All"] + iris["Species"].unique().sort().to_list(),
-    value="All",
-    label="Species"
-)
-species
+@app.cell
+def defaults():
+    DEFAULT_SPECIES = "All"
+    return (DEFAULT_SPECIES,)
 
-# Cell 4: Filter (polars is cleaner for simple filters)
-filtered = iris if species.value == "All" else iris.filter(pl.col("Species") == species.value)
+@app.cell
+def load_data(mo, IRIS_URL):
+    iris = mo.sql(f"""
+        SELECT * FROM '{IRIS_URL}'
+    """)
+    return (iris,)
 
-alt.Chart(filtered).mark_circle().encode(
-    x="SepalLengthCm",
-    y="SepalWidthCm",
-    color="Species"
-)
+@app.cell
+def species_dropdown(mo, iris, DEFAULT_SPECIES):
+    species = mo.ui.dropdown(
+        options=["All"] + iris["Species"].unique().sort().to_list(),
+        value=DEFAULT_SPECIES,
+        label="Species"
+    )
+    species
+    return (species,)
+
+@app.cell
+def scatter_plot(pl, alt, iris, species):
+    filtered = iris if species.value == "All" else iris.filter(pl.col("Species") == species.value)
+    alt.Chart(filtered).mark_circle().encode(
+        x="SepalLengthCm",
+        y="SepalWidthCm",
+        color="Species"
+    )
+    return (filtered,)
 ```
 
 ### Data Explorer
 
 ```python
-import marimo as mo
-import polars as pl
-from vega_datasets import data
+@app.cell
+def imports():
+    import marimo as mo
+    import polars as pl
+    from vega_datasets import data
+    return mo, pl, data
 
-cars = pl.DataFrame(data.cars())
-mo.ui.data_explorer(cars)
+@app.cell
+def explore_cars(mo, pl, data):
+    cars = pl.DataFrame(data.cars())
+    mo.ui.data_explorer(cars)
+    return (cars,)
 ```
 
 ### SQL Analysis (SQL-First Pattern)
 
 ```python
-# Cell 1: Imports
-import marimo as mo
-import altair as alt
+@app.cell
+def imports():
+    import marimo as mo
+    import altair as alt
+    return mo, alt
 
-# Cell 2: Load and filter data directly with SQL
-seattle = mo.sql(f"""
-    SELECT * FROM 'https://raw.githubusercontent.com/vega/vega-datasets/refs/heads/main/data/weather.csv'
-    WHERE location = 'Seattle'
-    ORDER BY date
-""")
+@app.cell
+def constants():
+    WEATHER_URL = "https://raw.githubusercontent.com/vega/vega-datasets/refs/heads/main/data/weather.csv"
+    LOCATION = "Seattle"
+    return WEATHER_URL, LOCATION
 
-# Cell 3: Aggregate with SQL
-monthly_avg = mo.sql(f"""
-    SELECT date_trunc('month', date) as month,
-           avg(temp_max) as avg_high,
-           avg(temp_min) as avg_low
-    FROM seattle
-    GROUP BY 1
-    ORDER BY 1
-""")
+@app.cell
+def load_weather(mo, WEATHER_URL, LOCATION):
+    seattle = mo.sql(f"""
+        SELECT * FROM '{WEATHER_URL}'
+        WHERE location = '{LOCATION}'
+        ORDER BY date
+    """)
+    return (seattle,)
 
-# Cell 4: Visualize
-alt.Chart(monthly_avg).mark_line().encode(x="month", y="avg_high")
+@app.cell
+def aggregate_monthly(mo, seattle):
+    monthly_avg = mo.sql(f"""
+        SELECT date_trunc('month', date) as month,
+               avg(temp_max) as avg_high,
+               avg(temp_min) as avg_low
+        FROM seattle
+        GROUP BY 1
+        ORDER BY 1
+    """)
+    return (monthly_avg,)
+
+@app.cell
+def visualize(alt, monthly_avg):
+    alt.Chart(monthly_avg).mark_line().encode(x="month", y="avg_high")
+    return
 ```
