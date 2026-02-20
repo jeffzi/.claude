@@ -109,9 +109,9 @@ check_destructive_operations() {
 	is_git_subcmd "checkout" && [[ "$command" =~ [[:space:]](--([[:space:]]|$)|\.([[:space:]]|$)) ]] &&
 		block_destructive "git checkout (discard)" "Discards uncommitted changes permanently."
 
-	# git reset --hard
-	is_git_subcmd "reset" && [[ "$command" =~ --hard ]] &&
-		block_destructive "git reset --hard" "Discards ALL uncommitted changes."
+	# git reset (all forms — even soft/mixed reset can move HEAD or unstage unexpectedly)
+	is_git_subcmd "reset" &&
+		block_destructive "git reset" "Resets HEAD, staging area, or working tree. Use git restore --staged to unstage."
 
 	# git clean -f
 	is_git_subcmd "clean" && [[ "$command" =~ -[fdxn]*f ]] &&
