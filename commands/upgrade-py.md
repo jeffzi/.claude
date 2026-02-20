@@ -1,6 +1,6 @@
 ---
 name: upgrade-py
-description: Upgrade Python dependencies in lock file and pyproject.toml
+description: Use when upgrading Python dependencies in lock file and pyproject.toml
 allowed-tools: Read, Grep, Edit, Bash(uv sync:*), Bash(uv pip list:*), Bash(uv run pre-commit:*), Bash(uv run pytest:*)
 ---
 
@@ -27,6 +27,17 @@ Update tasks with TaskUpdate as you progress:
 - Set `status: completed` when done (shows checkmark)
 - If a conditional step is skipped (e.g., no changes needed), mark it completed immediately
 
+## Pinning Strategy
+
+- **Caret** (`>=MAJOR.MINOR,<NEXT_MAJOR`) — default for dependencies with major >= 1. Lower bound is
+  the installed major.minor (drop the patch). Trusts semver; allows any version within the same
+  major.
+- **Floor** (`>=X.Y.Z`) — for 0.x dependencies (no upper bound). Semver treats 0.x as unstable, so
+  just pin the floor to the latest installed version.
+- **Exact** (`==X.Y.Z`) — only for tools shared with pre-commit (e.g., ruff, sqlfluff). The hook
+  pins an exact rev, so the pyproject.toml pin must match to keep behavior identical whether the
+  tool runs directly or via pre-commit.
+
 ## Steps
 
 1. Run `uv sync --upgrade --all-groups` to upgrade all dependencies
@@ -34,9 +45,11 @@ Update tasks with TaskUpdate as you progress:
 2. Find all dependencies explicitly mentioned in the pyproject.toml file. Use `uv pip list` to show
    the packages that are now installed.
 
-3. Update the minimum version constraints in pyproject.toml to match the exact versions from the
-   `uv pip list` output (e.g., change `>=2,<3` to `>=2.4.0,<3` if lockfile shows 2.4.0). If versions
-   already match, skip to next step.
+3. Update non-exact dependencies in pyproject.toml based on `uv pip list`. For major >= 1, use
+   caret: `>=MAJOR.MINOR,<NEXT_MAJOR` — drop the patch (e.g., installed 2.12.5 → `>=2.12,<3`). For
+   0.x, use the exact installed version as floor: `>=INSTALLED` (e.g., 0.29.0 → `>=0.29.0`). Skip
+   `==` pins — those are synced from pre-commit in step 6. If constraints already match, skip to
+   next step.
 
 4. Run `uv sync --all-groups` again to ensure the updated constraints work (skip if no changes were
    made)
@@ -55,8 +68,8 @@ Update tasks with TaskUpdate as you progress:
 
 ## Important Notes
 
-- Pinned versions (with `==` like ruff and sqlfluff) must be kept in sync between pyproject.toml and
-  .pre-commit-config.yaml - update both files when pre-commit autoupdate changes them
+- Exact-pinned (`==`) tools must match between pyproject.toml and .pre-commit-config.yaml. The flow
+  is: pre-commit autoupdate bumps the hook rev → you update the `==` pin in pyproject.toml to match
 - Preserve all comments in pyproject.toml
 - Unless explicitly noted, DO NOT upgrade to pre-release or alpha versions. Upgrade only to stable
   versions.
