@@ -1,6 +1,6 @@
 ---
 name: code-py
-description: Use when writing any Python code. Apply regardless of perceived simplicity, time pressure, or "just prototyping" mindset.
+description: Use when writing any Python code, regardless of perceived simplicity or prototyping context.
 ---
 
 # Pythonic Code - Python Best Practices
@@ -10,6 +10,18 @@ description: Use when writing any Python code. Apply regardless of perceived sim
 Write production-quality Python code using type hints, modern features (3.10+), and Pythonic idioms.
 **Core principle:** Every Python function gets type hints. Quick code becomes production code—write
 it correctly the first time.
+
+## Domain Skill Detection
+
+When reviewing or writing Python code, check imports for domain-specific libraries. If detected,
+load the corresponding skill for library-specific best practices:
+
+| Import pattern                         | Skill to load              |
+| -------------------------------------- | -------------------------- |
+| `import marimo` / `from marimo import` | `code-marimo`              |
+| `import polars` / `from polars import` | `scientific-skills:polars` |
+
+Only load skills that are actually installed. If a skill fails to load, continue without it.
 
 ## Mandatory Rules
 
@@ -293,12 +305,8 @@ async def main() -> None:
 **MANDATORY before completing any task:**
 
 ```bash
-uv run pre-commit run -a      # If .pre-commit-config.yaml exists
-uv run ruff check --fix .     # Always - auto-fix issues
-uv run pytest                 # If tests/ exists
+uv tool run prek run -a   # Linting and formatting (orchestrates ruff, basedpyright, dprint, etc.)
+uv run pytest        # If tests/ exist — always run separately from linting
 ```
 
 **Task is NOT complete until all pass.**
-
-Key Ruff rules: B006 (mutable defaults), PERF401 (list comprehensions), TC001-003 (type-only
-imports), UP006-007 (modern syntax).
