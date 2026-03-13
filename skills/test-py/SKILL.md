@@ -9,6 +9,21 @@ description: Use when writing Python tests with pytest. Apply for fixtures, mock
 
 **Also apply:** `code-py` rules. Exception: test functions don't need `-> None` annotations.
 
+**TDD phase constraints (when invoked by a TDD agent):** RED phase (tdd-red) — write tests for ONE
+behavior per invocation, no horizontal slicing. GREEN phase (tdd-green) — do NOT modify test files,
+fix implementation only.
+
+## Domain Skill Detection
+
+When reviewing or writing test files, check imports for domain-specific libraries. If detected, load
+the corresponding skill for library-specific testing patterns:
+
+| Import pattern                                 | Skill to load |
+| ---------------------------------------------- | ------------- |
+| `import polars` / `from polars.testing import` | `test-polars` |
+
+Only load skills that are actually installed. If a skill fails to load, continue without it.
+
 ## Mandatory Rules
 
 ### 1. Arrange-Act-Assert Structure
