@@ -16,10 +16,11 @@ it correctly the first time.
 When reviewing or writing Python code, check imports for domain-specific libraries. If detected,
 load the corresponding skill for library-specific best practices:
 
-| Import pattern                         | Skill to load              |
-| -------------------------------------- | -------------------------- |
-| `import marimo` / `from marimo import` | `code-marimo`              |
-| `import polars` / `from polars import` | `scientific-skills:polars` |
+| Import pattern                                    | Skill to load              |
+| ------------------------------------------------- | -------------------------- |
+| `import marimo` / `from marimo import`            | `code-marimo`              |
+| `from shiny import` / `from shiny.express import` | `code-shiny`               |
+| `import polars` / `from polars import`            | `scientific-skills:polars` |
 
 Only load skills that are actually installed. If a skill fails to load, continue without it.
 
