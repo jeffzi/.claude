@@ -15,11 +15,11 @@
 !.github/workflows/
 !.github/workflows/**
 
-# Allow plugin registry (not caches)
+# Allow plugin manifest and setup (not auto-generated state)
 !plugins/
 plugins/*
-!plugins/installed_plugins.json
-!plugins/known_marketplaces.json
+!plugins/manifest.json
+!plugins/setup.sh
 
 # Allow skills
 !skills/

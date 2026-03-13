@@ -1,0 +1,27 @@
+{
+  "marketplaces": [
+    {
+      "name": "superpowers-marketplace",
+      "source": "obra/superpowers-marketplace"
+    },
+    {
+      "name": "claude-plugins-official",
+      "source": "anthropics/claude-plugins-official"
+    },
+    {
+      "name": "claude-scientific-skills",
+      "source": "K-Dense-AI/claude-scientific-skills"
+    }
+  ],
+  "plugins": [
+    "commit-commands@claude-plugins-official",
+    "elements-of-style@superpowers-marketplace",
+    "lua-lsp@claude-plugins-official",
+    "rust-analyzer-lsp@claude-plugins-official",
+    "scientific-skills@claude-scientific-skills",
+    "superpowers-chrome@superpowers-marketplace",
+    "superpowers-developing-for-claude-code@superpowers-marketplace",
+    "superpowers@superpowers-marketplace",
+    "typescript-lsp@claude-plugins-official"
+  ]
+}
