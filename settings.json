@@ -1,16 +1,5 @@
 {
-  "alwaysThinkingEnabled": true,
   "includeCoAuthoredBy": false,
-  "enabledPlugins": {
-    "commit-commands@claude-plugins-official": true,
-    "elements-of-style@superpowers-marketplace": true,
-    "lua-lsp@claude-plugins-official": false,
-    "rust-analyzer-lsp@claude-plugins-official": true,
-    "scientific-skills@claude-scientific-skills": false,
-    "superpowers-developing-for-claude-code@superpowers-marketplace": true,
-    "superpowers@superpowers-marketplace": true,
-    "typescript-lsp@claude-plugins-official": false
-  },
   "permissions": {
     "allow": [
       "Bash(busted *)",
@@ -42,28 +31,77 @@
       "Bash(git clean:*)",
       "Bash(git reset --hard:*)",
       "Bash(git stash:*)"
-    ]
+    ],
+    "defaultMode": "plan"
   },
   "hooks": {
     "PreToolUse": [
       {
+        "matcher": "Bash(git *)",
         "hooks": [
           {
-            "command": "/Users/jeffzi/.claude/hooks/git-safety.sh",
-            "type": "command"
+            "type": "command",
+            "command": "/Users/jeffzi/.claude/hooks/git-safety.sh"
           }
-        ],
-        "matcher": "Bash(git *)"
+        ]
       },
       {
+        "matcher": "Bash(git commit*)",
         "hooks": [
           {
-            "command": "/Users/jeffzi/.claude/hooks/marimo-check.sh",
-            "type": "command"
+            "type": "command",
+            "command": "/Users/jeffzi/.claude/hooks/marimo-check.sh"
+          },
+          {
+            "type": "command",
+            "command": "/Users/jeffzi/.claude/hooks/shiny-check.sh"
           }
-        ],
-        "matcher": "Bash(git commit*)"
+        ]
+      },
+      {
+        "matcher": "ExitWorktree",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/jeffzi/.claude/hooks/worktree-safety.sh"
+          }
+        ]
       }
     ]
-  }
+  },
+  "enabledPlugins": {
+    "commit-commands@claude-plugins-official": true,
+    "elements-of-style@superpowers-marketplace": true,
+    "lua-lsp@claude-plugins-official": true,
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "scientific-skills@claude-scientific-skills": true,
+    "superpowers-developing-for-claude-code@superpowers-marketplace": true,
+    "superpowers@superpowers-marketplace": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "superpowers-chrome@superpowers-marketplace": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
+    },
+    "superpowers-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "obra/superpowers-marketplace"
+      }
+    },
+    "claude-scientific-skills": {
+      "source": {
+        "source": "github",
+        "repo": "K-Dense-AI/claude-scientific-skills"
+      }
+    }
+  },
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
+  "promptSuggestionEnabled": false,
+  "skipDangerousModePermissionPrompt": true
 }
