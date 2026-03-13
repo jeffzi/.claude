@@ -127,14 +127,13 @@ Tests in `tests/` with `*_test.lua` suffix.
 
 ```lua
 describe("PlayerManager", function()
-   test("creates player with default health", function()
+   it("creates player with default health", function()
       local player = PlayerManager.new("test")
       assert.are_equal(100, player.health)
    end)
 end)
 ```
 
-- Use `test` blocks, **not `it`** (no BDD style)
 - One `describe` per module, **flat structure** - no nested `describe` blocks
 - Use `before_each` for shared setup, `pending("reason")` for planned tests
 

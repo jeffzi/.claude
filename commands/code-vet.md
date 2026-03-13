@@ -15,7 +15,10 @@ wrong abstractions, missing type hints, and structural issues that automated too
 
 1. Detect language from file extension (e.g., `.py` → Python, `.lua` → Lua, `.sh` → Shell)
    - For `.py` files: check for `import marimo` → use `code-marimo` instead of `code-py`
-2. Load the matching `code-<lang>` skill (e.g., `code-py`, `code-lua`, `code-marimo`, `code-shell`)
+   - For `.py` files: check for `from shiny import` or `from shiny.express import` → use
+     `code-shiny` instead of `code-py`
+2. Load the matching `code-<lang>` skill (e.g., `code-py`, `code-lua`, `code-marimo`, `code-shiny`,
+   `code-shell`)
 3. Run verification commands from the skill (linters, formatters, tests)
 4. **Rule-by-rule manual review against the skill.** Linters only catch syntactic issues. You must
    catch judgment-based violations that linters miss — non-idiomatic patterns, wrong abstraction
