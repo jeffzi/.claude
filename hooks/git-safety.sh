@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -eo pipefail
+set -euo pipefail
 
 # ╭────────────────────────────────────────────────────────────╮
 # │                    Git Safety Hook                         │
@@ -177,6 +177,26 @@ check_single_command() {
 		root=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
 		staged_files=$(git -C "$root" diff --cached --name-only 2>/dev/null)
 		check_plan_files "$staged_files" || exit 2
+	fi
+
+	# Block git worktree remove if the target worktree has uncommitted changes
+	if is_git_subcmd "worktree" && [[ "$command" =~ [[:space:]]remove([[:space:]]|$) ]]; then
+		# Extract worktree path: last non-flag argument after 'remove'
+		local wt_path="" found_remove=false
+		for word in $command; do
+			if $found_remove && [[ "$word" != -* ]]; then
+				wt_path="$word"
+			fi
+			[[ "$word" == "remove" ]] && found_remove=true
+		done
+		if [[ -n "$wt_path" && -d "$wt_path" ]]; then
+			if ! git -C "$wt_path" diff --quiet 2>/dev/null ||
+				! git -C "$wt_path" diff --cached --quiet 2>/dev/null ||
+				[[ -n "$(git -C "$wt_path" ls-files --others --exclude-standard 2>/dev/null)" ]]; then
+				block_destructive "git worktree remove (dirty)" \
+					"Worktree at '$wt_path' has uncommitted changes. Commit work before removing."
+			fi
+		fi
 	fi
 
 	# Check destructive operations

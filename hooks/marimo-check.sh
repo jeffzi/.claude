@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -eo pipefail
+set -euo pipefail
 
 # ╭────────────────────────────────────────────────────────╮
 # │                   Marimo Check Hook                    │
@@ -10,31 +10,31 @@ set -eo pipefail
 command -v uvx >/dev/null || exit 0
 
 # Get staged Python files
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep '\.py$' || true)
+staged_files=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep '\.py$' || true)
 
-[[ -z "$STAGED_FILES" ]] && exit 0
+[[ -z "$staged_files" ]] && exit 0
 
-FAILED=0
-for FILE_PATH in $STAGED_FILES; do
-	[[ -f "$FILE_PATH" ]] || continue
+failed=0
+while IFS= read -r file_path; do
+	[[ -f "$file_path" ]] || continue
 
 	# Check if the file appears to be a marimo notebook
-	if grep -qE '(import marimo|@app\.cell)' "$FILE_PATH" 2>/dev/null; then
-		echo "Running marimo check on $FILE_PATH..."
+	if grep -qE '(import marimo|@app\.cell)' "$file_path" 2>/dev/null; then
+		printf "Running marimo check on %s...\n" "$file_path"
 
-		if ! CHECK_OUTPUT=$(timeout 30 uvx marimo check "$FILE_PATH" 2>&1); then
-			echo "Marimo check failed for $FILE_PATH" >&2
-			echo "$CHECK_OUTPUT" >&2
-			echo "" >&2
-			FAILED=1
+		if ! check_output=$(timeout 30 uvx marimo check "$file_path" 2>&1); then
+			printf "Marimo check failed for %s\n" "$file_path" >&2
+			printf "%s\n" "$check_output" >&2
+			printf "\n" >&2
+			failed=1
 		else
-			echo "Marimo check passed for $FILE_PATH"
+			printf "Marimo check passed for %s\n" "$file_path"
 		fi
 	fi
-done
+done <<<"$staged_files"
 
-if [[ $FAILED -eq 1 ]]; then
-	echo "Please fix the marimo issues before committing." >&2
+if [[ $failed -eq 1 ]]; then
+	printf "Please fix the marimo issues before committing.\n" >&2
 	exit 2
 fi
 
