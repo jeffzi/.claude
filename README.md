@@ -31,6 +31,18 @@ commands, agents, hooks, and settings.
 | `code-fixer`      | Surgical fixes at specific file:line locations   |
 | `code-simplifier` | Reduce code complexity while preserving behavior |
 
+### Plugins
+
+Plugins are managed via `plugins/manifest.json` (which marketplaces and plugins to install). The
+auto-generated JSON files (`installed_plugins.json`, `known_marketplaces.json`) are gitignored since
+they contain volatile metadata (timestamps, absolute paths, SHAs).
+
+To bootstrap plugins on a fresh machine:
+
+```sh
+bash plugins/setup.sh
+```
+
 ### Hooks
 
 | Hook              | Description                            |
