@@ -21,6 +21,20 @@ Automated pre-commit review with iterative fix loop.
 - On unmodified files without explicit path
 - During rapid prototyping
 
+**Context check (MANDATORY):** Preflight adds verbose output. If this session already has
+significant context (e.g., after a multi-step implementation, TDD cycle, or plan execution), **do
+not run preflight here**. Instead, tell the user:
+
+> Preflight works best in a clean context. Run it from terminal:
+
+```bash
+claude --dangerously-skip-permissions "/preflight [path]"
+```
+
+Or from within a Claude session, run via Bash: `~/.claude/scripts/run-preflight.sh [path]`
+
+Only proceed in the current session if the context is light (short conversation, few tool calls).
+
 **Announce at start:** "✈️ Preflight check initiated for [files/path]..."
 
 **Silent until Summary:** After the start announcement, output NOTHING until Step 4's Summary
@@ -76,10 +90,13 @@ pending/in_progress, you are NOT done. Keep going.
 
 ### Step 2: Cleanup
 
-- [ ] Invoke **Task** tool with `subagent_type: code-distill` - Reduce complexity
-- [ ] Invoke **Skill** tools in parallel:
-  - `skill: code-vet` - Language-specific idioms and patterns
-  - `skill: test-vet` - Test file best practices (if test files present)
+- [ ] Split target files into implementation files and test files
+- [ ] Dispatch two agents in parallel (single message, two **Agent** tool calls):
+  - **Agent A (impl):** "Simplify then review these implementation files: [list]. First apply
+    code-distill. Then invoke `/code-vet`. If code-vet made changes, re-run `/code-vet` (max 3
+    passes total)."
+  - **Agent B (tests):** "Simplify then review these test files: [list]. First apply code-distill.
+    Then invoke `/test-vet`. If test-vet made changes, re-run `/test-vet` (max 3 passes total)."
 
 → **TaskUpdate** task 2 to `completed`. **TaskUpdate** task 3 to `in_progress`. Continue silently.
 
@@ -91,7 +108,7 @@ pending/in_progress, you are NOT done. Keep going.
 
 Each iteration:
 
-1. **Launch review agents in parallel** using **Task** tool (single message, multiple tool calls):
+1. **Launch review agents in parallel** using **Agent** tool (single message, multiple tool calls):
 
    | Agent                | Focus                                               | When                 |
    | -------------------- | --------------------------------------------------- | -------------------- |
@@ -112,10 +129,10 @@ Each iteration:
    | **≥ 75** | Verified important | **Auto-fix** |
    | 100      | Definite, frequent | Auto-fix     |
 
-3. **Fix issues with score ≥75** using **Task** tool with `subagent_type: code-mend`
+3. **Fix issues with score ≥75** using **Agent** tool with `subagent_type: code-mend`
 
 4. **Decision point:**
-   - If fixes applied AND iterations < 3 → invoke **Skill** tool with `skill: code-vet` → repeat
+   - If fixes applied AND iterations < 3 → invoke `code-vet` and `test-vet` (if test files) → repeat
      from step 1
    - If no fixes OR iterations = 3 → proceed to Step 4
 
@@ -177,7 +194,7 @@ Generate the final report. **This is your FIRST text output since the start anno
 
 ## Common Mistakes
 
-- ❌ Sequential agent dispatch → use parallel (single message, multiple **Task** tool calls)
+- ❌ Sequential agent dispatch → use parallel (single message, multiple **Agent** tool calls)
 - ❌ Auto-fixing linter issues → run `ruff --fix` instead
 - ❌ Skipping "test files" or "examples" → treat all files uniformly
 - ❌ Fixing pre-existing issues → only fix what's in your diff (no-argument mode only)
