@@ -15,22 +15,84 @@ user first and explain why. This includes but is not limited to:
 - **File overwriting**: Reading content from git history (`git show`, `git cat-file`) and writing it
   back via Write/Edit tools to revert a file.
 - **Shell redirects**: Truncating files via `> file` or `echo "" > file`.
+- **Worktrees**: `git worktree remove` or `ExitWorktree` when the worktree has uncommitted changes.
+  Always commit work before leaving a worktree.
 
-### TDD for bug fixes
+### Worktree compression recovery
 
-When asked to fix a bug and the project has existing tests:
+**After context compression while in a worktree**, you have lost context about work already done.
+Before taking ANY action:
 
-1. **Write a failing test first** that reproduces the bug.
-2. **Run the test** to confirm it fails for the expected reason.
-3. **Fix the bug** with the minimal change needed.
-4. **Run the test again** to confirm it passes.
-5. **Run the full test suite** to ensure no regressions.
+1. Run `git status` to see uncommitted changes.
+2. Run `git log --oneline -10` to see recent commits on the branch.
+3. Run `git diff --stat` to see what files are modified.
+4. **Continue from where you left off** — do NOT restart the plan from scratch.
 
-Never skip straight to the fix. The failing test is the proof the bug exists and the proof it's
-resolved.
+If you see work already done (commits, staged/unstaged changes), that's YOUR prior work. Restarting
+the plan from step 1 would destroy it. Pick up where you left off based on the git state.
+
+If a worktree already exists at the expected path, enter it and continue — never remove and recreate
+it.
+
+### TDD — mandatory, non-negotiable
+
+When asked to fix a bug or implement a feature/behavior change and the project has a test suite, you
+**MUST** follow TDD. Do NOT touch production code until a failing test proves the need. No
+exceptions.
+
+One behavior group at a time: write tests for a single concern or a cohesive batch of related
+concerns (same function/module, same structural failure reason), implement, repeat. Batch edge cases
+and validation variants together — don't waste a separate RED-GREEN cycle on each. Never batch
+unrelated behaviors (vertical slices, not horizontal).
+
+For context-isolated TDD, you **MUST** invoke the `tdd` skill (`/tdd`). Never dispatch `tdd-red` or
+`tdd-green` agents directly — they exist solely for the `/tdd` orchestrator. Dispatching them
+yourself bypasses phase verification, circuit breakers, and structured data passing.
+
+For quick single-context TDD (small bug fixes), follow RED-GREEN-REFACTOR directly: failing test,
+minimal fix, verify pass, run full suite.
+
+If an implementation attempt fails 3 times, try a different approach. After 5 total failures, stop
+and report.
 
 A test suite existing anywhere in the project qualifies — do not skip TDD because the specific
 module or area being fixed has no tests yet. That's where you add them.
+
+**Wrote fix code before the test?** Copy the modified files to a temp directory, restore the
+originals from the backup, write the failing test, watch it fail, then copy the fixed files back. Do
+not use git commands to revert — just file copies. The test must fail before the fix lands — that's
+the proof it catches the bug.
+
+**Rationalizations to block** — if you think any of these, STOP:
+
+| Excuse                                  | Reality                                                               |
+| --------------------------------------- | --------------------------------------------------------------------- |
+| "The fix is obvious / trivial"          | Obvious fixes break obvious assumptions. Test first.                  |
+| "I'll add a test after the fix"         | A test that never failed proves nothing. Test first.                  |
+| "This is a one-liner"                   | One-liners still need proof they work. Test first.                    |
+| "The bug is in code without tests"      | That's exactly where you add them. Test first.                        |
+| "Let me just fix it quickly first"      | This is the exact failure mode this rule exists to prevent.           |
+| "This is a new feature, not a bug fix"  | TDD applies to features too.                                          |
+| "I need to see the whole picture first" | That's exploration. Delete it, start with TDD.                        |
+| "Let me batch these together"           | Batch related concerns only. Unrelated behaviors get separate cycles. |
+
+### Fix issues you encounter — don't deflect
+
+When you discover an issue during work or the user asks about one after the main task, fix it
+properly. No blame attribution. No scope gatekeeping. Don't deflect blame, apply workarounds, then
+declare it "out of scope." Go straight to root cause.
+
+**Rationalizations to block** — if you think any of these, STOP:
+
+| Excuse                                            | Reality                                         |
+| ------------------------------------------------- | ----------------------------------------------- |
+| "This isn't from my changes"                      | Irrelevant. You found it, you fix it.           |
+| "This is a pre-existing issue"                    | Now it's your issue. Fix it properly.           |
+| "This is outside the scope"                       | The user is asking you. That makes it in scope. |
+| "Let me add a quick workaround"                   | Investigate the root cause. Do the proper fix.  |
+| "Let me revert and leave it as-is"                | Don't give up. Iterate toward the real fix.     |
+| "That was already there / inherent / unavoidable" | Reworded deflection. Investigate alternatives.  |
+| "My fix didn't cause this new issue"              | The user reported a problem. Fix it.            |
 
 ### Load relevant skills in plans
 
@@ -40,25 +102,16 @@ step, before writing any code. Match skills to the languages and frameworks invo
 `code-shell` for shell scripts. This ensures coding standards and pitfall guards are active from the
 start.
 
-**Important:** Skills loaded during planning are NOT carried into implementation — plan mode context
-is erased when the plan is approved. Always invoke skills again at the start of implementation, even
-if they were loaded during planning. Never mark a skill as "already loaded".
+**Skills loaded during planning are NOT carried into implementation.** Plan mode context is erased
+when the plan is approved. Always invoke skills again at the start of implementation, even if they
+were loaded during planning. Never mark a skill as "already loaded".
 
 If no matching skill exists for a language or framework, note that explicitly in the plan rather
 than silently skipping the step.
 
-### Use prek for linting, run tests separately
+### Disabled superpowers skills
 
-Use [prek](https://github.com/j178/prek) (a fast Rust-based drop-in replacement for pre-commit). Run
-`prek install` to set up hooks, never `pre-commit`.
-
-For linting and formatting, always use `uv tool run prek run -a` (all files) over invoking
-individual tools (ruff, basedpyright, dprint, etc.) directly. Prek already orchestrates them with
-the right config. Only fall back to individual commands when debugging a specific linter issue.
-
-Tests are **not** part of pre-commit hooks and must always be run separately (e.g. `uv run pytest`).
-Plans should include distinct steps: one for linting via `uv tool run prek run -a`, another for
-running tests.
-
-Always prefix project tool commands with `uv run` (e.g. `uv run pytest`, `uv run ruff`). For prek,
-use `uv tool run prek` since it's an external tool, not a project dependency.
+Never use these skills from the superpowers plugin: `requesting-code-review`,
+`finishing-a-development-branch`, `receiving-code-review`, `test-driven-development`. They duplicate
+or conflict with the TDD, commit, and review workflows already defined in this file and in custom
+skills (`/tdd`, `/preflight`, `/commit`).
