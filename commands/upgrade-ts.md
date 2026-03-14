@@ -1,7 +1,11 @@
 ---
 name: upgrade-ts
 description: Use when upgrading TypeScript dependencies in package.json and lock file
-allowed-tools: Read, Grep, Edit, Bash(npm update:*), Bash(npm outdated:*), Bash(npm install:*), Bash(npm list:*), Bash(npx tsc:*), Bash(npx biome:*), Bash(npx vitest:*)
+allowed-tools: >
+  Read, Grep, Edit, Bash(npm update:*),
+  Bash(npm outdated:*), Bash(npm install:*),
+  Bash(npm list:*), Bash(npx tsc:*),
+  Bash(npx biome:*), Bash(npx vitest:*)
 ---
 
 # Upgrade All TypeScript Dependencies

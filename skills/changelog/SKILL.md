@@ -1,6 +1,10 @@
 ---
 name: changelog
-description: Use when writing, reviewing, or modifying CHANGELOG.md files. Apply for new changelogs, release entries, or auditing existing changelogs against the Keep a Changelog standard.
+description: >
+  Use when writing, reviewing, or modifying CHANGELOG.md
+  files. Apply for new changelogs, release entries, or
+  auditing existing changelogs against the Keep a Changelog
+  standard.
 ---
 
 # Changelog

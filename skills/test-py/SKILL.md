@@ -1,6 +1,11 @@
 ---
 name: test-py
-description: Use when writing Python tests with pytest. Apply for fixtures, mocking, parametrization, property-based testing, flaky tests, test isolation issues, data validation, AssertionError debugging, or any test_*.py files.
+description: >
+  Use when writing Python tests with pytest. Apply for
+  fixtures, mocking, parametrization, property-based
+  testing, flaky tests, test isolation issues, data
+  validation, AssertionError debugging, or any
+  test_*.py files.
 ---
 
 # Python Testing with pytest

@@ -1,6 +1,12 @@
 ---
 name: code-marimo
-description: Use when creating reactive Python notebooks, building data analysis dashboards, migrating from Jupyter, or working with marimo files (.py notebooks). Also use when encountering marimo errors like "multiple definitions", "circular dependency", or "variable redeclaration".
+description: >
+  Use when creating reactive Python notebooks, building
+  data analysis dashboards, migrating from Jupyter, or
+  working with marimo files (.py notebooks). Also use
+  when encountering marimo errors like "multiple
+  definitions", "circular dependency", or "variable
+  redeclaration".
 ---
 
 # Marimo Reactive Notebooks

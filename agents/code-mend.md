@@ -1,6 +1,8 @@
 ---
 name: code-mend
-description: Use when you have identified code issues with file:line references that need surgical fixes
+description: >
+  Use when you have identified code issues with file:line
+  references that need surgical fixes
 tools:
   - Read
   - Edit

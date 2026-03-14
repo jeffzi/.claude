@@ -1,6 +1,8 @@
 ---
 name: preflight
-description: Use when about to commit changes, before code review, or when preparing a PR for submission
+description: >
+  Use when about to commit changes, before code review,
+  or when preparing a PR for submission
 argument-hint: Optional path (defaults to git diff)
 ---
 
