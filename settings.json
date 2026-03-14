@@ -30,7 +30,13 @@
       "Bash(git checkout:*)",
       "Bash(git clean:*)",
       "Bash(git reset --hard:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/secrets/*)",
+      "Read(**/*credential*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)"
     ],
     "defaultMode": "plan"
   },
