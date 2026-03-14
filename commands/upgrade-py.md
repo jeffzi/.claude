@@ -1,7 +1,10 @@
 ---
 name: upgrade-py
 description: Use when upgrading Python dependencies in lock file and pyproject.toml
-allowed-tools: Read, Grep, Edit, Bash(uv sync:*), Bash(uv pip list:*), Bash(uv tool run prek:*), Bash(uv run pytest:*)
+allowed-tools: >
+  Read, Grep, Edit, Bash(uv sync:*),
+  Bash(uv pip list:*), Bash(uv tool run prek:*),
+  Bash(uv run pytest:*)
 ---
 
 # Upgrade All Python Dependencies

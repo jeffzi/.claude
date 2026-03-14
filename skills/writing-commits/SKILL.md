@@ -1,6 +1,11 @@
 ---
 name: writing-commits
-description: Use when writing git commit messages, reviewing commits before push, or about to commit during plan execution. Apply when tempted to write vague messages like "fix bug" or "update code", or when unsure whether a commit needs a body.
+description: >
+  Use when writing git commit messages, reviewing
+  commits before push, or about to commit during plan
+  execution. Apply when tempted to write vague messages
+  like "fix bug" or "update code", or when unsure
+  whether a commit needs a body.
 ---
 
 # Commit Messages

@@ -1,6 +1,9 @@
 ---
 name: test-vet
-description: Use when reviewing test files for redundant tests, AAA violations, test desiderata, and language skill rule violations
+description: >
+  Use when reviewing test files for redundant tests,
+  AAA violations, test desiderata, and language skill
+  rule violations
 argument-hint: "[test file or directory]"
 ---
 

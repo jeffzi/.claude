@@ -1,6 +1,8 @@
 ---
 name: code-py
-description: Use when writing any Python code, regardless of perceived simplicity or prototyping context.
+description: >
+  Use when writing any Python code, regardless of
+  perceived simplicity or prototyping context.
 ---
 
 # Pythonic Code - Python Best Practices
