@@ -26,11 +26,14 @@
       "Read"
     ],
     "deny": [
-      "Bash(git push:*)",
-      "Bash(git checkout:*)",
-      "Bash(git clean:*)",
-      "Bash(git reset --hard:*)",
-      "Bash(git stash:*)",
+      "Bash(git push)",
+      "Bash(git push *)",
+      "Bash(git stash)",
+      "Bash(git stash *)",
+      "Bash(git clean)",
+      "Bash(git clean *)",
+      "Bash(git reset)",
+      "Bash(git reset *)",
       "Read(.env)",
       "Read(.env.*)",
       "Read(**/secrets/*)",
@@ -73,7 +76,39 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/jeffzi/.claude/hooks/skill-loader.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/jeffzi/.claude/hooks/gsd-check-update.js\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/jeffzi/.claude/hooks/gsd-context-monitor.js\""
+          }
+        ]
+      }
     ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "node \"/Users/jeffzi/.claude/hooks/gsd-statusline.js\""
   },
   "enabledPlugins": {
     "commit-commands@claude-plugins-official": true,
@@ -84,7 +119,8 @@
     "superpowers-developing-for-claude-code@superpowers-marketplace": true,
     "superpowers@superpowers-marketplace": true,
     "typescript-lsp@claude-plugins-official": true,
-    "superpowers-chrome@superpowers-marketplace": true
+    "superpowers-chrome@superpowers-marketplace": true,
+    "skill-creator@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "claude-plugins-official": {
