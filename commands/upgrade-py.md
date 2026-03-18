@@ -37,9 +37,9 @@ Update tasks with TaskUpdate as you progress:
   major.
 - **Floor** (`>=X.Y.Z`) — for 0.x dependencies (no upper bound). Semver treats 0.x as unstable, so
   just pin the floor to the latest installed version.
-- **Exact** (`==X.Y.Z`) — only for tools shared with prek (e.g., ruff, sqlfluff). The hook pins an
-  exact rev, so the pyproject.toml pin must match to keep behavior identical whether the tool runs
-  directly or via prek.
+- **Exact** (`==X.Y.Z`) — only for tools shared with prek (e.g., ruff). The hook pins an exact rev,
+  so the pyproject.toml pin must match to keep behavior identical whether the tool runs directly or
+  via prek.
 
 ## Steps
 
@@ -59,8 +59,8 @@ Update tasks with TaskUpdate as you progress:
 
 5. Run `uv tool run prek autoupdate` to upgrade prek hook versions
 
-6. Update pinned versions in pyproject.toml to match .pre-commit-config.yaml (ruff and sqlfluff must
-   be kept in sync between both files). If versions already match, skip to next step.
+6. Update pinned versions in pyproject.toml to match prek hook revs in .pre-commit-config.yaml (ruff
+   must be kept in sync between both files). If versions already match, skip to next step.
 
 7. Run `uv sync --all-groups` again to install the updated pinned versions (skip if no changes were
    made)
@@ -71,8 +71,9 @@ Update tasks with TaskUpdate as you progress:
 
 ## Important Notes
 
-- Exact-pinned (`==`) tools must match between pyproject.toml and .pre-commit-config.yaml. The flow
-  is: prek autoupdate bumps the hook rev → you update the `==` pin in pyproject.toml to match
+- Exact-pinned (`==`) tools must match between pyproject.toml and the prek config
+  (.pre-commit-config.yaml). The flow is: prek autoupdate bumps the hook rev → you update the `==`
+  pin in pyproject.toml to match
 - Preserve all comments in pyproject.toml
 - Unless explicitly noted, DO NOT upgrade to pre-release or alpha versions. Upgrade only to stable
   versions.
