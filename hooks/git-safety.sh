@@ -105,10 +105,25 @@ block_destructive() {
 }
 
 check_destructive_operations() {
-	# git checkout -- or checkout . (discard changes)
+	# ── Universal flags ──────────────────────────────────────────
+	# --no-verify on any git command (skips pre-commit / pre-push hooks)
+	[[ "$command" =~ --no-verify ]] &&
+		block_destructive "git --no-verify" "Skipping hooks is forbidden."
+
+	# ── Checkout / Switch ────────────────────────────────────────
+	# git checkout -- <path> or checkout . (discard changes)
 	is_git_subcmd "checkout" && [[ "$command" =~ [[:space:]](--([[:space:]]|$)|\.([[:space:]]|$)) ]] &&
 		block_destructive "git checkout (discard)" "Discards uncommitted changes permanently."
 
+	# git checkout -f / --force (force-switch discards uncommitted changes)
+	is_git_subcmd "checkout" && [[ "$command" =~ [[:space:]](-f|--force)([[:space:]]|$) ]] &&
+		block_destructive "git checkout --force" "Force-checkout discards uncommitted changes."
+
+	# git switch -f / --force / --discard-changes
+	is_git_subcmd "switch" && [[ "$command" =~ [[:space:]](-f|--force|--discard-changes)([[:space:]]|$) ]] &&
+		block_destructive "git switch --force" "Force-switch discards uncommitted changes."
+
+	# ── Reset / Clean / Stash ────────────────────────────────────
 	# git reset (all forms — even soft/mixed reset can move HEAD or unstage unexpectedly)
 	is_git_subcmd "reset" &&
 		block_destructive "git reset" "Resets HEAD, staging area, or working tree. Use git restore --staged to unstage."
@@ -121,18 +136,38 @@ check_destructive_operations() {
 	is_git_subcmd "stash" &&
 		block_destructive "git stash" "Stashing risks losing uncommitted work."
 
+	# ── Branch ───────────────────────────────────────────────────
 	# git branch -D
 	is_git_subcmd "branch" && [[ "$command" =~ [[:space:]]-D ]] &&
 		block_destructive "git branch -D" "Force-deletes branch, may lose unmerged commits."
 
+	# ── Restore ──────────────────────────────────────────────────
 	# git restore without --staged discards changes
 	is_git_subcmd "restore" && [[ ! "$command" =~ --staged ]] &&
 		block_destructive "git restore (discard)" "Discards uncommitted changes to files."
 
+	# ── Commit ───────────────────────────────────────────────────
 	# git commit --amend rewrites history
 	is_git_subcmd "commit" && [[ "$command" =~ --amend ]] &&
 		block_destructive "git commit --amend" "Rewrites the previous commit. Use with caution on shared branches."
 
+	# ── History extraction with redirect (overwrite working tree) ─
+	# git show / cat-file with stdout redirect (> but not 2>)
+	if is_git_subcmd "show" || is_git_subcmd "cat-file"; then
+		# Strip fd-specific redirects (2>, 3>, etc.) then check if > remains
+		local _stripped
+		_stripped=$(printf '%s' "$command" | sed 's/[0-9]>//g')
+		[[ "$_stripped" =~ \> ]] &&
+			block_destructive "git show/cat-file with redirect" \
+				"Writing git history content to files can overwrite working tree changes."
+	fi
+
+	# ── Patch reversal ───────────────────────────────────────────
+	# git apply -R / --reverse (undo applied patches)
+	is_git_subcmd "apply" && [[ "$command" =~ [[:space:]](-R|--reverse)([[:space:]]|$) ]] &&
+		block_destructive "git apply --reverse" "Reverse-applying patches can discard changes."
+
+	# ── Rebase ───────────────────────────────────────────────────
 	# git rebase with uncommitted changes
 	if is_git_subcmd "rebase"; then
 		git diff --quiet 2>/dev/null && git diff --cached --quiet 2>/dev/null && return 0
@@ -166,15 +201,54 @@ check_single_command() {
 
 		# Block broad adds (git add ., git add -A, git add -a, git add --all) if plan files would be included
 		if [[ "$command" =~ [[:space:]](\.|-[aA]|--all)([[:space:]]|$) ]]; then
+			local root
 			root=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+			local pending_files
 			pending_files=$(git -C "$root" ls-files --others --modified --exclude-standard 2>/dev/null)
 			check_plan_files "$pending_files" || exit 2
 		fi
+
+		# Block force-add with broad scope (bypasses all gitignore rules)
+		if [[ "$command" =~ [[:space:]](-f|--force)([[:space:]]|$) ]] &&
+			[[ "$command" =~ [[:space:]](\.|-[aA]|--all)([[:space:]]|$) ]]; then
+			block_destructive "git add --force (broad)" \
+				"Force-adding with broad scope bypasses gitignore and may track unwanted files."
+		fi
+
+		# Check explicitly named paths against gitignore (local + global + .git/info/exclude)
+		local _found_add=false _past_dashdash=false
+		local -a _add_paths=()
+		for _word in $command; do
+			if ! $_found_add; then
+				[[ "$_word" == "add" ]] && _found_add=true
+				continue
+			fi
+			if [[ "$_word" == "--" ]]; then
+				_past_dashdash=true
+				continue
+			fi
+			if $_past_dashdash; then
+				_add_paths+=("$_word")
+				continue
+			fi
+			case "$_word" in
+			-* | .) continue ;; # skip flags and broad-scope dot
+			*) _add_paths+=("$_word") ;;
+			esac
+		done
+		for _path in "${_add_paths[@]}"; do
+			if git check-ignore -q -- "$_path" 2>/dev/null; then
+				block_destructive "git add (gitignored)" \
+					"'$_path' matches a gitignore rule (local or global). Do not track ignored files."
+			fi
+		done
 	fi
 
 	# Block commits if plan files are already staged
 	if is_git_subcmd "commit"; then
+		local root
 		root=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+		local staged_files
 		staged_files=$(git -C "$root" diff --cached --name-only 2>/dev/null)
 		check_plan_files "$staged_files" || exit 2
 	fi
@@ -203,15 +277,16 @@ check_single_command() {
 	check_destructive_operations
 }
 
-# Split chained commands (&&, ||, ;) and check each independently.
+# Split chained commands (&&, ||, ;, |) and check each independently.
 # This prevents bypasses like: git add . && git checkout -- .
 # where only the first git subcommand would otherwise be checked.
+# Order matters: || before | to avoid partial replacement.
 while IFS= read -r subcmd; do
 	# Trim leading/trailing whitespace
 	subcmd="${subcmd#"${subcmd%%[![:space:]]*}"}"
 	subcmd="${subcmd%"${subcmd##*[![:space:]]}"}"
 	[[ -z "$subcmd" ]] && continue
 	check_single_command "$subcmd"
-done <<<"$(printf '%s' "$full_command" | awk '{gsub(/&&/,"\n"); gsub(/\|\|/,"\n"); gsub(/;/,"\n"); print}')"
+done <<<"$(printf '%s' "$full_command" | awk '{gsub(/&&/,"\n"); gsub(/\|\|/,"\n"); gsub(/\|/,"\n"); gsub(/;/,"\n"); print}')"
 
 exit 0
