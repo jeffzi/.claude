@@ -7,13 +7,17 @@
 Never run any command that could destroy, overwrite, or discard uncommitted work. Always ask the
 user first and explain why. This includes but is not limited to:
 
-- **Git**: `checkout --`, `reset` (all forms including `reset HEAD`), `clean`, `stash`, `restore`
-  (without `--staged`), `push --force`, `rebase` (with uncommitted changes), `branch -D`,
-  `commit --amend`, or `--no-verify`. To unstage files, use `git restore --staged <path>` instead of
-  `git reset`.
-- **File deletion**: `rm`, `rm -rf`, `unlink`, or any command that removes files.
+- **Git (discarding changes)**: `checkout --`, `checkout -f`/`--force`, `switch -f`/`--force`/
+  `--discard-changes`, `restore` (without `--staged`), `reset` (all forms including `reset HEAD`),
+  `clean`, `stash`, `apply -R`/`--reverse`. To unstage files, use `git restore --staged <path>`
+  instead of `git reset`.
+- **Git (rewriting history / bypassing safeguards)**: `commit --amend`, `push --force`, `rebase`
+  (with uncommitted changes), `branch -D`, `--no-verify` on any command.
+- **Git (tracking ignored files)**: `add -f`/`--force` on gitignored files. Never force-add files
+  that match a local or global gitignore rule.
 - **File overwriting**: Reading content from git history (`git show`, `git cat-file`) and writing it
-  back via Write/Edit tools to revert a file.
+  back via Write/Edit tools or shell redirects (`git show HEAD:file > file`) to revert a file.
+- **File deletion**: `rm`, `rm -rf`, `unlink`, or any command that removes files.
 - **Shell redirects**: Truncating files via `> file` or `echo "" > file`.
 - **Worktrees**: `git worktree remove` or `ExitWorktree` when the worktree has uncommitted changes.
   Always commit work before leaving a worktree.
@@ -94,6 +98,12 @@ declare it "out of scope." Go straight to root cause.
 | "That was already there / inherent / unavoidable" | Reworded deflection. Investigate alternatives.  |
 | "My fix didn't cause this new issue"              | The user reported a problem. Fix it.            |
 
+### Plans describe behaviors, not TDD steps
+
+Plan tasks describe **what to build** (behaviors, files, approach), not **how to TDD it**. Never
+inline RED/GREEN steps, test assertions, or implementation code in a plan. Each plan task ends with
+"Use `/tdd` for implementation."
+
 ### Load relevant skills in plans
 
 When creating an implementation plan, always load the relevant language/tech skills as the first
@@ -109,9 +119,8 @@ were loaded during planning. Never mark a skill as "already loaded".
 If no matching skill exists for a language or framework, note that explicitly in the plan rather
 than silently skipping the step.
 
-### Disabled superpowers skills
+### Superpowers plugin is disabled
 
-Never use these skills from the superpowers plugin: `requesting-code-review`,
-`finishing-a-development-branch`, `receiving-code-review`, `test-driven-development`. They duplicate
-or conflict with the TDD, commit, and review workflows already defined in this file and in custom
-skills (`/tdd`, `/preflight`, `/commit`).
+The `superpowers@superpowers-marketplace` plugin is disabled. All workflow skills are local forks in
+`~/.claude/skills/` (`using-skills`, `verification-before-completion`, `systematic-debugging`).
+Never use `superpowers:*` skills — use the local equivalents instead.
