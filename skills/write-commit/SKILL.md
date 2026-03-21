@@ -1,5 +1,5 @@
 ---
-name: writing-commits
+name: write-commit
 description: >
   Use when writing git commit messages, reviewing
   commits before push, or about to commit during plan
@@ -66,13 +66,14 @@ footer, not as the message.
 
 ## Anti-Patterns
 
-| Pattern                               | Problem                                                  |
-| ------------------------------------- | -------------------------------------------------------- |
-| "Fix bug", "update code", "misc"      | Zero information — forces everyone to read the diff      |
-| "Fix JIRA-1234" (ticket only)         | Requires browser + tracker; breaks when tracker migrates |
-| "Change X from 5 to 10"               | Narrates the diff — explain _why_ the constant changed   |
-| "Address review comments"             | Meaningless outside PR context                           |
-| Auto-committing during plan execution | User loses ability to review before commit; hard to undo |
+| Pattern                               | Problem                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------------ |
+| "Fix bug", "update code", "misc"      | Zero information — forces everyone to read the diff                      |
+| "Fix JIRA-1234" (ticket only)         | Requires browser + tracker; breaks when tracker migrates                 |
+| "Change X from 5 to 10"               | Narrates the diff — explain _why_ the constant changed                   |
+| "Address review comments"             | Meaningless outside PR context                                           |
+| Auto-committing during plan execution | User loses ability to review before commit; hard to undo                 |
+| Internal tooling refs in message      | Skill names, agent names, phase IDs, planning conventions leak internals |
 
 ## Rationalization Guard
 
