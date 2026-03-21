@@ -1,9 +1,53 @@
 # CLAUDE.md
 
-This is the global Claude Code configuration directory. It contains custom skills (`skills/`),
-subagent definitions (`agents/`), hooks (`hooks/`), slash commands (`commands/`), and settings.
+This is the global Claude Code configuration directory.
+
+## Directory layout
+
+```text
+skills/          # SKILL.md definitions (code-py, tdd, write-doc, etc.)
+agents/          # Subagent definitions (tdd-red, tdd-green, gsd-*, code-distill, etc.)
+commands/        # Slash commands (gsd/*, preflight, vet-code, vet-test, upgrade-*)
+hooks/           # Pre/post hooks (git-safety, worktree-safety, skill-loader, etc.)
+scripts/         # Helper scripts
+plugins/         # Third-party plugin cache
+projects/        # Per-project memory and settings
+get-shit-done/   # GSD workflow engine (commands, agents, skills)
+settings.json    # Shared settings (permissions, env vars, MCP servers)
+settings.local.json # Local-only settings (gitignored)
+```
 
 ## Rules
+
+### Fix issues you encounter — don't deflect
+
+When you discover an issue during work or the user asks about one after the main task, fix it
+properly. Go straight to root cause.
+
+**Zero blame attribution.** Never comment on who or what introduced a bug. No "pre-existing", "not
+related to my changes", "unrelated to [current task]", "introduced before this PR." The user does
+not care about provenance. Stating it is deflection even when factually true. If your response
+contains a clause that assigns origin, delete the clause. Present the diagnosis and offer to fix —
+nothing else.
+
+**Red flags — if your draft contains any of these words/phrases, delete them:**
+
+- "pre-existing" / "not from my changes" / "unrelated to" / "introduced before"
+- "already there" / "inherent" / "unavoidable" / "not caused by"
+- Any sentence explaining what DID NOT cause the bug
+
+**Rationalizations to block** — if you think any of these, STOP and rewrite without the excuse:
+
+| Excuse                                            | Reality                                         |
+| ------------------------------------------------- | ----------------------------------------------- |
+| "This isn't from my changes"                      | Irrelevant. You found it, you fix it.           |
+| "This is a pre-existing bug"                      | Now it's your bug. Fix it properly.             |
+| "This is unrelated to [current task]"             | You found it during [current task]. Fix it.     |
+| "This is outside the scope"                       | The user is asking you. That makes it in scope. |
+| "Let me add a quick workaround"                   | Investigate the root cause. Do the proper fix.  |
+| "Let me revert and leave it as-is"                | Don't give up. Iterate toward the real fix.     |
+| "That was already there / inherent / unavoidable" | Reworded deflection. Investigate alternatives.  |
+| "My fix didn't cause this new issue"              | The user reported a problem. Fix it.            |
 
 ### No destructive operations without explicit permission
 
@@ -41,7 +85,7 @@ the plan from step 1 would destroy it. Pick up where you left off based on the g
 If a worktree already exists at the expected path, enter it and continue — never remove and recreate
 it.
 
-### TDD — mandatory, non-negotiable
+### TDD
 
 When asked to fix a bug or implement a feature/behavior change and the project has a test suite, you
 **MUST** follow TDD. Do NOT touch production code until a failing test proves the need. No
@@ -69,24 +113,6 @@ module or area being fixed has no tests yet. That's where you add them.
 originals from the backup, write the failing test, watch it fail, then copy the fixed files back. Do
 not use git commands to revert — just file copies. The test must fail before the fix lands — that's
 the proof it catches the bug.
-
-### Fix issues you encounter — don't deflect
-
-When you discover an issue during work or the user asks about one after the main task, fix it
-properly. No blame attribution. No scope gatekeeping. Don't deflect blame, apply workarounds, then
-declare it "out of scope." Go straight to root cause.
-
-**Rationalizations to block** — if you think any of these, STOP:
-
-| Excuse                                            | Reality                                         |
-| ------------------------------------------------- | ----------------------------------------------- |
-| "This isn't from my changes"                      | Irrelevant. You found it, you fix it.           |
-| "This is a pre-existing issue"                    | Now it's your issue. Fix it properly.           |
-| "This is outside the scope"                       | The user is asking you. That makes it in scope. |
-| "Let me add a quick workaround"                   | Investigate the root cause. Do the proper fix.  |
-| "Let me revert and leave it as-is"                | Don't give up. Iterate toward the real fix.     |
-| "That was already there / inherent / unavoidable" | Reworded deflection. Investigate alternatives.  |
-| "My fix didn't cause this new issue"              | The user reported a problem. Fix it.            |
 
 ### No internal tooling leaks in user-facing output
 
