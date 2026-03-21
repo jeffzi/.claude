@@ -92,13 +92,15 @@ pending/in_progress, you are NOT done. Keep going.
 
 ### Step 2: Cleanup
 
-- [ ] Split target files into implementation files and test files
-- [ ] Dispatch two agents in parallel (single message, two **Agent** tool calls):
+- [ ] Split target files into implementation files, test files, and documentation files (`.md`)
+- [ ] Dispatch agents in parallel (single message, one **Agent** tool call per non-empty bucket):
   - **Agent A (impl):** "Simplify then review these implementation files: [list]. First apply
     code-distill. Then invoke `/vet-code`. If vet-code made changes, re-run `/vet-code` (max 3
     passes total)."
   - **Agent B (tests):** "Simplify then review these test files: [list]. First apply code-distill.
     Then invoke `/vet-test`. If vet-test made changes, re-run `/vet-test` (max 3 passes total)."
+  - **Agent C (docs):** "Review these documentation files: [list]. Invoke `/vet-doc`. If vet-doc
+    made changes, re-run `/vet-doc` (max 3 passes total)."
 
 → **TaskUpdate** task 2 to `completed`. **TaskUpdate** task 3 to `in_progress`. Continue silently.
 
@@ -114,8 +116,9 @@ Each iteration:
 
    | Agent                | Focus                                               | When                 |
    | -------------------- | --------------------------------------------------- | -------------------- |
-   | Bug Scanner          | Null access, off-by-one, leaks, races, logic errors | Always               |
+   | Bug Scanner          | Null access, off-by-one, leaks, races, logic errors | If code files found  |
    | CLAUDE.md Compliance | Convention violations                               | If conventions found |
+   | Doc Reviewer         | Structure, prose, accessibility, AI-writing         | If doc files found   |
 
    **Review scope depends on input mode:**
    - **Path argument**: Review entire file(s) - flag any issues found
@@ -131,11 +134,13 @@ Each iteration:
    | **≥ 75** | Verified important | **Auto-fix** |
    | 100      | Definite, frequent | Auto-fix     |
 
-3. **Fix issues with score ≥75** using **Agent** tool with `subagent_type: code-mend`
+3. **Fix issues with score ≥75:**
+   - Code issues → **Agent** tool with `subagent_type: code-mend`
+   - Doc issues → fix inline (Edit tool) applying `write-doc` and `write-prose` rules
 
 4. **Decision point:**
-   - If fixes applied AND iterations < 3 → invoke `vet-code` and `vet-test` (if test files) → repeat
-     from step 1
+   - If fixes applied AND iterations < 3 → invoke `vet-code`, `vet-test` (if test files), and
+     `vet-doc` (if doc files) → repeat from iteration step 1
    - If no fixes OR iterations = 3 → proceed to Step 4
 
 **False Positives (score = 0, discard):**
@@ -144,6 +149,7 @@ Each iteration:
 - Linter/typechecker would catch (unused imports, missing type hints, style violations)
 - General quality without CLAUDE.md backing
 - Silenced by ignore comments
+- Stylistic prose preferences without `write-doc` rule backing
 
 ⚠️ **CHECKPOINT: Only exit loop when no fixes needed OR 3 iterations done.**
 
@@ -198,5 +204,5 @@ Generate the final report. **This is your FIRST text output since the start anno
 
 - ❌ Sequential agent dispatch → use parallel (single message, multiple **Agent** tool calls)
 - ❌ Auto-fixing linter issues → run `ruff --fix` instead
-- ❌ Skipping "test files" or "examples" → treat all files uniformly
+- ❌ Skipping "test files", "doc files", or "examples" → treat all files uniformly
 - ❌ Fixing pre-existing issues → only fix what's in your diff (no-argument mode only)
