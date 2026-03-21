@@ -135,6 +135,3 @@ BAD Trust agent report
 Run the command. Read the output. THEN claim the result.
 
 This is non-negotiable.
-
-```
-```

@@ -246,6 +246,18 @@ monthly = mo.sql(f"""
 
 **After fixing issues, always run:** `uv run marimo check --fix notebook.py && uv run notebook.py`
 
+## Rationalizations That Mean You're About to Fail
+
+| Excuse                                         | Reality                                                     |
+| ---------------------------------------------- | ----------------------------------------------------------- |
+| "I'll just use `global` for this one variable" | `global` breaks marimo's tracking. Use cell returns.        |
+| "`on_change` callbacks are more explicit"      | Callbacks are unnecessary — reactivity handles it.          |
+| "`mo.state()` gives me more control"           | `mo.state()` is a footgun. Use UI element `.value` instead. |
+| "I can redeclare this in another cell"         | One cell per variable. Extract shared logic to a helper.    |
+| "Mutating this list in place is fine"          | Mutations don't trigger reactivity. Create new objects.     |
+| "Cell names don't matter"                      | Unnamed cells make debugging and navigation harder.         |
+| "I'll skip the `defaults` cell for now"        | Default values prevent stale UI state across restarts.      |
+
 ## Testing and Validation
 
 **MANDATORY before completing any task:**
