@@ -241,7 +241,3 @@ shellcheck *.sh      # Lint for issues
 
 Key ShellCheck codes: SC2086 (quote expansion), SC2046 (quote command sub), SC2006 (use $()), SC2004
 (unnecessary $), SC2034 (unused variable).
-
-## Related Commands
-
-- `/vet` - Vet shell scripts against these rules

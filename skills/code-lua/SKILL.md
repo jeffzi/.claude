@@ -171,7 +171,3 @@ busted --coverage && luacov # Coverage (if .luacov exists)
 ```
 
 **Task is NOT complete until all pass.**
-
-## Related Commands
-
-- `/vet` - Vet Lua code against these rules
