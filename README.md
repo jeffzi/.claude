@@ -45,16 +45,16 @@ commands, agents, hooks, and settings.
 
 #### Writing
 
-| Skill                                          | Description                                          |
-| ---------------------------------------------- | ---------------------------------------------------- |
-| [`write-doc`](skills/write-doc/SKILL.md)       | Documentation structure and information architecture |
-| [`write-prose`](skills/write-prose/SKILL.md)   | Sentence-level clarity (Strunk's rules)              |
-| [`write-commit`](skills/write-commit/SKILL.md) | Git commit message quality                           |
-| [`write-skill`](skills/write-skill/SKILL.md)   | Author and review SKILL.md files                     |
-| [`write-plan`](skills/write-plan/SKILL.md)     | Multi-step implementation plans                      |
-| [`humanizer`](skills/humanizer/SKILL.md)       | Detect and remove AI-generated writing patterns      |
-| [`vet-doc`](skills/vet-doc/SKILL.md)           | Review docs for structural and prose issues          |
-| [`changelog`](skills/changelog/SKILL.md)       | Keep a Changelog standard for CHANGELOG.md           |
+| Skill                                                | Description                                          |
+| ---------------------------------------------------- | ---------------------------------------------------- |
+| [`write-doc`](skills/write-doc/SKILL.md)             | Documentation structure and information architecture |
+| [`write-prose`](skills/write-prose/SKILL.md)         | Sentence-level clarity (Strunk's rules)              |
+| [`write-commit`](skills/write-commit/SKILL.md)       | Git commit message quality                           |
+| [`write-skill`](skills/write-skill/SKILL.md)         | Author and review SKILL.md files                     |
+| [`write-plan`](skills/write-plan/SKILL.md)           | Multi-step implementation plans                      |
+| [`humanizer`](skills/humanizer/SKILL.md)             | Detect and remove AI-generated writing patterns      |
+| [`vet-doc`](skills/vet-doc/SKILL.md)                 | Review docs for structural and prose issues          |
+| [`write-changelog`](skills/write-changelog/SKILL.md) | Keep a Changelog standard for CHANGELOG.md           |
 
 #### Process
 

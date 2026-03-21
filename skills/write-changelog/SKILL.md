@@ -1,5 +1,5 @@
 ---
-name: changelog
+name: write-changelog
 description: >
   Use when writing, reviewing, or modifying CHANGELOG.md
   files. Apply for new changelogs, release entries, or
