@@ -4,6 +4,7 @@
 # Allow config files
 !.gitignore
 !.pre-commit-config.yaml
+!dprint.json
 !.markdownlint-cli2.jsonc
 !settings.json
 !README.md
