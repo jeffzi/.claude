@@ -1,5 +1,8 @@
 # CLAUDE.md
 
+This is the global Claude Code configuration directory. It contains custom skills (`skills/`),
+subagent definitions (`agents/`), hooks (`hooks/`), slash commands (`commands/`), and settings.
+
 ## Rules
 
 ### No destructive operations without explicit permission
@@ -67,19 +70,6 @@ originals from the backup, write the failing test, watch it fail, then copy the 
 not use git commands to revert — just file copies. The test must fail before the fix lands — that's
 the proof it catches the bug.
 
-**Rationalizations to block** — if you think any of these, STOP:
-
-| Excuse                                  | Reality                                                               |
-| --------------------------------------- | --------------------------------------------------------------------- |
-| "The fix is obvious / trivial"          | Obvious fixes break obvious assumptions. Test first.                  |
-| "I'll add a test after the fix"         | A test that never failed proves nothing. Test first.                  |
-| "This is a one-liner"                   | One-liners still need proof they work. Test first.                    |
-| "The bug is in code without tests"      | That's exactly where you add them. Test first.                        |
-| "Let me just fix it quickly first"      | This is the exact failure mode this rule exists to prevent.           |
-| "This is a new feature, not a bug fix"  | TDD applies to features too.                                          |
-| "I need to see the whole picture first" | That's exploration. Delete it, start with TDD.                        |
-| "Let me batch these together"           | Batch related concerns only. Unrelated behaviors get separate cycles. |
-
 ### Fix issues you encounter — don't deflect
 
 When you discover an issue during work or the user asks about one after the main task, fix it
@@ -97,6 +87,28 @@ declare it "out of scope." Go straight to root cause.
 | "Let me revert and leave it as-is"                | Don't give up. Iterate toward the real fix.     |
 | "That was already there / inherent / unavoidable" | Reworded deflection. Investigate alternatives.  |
 | "My fix didn't cause this new issue"              | The user reported a problem. Fix it.            |
+
+### No internal tooling leaks in user-facing output
+
+Never expose internal tooling details in commits, PRs, code comments, or any output visible to
+people outside this Claude session. This includes:
+
+- **GSD IDs and planning references**: phase IDs (`01-01`, `phase-3`), plan IDs (`EXEC-04`),
+  milestone labels, or any `.planning/` artifact names.
+- **Skill names and invocations**: `/tdd`, `/preflight`, `code-py`, `tdd-red`, `tdd-green`,
+  `code-distill`, `code-vet`, `test-vet`, or any skill/agent name.
+- **Internal conventions**: references to "the orchestrator", "RED-GREEN cycle", "circuit breaker",
+  subagent dispatch patterns, or any process that only exists within Claude's workflow.
+
+Commit messages, PR descriptions, and code comments describe **what was built or fixed** — not the
+tooling or process that produced it.
+
+- **Bad**: `feat(01-02): implement CLI module`
+- **Bad**: `fix: resolve bug found during /tdd RED phase`
+- **Bad**: `# Added per code-vet recommendation`
+- **Good**: `feat: implement CLI module and entrypoint`
+- **Good**: `fix: reject empty email in form submission`
+- **Good**: `# Validate email before processing`
 
 ### Plans describe behaviors, not TDD steps
 
@@ -118,9 +130,3 @@ were loaded during planning. Never mark a skill as "already loaded".
 
 If no matching skill exists for a language or framework, note that explicitly in the plan rather
 than silently skipping the step.
-
-### Superpowers plugin is disabled
-
-The `superpowers@superpowers-marketplace` plugin is disabled. All workflow skills are local forks in
-`~/.claude/skills/` (`using-skills`, `verification-before-completion`, `systematic-debugging`).
-Never use `superpowers:*` skills — use the local equivalents instead.

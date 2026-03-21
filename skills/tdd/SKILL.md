@@ -33,18 +33,16 @@ Thinking "skip TDD just this once"? Stop. That's rationalization.
 
 ## Plans and TDD
 
-Plans must describe **behaviors to implement**, not inline RED/GREEN steps. A plan that specifies
-both test details and implementation details in the same document defeats context isolation — the
-implementation agent sees everything and just executes linearly.
+Plans describe **behaviors to implement**, not inline RED/GREEN steps. Never inline test assertions
+or implementation code in plan tasks.
 
-**Good plan:** "Behaviors: (1) HMAC-based anonymization (2) seed parameter for reproducibility. Use
-`/tdd` for implementation."
+A plan that contains both test assertions and implementation code defeats context isolation — the
+RED agent should write tests without seeing implementation plans, and the GREEN agent should write
+code guided only by failing tests. When the plan inlines both, that isolation is broken.
 
-**Bad plan:** "Step 1 — RED: Update test X to assert hex strings. Step 2 — GREEN: Add
-`hmac.new(...)` to `_anonymize.py`."
+**Good:** "Behaviors: (1) resolve by name (2) resolve by type. Use `/tdd` for implementation."
 
-The plan may describe the API design and high-level approach, but must NOT prescribe specific test
-assertions or implementation code. That's `/tdd`'s job.
+**Bad:** "RED: assert X created. GREEN: fix lookup to use Y." — prescribes test + impl in one place.
 
 ## The Iron Law
 
@@ -357,25 +355,26 @@ are biased by your implementation. 30 minutes of tests after is not TDD.
 
 ## Common Rationalizations
 
-| Excuse                                  | Reality                                                                                      |
-| --------------------------------------- | -------------------------------------------------------------------------------------------- |
-| "Too simple to test"                    | Simple code breaks. Test takes 30 seconds.                                                   |
-| "I'll test after"                       | Tests passing immediately prove nothing.                                                     |
-| "Tests after achieve same goals"        | Tests-after = "what does this do?" Tests-first = "what should this do?"                      |
-| "Already manually tested"               | Ad-hoc, no record, can't re-run.                                                             |
-| "Deleting X hours is wasteful"          | Sunk cost fallacy. Keeping unverified code is technical debt.                                |
-| "Keep as reference, write tests first"  | You'll adapt it. That's testing after. Delete means delete.                                  |
-| "Need to explore first"                 | Fine. Throw away exploration, start with TDD.                                                |
-| "Test hard = design unclear"            | Listen to test. Hard to test = hard to use.                                                  |
-| "TDD will slow me down"                 | TDD faster than debugging. Pragmatic = test-first.                                           |
-| "This is a new feature, not a bug fix"  | TDD applies to features too.                                                                 |
-| "I need to see the whole picture first" | That's exploration. Delete it, start with TDD.                                               |
-| "Existing code has no tests"            | You're improving it. Add tests for existing code.                                            |
-| "I can orchestrate the agents myself"   | The skill IS the orchestrator. Invoke `/tdd`.                                                |
-| "The plan already has RED/GREEN steps"  | Plans describe behaviors, not test/impl details. Use `/tdd`.                                 |
-| "I already know RED-GREEN-REFACTOR"     | Knowing the pattern ≠ following the discipline. Invoke the skill.                            |
-| "Each test needs its own cycle"         | Cohesive tests (same function, same failure reason) batch together. Don't waste cycles.      |
-| "I'll batch these unrelated tests"      | Different modules/failure reasons = separate cycles. Batching ≠ dumping everything together. |
+| Excuse                                  | Reality                                                                                          |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| "Too simple to test"                    | Simple code breaks. Test takes 30 seconds.                                                       |
+| "I'll test after"                       | Tests passing immediately prove nothing.                                                         |
+| "Tests after achieve same goals"        | Tests-after = "what does this do?" Tests-first = "what should this do?"                          |
+| "Already manually tested"               | Ad-hoc, no record, can't re-run.                                                                 |
+| "Deleting X hours is wasteful"          | Sunk cost fallacy. Keeping unverified code is technical debt.                                    |
+| "Keep as reference, write tests first"  | You'll adapt it. That's testing after. Delete means delete.                                      |
+| "Need to explore first"                 | Fine. Throw away exploration, start with TDD.                                                    |
+| "Test hard = design unclear"            | Listen to test. Hard to test = hard to use.                                                      |
+| "TDD will slow me down"                 | TDD faster than debugging. Pragmatic = test-first.                                               |
+| "This is a new feature, not a bug fix"  | TDD applies to features too.                                                                     |
+| "I need to see the whole picture first" | That's exploration. Delete it, start with TDD.                                                   |
+| "Existing code has no tests"            | You're improving it. Add tests for existing code.                                                |
+| "I can orchestrate the agents myself"   | The skill IS the orchestrator. Invoke `/tdd`.                                                    |
+| "The plan already has RED/GREEN steps"  | Plans describe behaviors, not test/impl details. Use `/tdd`.                                     |
+| "The plan template shows inline code"   | Plan templates with inline test/impl code don't apply to TDD. Describe behaviors + "Use `/tdd`". |
+| "I already know RED-GREEN-REFACTOR"     | Knowing the pattern ≠ following the discipline. Invoke the skill.                                |
+| "Each test needs its own cycle"         | Cohesive tests (same function, same failure reason) batch together. Don't waste cycles.          |
+| "I'll batch these unrelated tests"      | Different modules/failure reasons = separate cycles. Batching ≠ dumping everything together.     |
 
 ## Red Flags — STOP and Start Over
 
@@ -394,6 +393,7 @@ are biased by your implementation. 30 minutes of tests after is not TDD.
 - "This is different because..."
 - Dispatching `tdd-red`/`tdd-green` without invoking `/tdd` first
 - Plan with inline RED/GREEN steps (test assertions + implementation code)
+- Following a plan template that inlines test assertions and implementation code
 
 **All of these mean: Delete code. Start over with TDD.**
 
