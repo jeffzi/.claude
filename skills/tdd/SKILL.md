@@ -71,7 +71,7 @@ GREEN phases. Each agent sees only what it needs.
 | -------- | ------------ | ----------------------------- | ------------------------------------------- |
 | RED      | `tdd-red`    | Tests, type stubs, public API | Implementation source                       |
 | GREEN    | `tdd-green`  | Everything                    | Cannot modify test files                    |
-| REFACTOR | `/preflight` | Everything                    | N/A (runs code-distill, code-vet, test-vet) |
+| REFACTOR | `/preflight` | Everything                    | N/A (runs code-distill, vet-code, vet-test) |
 
 ### Mandatory Entry Point
 
@@ -146,8 +146,8 @@ LOOP (one behavior group per cycle):
   REFACTOR:
     9.  Split CHANGED_FILES into implementation files and test files
     10. Dispatch two agents in parallel (single message, two Agent tool calls):
-        - Agent A: code-distill → code-vet (→ code-vet again if changes) on impl files
-        - Agent B: code-distill → test-vet (→ test-vet again if changes) on test files
+        - Agent A: code-distill → vet-code (→ vet-code again if changes) on impl files
+        - Agent B: code-distill → vet-test (→ vet-test again if changes) on test files
     11. If any fixes applied, re-run test suite to confirm tests still green
 
   CONTINUE:
@@ -281,11 +281,11 @@ Split changed files into implementation files and test files. Dispatch two agent
 
 - **Agent A (impl):** general-purpose agent. "Simplify then review these implementation files:
   [list]. First apply code-distill (reduce complexity, DRY, naming, dead code). Then invoke
-  `/code-vet` on the same files. If code-vet made changes, run `/code-vet` once more (max 2
+  `/vet-code` on the same files. If vet-code made changes, run `/vet-code` once more (max 2
   passes)."
 - **Agent B (tests):** general-purpose agent. "Simplify then review these test files: [list]. First
-  apply code-distill (reduce complexity, DRY, naming, dead code). Then invoke `/test-vet` on the
-  same files. If test-vet made changes, run `/test-vet` once more (max 2 passes)."
+  apply code-distill (reduce complexity, DRY, naming, dead code). Then invoke `/vet-test` on the
+  same files. If vet-test made changes, run `/vet-test` once more (max 2 passes)."
 
 Each agent runs distill → vet → (if changes) vet again, sequentially in its own context. The vet
 benefits from seeing what was simplified, and a second pass catches improvements created by the

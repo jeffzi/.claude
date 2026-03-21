@@ -1,5 +1,5 @@
 ---
-name: code-vet
+name: vet-code
 description: Use when reviewing code files for language skill rule and pitfall violations
 argument-hint: "[file or directory]"
 ---
@@ -56,7 +56,7 @@ For directories, detect from file extensions present.
 **When called from preflight or another workflow:** Output NOTHING. Accumulate findings internally
 for the caller. The parent workflow controls all output.
 
-**When called standalone (direct `/code-vet` invocation):**
+**When called standalone (direct `/vet-code` invocation):**
 
 - Verification commands: Show name + pass/fail. If skipped, briefly note why.
 - Violations: List ONLY violations found with file:line and brief description.

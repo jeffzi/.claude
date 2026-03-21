@@ -1,5 +1,5 @@
 ---
-name: doc-vet
+name: vet-doc
 description: |
   Use when reviewing READMEs, guides, tutorials, reference docs, or any documentation file for
   structural issues, prose quality violations, and anti-patterns. Also use after writing docs to
