@@ -75,6 +75,16 @@
             "command": "/Users/jeffzi/.claude/hooks/worktree-safety.sh"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"/Users/jeffzi/.claude/hooks/gsd-prompt-guard.js\"",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SessionStart": [
@@ -97,10 +107,12 @@
     ],
     "PostToolUse": [
       {
+        "matcher": "Bash|Edit|Write|MultiEdit|Agent|Task",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"/Users/jeffzi/.claude/hooks/gsd-context-monitor.js\""
+            "command": "node \"/Users/jeffzi/.claude/hooks/gsd-context-monitor.js\"",
+            "timeout": 10
           }
         ]
       }
@@ -111,28 +123,19 @@
     "command": "node \"/Users/jeffzi/.claude/hooks/gsd-statusline.js\""
   },
   "enabledPlugins": {
+    "claude-md-management@claude-plugins-official": true,
     "commit-commands@claude-plugins-official": true,
-    "elements-of-style@superpowers-marketplace": true,
     "lua-lsp@claude-plugins-official": true,
     "rust-analyzer-lsp@claude-plugins-official": true,
     "scientific-skills@claude-scientific-skills": true,
-    "superpowers-developing-for-claude-code@superpowers-marketplace": true,
-    "superpowers@superpowers-marketplace": true,
-    "typescript-lsp@claude-plugins-official": true,
-    "superpowers-chrome@superpowers-marketplace": true,
-    "skill-creator@claude-plugins-official": true
+    "skill-creator@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "claude-plugins-official": {
       "source": {
         "source": "github",
         "repo": "anthropics/claude-plugins-official"
-      }
-    },
-    "superpowers-marketplace": {
-      "source": {
-        "source": "github",
-        "repo": "obra/superpowers-marketplace"
       }
     },
     "claude-scientific-skills": {
