@@ -96,7 +96,7 @@ people outside this Claude session. This includes:
 - **GSD IDs and planning references**: phase IDs (`01-01`, `phase-3`), plan IDs (`EXEC-04`),
   milestone labels, or any `.planning/` artifact names.
 - **Skill names and invocations**: `/tdd`, `/preflight`, `code-py`, `tdd-red`, `tdd-green`,
-  `code-distill`, `code-vet`, `test-vet`, or any skill/agent name.
+  `code-distill`, `vet-code`, `vet-test`, or any skill/agent name.
 - **Internal conventions**: references to "the orchestrator", "RED-GREEN cycle", "circuit breaker",
   subagent dispatch patterns, or any process that only exists within Claude's workflow.
 
@@ -105,7 +105,7 @@ tooling or process that produced it.
 
 - **Bad**: `feat(01-02): implement CLI module`
 - **Bad**: `fix: resolve bug found during /tdd RED phase`
-- **Bad**: `# Added per code-vet recommendation`
+- **Bad**: `# Added per vet-code recommendation`
 - **Good**: `feat: implement CLI module and entrypoint`
 - **Good**: `fix: reject empty email in form submission`
 - **Good**: `# Validate email before processing`

@@ -1,5 +1,5 @@
 ---
-name: test-vet
+name: vet-test
 description: >
   Use when reviewing test files for redundant tests,
   AAA violations, test desiderata, and language skill
@@ -160,7 +160,7 @@ For directories, find all test files recursively. **Only vet test files — neve
 **When called from preflight or another workflow:** Output NOTHING. Accumulate findings internally
 for the caller. The parent workflow controls all output.
 
-**When called standalone (direct `/test-vet` invocation):**
+**When called standalone (direct `/vet-test` invocation):**
 
 - Verification commands: Show name + pass/fail. If skipped, briefly note why.
 - Violations: List ONLY violations found with file:line and brief description.

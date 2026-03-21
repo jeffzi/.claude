@@ -95,10 +95,10 @@ pending/in_progress, you are NOT done. Keep going.
 - [ ] Split target files into implementation files and test files
 - [ ] Dispatch two agents in parallel (single message, two **Agent** tool calls):
   - **Agent A (impl):** "Simplify then review these implementation files: [list]. First apply
-    code-distill. Then invoke `/code-vet`. If code-vet made changes, re-run `/code-vet` (max 3
+    code-distill. Then invoke `/vet-code`. If vet-code made changes, re-run `/vet-code` (max 3
     passes total)."
   - **Agent B (tests):** "Simplify then review these test files: [list]. First apply code-distill.
-    Then invoke `/test-vet`. If test-vet made changes, re-run `/test-vet` (max 3 passes total)."
+    Then invoke `/vet-test`. If vet-test made changes, re-run `/vet-test` (max 3 passes total)."
 
 → **TaskUpdate** task 2 to `completed`. **TaskUpdate** task 3 to `in_progress`. Continue silently.
 
@@ -134,7 +134,7 @@ Each iteration:
 3. **Fix issues with score ≥75** using **Agent** tool with `subagent_type: code-mend`
 
 4. **Decision point:**
-   - If fixes applied AND iterations < 3 → invoke `code-vet` and `test-vet` (if test files) → repeat
+   - If fixes applied AND iterations < 3 → invoke `vet-code` and `vet-test` (if test files) → repeat
      from step 1
    - If no fixes OR iterations = 3 → proceed to Step 4
 
