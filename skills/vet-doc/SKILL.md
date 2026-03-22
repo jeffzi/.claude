@@ -1,11 +1,12 @@
 ---
 name: vet-doc
 description: |
-  Use when reviewing READMEs, guides, tutorials, reference docs, or any documentation file for
-  structural issues, prose quality violations, and anti-patterns. Also use after writing docs to
-  catch issues before publishing, when the user says "review the docs", "check the documentation",
-  "audit the README", or when reviewing a PR that includes documentation changes. Checks against
-  write-doc structural rules, write-prose clarity rules, and humanizer AI-pattern detection.
+  Use when reviewing READMEs, guides, tutorials, reference docs, CHANGELOG.md, or any documentation
+  file for structural issues, prose quality violations, and anti-patterns. Also use after writing
+  docs to catch issues before publishing, when the user says "review the docs", "check the
+  documentation", "audit the README", or when reviewing a PR that includes documentation changes.
+  Not for inline code docstrings (use language-specific skills) or CLAUDE.md files (use
+  claude-md-improver).
 ---
 
 # Documentation Review
@@ -15,20 +16,26 @@ Review documentation systematically against structural and prose quality standar
 ## How to review
 
 1. **Read the document** in full before starting the review.
-2. **Identify the document type** — tutorial, how-to, reference, explanation, README, or other. This
-   determines which structural rules apply.
-3. **Run through the checklists** below, section by section.
-4. **Invoke skills as needed** — invoke `write-doc` for structural rules, invoke `write-prose` for
+2. **Identify the document type** — tutorial, how-to, reference, explanation, README, CHANGELOG, or
+   other. This determines which rules apply.
+3. **Route by type:**
+   - **CHANGELOG.md** → invoke `write-changelog` for structure and entry quality rules. Skip the
+     general checklists below — `write-changelog` is the sole authority.
+   - **All other docs** → continue with the checklists below.
+4. **Run through the checklists** below, section by section.
+5. **Invoke skills as needed** — invoke `write-doc` for structural rules, invoke `write-prose` for
    prose editing, invoke `humanizer` if AI-generated text is suspected.
-5. **Report findings** using the output format at the bottom.
-6. **Apply fixes** directly unless the user asked for review-only.
+6. **Report findings** using the output format at the bottom.
+7. **Apply fixes** directly unless the user asked for review-only.
 
 ## Structure checklist
 
 ### Document type integrity
 
-- [ ] Is the document type identifiable? (tutorial, how-to, reference, explanation, README)
-- [ ] Does it follow the correct structure for its type? (see write-doc `references/doc-types.md`)
+- [ ] Is the document type identifiable? (tutorial, how-to, reference, explanation, README,
+      CHANGELOG)
+- [ ] Does it follow the correct structure for its type? (see write-doc `references/doc-types.md`;
+      for CHANGELOG.md see `write-changelog`)
 - [ ] Are Diataxis types kept separate? Tutorials that digress into explanation, or reference that
       veers into how-to steps, are the primary structural anti-pattern.
 
