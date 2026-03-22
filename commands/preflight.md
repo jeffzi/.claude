@@ -92,15 +92,17 @@ pending/in_progress, you are NOT done. Keep going.
 
 ### Step 2: Cleanup
 
-- [ ] Split target files into implementation files, test files, and documentation files (`.md`)
+- [ ] Split target files into implementation files, test files, and documentation files (`.md`,
+      `README*`, `CHANGELOG*`)
 - [ ] Dispatch agents in parallel (single message, one **Agent** tool call per non-empty bucket):
   - **Agent A (impl):** "Simplify then review these implementation files: [list]. First apply
     code-distill. Then invoke `/vet-code`. If vet-code made changes, re-run `/vet-code` (max 3
     passes total)."
   - **Agent B (tests):** "Simplify then review these test files: [list]. First apply code-distill.
     Then invoke `/vet-test`. If vet-test made changes, re-run `/vet-test` (max 3 passes total)."
-  - **Agent C (docs):** "Review these documentation files: [list]. Invoke `/vet-doc`. If vet-doc
-    made changes, re-run `/vet-doc` (max 3 passes total)."
+  - **Agent C (docs):** "Review these documentation files: [list]. Invoke `/vet-doc` (which routes
+    CHANGELOG.md to `write-changelog` rules automatically). If vet-doc made changes, re-run
+    `/vet-doc` (max 3 passes total)."
 
 → **TaskUpdate** task 2 to `completed`. **TaskUpdate** task 3 to `in_progress`. Continue silently.
 
@@ -114,11 +116,11 @@ Each iteration:
 
 1. **Launch review agents in parallel** using **Agent** tool (single message, multiple tool calls):
 
-   | Agent                | Focus                                               | When                 |
-   | -------------------- | --------------------------------------------------- | -------------------- |
-   | Bug Scanner          | Null access, off-by-one, leaks, races, logic errors | If code files found  |
-   | CLAUDE.md Compliance | Convention violations                               | If conventions found |
-   | Doc Reviewer         | Structure, prose, accessibility, AI-writing         | If doc files found   |
+   | Agent                | Focus                                                             | When                 |
+   | -------------------- | ----------------------------------------------------------------- | -------------------- |
+   | Bug Scanner          | Null access, off-by-one, leaks, races, logic errors               | If code files found  |
+   | CLAUDE.md Compliance | Convention violations                                             | If conventions found |
+   | Doc Reviewer         | Structure, prose, accessibility, AI-writing, changelog compliance | If doc files found   |
 
    **Review scope depends on input mode:**
    - **Path argument**: Review entire file(s) - flag any issues found
@@ -136,7 +138,8 @@ Each iteration:
 
 3. **Fix issues with score ≥75:**
    - Code issues → **Agent** tool with `subagent_type: code-mend`
-   - Doc issues → fix inline (Edit tool) applying `write-doc` and `write-prose` rules
+   - Doc issues → fix inline (Edit tool) applying `write-doc` and `write-prose` rules (for
+     CHANGELOG.md, apply `write-changelog` rules instead)
 
 4. **Decision point:**
    - If fixes applied AND iterations < 3 → invoke `vet-code`, `vet-test` (if test files), and
