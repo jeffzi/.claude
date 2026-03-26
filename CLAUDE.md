@@ -89,7 +89,8 @@ it.
 
 When asked to fix a bug or implement a feature/behavior change and the project has a test suite, you
 **MUST** follow TDD. Do NOT touch production code until a failing test proves the need. No
-exceptions.
+exceptions. If the project has no test suite at all, TDD does not apply — just write the code
+directly.
 
 One behavior group at a time: write tests for a single concern or a cohesive batch of related
 concerns (same function/module, same structural failure reason), implement, repeat. Batch edge cases
@@ -99,6 +100,11 @@ unrelated behaviors (vertical slices, not horizontal).
 For context-isolated TDD, you **MUST** invoke the `tdd` skill (`/tdd`). Never dispatch `tdd-red` or
 `tdd-green` agents directly — they exist solely for the `/tdd` orchestrator. Dispatching them
 yourself bypasses phase verification, circuit breakers, and structured data passing.
+
+**You are the coordinator, not the implementer.** Never write tests or implementation code yourself
+— dispatch `tdd-red` and `tdd-green` via `/tdd`. Never read implementation source files to "prepare"
+or "understand the API" — that's the RED agent's job. You describe _what behaviors to test_; agents
+figure out _how_.
 
 For quick single-context TDD (small bug fixes), follow RED-GREEN-REFACTOR directly: failing test,
 minimal fix, verify pass, run full suite.
@@ -136,11 +142,18 @@ tooling or process that produced it.
 - **Good**: `fix: reject empty email in form submission`
 - **Good**: `# Validate email before processing`
 
+### Load `write-plan` before creating any plan
+
+Before using the Plan agent, EnterPlanMode, or writing a plan inline, **always** invoke
+`Skill(write-plan)` first. This loads the plan format constraints (task structure, header, what
+belongs in a plan vs. not). Without it, plans will use the wrong format.
+
 ### Plans describe behaviors, not TDD steps
 
-Plan tasks describe **what to build** (behaviors, files, approach), not **how to TDD it**. Never
-inline RED/GREEN steps, test assertions, or implementation code in a plan. Each plan task ends with
-"Use `/tdd` for implementation."
+When the project has a test suite, plan tasks describe **behaviors to implement** — not
+implementation details. Never inline RED/GREEN steps, test assertions, or implementation code. Each
+plan task ends with "Use `/tdd` for implementation." When the project has no test suite, plans
+describe implementation directly (files, approach, specific changes).
 
 ### Load relevant skills in plans
 

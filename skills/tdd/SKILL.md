@@ -2,7 +2,8 @@
 name: tdd
 description: >
   Use when implementing any feature, behavior change, or bug fix in a project with a test suite.
-  Also use when asked to follow TDD or invoked via /tdd.
+  Also use when asked to follow TDD or invoked via /tdd. Use when you think "I'll add tests later"
+  — that's rationalization. Not for projects without a test suite.
 ---
 
 # Test-Driven Development (TDD)
@@ -33,16 +34,27 @@ Thinking "skip TDD just this once"? Stop. That's rationalization.
 
 ## Plans and TDD
 
-Plans describe **behaviors to implement**, not inline RED/GREEN steps. Never inline test assertions
-or implementation code in plan tasks.
+**Before creating any plan, load `/write-plan`.** Always. No exceptions.
 
-A plan that contains both test assertions and implementation code defeats context isolation — the
-RED agent should write tests without seeing implementation plans, and the GREEN agent should write
-code guided only by failing tests. When the plan inlines both, that isolation is broken.
+When the project has a test suite, plans describe **behaviors to implement** — not implementation
+details, not file paths with line numbers, not specific code changes. The RED agent needs to figure
+out the API on its own (that's the point of context isolation). The GREEN agent needs to figure out
+the implementation guided only by failing tests. When a plan prescribes implementation details, both
+agents are compromised. Each plan task ends with **"Use `/tdd` for implementation."** — no inline
+RED/GREEN steps, no test assertions, no implementation code, no "change X at line Y."
 
-**Good:** "Behaviors: (1) resolve by name (2) resolve by type. Use `/tdd` for implementation."
+When the project has no test suite, plans describe implementation directly (files, approach,
+specific changes) — TDD constraints don't apply.
 
-**Bad:** "RED: assert X created. GREEN: fix lookup to use Y." — prescribes test + impl in one place.
+**Good (with test suite):** "Accept hud.duration as a positive number, default 0.5. Reject
+non-positive and non-number values. Use `/tdd` for implementation."
+
+**Good (no test suite):** "Add duration validation in prepare.lua. HUD.new reads config.duration,
+stores as self._duration. Reject non-positive and non-number values."
+
+**Bad (with test suite):** "Update prepare.lua:614 to skip duration from trigger-flag check,
+validate as positive number. HUD.new reads config.duration, stores as self._duration." — prescribes
+implementation when TDD should drive it.
 
 ## The Iron Law
 
@@ -117,6 +129,18 @@ they're separate cycles.
 
 ## Orchestration Flow
 
+### Step 0: Plan or Execute?
+
+When `/tdd` is invoked, determine the entry point before doing anything else:
+
+- **Plan mode is active** → Write plan tasks describing behaviors. Each task ends with "Use `/tdd`
+  for implementation." Do NOT dispatch agents from plan mode.
+- **Multiple behaviors, no plan yet** → Load `/write-plan` and create a plan first. Do NOT dispatch
+  agents until the plan is approved and you're executing a specific task.
+- **Single behavior or executing a plan task** → Proceed to the RED-GREEN-REFACTOR loop below.
+
+### RED-GREEN-REFACTOR Loop
+
 ```text
 LOOP (one behavior group per cycle):
 
@@ -188,11 +212,13 @@ def test_catalog_entry_parses_valid_section():
     entry = CatalogEntry(**valid_catalog)
     assert entry.name == "My App"
 
-def test_catalog_entry_rejects_missing_field(): with pytest.raises(ValidationError):
-CatalogEntry(**{k: v for k, v in valid_catalog.items() if k != "name"})
+def test_catalog_entry_rejects_missing_field():
+    with pytest.raises(ValidationError):
+        CatalogEntry(**{k: v for k, v in valid_catalog.items() if k != "name"})
 
-def test_catalog_entry_rejects_invalid_type(): with pytest.raises(ValidationError):
-CatalogEntry(**{**valid_catalog, "type": "invalid"})
+def test_catalog_entry_rejects_invalid_type():
+    with pytest.raises(ValidationError):
+        CatalogEntry(**{**valid_catalog, "type": "invalid"})
 ```
 
 **Bad** — Same model, same failure reason — splitting wastes time without improving isolation:
@@ -322,59 +348,32 @@ Agent reports STUCK with diagnostics. Orchestrator presents to user with options
 | **Clear**        | Name describes behavior             | `test('test1')`                                     |
 | **Shows intent** | Demonstrates desired API            | Obscures what code should do                        |
 
-## Why Order Matters
-
-### "I'll write tests after to verify it works"
-
-Tests written after code pass immediately. Passing immediately proves nothing:
-
-- Might test wrong thing
-- Might test implementation, not behavior
-- Might miss edge cases you forgot
-- You never saw it catch the bug
-
-Test-first forces you to see the test fail, proving it actually tests something.
-
-### "I already manually tested all the edge cases"
-
-Manual testing is ad-hoc. No record, can't re-run, easy to forget cases.
-
-### "Deleting X hours of work is wasteful"
-
-Sunk cost fallacy. Working code without real tests is technical debt.
-
-### "TDD is dogmatic, being pragmatic means adapting"
-
-TDD IS pragmatic: finds bugs before commit, prevents regressions, documents behavior, enables
-refactoring. "Pragmatic" shortcuts = debugging in production = slower.
-
-### "Tests after achieve the same goals — it's spirit not ritual"
-
-No. Tests-after answer "What does this do?" Tests-first answer "What should this do?" Tests-after
-are biased by your implementation. 30 minutes of tests after is not TDD.
-
 ## Common Rationalizations
 
-| Excuse                                  | Reality                                                                                          |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| "Too simple to test"                    | Simple code breaks. Test takes 30 seconds.                                                       |
-| "I'll test after"                       | Tests passing immediately prove nothing.                                                         |
-| "Tests after achieve same goals"        | Tests-after = "what does this do?" Tests-first = "what should this do?"                          |
-| "Already manually tested"               | Ad-hoc, no record, can't re-run.                                                                 |
-| "Deleting X hours is wasteful"          | Sunk cost fallacy. Keeping unverified code is technical debt.                                    |
-| "Keep as reference, write tests first"  | You'll adapt it. That's testing after. Delete means delete.                                      |
-| "Need to explore first"                 | Fine. Throw away exploration, start with TDD.                                                    |
-| "Test hard = design unclear"            | Listen to test. Hard to test = hard to use.                                                      |
-| "TDD will slow me down"                 | TDD faster than debugging. Pragmatic = test-first.                                               |
-| "This is a new feature, not a bug fix"  | TDD applies to features too.                                                                     |
-| "I need to see the whole picture first" | That's exploration. Delete it, start with TDD.                                                   |
-| "Existing code has no tests"            | You're improving it. Add tests for existing code.                                                |
-| "I can orchestrate the agents myself"   | The skill IS the orchestrator. Invoke `/tdd`.                                                    |
-| "The plan already has RED/GREEN steps"  | Plans describe behaviors, not test/impl details. Use `/tdd`.                                     |
-| "The plan template shows inline code"   | Plan templates with inline test/impl code don't apply to TDD. Describe behaviors + "Use `/tdd`". |
-| "I already know RED-GREEN-REFACTOR"     | Knowing the pattern ≠ following the discipline. Invoke the skill.                                |
-| "Each test needs its own cycle"         | Cohesive tests (same function, same failure reason) batch together. Don't waste cycles.          |
-| "I'll batch these unrelated tests"      | Different modules/failure reasons = separate cycles. Batching ≠ dumping everything together.     |
+| Excuse                                   | Reality                                                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| "Too simple to test"                     | Simple code breaks. Test takes 30 seconds.                                                       |
+| "I'll test after"                        | Tests passing immediately prove nothing.                                                         |
+| "Tests after achieve same goals"         | Tests-after = "what does this do?" Tests-first = "what should this do?"                          |
+| "Already manually tested"                | Ad-hoc, no record, can't re-run.                                                                 |
+| "Deleting X hours is wasteful"           | Sunk cost fallacy. Keeping unverified code is technical debt.                                    |
+| "Keep as reference, write tests first"   | You'll adapt it. That's testing after. Delete means delete.                                      |
+| "Need to explore first"                  | Fine. Throw away exploration, start with TDD.                                                    |
+| "Test hard = design unclear"             | Listen to test. Hard to test = hard to use.                                                      |
+| "TDD will slow me down"                  | TDD faster than debugging. Pragmatic = test-first.                                               |
+| "This is a new feature, not a bug fix"   | TDD applies to features too.                                                                     |
+| "I need to see the whole picture first"  | That's exploration. Delete it, start with TDD.                                                   |
+| "Existing code has no tests"             | You're improving it. Add tests for existing code.                                                |
+| "I can orchestrate the agents myself"    | The skill IS the orchestrator. Invoke `/tdd`.                                                    |
+| "The plan already has RED/GREEN steps"   | Plans describe behaviors, not test/impl details. Use `/tdd`.                                     |
+| "The plan template shows inline code"    | Plan templates with inline test/impl code don't apply to TDD. Describe behaviors + "Use `/tdd`". |
+| "I already know RED-GREEN-REFACTOR"      | Knowing the pattern ≠ following the discipline. Invoke the skill.                                |
+| "Each test needs its own cycle"          | Cohesive tests (same function, same failure reason) batch together. Don't waste cycles.          |
+| "I'll batch these unrelated tests"       | Different modules/failure reasons = separate cycles. Batching ≠ dumping everything together.     |
+| "Let me read the source first"           | The RED agent reads what it needs. You describe behaviors.                                       |
+| "I'll write the test inline, faster"     | Context isolation exists for a reason. Dispatch `tdd-red`.                                       |
+| "Just one quick cycle, no plan needed"   | Multi-behavior tasks need a plan. Each task describes a behavior + "Use `/tdd`."                 |
+| "Plan needs impl details so agents know" | Plans describe behaviors. Agents figure out the how — that's the point of isolation.             |
 
 ## Red Flags — STOP and Start Over
 
@@ -392,6 +391,11 @@ are biased by your implementation. 30 minutes of tests after is not TDD.
 - "TDD is dogmatic, I'm being pragmatic"
 - "This is different because..."
 - Dispatching `tdd-red`/`tdd-green` without invoking `/tdd` first
+- Orchestrator reading implementation source files
+- Orchestrator writing test code instead of dispatching `tdd-red`
+- Dispatching agents without a plan for multi-behavior tasks
+- Dispatching agents from plan mode instead of writing plan tasks
+- Plan with implementation details (file paths, line numbers, specific code changes)
 - Plan with inline RED/GREEN steps (test assertions + implementation code)
 - Following a plan template that inlines test assertions and implementation code
 
@@ -477,14 +481,5 @@ pitfalls:
 - Testing mock behavior instead of real behavior
 - Adding test-only methods to production classes
 - Mocking without understanding dependencies
-
-## Final Rule
-
-```text
-Production code → test exists and failed first (via tdd-red)
-Implementation → minimal pass (via tdd-green)
-Cleanup → /preflight
-Otherwise → not TDD
-```
 
 No exceptions without your human partner's permission.
