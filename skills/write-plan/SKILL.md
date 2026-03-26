@@ -3,6 +3,8 @@ name: write-plan
 description: >
   Use when you have a spec or requirements for a multi-step task, before touching code.
   Also use when asked to create an implementation plan or invoked via /write-plan.
+  MUST be loaded before using the Plan agent or EnterPlanMode — load this skill first
+  so its format constraints are active during plan creation.
 ---
 
 # Writing Plans

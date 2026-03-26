@@ -1,8 +1,9 @@
 ---
 name: code-py
 description: >
-  Use when writing any Python code, regardless of
-  perceived simplicity or prototyping context.
+  Use when writing any Python code, regardless of perceived simplicity or prototyping context.
+  Use when you think code is "just a quick script" or "types slow me down" — these are symptoms
+  this skill applies.
 ---
 
 # Pythonic Code - Python Best Practices
@@ -11,7 +12,8 @@ description: >
 
 Write production-quality Python code using type hints, modern features (3.10+), and Pythonic idioms.
 **Core principle:** Every Python function gets type hints. Quick code becomes production code—write
-it correctly the first time.
+it correctly the first time. Check `pyproject.toml` `requires-python` for version-specific syntax
+(e.g., PEP 758 in 3.14+).
 
 ## Domain Skill Detection
 
@@ -145,16 +147,12 @@ def read_file(filepath: str) -> str | None:
 
 ### Common Patterns
 
-| Task                | Pythonic Pattern                                         |
-| ------------------- | -------------------------------------------------------- |
-| Iterate over list   | `for item in items:` NOT `for i in range(len(items)):`   |
-| List transformation | `[x**2 for x in nums if x % 2 == 0]`                     |
-| Count occurrences   | `from collections import Counter; Counter(items)`        |
-| Dict with defaults  | `from collections import defaultdict; defaultdict(int)`  |
-| Safe dict access    | `my_dict.get(key, default)`                              |
-| File operations     | `Path(filepath).read_text()` NOT `open(filepath).read()` |
-| Check None          | `if value is None:` NOT `if value == None:`              |
-| Check truthiness    | `if items:` NOT `if len(items) > 0:`                     |
+| Task                | Pythonic Pattern                                        |
+| ------------------- | ------------------------------------------------------- |
+| List transformation | `[x**2 for x in nums if x % 2 == 0]`                    |
+| Count occurrences   | `from collections import Counter; Counter(items)`       |
+| Dict with defaults  | `from collections import defaultdict; defaultdict(int)` |
+| Safe dict access    | `my_dict.get(key, default)`                             |
 
 ### Type Hints Reference
 
@@ -201,6 +199,7 @@ def process(data: ExpensiveClass) -> None: ...
 | `os.path.*`                       | `pathlib.Path`                                      |
 | Manual class for data             | `@dataclass`                                        |
 | LBYL (check before act)           | EAFP (try/except)                                   |
+| "Fix" `except A, B:` to add `()`  | Check `requires-python` — valid in 3.14+ (PEP 758)  |
 | No type hints                     | Type hints on ALL function signatures               |
 | Manual dict counting              | `Counter` or `defaultdict(int)`                     |
 
@@ -259,6 +258,30 @@ try:
     process()
 except ValueError as e:
     raise CustomError("Processing failed") from e
+```
+
+### Unparenthesized Except (Python 3.14+, PEP 758)
+
+Python 3.14+ allows omitting parentheses around multiple exception types in `except` and `except*`
+clauses **when `as` is not used**. This is NOT the old Python 2 syntax — it is valid modern Python.
+Check `pyproject.toml` `requires-python` before flagging this as an issue.
+
+```python
+# ✓ Valid Python 3.14+ — catches both exceptions (PEP 758)
+except ValueError, TypeError:
+    ...
+
+# ✓ Valid Python 3.14+ — except* variant
+except* OSError, RuntimeError:
+    ...
+
+# ✓ Parentheses REQUIRED when using `as`
+except (ValueError, TypeError) as e:
+    ...
+
+# ✗ INVALID — cannot omit parentheses with `as`
+except ValueError, TypeError as e:  # SyntaxError in 3.14+, ambiguous in <3.14
+    ...
 ```
 
 ## Async Code Patterns

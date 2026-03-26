@@ -150,11 +150,27 @@ function fadeOut(entity: Entity): void {
 
 ## Hot-Path Patterns
 
-### Cache Math Functions as Locals
+### Localize Repeated Field Access in Hot Loops
 
-Global lookups through `_G` hash table are **~30% slower** per access than local register reads.
+Lua local variables use register-based access; table field lookups go through hash tables. Any field
+read repeated per iteration of a hot loop should be hoisted to a `const` local before the loop.
+
+This applies to **all** table field access — globals (`_G`), module tables, context objects, nested
+fields — not just `Math.*`.
 
 ```typescript
+// BAD: ctx.world looked up through hash table on every iteration
+for (const i of $range(0, n - 1)) {
+  despawn(ctx.world, ctx.tracked[i]);
+}
+
+// GOOD: localized before the loop
+const world = ctx.world;
+const tracked = ctx.tracked;
+for (const i of $range(0, n - 1)) {
+  despawn(world, tracked[i]);
+}
+
 // BAD: math.cos, math.sin looked up through _G each iteration
 for (const p of particles) { p.x += Math.cos(p.angle) * p.speed; }
 
