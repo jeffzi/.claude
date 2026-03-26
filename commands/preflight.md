@@ -3,7 +3,7 @@ name: preflight
 description: >
   Use when about to commit changes, before code review,
   or when preparing a PR for submission
-argument-hint: Optional path (defaults to git diff)
+argument-hint: Optional path (defaults to changes since last push)
 ---
 
 # Preflight
@@ -75,10 +75,14 @@ pending/in_progress, you are NOT done. Keep going.
 - [ ] Find CLAUDE.md conventions
 - [ ] Detect languages
 
-| Source        | Method                                                   |
-| ------------- | -------------------------------------------------------- |
-| Path argument | Use directly                                             |
-| No argument   | `git diff --name-only` + `git diff --cached --name-only` |
+| Source        | Method                                                       |
+| ------------- | ------------------------------------------------------------ |
+| Path argument | Use directly                                                 |
+| No argument   | `git diff --name-only @{push}` (all changes since last push) |
+
+If `@{push}` fails (no upstream set), fall back to `git diff --name-only` +
+`git diff --cached --name-only`. Note: this fallback only captures uncommitted changes, not
+committed-since-push.
 
 **CLAUDE.md Locations** (check only these, do NOT search subdirectories):
 
@@ -124,7 +128,8 @@ Each iteration:
 
    **Review scope depends on input mode:**
    - **Path argument**: Review entire file(s) - flag any issues found
-   - **No argument (git diff)**: Review only changed lines - flag only issues in diff
+   - **No argument (since last push)**: Review only changed lines - use `git diff @{push} -- <file>`
+     to identify changed lines, flag only issues in those lines
 
 2. **Score issues with Haiku** (batch all issues together):
 
