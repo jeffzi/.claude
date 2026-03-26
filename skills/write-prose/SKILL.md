@@ -1,12 +1,11 @@
 ---
 name: write-prose
 description: |
-  Apply Strunk's writing rules to ANY prose humans will read — documentation, commit messages,
-  error messages, PR descriptions, UI text, reports, or explanations. Use whenever writing text for
-  human readers, editing for clarity, or reviewing prose quality. Also use when the user says "make
-  this clearer", "tighten the prose", "improve the writing", or when text feels bloated, passive,
-  or vague. This skill covers sentence-level clarity, not document structure — for organizing
-  documentation, use write-doc instead.
+  Use when writing or editing any prose humans will read — documentation, commit messages, error
+  messages, PR descriptions, UI text, reports, or explanations. Applies Strunk's writing rules for
+  sentence-level clarity. Also use when the user says "make this clearer", "tighten the prose",
+  "improve the writing", or when text feels bloated, passive, or vague. Covers sentence-level
+  clarity, not document structure — for organizing documentation, use write-doc instead.
 ---
 
 # Writing Clearly and Concisely
