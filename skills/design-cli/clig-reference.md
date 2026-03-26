@@ -3,6 +3,22 @@
 > Condensed actionable reference from [clig.dev](https://clig.dev). Tables, rules, and examples for
 > quick lookup during CLI design and review. For the decision framework and checklist, see SKILL.md.
 
+## Table of Contents
+
+- [Exit Codes](#exit-codes)
+- [Standard Flag Names](#standard-flag-names)
+- [Help Text Rules](#help-text-rules)
+- [Output Design](#output-design)
+- [Error Design](#error-design)
+- [Arguments and Flags](#arguments-and-flags)
+- [Subcommands](#subcommands)
+- [Interactivity](#interactivity)
+- [Configuration Precedence](#configuration-precedence)
+- [Environment Variables](#environment-variables)
+- [Naming](#naming)
+- [Future-Proofing](#future-proofing)
+- [Argument Parsing Libraries](#argument-parsing-libraries)
+
 ## Exit Codes
 
 | Code  | Meaning            | Example                              |

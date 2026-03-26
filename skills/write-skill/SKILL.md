@@ -14,9 +14,6 @@ Design guidance for creating skills that trigger reliably, get followed under pr
 rationalization. This skill covers the _design_ side; use `skill-creator` for eval infrastructure,
 benchmarking, and description optimization loops.
 
-**Skill type:** technique + reference hybrid. Teaches the method of writing skills (technique) with
-structural and API-level guidance (reference).
-
 ## When to create a skill
 
 **Create when:**
@@ -345,7 +342,6 @@ Before deploying any skill:
 
 **Design:**
 
-- [ ] Skill type identified (discipline / technique / pattern / reference)
 - [ ] `name` uses only letters, numbers, hyphens
 - [ ] `description` starts with "Use when...", third person, no workflow summary
 - [ ] SKILL.md under 500 lines; heavy content in reference files

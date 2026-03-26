@@ -13,8 +13,6 @@ description: |
 Review SKILL.md files systematically against activation, implementation, structural, security, and
 compliance standards.
 
-**Skill type:** technique — checklist-driven review methodology.
-
 ## How to review
 
 1. **Read the SKILL.md** in full, including any files in references/.
@@ -86,7 +84,6 @@ Will Claude follow this skill effectively?
 
 ### File organization
 
-- [ ] Skill type identified in the body (discipline / technique / pattern / reference)
 - [ ] Body sections adapted to content, not rigidly following a template
 - [ ] Common mistakes or rationalizations section present
 - [ ] Naming uses verb-first active voice with hyphens (`write-skill` not `skill-writing`)
