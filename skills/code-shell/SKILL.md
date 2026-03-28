@@ -3,7 +3,8 @@ name: code-shell
 description: >
   Use when writing Bash/shell scripts, encountering "unbound variable" or
   "command not found" errors, or scripts failing silently. Apply for
-  automation, hooks, CI/CD, CLI tools, or any .sh files.
+  automation, hooks, CI/CD, CLI tools, or any .sh files. Not for fish, zsh,
+  or PowerShell — Bash/sh only. Applies to *.sh and *.bash files.
 ---
 
 # Shell Scripting - Bash Best Practices

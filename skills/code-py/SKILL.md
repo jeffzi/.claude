@@ -3,7 +3,8 @@ name: code-py
 description: >
   Use when writing any Python code, regardless of perceived simplicity or prototyping context.
   Use when you think code is "just a quick script" or "types slow me down" — these are symptoms
-  this skill applies.
+  this skill applies. Not for marimo notebook patterns — use code-marimo. Not for Shiny UI
+  patterns — use code-shiny. For tests, also load test-py. Applies to *.py files.
 ---
 
 # Pythonic Code - Python Best Practices

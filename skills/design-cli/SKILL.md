@@ -54,9 +54,9 @@ obvious." Score each category (pass/total applicable).
 
 ### Arguments and Flags
 
-- [ ] Prefer flags over positional args for clarity args;
+- [ ] Prefer flags over positional args for clarity
 - [ ] Every flag has a `--long-form`; short forms only for common flags
-- [ ] Standard flag names used (see clig-reference.md)
+- [ ] Standard flag names used (see references/clig-reference.md)
 - [ ] Flags and args are order-independent
 - [ ] Secrets via `--password-file` or stdin, never `--password`
 - [ ] `-` supported for stdin/stdout where files expected
@@ -118,5 +118,5 @@ obvious." Score each category (pass/total applicable).
 
 ## Deep Reference
 
-See `clig-reference.md` for standard flag names, color rules, exit codes, config precedence,
-argument parsing libraries, and concrete good/bad examples.
+See `references/clig-reference.md` for standard flag names, color rules, exit codes, config
+precedence, argument parsing libraries, and concrete good/bad examples.

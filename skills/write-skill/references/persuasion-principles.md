@@ -138,6 +138,66 @@ feedback culture and creates sycophancy. Avoid for all discipline enforcement.
 | Collaborative        | Unity + Commitment                    | Authority, Liking   |
 | Reference            | Clarity only                          | All persuasion      |
 
+## Writing compliance-resistant rules
+
+How to apply persuasion principles in discipline-enforcing skills.
+
+### Foundational principle
+
+**Violating the letter of the rules is violating the spirit of the rules.** Add this early in any
+discipline skill — it cuts off the entire class of "I'm following the spirit" rationalizations.
+
+### Bright-line rules
+
+Absolute language removes decision fatigue. "YOU MUST" is more effective than "consider doing."
+
+```markdown
+# Weak — agent will rationalize exceptions
+
+Consider writing tests first when feasible.
+
+# Strong — no decision to make
+
+Write code before test? Delete it. Start over. No exceptions.
+```
+
+### Close every loophole explicitly
+
+Don't just state the rule — forbid specific workarounds:
+
+```markdown
+**No exceptions:**
+
+- Don't keep it as "reference"
+- Don't "adapt" it while writing tests
+- Don't look at it
+- Delete means delete
+```
+
+### Build rationalization tables
+
+Capture excuses from testing and counter each one:
+
+```markdown
+| Excuse               | Reality                                       |
+| -------------------- | --------------------------------------------- |
+| "Too simple to test" | Simple code breaks. Test takes 30 seconds.    |
+| "I'll test after"    | Tests passing immediately prove nothing.      |
+| "Spirit not letter"  | Violating the letter IS violating the spirit. |
+```
+
+### Create red flags lists
+
+Make it easy for agents to self-check:
+
+```markdown
+## Red flags — STOP and start over
+
+- Code before test
+- "I already manually tested it"
+- "This is different because..."
+```
+
 ## Why this works
 
 **Bright-line rules reduce rationalization:** "YOU MUST" removes decision fatigue. Absolute language

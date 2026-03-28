@@ -2,8 +2,9 @@
 name: test-polars
 description: >
   Use when writing tests for Python code that uses Polars DataFrames. Apply for assert_frame_equal
-  usage, null/NaN assertion pitfalls, expression isolation testing, schema mismatches in fixtures,
-  non-deterministic group_by order, float tolerance, or any test files importing polars.
+  and assert_series_equal usage, null/NaN assertion pitfalls, expression isolation testing, schema
+  mismatches in fixtures, non-deterministic group_by order, float tolerance, or any test files
+  importing polars.
 ---
 
 # Testing Polars Code
@@ -53,7 +54,7 @@ df = pl.DataFrame(
 Define schema once and reuse across fixtures:
 
 ```python
-ORDERS_SCHEMA = {"id": pl.Int32, "amount": pl.Float64, "status": pl.Utf8}
+ORDERS_SCHEMA = {"id": pl.Int32, "amount": pl.Float64, "status": pl.String}
 
 @pytest.fixture
 def orders():
@@ -147,7 +148,7 @@ def test_exclude_inactive():
 def test_exclude_inactive_preserves_nulls():
     df = pl.DataFrame(
         {"status": ["active", "inactive", None, "active"]},
-        schema={"status": pl.Utf8},
+        schema={"status": pl.String},
     )
 
     result = exclude_inactive(df)
@@ -266,6 +267,17 @@ idempotency.
 | Join without `validate=` in assertions      | Always specify `validate="m:1"` or expected cardinality       |
 | `when-then-otherwise` assumed short-circuit | All branches evaluate — cast in `then()` runs on ALL rows     |
 | Timezone-aware datetime cast to Date        | Converts via UTC, not local time — test both                  |
+
+## Verification
+
+**MANDATORY before completing any task:**
+
+```bash
+pytest                   # Run test suite
+ruff check .             # Lint check
+```
+
+**Task is NOT complete until all pass.**
 
 ## Rationalizations
 

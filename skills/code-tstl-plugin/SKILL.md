@@ -4,7 +4,8 @@ description: >
   Use when writing TypeScript-to-Lua (TSTL) plugins — visitor transforms, printer overrides,
   beforeTransform/afterPrint/beforeEmit hooks. Use when you see deep internal imports from
   typescript-to-lua/dist/*, context.transformExpression causing infinite recursion, or need to
-  choose between plain-object and class-based plugin shapes.
+  choose between plain-object and class-based plugin shapes. Not for general TSTL application
+  code — use code-tstl.
 ---
 
 # TSTL Plugin Development
@@ -195,48 +196,7 @@ beforeEmit(program: ts.Program, options: tstl.CompilerOptions,
 }
 ```
 
-## Lua AST Quick Reference
-
-### Factory Functions
-
-```typescript
-// Literals and identifiers
-tstl.createIdentifier("name")
-tstl.createStringLiteral("value")
-tstl.createNumericLiteral(42)
-tstl.createBooleanLiteral(true)
-tstl.createNilLiteral()
-
-// Expressions
-tstl.createCallExpression(callee, [arg1, arg2])
-tstl.createTableIndexExpression(table, key)   // table[key] or table.key
-tstl.createTableExpression([field1, field2])   // { k = v, ... }
-tstl.createTableFieldExpression(value, key)    // key = value
-tstl.createBinaryExpression(left, op, right)
-tstl.createUnaryExpression(operand, op)
-
-// Statements
-tstl.createExpressionStatement(expr)
-tstl.createReturnStatement([expr1, expr2])
-tstl.createVariableDeclarationStatement(ident, initializer)
-tstl.createAssignmentStatement(ident, value)
-```
-
-### Type Guards
-
-Every factory has a matching `tstl.is*` guard: `tstl.isStringLiteral()`, `tstl.isCallExpression()`,
-`tstl.isIdentifier()`, `tstl.isReturnStatement()`, `tstl.isIfStatement()`, etc.
-
-### Reserved Word Keys
-
-Lua keywords (`end`, `repeat`, `until`, etc.) require bracket notation in `TableIndexExpression`:
-
-```typescript
-// "end" is a Lua keyword — use string literal key
-const key = tstl.createStringLiteral("end");
-const access = tstl.createTableIndexExpression(obj, key);
-// Emits: obj["end"]
-```
+For Lua AST factory functions and type guards, see `references/lua-ast.md`.
 
 ## Testing with `transpileVirtualProject`
 
@@ -279,31 +239,20 @@ function compile(source: string): string {
 - All lifecycle hooks fire for every plugin in order
 - Only **one printer** can be active (last one wins)
 
-## Common Mistakes
+## Common Mistakes and Rationalizations
 
-| Mistake                                         | Fix                                                 |
-| ----------------------------------------------- | --------------------------------------------------- |
-| `import ... from "typescript-to-lua/dist/..."`  | `import * as tstl from "typescript-to-lua"`         |
-| `context.transformExpression(node)`             | `context.superTransformExpression(node)`            |
-| Class for a single-hook string processor        | Plain object — class adds indirection for zero gain |
-| Plain object with visitors or type checker      | Class-based plugin with `beforeTransform` setup     |
-| Reading env vars inside visitor body            | Cache in `beforeTransform`                          |
-| `luaLibImport: "none" as any` in tests          | `luaLibImport: tstl.LuaLibImportKind.None`          |
-| Comments explaining WHAT code does              | Comments explaining WHY the approach was chosen     |
-| `node:` prefix missing on Node.js imports       | `import * as fs from "node:fs"`                     |
-| Forgetting `return undefined` strips statements | Explicit — works for statement visitors only        |
-
-## Rationalizations That Mean You're About to Fail
-
-| Excuse                                 | Reality                                                                       |
-| -------------------------------------- | ----------------------------------------------------------------------------- |
-| "The dist/ import works fine"          | Until the next minor TSTL update shuffles internals. Use the public API.      |
-| "I'll wrap this in a class for safety" | Single-hook string processors don't need a class. Match shape to complexity.  |
-| "Plain objects can't do anything"      | They handle single hooks fine. Class is for type checker or cross-hook state. |
-| "Env var check per node is fine"       | Visitors fire for _every_ matching node. Cache once in `beforeTransform`.     |
-| "I'll use `transformExpression`"       | That calls YOUR visitor again. Stack overflow. Always use `super` variant.    |
-| "String `as any` is just for tests"    | TSTL exports proper enums (`LuaTarget`, `LuaLibImportKind`). Use them.        |
-| "One printer is enough for everyone"   | Only one printer is active globally. Prefer AST transforms or `beforeEmit`.   |
+| Mistake                                         | What happens                                        | Instead                                                   |
+| ----------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------- |
+| `import ... from "typescript-to-lua/dist/..."`  | Breaks on next minor TSTL update                    | `import * as tstl from "typescript-to-lua"`               |
+| `context.transformExpression(node)`             | Calls YOUR visitor again — stack overflow           | `context.superTransformExpression(node)`                  |
+| Class for a single-hook string processor        | Adds indirection for zero gain                      | Plain object — match shape to complexity                  |
+| Plain object with visitors or type checker      | No place to store `TypeChecker` or cross-hook state | Class-based plugin with `beforeTransform` setup           |
+| Reading env vars inside visitor body            | Re-reads on every matching node                     | Cache in `beforeTransform`                                |
+| `luaLibImport: "none" as any` in tests          | Bypasses type safety for no reason                  | `luaLibImport: tstl.LuaLibImportKind.None`                |
+| Comments explaining WHAT code does              | Noise — the code already says what                  | Comments explaining WHY the approach was chosen           |
+| `node:` prefix missing on Node.js imports       | May resolve incorrectly                             | `import * as fs from "node:fs"`                           |
+| Forgetting `return undefined` strips statements | Statement silently disappears from output           | Explicit — works for statement visitors only              |
+| Using multiple printers across plugins          | Only one printer is active globally — last one wins | Prefer AST transforms or `beforeEmit` string manipulation |
 
 ## Verification
 

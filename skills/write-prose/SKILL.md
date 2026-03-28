@@ -17,18 +17,6 @@ William Strunk Jr.'s _The Elements of Style_ (1918) teaches you to write clearly
 **WARNING:** `elements-of-style.md` consumes ~12,000 tokens. Read it only when writing or editing
 prose.
 
-## When to Use This Skill
-
-Use this skill whenever you write prose for humans:
-
-- Documentation, README files, technical explanations
-- Commit messages, pull request descriptions
-- Error messages, UI copy, help text, comments
-- Reports, summaries, or any explanation
-- Editing to improve clarity
-
-**If you're writing sentences for a human to read, use this skill.**
-
 ## Limited Context Strategy
 
 When context is tight:
@@ -66,6 +54,38 @@ When context is tight:
 ### Section V: Words and Expressions Commonly Misused
 
 Alphabetical reference for usage questions
+
+## Before/After Examples
+
+**Active voice (Rule 3):**
+
+- Before: "The configuration file is read by the parser at startup."
+- After: "The parser reads the configuration file at startup."
+
+**Positive form (Rule 4):**
+
+- Before: "Do not use the old API unless you have no alternative."
+- After: "Use the new API. Fall back to the old API only when the new one lacks a required feature."
+
+**Omit needless words (Rule 6):**
+
+- Before: "In order to establish a connection to the database, it is necessary to first configure
+  the credentials."
+- After: "Configure credentials before connecting to the database."
+
+**Concrete language (Rule 5):**
+
+- Before: "The system experienced a significant degradation in performance."
+- After: "Response latency increased from 50ms to 1200ms after the migration."
+
+## Anti-patterns
+
+| Anti-pattern                                 | Why it fails                                                                                |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| "This is a draft, style doesn't matter"      | Sloppy drafts become sloppy finals. Clarity during drafting catches logic gaps early.       |
+| "Technical audiences don't care about style" | Technical readers care more — they scan under time pressure and ambiguity costs them hours. |
+| "More words = more thorough"                 | Extra words dilute the signal. Readers skim past filler and miss the point.                 |
+| "Passive voice sounds more professional"     | Passive voice hides the actor and weakens every sentence. Active voice is direct and clear. |
 
 ## Bottom Line
 
