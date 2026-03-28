@@ -17,7 +17,7 @@ commands, agents, hooks, and settings.
 | [`/vet-test`](commands/vet-test.md)     | Review test files for redundancy and AAA violations                                                                                                                                                                                                                                                                                           |
 | [`/upgrade-py`](commands/upgrade-py.md) | Upgrade Python dependencies and sync versions                                                                                                                                                                                                                                                                                                 |
 | [`/upgrade-ts`](commands/upgrade-ts.md) | Upgrade TypeScript dependencies and sync versions                                                                                                                                                                                                                                                                                             |
-| [`/setup-gsd`](commands/setup-gsd.md)   | Configure GSD model overrides for a project                                                                                                                                                                                                                                                                                                   |
+| [`/setup-gsd`](commands/setup-gsd.md)   | Configure [GSD](https://github.com/gsd-build/get-shit-done) model overrides for a project                                                                                                                                                                                                                                                     |
 
 ### Skills
 
@@ -56,7 +56,6 @@ commands, agents, hooks, and settings.
 | [`write-commit`](skills/write-commit/SKILL.md)       | Git commit message quality                           |
 | [`write-skill`](skills/write-skill/SKILL.md)         | Author and review SKILL.md files                     |
 | [`write-plan`](skills/write-plan/SKILL.md)           | Multi-step implementation plans                      |
-| [`humanizer`](skills/humanizer/SKILL.md)             | Detect and remove AI-generated writing patterns      |
 | [`vet-doc`](skills/vet-doc/SKILL.md)                 | Review docs for structural and prose issues          |
 | [`vet-skill`](skills/vet-skill/SKILL.md)             | Review SKILL.md files for quality and structure      |
 | [`write-changelog`](skills/write-changelog/SKILL.md) | Keep a Changelog standard for CHANGELOG.md           |
