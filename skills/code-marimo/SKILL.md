@@ -6,35 +6,22 @@ description: >
   working with marimo files (.py notebooks). Also use
   when encountering marimo errors like "multiple
   definitions", "circular dependency", or "variable
-  redeclaration".
+  redeclaration". Load alongside code-py for Python
+  standards. Not for standard Python scripts — use
+  code-py alone. Not for notebooks needing side
+  effects with manual execution order, variable
+  redeclaration across cells, or implicit state.
 ---
 
 # Marimo Reactive Notebooks
 
 ## Overview
 
-Marimo is a reactive Python notebook where cells form a directed acyclic graph (DAG) and
-automatically re-execute when dependencies change. Unlike Jupyter, variables cannot be redeclared,
-and execution order is determined by the dependency graph, not cell position.
+Marimo is a reactive Python notebook where cells form a DAG and auto-re-execute when dependencies
+change — variables cannot be redeclared and execution order follows the dependency graph.
 
 **Core principle:** Write declarative, idempotent cells that react to changes instead of imperative
 code with manual execution.
-
-## When to Use
-
-Use when:
-
-- Creating interactive data analysis dashboards
-- Building reproducible data science workflows
-- Migrating from Jupyter notebooks
-- Need automatic reactivity without callbacks
-- Working with real-time data that requires UI updates
-
-Don't use when:
-
-- Need notebooks with side effects and manual execution order
-- Require variable redeclaration across cells
-- Working with codebases that rely on implicit state
 
 ## Quick Reference
 

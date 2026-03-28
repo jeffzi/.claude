@@ -96,11 +96,11 @@ committed-since-push.
 
 ### Step 2: Cleanup
 
-- [ ] Split target files into implementation files, test files, and documentation files (`.md`,
-      `README*`, `CHANGELOG*`)
+- [ ] Split target files into source files, test files, and documentation files (`.md`, `README*`,
+      `CHANGELOG*`)
 - [ ] Dispatch agents in parallel (single message, one **Agent** tool call per non-empty bucket):
-  - **Agent A (impl):** "Simplify then review these implementation files: [list]. First apply
-    code-distill. Then invoke `/vet-code`. If vet-code made changes, re-run `/vet-code` (max 3
+  - **Agent A (implementation):** "Simplify then review these implementation files: [list]. First
+    apply code-distill. Then invoke `/vet-code`. If vet-code made changes, re-run `/vet-code` (max 3
     passes total)."
   - **Agent B (tests):** "Simplify then review these test files: [list]. First apply code-distill.
     Then invoke `/vet-test`. If vet-test made changes, re-run `/vet-test` (max 3 passes total)."

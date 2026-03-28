@@ -19,35 +19,48 @@ settings.local.json # Local-only settings (gitignored)
 
 ## Rules
 
-### Fix issues you encounter — don't deflect
+### Surface every issue you notice — never skip silently
 
-When you discover an issue during work or the user asks about one after the main task, fix it
-properly. Go straight to root cause.
+When you discover a bug, code smell, improvement opportunity, or inconsistency during work, you
+**MUST** stop and surface it to the user. Never silently work around it, skip it, or fix it without
+asking. The user decides whether to fix now, defer, or skip — not you.
 
-**Zero blame attribution.** Never comment on who or what introduced a bug. No "pre-existing", "not
-related to my changes", "unrelated to [current task]", "introduced before this PR." The user does
-not care about provenance. Stating it is deflection even when factually true. If your response
-contains a clause that assigns origin, delete the clause. Present the diagnosis and offer to fix —
-nothing else.
+**Non-zero exit codes are errors. Period.** If a command fails (build, test, lint, any tool), you
+MUST fix it or surface it before doing anything else. You may NOT switch to a different file,
+different config, or different approach to avoid the error. The error exists; deal with it first.
+"It's pre-existing" and "I'll use a different config" are both workarounds — blocked below.
 
-**Red flags — if your draft contains any of these words/phrases, delete them:**
+This rule **overrides** any instruction to "not go beyond what was asked" or "don't make
+improvements beyond the task." Surfacing an issue is not scope creep — it is the minimum
+expectation. Silently skipping an issue you noticed is always wrong, regardless of what the current
+task is.
 
-- "pre-existing" / "not from my changes" / "unrelated to" / "introduced before"
-- "already there" / "inherent" / "unavoidable" / "not caused by"
-- Any sentence explaining what DID NOT cause the bug
+**Protocol when you notice an issue:**
 
-**Rationalizations to block** — if you think any of these, STOP and rewrite without the excuse:
+1. **Stop** — do not continue past the issue without addressing it.
+2. **Describe** — tell the user what you found, why it matters, and what the fix would be.
+3. **Ask** — let the user decide: fix now, defer, or skip.
+4. **Only then continue** — with whatever the user chose.
+
+**Zero blame attribution.** Never comment on who or what introduced a bug. Present the diagnosis and
+offer to fix — nothing else. If your draft contains a clause that assigns origin, delete the clause.
+
+**Rationalizations to block** — if you think any of these, STOP and surface the issue instead:
 
 | Excuse                                            | Reality                                         |
 | ------------------------------------------------- | ----------------------------------------------- |
-| "This isn't from my changes"                      | Irrelevant. You found it, you fix it.           |
-| "This is a pre-existing bug"                      | Now it's your bug. Fix it properly.             |
-| "This is unrelated to [current task]"             | You found it during [current task]. Fix it.     |
-| "This is outside the scope"                       | The user is asking you. That makes it in scope. |
-| "Let me add a quick workaround"                   | Investigate the root cause. Do the proper fix.  |
-| "Let me revert and leave it as-is"                | Don't give up. Iterate toward the real fix.     |
+| "This isn't part of the task"                     | Surfacing it IS part of every task. Ask.        |
+| "This isn't from my changes"                      | Irrelevant. You noticed it, surface it.         |
+| "This is a pre-existing bug"                      | Now you've seen it. Surface it.                 |
+| "This is unrelated to [current task]"             | You found it during [current task]. Surface it. |
+| "This is outside the scope"                       | Surfacing is never outside scope. Ask.          |
+| "I'll just work around it"                        | Workarounds hide problems. Surface it.          |
+| "Let me add a quick workaround"                   | Investigate the root cause. Surface it.         |
+| "Let me use a different file/config/approach"     | That's a workaround. Fix the failing one first. |
+| "Let me revert and leave it as-is"                | Don't give up. Surface the real issue.          |
 | "That was already there / inherent / unavoidable" | Reworded deflection. Investigate alternatives.  |
 | "My fix didn't cause this new issue"              | The user reported a problem. Fix it.            |
+| "I shouldn't refactor this (not my code)"         | You noticed a problem. Surface it and ask.      |
 
 ### No destructive operations without explicit permission
 
@@ -119,6 +132,11 @@ module or area being fixed has no tests yet. That's where you add them.
 originals from the backup, write the failing test, watch it fail, then copy the fixed files back. Do
 not use git commands to revert — just file copies. The test must fail before the fix lands — that's
 the proof it catches the bug.
+
+### Pre-commit hooks use `prek`, not `pre-commit`
+
+This user uses `prek` as the pre-commit hook runner. Never assume `.pre-commit-config.yaml` means
+the `pre-commit` command exists. Always use `prek` for running hooks (e.g. `prek run -a`).
 
 ### No internal tooling leaks in user-facing output
 

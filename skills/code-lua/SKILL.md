@@ -3,7 +3,9 @@ name: code-lua
 description: >
   Use when writing Lua code for game development (LÖVE2D, Defold, WoW addons), Neovim
   plugins, or embedded scripting. Use when you think code is "too simple for types" or "just
-  a prototype" - these are symptoms this skill applies.
+  a prototype" - these are symptoms this skill applies. Not for TypeScript-to-Lua (TSTL)
+  projects — use code-tstl. For Lua tests with busted, also load test-lua. Applies to *.lua
+  files.
 ---
 
 # Lua Coding

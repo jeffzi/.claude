@@ -3,7 +3,8 @@ name: code-ts
 description: >
   Use when writing any TypeScript code, regardless of perceived simplicity or prototyping context.
   Use when you think code is "just a quick script" or "types slow me down" - these are symptoms
-  this skill applies.
+  this skill applies. Not for TypeScript-to-Lua — use code-tstl. Not for TSTL plugins — use
+  code-tstl-plugin. For tests, also load test-ts. Applies to *.ts and *.tsx files.
 ---
 
 # TypeScript - Production-Quality Code

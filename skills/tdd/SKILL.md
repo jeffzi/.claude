@@ -8,6 +8,27 @@ description: >
 
 # Test-Driven Development (TDD)
 
+## Table of Contents
+
+- [Overview](#overview)
+- [When to Use](#when-to-use)
+- [Plans and TDD](#plans-and-tdd)
+- [The Iron Law](#the-iron-law)
+- [Architecture: Context-Isolated Subagents](#architecture-context-isolated-subagents)
+- [Language Detection](#language-detection)
+- [Batching: Cohesive vs. Unrelated](#batching-cohesive-vs-unrelated)
+- [Orchestration Flow](#orchestration-flow)
+- [Red-Green-Refactor](#red-green-refactor)
+- [Circuit Breaker](#circuit-breaker)
+- [Good Tests](#good-tests)
+- [Common Rationalizations](#common-rationalizations)
+- [Red Flags](#red-flags--stop-and-start-over)
+- [Example: Bug Fix](#example-bug-fix)
+- [Verification Checklist](#verification-checklist)
+- [When Stuck](#when-stuck)
+- [Debugging Integration](#debugging-integration)
+- [Testing Anti-Patterns](#testing-anti-patterns)
+
 ## Overview
 
 Write the test first. Watch it fail. Write minimal code to pass. Context-isolated via subagents.
@@ -98,11 +119,15 @@ Thinking "I know the pattern, I'll just dispatch agents myself"? That's rational
 
 Detect from file extensions and config files:
 
-| Signal           | Language   | Test runner      |
-| ---------------- | ---------- | ---------------- |
-| `pyproject.toml` | Python     | `uv run pytest`  |
-| `package.json`   | TypeScript | `npx vitest run` |
-| `*.rockspec`     | Lua        | `busted`         |
+| Signal           | Language   | Test runner      | Skill        |
+| ---------------- | ---------- | ---------------- | ------------ |
+| `pyproject.toml` | Python     | `uv run pytest`  | `test-py`    |
+| `package.json`   | TypeScript | `npx vitest run` | `test-ts`    |
+| `*.rockspec`     | Lua        | `busted`         | `test-lua`   |
+| `Package.swift`  | Swift      | `swift test`     | `test-swift` |
+
+Other languages: follow the same RED-GREEN-REFACTOR pattern with the project's existing test
+framework.
 
 ## Batching: Cohesive vs. Unrelated
 
@@ -129,73 +154,8 @@ they're separate cycles.
 
 ## Orchestration Flow
 
-### Step 0: Plan or Execute?
-
-When `/tdd` is invoked, determine the entry point before doing anything else:
-
-- **Plan mode is active** → Write plan tasks describing behaviors. Each task ends with "Use `/tdd`
-  for implementation." Do NOT dispatch agents from plan mode.
-- **Multiple behaviors, no plan yet** → Load `/write-plan` and create a plan first. Do NOT dispatch
-  agents until the plan is approved and you're executing a specific task.
-- **Single behavior or executing a plan task** → Proceed to the RED-GREEN-REFACTOR loop below.
-
-### RED-GREEN-REFACTOR Loop
-
-```text
-LOOP (one behavior group per cycle):
-
-  RED:
-    1. Dispatch tdd-red agent with:
-       - Task description (what behaviors to test — may be a cohesive batch)
-       - Language and test runner
-       - Relevant test file paths
-    2. Capture: test file, test name(s), failure output
-    3. Verify all tests actually failed
-    4. If any test PASSED_UNEXPECTEDLY:
-       → Report to user: behavior already exists
-       → Ask: skip (next behavior) or revise test scope?
-
-  GREEN:
-    5. Dispatch tdd-green agent with:
-       - Test file path
-       - Test name(s)
-       - Failure output
-       - Test command
-    6. Capture: implementation files, test results
-    7. Verify: all new tests pass + full suite passes
-    8. If STUCK (5 failures):
-       → Report diagnostics to user
-       → Ask: adjust test, try manually, or skip?
-
-  REFACTOR:
-    9.  Split CHANGED_FILES into implementation files and test files
-    10. Dispatch two agents in parallel (single message, two Agent tool calls):
-        - Agent A: code-distill → vet-code (→ vet-code again if changes) on impl files
-        - Agent B: code-distill → vet-test (→ vet-test again if changes) on test files
-    11. If any fixes applied, re-run test suite to confirm tests still green
-
-  CONTINUE:
-    12. Ask user: more behaviors to implement? → loop or exit
-```
-
-### What Passes Between Phases
-
-Only structured data — never reasoning or analysis:
-
-**RED → GREEN:**
-
-```text
-TEST_FILE: <path>
-TEST_NAME: <name(s)>
-TEST_COMMAND: <command>
-FAILURE_OUTPUT: <output>
-```
-
-**GREEN → REFACTOR:**
-
-```text
-CHANGED_FILES: <list of all files modified in RED + GREEN>
-```
+For the detailed entry-point logic, RED-GREEN-REFACTOR loop pseudocode, and phase data contracts,
+see `references/orchestration-flow.md`.
 
 ## Red-Green-Refactor
 
@@ -302,8 +262,7 @@ Confirm:
 
 ### REFACTOR — Clean Up
 
-Split changed files into implementation files and test files. Dispatch two agents in parallel
-(single message, two Agent tool calls):
+Split changed files into implementation files and test files. Dispatch two agents in parallel:
 
 - **Agent A (impl):** general-purpose agent. "Simplify then review these implementation files:
   [list]. First apply code-distill (reduce complexity, DRY, naming, dead code). Then invoke
@@ -313,13 +272,12 @@ Split changed files into implementation files and test files. Dispatch two agent
   apply code-distill (reduce complexity, DRY, naming, dead code). Then invoke `/vet-test` on the
   same files. If vet-test made changes, run `/vet-test` once more (max 2 passes)."
 
-Each agent runs distill → vet → (if changes) vet again, sequentially in its own context. The vet
+Each agent runs distill -> vet -> (if changes) vet again, sequentially in its own context. The vet
 benefits from seeing what was simplified, and a second pass catches improvements created by the
-first. After both complete, re-run the test suite if either agent made changes.
+first.
 
-Keep tests green. Don't add behavior.
-
-For full review (bug scanning, compliance), run `/preflight` before committing.
+After both agents complete, re-run the test suite if either agent made changes. Keep tests green.
+Don't add behavior. Run `/preflight` before committing.
 
 ### Repeat
 
@@ -475,7 +433,7 @@ Never fix bugs without a test.
 
 ## Testing Anti-Patterns
 
-When adding mocks or test utilities, read @references/testing-anti-patterns.md to avoid common
+When adding mocks or test utilities, read `references/testing-anti-patterns.md` to avoid common
 pitfalls:
 
 - Testing mock behavior instead of real behavior

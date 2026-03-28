@@ -177,7 +177,7 @@ def test_add(a, b, expected):
 
 | Tool                              | Use For                                                                |
 | --------------------------------- | ---------------------------------------------------------------------- |
-| `hypothesis`                      | Property-based testing—prefer over hardcoded data                      |
+| `hypothesis`                      | Property-based testing — prefer over hardcoded data                    |
 | `pandera`                         | DataFrame schema validation                                            |
 | `dirty-equals`                    | Flexible assertions (`IsDatetime`, `IsUUID`, `IsPartialDict`)          |
 | `pytest.approx()`                 | Float comparisons with tolerance                                       |
@@ -191,8 +191,19 @@ def test_add(a, b, expected):
 **Hardcoded data only for**: realistic inputs from production (e.g., actual JSON events, real API
 responses).
 
-**Seeding**: Set ALL sources—`random.seed()`, `np.random.seed()`, `torch.manual_seed()`,
+**Seeding**: Set ALL sources — `random.seed()`, `np.random.seed()`, `torch.manual_seed()`,
 `PYTHONHASHSEED`.
+
+## Verification
+
+**MANDATORY before completing any task:**
+
+```bash
+pytest                   # Run test suite
+ruff check .             # Lint check
+```
+
+**Task is NOT complete until all pass.**
 
 ## Rationalizations
 

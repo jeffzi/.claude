@@ -1,13 +1,20 @@
 ---
 name: verification-before-completion
-description: Use when about to claim work is complete, fixed, or passing, before committing or creating PRs
+description: >-
+  Use when about to claim work is complete, fixed, or passing, before committing or creating PRs.
+  Not for exploratory prototyping, local scratch work, or intermediate states during multi-step
+  operations.
 ---
-
-<!-- markdownlint-disable MD040 -->
 
 # Verification Before Completion
 
 ## Overview
+
+## When NOT to Use
+
+- Exploratory prototyping or spike work
+- Intermediate states during multi-step plans (verify at the end)
+- Local-only scratch files not intended for commit
 
 Claiming work is complete without verification is dishonesty, not efficiency.
 
@@ -17,7 +24,7 @@ Claiming work is complete without verification is dishonesty, not efficiency.
 
 ## The Iron Law
 
-```
+```text
 NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
 ```
 
@@ -25,7 +32,7 @@ If you haven't run the verification command in this message, you cannot claim it
 
 ## The Gate Function
 
-```
+```text
 BEFORE claiming any status or expressing satisfaction:
 
 1. IDENTIFY: What command proves this claim?
@@ -77,35 +84,35 @@ Skip any step = lying, not verifying
 
 **Tests:**
 
-```
+```text
 OK  [Run test command] [See: 34/34 pass] "All tests pass"
 BAD "Should pass now" / "Looks correct"
 ```
 
 **Regression tests (TDD Red-Green):**
 
-```
+```text
 OK  Write -> Run (pass) -> Revert fix -> Run (MUST FAIL) -> Restore -> Run (pass)
 BAD "I've written a regression test" (without red-green verification)
 ```
 
 **Build:**
 
-```
+```text
 OK  [Run build] [See: exit 0] "Build passes"
 BAD "Linter passed" (linter doesn't check compilation)
 ```
 
 **Requirements:**
 
-```
+```text
 OK  Re-read plan -> Create checklist -> Verify each -> Report gaps or completion
 BAD "Tests pass, phase complete"
 ```
 
 **Agent delegation:**
 
-```
+```text
 OK  Agent reports success -> Check VCS diff -> Verify changes -> Report actual state
 BAD Trust agent report
 ```
