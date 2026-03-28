@@ -87,15 +87,18 @@
         ]
       }
     ],
-    "SessionStart": [
+    "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/jeffzi/.claude/hooks/skill-loader.sh"
+            "command": "/Users/jeffzi/.claude/hooks/gsd-setup-config.sh",
+            "timeout": 5
           }
         ]
-      },
+      }
+    ],
+    "SessionStart": [
       {
         "hooks": [
           {
@@ -106,6 +109,16 @@
       }
     ],
     "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/jeffzi/.claude/hooks/bash-exit-guard.sh",
+            "timeout": 5
+          }
+        ]
+      },
       {
         "matcher": "Bash|Edit|Write|MultiEdit|Agent|Task",
         "hooks": [
