@@ -10,8 +10,9 @@ description: >
 
 # Commit Messages
 
-The diff shows _what_ changed. The commit message's job is to explain _why_ — motivation, reasoning,
-and context that vanish from memory within weeks.
+The diff shows what code changed. The commit message adds what the diff can't: the subject names the
+**concrete effect**, the body explains **why** — motivation, reasoning, and context that vanish from
+memory within weeks.
 
 ## Commit Granularity
 
@@ -29,21 +30,25 @@ made. If a plan requires multiple commits, surface this during planning and get 
 
 ## Subject Lines
 
-Keep under **50 characters**. Describe **impact or purpose**, not implementation.
+Keep under **50 characters**. Describe the **concrete effect** — what changed from a user's
+perspective — not the implementation steps. The body explains _why_; the subject explains _what
+happened_.
 
 | Test                | How to apply                                                           |
 | ------------------- | ---------------------------------------------------------------------- |
 | `git log --oneline` | Would someone scanning 50 commits quickly include or exclude this one? |
 | "If applied" test   | "If applied, this commit will ___" — meaningful to an outsider?        |
+| Motivation test     | Does it read as "in order to ___"? Too abstract — name the effect.     |
 
 Scope to the affected area when not generic: `net/http: handle foo when bar`.
 
-| Implementation-focused (bad)                   | Impact-focused (good)                            |
+| Implementation-focused (bad)                   | Effect-focused (good)                            |
 | ---------------------------------------------- | ------------------------------------------------ |
 | Refactor load_data() to use list comprehension | Speed up data loading by 40% for large CSV files |
 | Change query to use index                      | Fix 10-second page load on user dashboard        |
 | Add import_key() function                      | Add support for importing GPG keys               |
 | Fix BUG-9284                                   | Fix buy button disappearing on Mondays           |
+| Allow doc:sync on sensitive models             | Fix doc:sync failing on sensitive TOTP models    |
 
 ## Body
 
@@ -71,6 +76,7 @@ footer, not as the message.
 | "Fix bug", "update code", "misc"      | Zero information — forces everyone to read the diff                      |
 | "Fix JIRA-1234" (ticket only)         | Requires browser + tracker; breaks when tracker migrates                 |
 | "Change X from 5 to 10"               | Narrates the diff — explain _why_ the constant changed                   |
+| "Allow X on Y" / "Enable X for Z"     | Reads as motivation, not effect — name what concretely changed           |
 | "Address review comments"             | Meaningless outside PR context                                           |
 | Auto-committing during plan execution | User loses ability to review before commit; hard to undo                 |
 | Internal tooling refs in message      | Skill names, agent names, phase IDs, planning conventions leak internals |
