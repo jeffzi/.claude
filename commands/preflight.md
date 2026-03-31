@@ -61,14 +61,19 @@ pending/in_progress, you are NOT done. Keep going.
 - [ ] Find CLAUDE.md conventions
 - [ ] Detect languages
 
-| Source        | Method                                                       |
-| ------------- | ------------------------------------------------------------ |
-| Path argument | Use directly                                                 |
-| No argument   | `git diff --name-only @{push}` (all changes since last push) |
+| Source                         | Method                                                                        |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| Path argument (specific file)  | Use directly — user's explicit choice, gitignore not applied                  |
+| Path argument (directory/glob) | Expand files, then filter gitignored: `git check-ignore --stdin < <filelist>` |
+| No argument                    | Union of all sources below (deduplicated)                                     |
 
-If `@{push}` fails (no upstream set), fall back to `git diff --name-only` +
-`git diff --cached --name-only` + `git ls-files --others --exclude-standard` (untracked files).
-Note: this fallback only captures uncommitted changes, not committed-since-push.
+**No-argument file collection** — always run all four, combine and deduplicate:
+
+1. `git diff --name-only @{push}` — committed but not yet pushed (skip if `@{push}` fails — no
+   upstream)
+2. `git diff --name-only` — unstaged working-tree changes
+3. `git diff --cached --name-only` — staged changes
+4. `git ls-files --others --exclude-standard` — untracked, non-gitignored files
 
 If no target files are found (empty diff and no path argument), report "No changes detected" and
 stop.
