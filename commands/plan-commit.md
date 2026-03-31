@@ -1,7 +1,6 @@
 ---
 description: >
   Analyze uncommitted changes and suggest a plan of granular, logical commits.
-  Shows the plan for approval before any commits are made.
 ---
 
 # Plan Commits
@@ -17,6 +16,8 @@ description: >
 
 Analyze all uncommitted changes (staged, unstaged, and untracked files) and organize them into a
 plan of **granular, logical commits** — each capturing one coherent unit of work.
+
+If there are no uncommitted changes (all context commands return empty), inform the user and stop.
 
 ### Step 1: Load the write-commit skill
 
@@ -73,5 +74,6 @@ After presenting the plan, ask the user to confirm before executing:
 
 For each commit in the approved plan, stage only the listed files and commit. Use `write-commit`
 guidelines for the final message. Execute commits sequentially — each must succeed before the next.
+If a commit fails, stop immediately and report the error. Do not continue with remaining commits.
 
 **Do not push.** The user will push when ready.

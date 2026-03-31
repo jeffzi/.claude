@@ -17,8 +17,8 @@ wrong abstractions, missing type hints, and structural issues that automated too
    - For `.py` files: check for `import marimo` → use `code-marimo` instead of `code-py`
    - For `.py` files: check for `from shiny import` or `from shiny.express import` → use
      `code-shiny` instead of `code-py`
-2. Load the matching `code-<lang>` skill (e.g., `code-py`, `code-lua`, `code-marimo`, `code-shiny`,
-   `code-shell`)
+2. Load the matching `code-<lang>` skill via `Skill()`. If no matching skill exists for the detected
+   language, skip skill-based review and note that no skill was available.
 3. Run verification commands from the skill (linters, formatters, tests)
 4. **Rule-by-rule manual review against the skill.** Linters only catch syntactic issues. You must
    catch judgment-based violations that linters miss — non-idiomatic patterns, wrong abstraction
@@ -49,7 +49,9 @@ wrong abstractions, missing type hints, and structural issues that automated too
 
 5. Fix any issues found
 
-For directories, detect from file extensions present.
+For directories, recurse into subdirectories. Skip common non-source directories (`node_modules/`,
+`__pycache__/`, `.git/`, `dist/`, `build/`, `.venv/`). Detect language per file from extension.
+Report findings per file, grouped by language.
 
 ## Output Rules
 
