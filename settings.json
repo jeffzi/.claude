@@ -43,6 +43,7 @@
     ],
     "defaultMode": "plan"
   },
+  "model": "opusplan",
   "hooks": {
     "PreToolUse": [
       {
