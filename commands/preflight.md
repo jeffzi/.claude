@@ -23,20 +23,6 @@ Automated pre-commit review with iterative fix loop.
 - On unmodified files without explicit path
 - During rapid prototyping
 
-**Context check (MANDATORY):** Preflight adds verbose output. If this session already has
-significant context (e.g., after a multi-step implementation, TDD cycle, or plan execution), **do
-not run preflight here**. Instead, tell the user:
-
-> Preflight works best in a clean context. Run it from terminal:
-
-```bash
-claude --dangerously-skip-permissions "/preflight [path]"
-```
-
-Or from within a Claude session, run via Bash: `~/.claude/scripts/run-preflight.sh [path]`
-
-Only proceed in the current session if the context is light (short conversation, few tool calls).
-
 **Announce at start:** "✈️ Preflight check initiated for [files/path]..."
 
 **Silent until Summary:** After the start announcement, output NOTHING until Step 4's Summary
@@ -81,8 +67,11 @@ pending/in_progress, you are NOT done. Keep going.
 | No argument   | `git diff --name-only @{push}` (all changes since last push) |
 
 If `@{push}` fails (no upstream set), fall back to `git diff --name-only` +
-`git diff --cached --name-only`. Note: this fallback only captures uncommitted changes, not
-committed-since-push.
+`git diff --cached --name-only` + `git ls-files --others --exclude-standard` (untracked files).
+Note: this fallback only captures uncommitted changes, not committed-since-push.
+
+If no target files are found (empty diff and no path argument), report "No changes detected" and
+stop.
 
 **CLAUDE.md Locations** (check only these, do NOT search subdirectories):
 
@@ -129,10 +118,13 @@ Each iteration:
 
    **Review scope depends on input mode:**
    - **Path argument**: Review entire file(s) - flag any issues found
-   - **No argument (since last push)**: Review only changed lines - use `git diff @{push} -- <file>`
-     to identify changed lines, flag only issues in those lines
+   - **No argument (since last push)**: Review only changed lines — use the same diff method from
+     Step 1 (`git diff @{push} -- <file>`, or the fallback if no upstream) to identify changed
+     lines, flag only issues in those lines
 
-2. **Score issues with Haiku** (batch all issues together):
+2. **Score issues with Haiku** — dispatch **Agent** tool with `model: haiku`:
+
+   "Score each issue on this scale and return a JSON array of `{issue, location, score}`:
 
    | Score    | Meaning            | Action       |
    | -------- | ------------------ | ------------ |
@@ -142,14 +134,21 @@ Each iteration:
    | **≥ 75** | Verified important | **Auto-fix** |
    | 100      | Definite, frequent | Auto-fix     |
 
-3. **Fix issues with score ≥75:**
+   Issues: [paste all issues from review agents]"
+
+3. **Fix issues with score ≥75** — dispatch agents in parallel (single message):
    - Code issues → **Agent** tool with `subagent_type: code-mend`, `model: sonnet`
-   - Doc issues → fix inline (Edit tool) applying `write-doc` and `write-prose` rules (for
-     CHANGELOG.md, apply `write-changelog` rules instead)
+   - Doc issues → **Agent** tool with `model: sonnet` — "Fix these documentation issues: [list].
+     Apply `write-doc` and `write-prose` rules (for CHANGELOG.md, apply `write-changelog` rules
+     instead)."
 
 4. **Decision point:**
-   - If fixes applied AND iterations < 3 → invoke `vet-code`, `vet-test` (if test files), and
-     `vet-doc` (if doc files) → repeat from iteration step 1
+   - If fixes applied AND iterations < 3 → dispatch **vet agents in parallel** (single message, one
+     Agent per non-empty bucket):
+     - **Agent** `model: sonnet` — "Invoke `/vet-code` on these files: [list]"
+     - **Agent** `model: sonnet` — "Invoke `/vet-test` on these files: [list]" (if test files)
+     - **Agent** `model: sonnet` — "Invoke `/vet-doc` on these files: [list]" (if doc files) →
+       repeat from iteration step 1
    - If no fixes OR iterations = 3 → proceed to Step 4
 
 **False Positives (score = 0, discard):**
