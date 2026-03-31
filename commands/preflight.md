@@ -3,7 +3,7 @@ name: preflight
 description: >
   Use when about to commit changes, before code review,
   or when preparing a PR for submission
-argument-hint: Optional path (defaults to changes since last push)
+argument-hint: Optional path or commit ref (defaults to changes since last push)
 ---
 
 # Preflight
@@ -61,10 +61,18 @@ pending/in_progress, you are NOT done. Keep going.
 - [ ] Find CLAUDE.md conventions
 - [ ] Detect languages
 
+**Argument disambiguation:** if an argument is given:
+
+1. If it contains `..` or `...` → commit range immediately (skip `git rev-parse`)
+2. Otherwise try `git rev-parse --verify <arg> 2>/dev/null`. If it succeeds → single commit-ref
+   mode. If it fails → path mode.
+
 | Source                         | Method                                                                        |
 | ------------------------------ | ----------------------------------------------------------------------------- |
 | Path argument (specific file)  | Use directly — user's explicit choice, gitignore not applied                  |
 | Path argument (directory/glob) | Expand files, then filter gitignored: `git check-ignore --stdin < <filelist>` |
+| Commit ref (single)            | `git diff --name-only <ref>~1 <ref>`                                          |
+| Commit range (`a..b`)          | `git diff --name-only <from>..<to>`                                           |
 | No argument                    | Union of all sources below (deduplicated)                                     |
 
 **No-argument file collection** — always run all four, combine and deduplicate:
@@ -122,7 +130,9 @@ Each iteration:
    | Doc Reviewer         | Structure, prose, accessibility, AI-writing, changelog compliance | sonnet | If doc files found   |
 
    **Review scope depends on input mode:**
-   - **Path argument**: Review entire file(s) - flag any issues found
+   - **Path argument**: Review entire file(s) — flag any issues found
+   - **Commit ref (single)**: Review only changed lines — `git diff <ref>~1 <ref> -- <file>`
+   - **Commit range**: Review only changed lines — `git diff <from> <to> -- <file>`
    - **No argument (since last push)**: Review only changed lines — use the same diff method from
      Step 1 (`git diff @{push} -- <file>`, or the fallback if no upstream) to identify changed
      lines, flag only issues in those lines
