@@ -1,0 +1,15 @@
+__pycache__/
+_scratch
+.env*
+.git/
+.venv/
+*.key
+*.log
+*.pem
+*.secret
+build/
+coverage/
+dist/
+node_modules/
+plugins/
+cache/
