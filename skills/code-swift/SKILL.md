@@ -5,7 +5,7 @@ description: >
   Use when you think "just a quick script" or "concurrency is overkill" — these are symptoms
   this skill applies. Also use when encountering Swift 6.x strict concurrency errors, Sendable
   warnings, or actor isolation issues. Applies to any *.swift file. For test files (*Tests.swift),
-  also load test-swift.
+  also load test-swift. Not for Swift test patterns — use test-swift for that.
 ---
 
 # Swift — Production-Quality Code

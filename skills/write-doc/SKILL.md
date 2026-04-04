@@ -29,6 +29,15 @@ actually have, not an imagined universal audience.
 
 ### Choose the right document type (Diataxis)
 
+If the document type isn't obvious from context, use AskUserQuestion to ask:
+
+- **Question:** "What type of documentation are you writing?"
+- **Options:**
+  - **Tutorial** — step-by-step learning ("teach me")
+  - **How-to guide** — task-focused ("help me accomplish X")
+  - **Reference** — lookup documentation ("what are the exact details?")
+  - **Explanation** — conceptual deep dive ("why does it work this way?")
+
 Documentation serves four distinct purposes. Mixing them is the primary structural anti-pattern — it
 produces docs that do none well.
 

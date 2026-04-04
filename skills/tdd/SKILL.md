@@ -408,6 +408,7 @@ Before marking work complete:
 - [ ] All tests pass
 - [ ] Output pristine (no errors, warnings)
 - [ ] Tests use real code (mocks only if unavoidable)
+- [ ] Showed test output proving pass (not "should pass" — actual output)
 - [ ] Edge cases and errors covered
 - [ ] /preflight passed on all changed files
 

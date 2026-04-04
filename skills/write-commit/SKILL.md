@@ -5,7 +5,7 @@ description: >
   commits before push, or about to commit during plan
   execution. Apply when tempted to write vague messages
   like "fix bug" or "update code", or when unsure
-  whether a commit needs a body.
+  whether a commit needs a body. Not for PR descriptions or changelog entries.
 ---
 
 # Commit Messages
@@ -71,21 +71,56 @@ footer, not as the message.
 
 ## Anti-Patterns
 
-| Pattern                               | Problem                                                                  |
-| ------------------------------------- | ------------------------------------------------------------------------ |
-| "Fix bug", "update code", "misc"      | Zero information — forces everyone to read the diff                      |
-| "Fix JIRA-1234" (ticket only)         | Requires browser + tracker; breaks when tracker migrates                 |
-| "Change X from 5 to 10"               | Narrates the diff — explain _why_ the constant changed                   |
-| "Allow X on Y" / "Enable X for Z"     | Reads as motivation, not effect — name what concretely changed           |
-| "Address review comments"             | Meaningless outside PR context                                           |
-| Auto-committing during plan execution | User loses ability to review before commit; hard to undo                 |
-| Internal tooling refs in message      | Skill names, agent names, phase IDs, planning conventions leak internals |
+| Pattern                               | Problem                                                                                                  |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| "Fix bug", "update code", "misc"      | Zero information — forces everyone to read the diff                                                      |
+| "Fix JIRA-1234" (ticket only)         | Requires browser + tracker; breaks when tracker migrates                                                 |
+| "Change X from 5 to 10"               | Narrates the diff — explain _why_ the constant changed                                                   |
+| "Allow X on Y" / "Enable X for Z"     | Reads as motivation, not effect — name what concretely changed                                           |
+| "Address review comments"             | Meaningless outside PR context                                                                           |
+| Auto-committing during plan execution | User loses ability to review before commit; hard to undo                                                 |
+| Internal tooling refs in message      | Skill names, agent names, phase IDs leak internals — `chore: run preflight` → `fix: resolve lint errors` |
+
+## Execution
+
+When the user **explicitly** asks to commit (in any phrasing — "commit", "commit changes", "commit
+this"). **Never execute this during plan execution** — the user must review all changes first. An
+explicit "commit" request during an active plan is not an exception to this rule.
+
+0. **Verify before committing** — if this commit includes code changes (not docs-only or config),
+   run the project's test command and confirm it passes. No commit without fresh passing evidence.
+   If tests fail, fix first. If no test suite exists, skip this step.
+
+1. **Gather context** — run in parallel:
+   - `git status`
+   - `git diff --cached --name-only` ← what is already staged
+   - `git diff HEAD`
+   - `git branch --show-current`
+   - `git log --oneline -10`
+
+2. **Compose the message** — apply all rules above before writing a single word of the subject.
+
+3. **Stage** — before running `git add`, check what `git diff --cached --name-only` returned. If
+   files are already staged that shouldn't be part of this commit, unstage them first with
+   `git restore --staged <path>`. Then add only the intended files and confirm with
+   `git diff --cached --name-only` before committing.
+
+4. **Confirm** — use AskUserQuestion to present the composed message and staged files for approval.
+   Options: "Commit" (proceed), "Edit message" (user provides revised wording), "Cancel" (abort).
+   Never run `git commit` without the user approving the final message.
+
+5. **Commit** — `git commit -m "..."` using a HEREDOC to preserve formatting.
 
 ## Rationalization Guard
 
-| Excuse                           | Reality                                                                 |
-| -------------------------------- | ----------------------------------------------------------------------- |
-| "The diff is self-explanatory"   | Diffs show _what_, never _why_. Add the why.                            |
-| "I'll remember the context"      | You won't, and your teammates never had it.                             |
-| "The ticket has all the details" | Tickets get migrated, deleted, or go offline. Message must stand alone. |
-| "It's just a small fix"          | Small fixes deserve clear subjects. "Fix X when Y" takes 5 seconds.     |
+A commit message that technically avoids the listed anti-patterns but still obscures intent violates
+the spirit of these rules. If a future reader would need to open the diff to understand what
+changed, the message has failed.
+
+| Excuse                                                                  | Reality                                                                 |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| "The diff is self-explanatory"                                          | Diffs show _what_, never _why_. Add the why.                            |
+| "I'll remember the context"                                             | You won't, and your teammates never had it.                             |
+| "The ticket has all the details"                                        | Tickets get migrated, deleted, or go offline. Message must stand alone. |
+| "It's just a small fix"                                                 | Small fixes deserve clear subjects. "Fix X when Y" takes 5 seconds.     |
+| "The user asked me to commit, so auto-committing during a plan is fine" | Explicit commit request during a plan still requires user review first. |

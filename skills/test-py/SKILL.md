@@ -154,18 +154,19 @@ def test_add(a, b, expected):
 
 ## Pitfalls
 
-| ✗ Never                         | ✓ Always                                                            |
-| ------------------------------- | ------------------------------------------------------------------- |
-| Mock internal functions         | Mock at system boundaries                                           |
-| Session-scoped mutable fixtures | Function-scoped or copy data                                        |
-| Loops in test body              | `@pytest.mark.parametrize`                                          |
-| `assert x == True`              | `assert x` or `assert x is True`                                    |
-| Bare `except` in tests          | Let exceptions propagate                                            |
-| Interdependent tests            | Each test sets up own context                                       |
-| Hardcoded paths                 | Use `tmp_path` fixture                                              |
-| Over-mocking everything         | Use fakes for integration                                           |
-| Import boto3 before moto mock   | Import modules AFTER `@mock_aws` is active                          |
-| Classes as section headers      | Comment section headers; classes only for shared `autouse` fixtures |
+| ✗ Never                                      | ✓ Always                                                            |
+| -------------------------------------------- | ------------------------------------------------------------------- |
+| Mock internal functions                      | Mock at system boundaries                                           |
+| `mocker.patch("mod.Class")` without autospec | `autospec=True` — catches wrong method names/args                   |
+| Session-scoped mutable fixtures              | Function-scoped or copy data                                        |
+| Loops in test body                           | `@pytest.mark.parametrize`                                          |
+| `assert x == True`                           | `assert x` or `assert x is True`                                    |
+| Bare `except` in tests                       | Let exceptions propagate                                            |
+| Interdependent tests                         | Each test sets up own context                                       |
+| Hardcoded paths                              | Use `tmp_path` fixture                                              |
+| Over-mocking everything                      | Use fakes for integration                                           |
+| Import boto3 before moto mock                | Import modules AFTER `@mock_aws` is active                          |
+| Classes as section headers                   | Comment section headers; classes only for shared `autouse` fixtures |
 
 ## Fixture Best Practices
 
@@ -207,10 +208,11 @@ ruff check .             # Lint check
 
 ## Rationalizations
 
-| Excuse                        | Reality                                                                                  |
-| ----------------------------- | ---------------------------------------------------------------------------------------- |
-| "Mocking internals is faster" | You're testing implementation, not behavior.                                             |
-| "Loop is cleaner"             | Parametrize shows all cases, loop stops at first failure.                                |
-| "Session scope for speed"     | Mutation bugs cost more than test time.                                                  |
-| "All mocks pass"              | If integration fails, mocks gave false security.                                         |
-| "Classes organize tests"      | Comment section headers organize without `self` tax or false suggestion of shared state. |
+| Excuse                           | Reality                                                                                     |
+| -------------------------------- | ------------------------------------------------------------------------------------------- |
+| "Mocking internals is faster"    | You're testing implementation, not behavior.                                                |
+| "Loop is cleaner"                | Parametrize shows all cases, loop stops at first failure.                                   |
+| "Session scope for speed"        | Mutation bugs cost more than test time.                                                     |
+| "All mocks pass"                 | If integration fails, mocks gave false security.                                            |
+| "Classes organize tests"         | Comment section headers organize without `self` tax or false suggestion of shared state.    |
+| "My mock works without autospec" | Until you rename a method. `autospec=True` catches wrong names and arg counts at call time. |

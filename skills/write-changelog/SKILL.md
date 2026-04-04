@@ -4,7 +4,7 @@ description: >
   Use when writing, reviewing, or modifying CHANGELOG.md
   files. Apply for new changelogs, release entries, or
   auditing existing changelogs against the Keep a Changelog
-  standard.
+  standard. Not for release notes in documentation — use write-doc for that.
 ---
 
 # Changelog

@@ -4,7 +4,7 @@ description: >-
   Use when designing a new CLI tool, reviewing an existing CLI interface,
   adding subcommands or flags, writing help text, structuring output for
   humans and machines, or handling errors and configuration in command-line
-  programs.
+  programs. Not for GUI or TUI design.
 ---
 
 # CLI Interface Design
@@ -26,6 +26,18 @@ programs, distilled from [clig.dev](https://clig.dev).
 
 - Library/API design (different conventions apply)
 - GUIs or TUIs with interactive frameworks (e.g. textual, blessed)
+
+## First Question
+
+If the primary audience isn't clear from context, use AskUserQuestion to ask:
+
+- **Question:** "Who is the primary audience for this CLI?"
+- **Options:**
+  - **Humans** — interactive use, colorized output, friendly errors
+  - **Machines** — structured JSON, minimal noise, strict exit codes
+  - **Both** — detect TTY and switch between human/machine modes
+
+This shapes every downstream decision (output format, error style, flag design).
 
 ## Core Principles
 
