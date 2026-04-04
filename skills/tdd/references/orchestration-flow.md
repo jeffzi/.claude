@@ -24,7 +24,7 @@ When `/tdd` is invoked, determine the entry point before doing anything else:
 LOOP (one behavior group per cycle):
 
   RED:
-    1. Dispatch tdd-red agent with:
+    1. Dispatch tdd-red agent (model: sonnet) with:
        - Task description (what behaviors to test -- may be a cohesive batch)
        - Language and test runner
        - Relevant test file paths
@@ -35,7 +35,7 @@ LOOP (one behavior group per cycle):
        -> Ask: skip (next behavior) or revise test scope?
 
   GREEN:
-    5. Dispatch tdd-green agent with:
+    5. Dispatch tdd-green agent (model: sonnet) with:
        - Test file path
        - Test name(s)
        - Failure output
