@@ -1,29 +1,45 @@
 {
+  "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+  },
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
-      "Bash(busted *)",
-      "Bash(cargo *)",
-      "Bash(gh *)",
+      "Glob",
+      "Grep",
+      "Read",
       "Bash(git *)",
-      "Bash(ls *)",
-      "Bash(llscheck *)",
-      "Bash(luacheck *)",
-      "Bash(mkdir *)",
-      "Bash(mypy *)",
-      "Bash(prek *)",
-      "Bash(pytest *)",
-      "Bash(ruff *)",
+      "Bash(gh *)",
       "Bash(awk *)",
+      "Bash(cat *)",
+      "Bash(jq *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)",
       "Bash(sed *)",
       "Bash(shellcheck *)",
       "Bash(shfmt *)",
-      "Bash(task *)",
-      "Bash(uv *)",
       "Bash(which *)",
-      "Glob",
-      "Grep",
-      "Read"
+      "Bash(prek *)",
+      "Bash(task *)",
+      "Bash(mypy *)",
+      "Bash(pytest *)",
+      "Bash(ruff *)",
+      "Bash(uv *)",
+      "Bash(biome *)",
+      "Bash(bun *)",
+      "Bash(eslint *)",
+      "Bash(node *)",
+      "Bash(npm run *)",
+      "Bash(npx *)",
+      "Bash(tsc *)",
+      "Bash(busted *)",
+      "Bash(llscheck *)",
+      "Bash(luacheck *)",
+      "Bash(cargo *)",
+      "Bash(swift *)",
+      "Bash(swiftformat *)",
+      "Bash(swiftlint *)"
     ],
     "deny": [
       "Bash(git push)",
@@ -39,11 +55,11 @@
       "Read(**/secrets/*)",
       "Read(**/*credential*)",
       "Read(**/*.pem)",
-      "Read(**/*.key)"
+      "Read(**/*.key)",
+      "Read(**/*.secret)"
     ],
     "defaultMode": "plan"
   },
-  "model": "opusplan",
   "hooks": {
     "PreToolUse": [
       {
@@ -51,7 +67,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/jeffzi/.claude/hooks/git-safety.sh"
+            "command": "$HOME/.claude/hooks/git-guard.sh"
           }
         ]
       },
@@ -60,11 +76,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/jeffzi/.claude/hooks/marimo-check.sh"
+            "command": "$HOME/.claude/hooks/marimo-check.sh"
           },
           {
             "type": "command",
-            "command": "/Users/jeffzi/.claude/hooks/shiny-check.sh"
+            "command": "$HOME/.claude/hooks/shiny-check.sh"
           }
         ]
       },
@@ -73,7 +89,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/jeffzi/.claude/hooks/worktree-safety.sh"
+            "command": "$HOME/.claude/hooks/worktree-guard.sh"
           }
         ]
       },
@@ -82,8 +98,27 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"/Users/jeffzi/.claude/hooks/gsd-prompt-guard.js\"",
+            "command": "$HOME/.claude/hooks/config-guard.sh",
             "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/gsd-prompt-guard.js\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/rtk-rewrite.sh"
           }
         ]
       }
@@ -93,7 +128,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/jeffzi/.claude/hooks/gsd-setup-config.sh",
+            "command": "$HOME/.claude/hooks/gsd-setup-config.sh",
             "timeout": 5
           }
         ]
@@ -104,7 +139,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"/Users/jeffzi/.claude/hooks/gsd-check-update.js\""
+            "command": "node \"$HOME/.claude/hooks/gsd-check-update.js\""
           }
         ]
       }
@@ -115,7 +150,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/jeffzi/.claude/hooks/bash-exit-guard.sh",
+            "command": "$HOME/.claude/hooks/bash-exit-guard.sh",
             "timeout": 5
           }
         ]
@@ -125,8 +160,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"/Users/jeffzi/.claude/hooks/gsd-context-monitor.js\"",
+            "command": "node \"$HOME/.claude/hooks/gsd-context-monitor.js\"",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/desktop-notify.sh",
+            "timeout": 5
           }
         ]
       }
@@ -134,17 +180,17 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "node \"/Users/jeffzi/.claude/hooks/gsd-statusline.js\""
+    "command": "node \"$HOME/.claude/hooks/gsd-statusline.js\""
   },
   "enabledPlugins": {
     "claude-md-management@claude-plugins-official": true,
-    "commit-commands@claude-plugins-official": true,
     "lua-lsp@claude-plugins-official": true,
     "rust-analyzer-lsp@claude-plugins-official": true,
     "scientific-skills@claude-scientific-skills": true,
     "skill-creator@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
-    "swift-lsp@claude-plugins-official": true
+    "swift-lsp@claude-plugins-official": true,
+    "ast-grep@ast-grep-marketplace": true
   },
   "extraKnownMarketplaces": {
     "claude-plugins-official": {
@@ -158,10 +204,16 @@
         "source": "github",
         "repo": "K-Dense-AI/claude-scientific-skills"
       }
+    },
+    "ast-grep-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "ast-grep/agent-skill"
+      }
     }
   },
   "alwaysThinkingEnabled": true,
-  "effortLevel": "high",
+  "effortLevel": "medium",
   "promptSuggestionEnabled": false,
   "skipDangerousModePermissionPrompt": true
 }
