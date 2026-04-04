@@ -11,12 +11,23 @@ surface before anything else; never switch files or approaches to avoid one. Nev
 
 ### No destructive operations without explicit permission
 
-Always ask before:
+Never run any command that could destroy, overwrite, or discard uncommitted work. Always ask the
+user first and explain why. This includes but is not limited to:
 
-- **File deletion**: `rm`, `rm -rf`, `unlink`
-- **Shell truncation**: `> file` or `echo "" > file`
-- **Covert reverts**: reading git history (`git show`, `git cat-file`) then writing back via
-  Write/Edit tools
+- **Git (discarding changes)**: `checkout --`, `checkout HEAD -- <path>`, `checkout -f`/`--force`,
+  `switch -f`/`--force`/`--discard-changes`, `restore` (without `--staged`), `reset` (all forms
+  including `reset HEAD`), `clean`, `stash`, `apply -R`/`--reverse`. To unstage files, use
+  `git restore --staged <path>` instead of `git reset`.
+- **Git (rewriting history / bypassing safeguards)**: `commit --amend`, `push --force`, `rebase`
+  (with uncommitted changes), `branch -D`, `--no-verify` on any command.
+- **Git (tracking ignored files)**: `add -f`/`--force` on gitignored files. Never force-add files
+  that match a local or global gitignore rule.
+- **File overwriting**: Reading content from git history (`git show`, `git cat-file`) and writing it
+  back via Write/Edit tools or shell redirects (`git show HEAD:file > file`) to revert a file.
+- **File deletion**: `rm`, `rm -rf`, `unlink`, or any command that removes files.
+- **Shell redirects**: Truncating files via `> file` or `echo "" > file`.
+- **Worktrees**: `git worktree remove` or `ExitWorktree` when the worktree has uncommitted changes.
+  Always commit work before leaving a worktree.
 
 ### Worktree compression recovery
 
