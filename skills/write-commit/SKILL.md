@@ -71,15 +71,23 @@ footer, not as the message.
 
 ## Anti-Patterns
 
-| Pattern                               | Problem                                                                                                  |
-| ------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| "Fix bug", "update code", "misc"      | Zero information — forces everyone to read the diff                                                      |
-| "Fix JIRA-1234" (ticket only)         | Requires browser + tracker; breaks when tracker migrates                                                 |
-| "Change X from 5 to 10"               | Narrates the diff — explain _why_ the constant changed                                                   |
-| "Allow X on Y" / "Enable X for Z"     | Reads as motivation, not effect — name what concretely changed                                           |
-| "Address review comments"             | Meaningless outside PR context                                                                           |
-| Auto-committing during plan execution | User loses ability to review before commit; hard to undo                                                 |
-| Internal tooling refs in message      | Skill names, agent names, phase IDs leak internals — `chore: run preflight` → `fix: resolve lint errors` |
+| Pattern                               | Problem                                                        |
+| ------------------------------------- | -------------------------------------------------------------- |
+| "Fix bug", "update code", "misc"      | Zero information — forces everyone to read the diff            |
+| "Fix JIRA-1234" (ticket only)         | Requires browser + tracker; breaks when tracker migrates       |
+| "Change X from 5 to 10"               | Narrates the diff — explain _why_ the constant changed         |
+| "Allow X on Y" / "Enable X for Z"     | Reads as motivation, not effect — name what concretely changed |
+| "Address review comments"             | Meaningless outside PR context                                 |
+| Auto-committing during plan execution | User loses ability to review before commit; hard to undo       |
+
+## No internal tooling leaks
+
+Never reference skill names, agent names, phase IDs, `.planning/` paths, or any Claude-internal
+process in commit messages. Scan every draft message before committing — if it contains any of
+these, rewrite to describe the effect instead.
+
+- **Bad**: `chore: run preflight checks` / `fix: resolve bug found during /tdd RED phase`
+- **Good**: `fix: resolve lint errors` / `fix: reject empty email in form submission`
 
 ## Execution
 

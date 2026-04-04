@@ -246,6 +246,9 @@ check_single_command() {
 
 	# Block commits if plan files are already staged
 	if is_git_subcmd "commit"; then
+		# Remind to load write-commit skill
+		printf "STOP: You MUST load Skill(write-commit) before committing. If you have not loaded it yet, abort and load it now.\n" >&2
+
 		local root
 		root=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
 		local staged_files
