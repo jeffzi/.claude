@@ -63,12 +63,13 @@ Files:
 
 ### Step 4: Wait for approval
 
-After presenting the plan, ask the user to confirm before executing:
+After presenting the plan, use **AskUserQuestion** to let the user confirm before executing.
+Options:
 
-- **(a)ccept** — execute all commits in order.
-- **(e)dit** — the user describes what to change (regroup files, reword messages, merge/split
-  commits) and you revise the plan before executing.
-- **(c)ancel** — do nothing.
+- **Accept** — execute all commits in order.
+- **Edit** — the user describes what to change (regroup files, reword messages, merge/split commits)
+  and you revise the plan before executing.
+- **Cancel** — do nothing.
 
 ### Step 5: Execute (only after approval)
 

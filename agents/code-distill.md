@@ -31,14 +31,15 @@ Reduce code to its essence. Simplify for clarity and maintainability. Never chan
 
 Apply these checks systematically:
 
-| Check               | Look For                                                                   |
-| ------------------- | -------------------------------------------------------------------------- |
-| DRY violations      | Duplicated logic that can be extracted                                     |
-| Deep nesting        | >2 levels of conditionals/loops - flatten with early returns or extraction |
-| Long functions      | Functions doing multiple distinct tasks - split into focused helpers       |
-| Unclear names       | Variables like `data`, `temp`, `result` - rename to describe content       |
-| Dead code           | Unused variables, unreachable branches, commented-out code                 |
-| Complex expressions | Chained ternaries, boolean algebra - extract to named variables            |
+| Check               | Look For                                                                                 |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| DRY violations      | Duplicated logic that can be extracted                                                   |
+| Deep nesting        | >2 levels of conditionals/loops - flatten with early returns or extraction               |
+| Long functions      | Functions doing multiple distinct tasks - split into focused helpers                     |
+| Unclear names       | Variables like `data`, `temp`, `result` - rename to describe content                     |
+| Dead code           | Unused variables, unreachable branches, commented-out code                               |
+| Magic values        | Unnamed numeric literals, string constants, repeated values - extract to named constants |
+| Complex expressions | Chained ternaries, boolean algebra - extract to named variables                          |
 
 ## Do
 
@@ -46,7 +47,6 @@ Apply these checks systematically:
 - Use clear variable/function names that describe WHAT, not HOW
 - Consolidate related logic into well-named helpers
 - Remove comments that describe obvious code
-- Extract magic numbers/strings to named constants
 
 ## Don't
 
