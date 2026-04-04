@@ -4,7 +4,7 @@ description: >
   Use when writing tests for Python code that uses Polars DataFrames. Apply for assert_frame_equal
   and assert_series_equal usage, null/NaN assertion pitfalls, expression isolation testing, schema
   mismatches in fixtures, non-deterministic group_by order, float tolerance, or any test files
-  importing polars.
+  importing polars. Not for non-Polars Python tests — use test-py for that.
 ---
 
 # Testing Polars Code

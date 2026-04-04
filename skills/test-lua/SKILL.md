@@ -2,7 +2,8 @@
 name: test-lua
 description: >
   Use when writing Lua tests with busted. Apply for assertions, spies/stubs, test isolation,
-  before_each/setup patterns, coverage with luacov, or any *_test.lua files.
+  before_each/setup patterns, coverage with luacov, or any *_test.lua files. Not for production
+  Lua code — use code-lua for that.
 ---
 
 # Lua Testing with Busted
