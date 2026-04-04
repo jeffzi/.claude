@@ -35,6 +35,10 @@ plugins/*
 !hooks/
 !hooks/**
 
+# Allow tests
+!tests/
+!tests/**
+
 # Allow local marketplace
 !local-marketplace/
 !local-marketplace/**
