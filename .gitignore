@@ -3,6 +3,7 @@
 
 # Allow config files
 !.gitignore
+!.claudeignore
 !.pre-commit-config.yaml
 !dprint.json
 !.markdownlint-cli2.jsonc
@@ -46,6 +47,9 @@ plugins/*
 agents/gsd-*.md
 commands/gsd/
 hooks/gsd-*.js
+
+# RTK hook state
+hooks/.rtk*
 
 # Exclude junk (after whitelist so these take precedence)
 .DS_Store

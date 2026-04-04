@@ -1,22 +1,5 @@
 # CLAUDE.md
 
-This is the global Claude Code configuration directory.
-
-## Directory layout
-
-```text
-skills/          # SKILL.md definitions (code-py, tdd, write-doc, etc.)
-agents/          # Subagent definitions (tdd-red, tdd-green, gsd-*, code-distill, etc.)
-commands/        # Slash commands (gsd/*, preflight, vet-code, vet-test, upgrade-*)
-hooks/           # Pre/post hooks (git-safety, worktree-safety, skill-loader, etc.)
-scripts/         # Helper scripts
-plugins/         # Third-party plugin cache
-projects/        # Per-project memory and settings
-get-shit-done/   # GSD workflow engine (commands, agents, skills)
-settings.json    # Shared settings (permissions, env vars, MCP servers)
-settings.local.json # Local-only settings (gitignored)
-```
-
 ## Rules
 
 ### Surface every issue you notice — never skip silently
@@ -50,17 +33,11 @@ offer to fix — nothing else. If your draft contains a clause that assigns orig
 | Excuse                                            | Reality                                         |
 | ------------------------------------------------- | ----------------------------------------------- |
 | "This isn't part of the task"                     | Surfacing it IS part of every task. Ask.        |
-| "This isn't from my changes"                      | Irrelevant. You noticed it, surface it.         |
 | "This is a pre-existing bug"                      | Now you've seen it. Surface it.                 |
-| "This is unrelated to [current task]"             | You found it during [current task]. Surface it. |
-| "This is outside the scope"                       | Surfacing is never outside scope. Ask.          |
 | "I'll just work around it"                        | Workarounds hide problems. Surface it.          |
-| "Let me add a quick workaround"                   | Investigate the root cause. Surface it.         |
 | "Let me use a different file/config/approach"     | That's a workaround. Fix the failing one first. |
-| "Let me revert and leave it as-is"                | Don't give up. Surface the real issue.          |
 | "That was already there / inherent / unavoidable" | Reworded deflection. Investigate alternatives.  |
 | "My fix didn't cause this new issue"              | The user reported a problem. Fix it.            |
-| "I shouldn't refactor this (not my code)"         | You noticed a problem. Surface it and ask.      |
 
 ### No destructive operations without explicit permission
 
@@ -105,28 +82,29 @@ When asked to fix a bug or implement a feature/behavior change and the project h
 exceptions. If the project has no test suite at all, TDD does not apply — just write the code
 directly.
 
+A test suite existing anywhere in the project qualifies — do not skip TDD because the specific
+module or area being fixed has no tests yet. That's where you add them.
+
 One behavior group at a time: write tests for a single concern or a cohesive batch of related
 concerns (same function/module, same structural failure reason), implement, repeat. Batch edge cases
 and validation variants together — don't waste a separate RED-GREEN cycle on each. Never batch
 unrelated behaviors (vertical slices, not horizontal).
 
-For context-isolated TDD, you **MUST** invoke the `tdd` skill (`/tdd`). Never dispatch `tdd-red` or
-`tdd-green` agents directly — they exist solely for the `/tdd` orchestrator. Dispatching them
-yourself bypasses phase verification, circuit breakers, and structured data passing.
+**Plan tasks describe behaviors to implement** — not implementation details. Never inline RED/GREEN
+steps, test assertions, or implementation code in plans. Each plan task ends with "Use `/tdd` for
+implementation." When the project has no test suite, plans describe implementation directly.
 
-**You are the coordinator, not the implementer.** Never write tests or implementation code yourself
-— dispatch `tdd-red` and `tdd-green` via `/tdd`. Never read implementation source files to "prepare"
-or "understand the API" — that's the RED agent's job. You describe _what behaviors to test_; agents
-figure out _how_.
+**Two modes:**
 
-For quick single-context TDD (small bug fixes), follow RED-GREEN-REFACTOR directly: failing test,
-minimal fix, verify pass, run full suite.
+- **Quick (small bug fixes):** Follow RED-GREEN-REFACTOR directly in the main context: failing test,
+  minimal fix, verify pass, run full suite.
+- **Context-isolated (larger work):** Invoke the `tdd` skill (`/tdd`). Never dispatch `tdd-red` or
+  `tdd-green` directly — they exist solely for the `/tdd` orchestrator. You describe _what behaviors
+  to test_; agents figure out _how_. Never write tests or implementation code yourself, and never
+  read implementation source files to "prepare".
 
 If an implementation attempt fails 3 times, try a different approach. After 5 total failures, stop
 and report.
-
-A test suite existing anywhere in the project qualifies — do not skip TDD because the specific
-module or area being fixed has no tests yet. That's where you add them.
 
 **Wrote fix code before the test?** Copy the modified files to a temp directory, restore the
 originals from the backup, write the failing test, watch it fail, then copy the fixed files back. Do
@@ -155,35 +133,34 @@ tooling or process that produced it.
 
 - **Bad**: `feat(01-02): implement CLI module`
 - **Bad**: `fix: resolve bug found during /tdd RED phase`
+- **Bad**: `chore: run preflight checks`
 - **Bad**: `# Added per vet-code recommendation`
 - **Good**: `feat: implement CLI module and entrypoint`
 - **Good**: `fix: reject empty email in form submission`
+- **Good**: `chore: fix lint and formatting issues`
 - **Good**: `# Validate email before processing`
 
-### Load `write-plan` before creating any plan
+### Verify before claiming completion
 
-Before using the Plan agent, EnterPlanMode, or writing a plan inline, **always** invoke
-`Skill(write-plan)` first. This loads the plan format constraints (task structure, header, what
-belongs in a plan vs. not). Without it, plans will use the wrong format.
+Never claim tests pass, builds succeed, or work is complete without showing the command output that
+proves it in the current message. "Should work" and "probably fixed" are not verification.
 
-### Plans describe behaviors, not TDD steps
+Before any success claim: identify the verification command, run it, read the full output, confirm
+it supports the claim. Skip any step and the claim is unverified.
 
-When the project has a test suite, plan tasks describe **behaviors to implement** — not
-implementation details. Never inline RED/GREEN steps, test assertions, or implementation code. Each
-plan task ends with "Use `/tdd` for implementation." When the project has no test suite, plans
-describe implementation directly (files, approach, specific changes).
+### Skill loading
 
-### Load relevant skills in plans
+Always load the relevant skill before the corresponding action — every time, even if loaded earlier
+in the same session. Plan mode context is erased on approval; never mark a skill as "already
+loaded".
 
-When creating an implementation plan, always load the relevant language/tech skills as the first
-step, before writing any code. Match skills to the languages and frameworks involved — e.g.
-`code-py` and `test-py` for Python, `code-marimo` for Marimo notebooks, `code-lua` for Lua,
-`code-shell` for shell scripts. This ensures coding standards and pitfall guards are active from the
-start.
-
-**Skills loaded during planning are NOT carried into implementation.** Plan mode context is erased
-when the plan is approved. Always invoke skills again at the start of implementation, even if they
-were loaded during planning. Never mark a skill as "already loaded".
+| Action                          | Skill to load first                                                       |
+| ------------------------------- | ------------------------------------------------------------------------- |
+| `git commit` or staging files   | `write-commit`                                                            |
+| EnterPlanMode or writing a plan | `write-plan`                                                              |
+| Writing code                    | Load the matching `code-*` and `test-*` skills for the language/framework |
 
 If no matching skill exists for a language or framework, note that explicitly in the plan rather
 than silently skipping the step.
+
+@RTK.md
