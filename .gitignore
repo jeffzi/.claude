@@ -48,7 +48,8 @@ agents/gsd-*.md
 commands/gsd/
 hooks/gsd-*.js
 
-# RTK hook state
+# RTK (auto-installed by rtk init, don't track)
+hooks/rtk-rewrite.sh
 hooks/.rtk*
 
 # Exclude junk (after whitelist so these take precedence)
