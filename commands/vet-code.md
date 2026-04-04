@@ -30,7 +30,10 @@ wrong abstractions, missing type hints, and structural issues that automated too
 
 2. Load the skill identified in step 1 via `Skill()`. Apply its rules throughout the review.
 3. Run verification commands from the skill (linters, formatters, tests)
-4. **Rule-by-rule manual review against the skill.** Linters only catch syntactic issues. You must
+4. Load the `ast-grep` skill via `Skill(ast-grep)` for structural pattern matching. Use it to find
+   anti-patterns that text grep misses — wrong call signatures, missing error handling branches,
+   structural violations from the language skill's rules.
+5. **Rule-by-rule manual review against the skill.** Linters only catch syntactic issues. You must
    catch judgment-based violations that linters miss — non-idiomatic patterns, wrong abstraction
    choices, error handling anti-patterns, missing or incorrect type hints, and structural issues
    (e.g., manual classes where dataclasses suffice, LBYL where EAFP applies).
@@ -57,7 +60,7 @@ wrong abstractions, missing type hints, and structural issues that automated too
    | "Code works correctly"                   | Working ≠ idiomatic. Check against (c) tables.          |
    | "Type hints are mostly there"            | Mostly ≠ complete. Verify every signature in (d).       |
 
-5. Fix any issues found
+6. Fix any issues found
 
 For directories, recurse into subdirectories. Skip common non-source directories (`node_modules/`,
 `__pycache__/`, `.git/`, `dist/`, `build/`, `.venv/`). Detect language per file from extension.
