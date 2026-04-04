@@ -25,32 +25,33 @@ Automated pre-commit review with iterative fix loop.
 
 **Announce at start:** "✈️ Preflight check initiated for [files/path]..."
 
-**Silent until Summary:** After the start announcement, output NOTHING until Step 4's Summary
+**Silent until Summary:** After the start announcement, output NOTHING until Step 5's Summary
 Report. No progress updates, no tool results, no "verification passed", no "no issues found". The
 spinner shows progress. If you're about to output text, that's a signal to keep working
 silently—user should never need to say "go on".
 
 ## Execution Sequence
 
-**Execute steps 1-4 in order. Only stop after step 4.**
+**Execute steps 1-5 in order. Only stop after step 5.**
 
 ### Task Management (MANDATORY)
 
-**At the very start**, use the **TaskCreate** tool to create ALL 4 tasks:
+**At the very start**, use the **TaskCreate** tool to create ALL 5 tasks:
 
 | # | Task subject                        | activeForm                      |
 | - | ----------------------------------- | ------------------------------- |
 | 1 | Setup: detect files and conventions | Detecting files and conventions |
 | 2 | Cleanup: simplify and review        | Running cleanup                 |
 | 3 | Review-Fix Loop                     | Scanning for issues             |
-| 4 | Generate summary report             | Generating summary              |
+| 4 | Final verification                  | Verifying changes               |
+| 5 | Generate summary report             | Generating summary              |
 
 **As you work**, use the **TaskUpdate** tool:
 
 - Set `status: in_progress` when starting a step
 - Set `status: completed` when finishing a step
 
-⚠️ **HARD RULE: You cannot stop while ANY task is incomplete.** If tasks 3 or 4 show as
+⚠️ **HARD RULE: You cannot stop while ANY task is incomplete.** If tasks 3, 4, or 5 show as
 pending/in_progress, you are NOT done. Keep going.
 
 ---
@@ -154,8 +155,8 @@ Each iteration:
 3. **Fix issues with score ≥75** — dispatch agents in parallel (single message):
    - Code issues → **Agent** tool with `subagent_type: code-mend`, `model: sonnet`
    - Doc issues → **Agent** tool with `model: sonnet` — "Fix these documentation issues: [list].
-     Apply `write-doc` and `write-prose` rules (for CHANGELOG.md, apply `write-changelog` rules
-     instead)."
+     Load Skill(write-doc) and Skill(write-prose) to guide fixes. For CHANGELOG.md, load
+     Skill(write-changelog) instead."
 
 4. **Decision point:**
    - If fixes applied AND iterations < 3 → dispatch **vet agents in parallel** (single message, one
@@ -180,7 +181,28 @@ Each iteration:
 
 ---
 
-### Step 4: Summary Report
+### Step 4: Final Verification
+
+**Skip this step if preflight made no modifications during steps 2-3** — proceed directly to Step 5.
+
+Dispatch a single **Agent** tool call with `model: opus`:
+
+"Review these files for correctness — bugs, logic errors, regressions. Read each file and report
+issues. Return a JSON array of `{issue, location, severity}` or empty array if clean.
+
+Files: [list of files preflight modified during steps 2-3]"
+
+The agent reads files in its own context — do NOT pass diffs or prior state. No success claims
+without fresh command output. "Should pass" is not evidence.
+
+Issues from this step are **report-only** — no automated fix attempt. They go into the summary as
+verification findings.
+
+→ **TaskUpdate** task 4 to `completed`. **TaskUpdate** task 5 to `in_progress`.
+
+---
+
+### Step 5: Summary Report
 
 Generate the final report. **This is your FIRST text output since the start announcement.**
 
@@ -214,12 +236,19 @@ Generate the final report. **This is your FIRST text output since the start anno
 | Issue | Location | Score | Reason Not Fixed |
 | ----- | -------- | ----- | ---------------- |
 
+## Verification Findings
+
+| Issue | Location | Severity |
+| ----- | -------- | -------- |
+
 ## Status
 
-✅ Cleared for commit / ⚠️ Needs manual review / 🚫 Grounded - issues remain
+✅ Cleared for commit / ⚠️ Needs manual review / 🚫 Grounded — issues remain
+
+(Verification findings always escalate to ⚠️ or 🚫)
 ```
 
-→ **TaskUpdate** task 4 to `completed`. **All tasks must now show as completed.**
+→ **TaskUpdate** task 5 to `completed`. **All tasks must now show as completed.**
 
 ---
 

@@ -13,12 +13,22 @@ wrong abstractions, missing type hints, and structural issues that automated too
 
 ## Process
 
-1. Detect language from file extension (e.g., `.py` → Python, `.lua` → Lua, `.sh` → Shell)
-   - For `.py` files: check for `import marimo` → use `code-marimo` instead of `code-py`
-   - For `.py` files: check for `from shiny import` or `from shiny.express import` → use
-     `code-shiny` instead of `code-py`
-2. Load the matching `code-<lang>` skill via `Skill()`. If no matching skill exists for the detected
-   language, skip skill-based review and note that no skill was available.
+1. Determine the skill: check `skills/` for `code-<ext>` where `<ext>` is the file extension. If
+   found, use it. Apply these overrides first for non-obvious mappings:
+
+   | Extension       | Skill        | Reason             |
+   | --------------- | ------------ | ------------------ |
+   | `.js`           | `code-ts`    | no `code-js` skill |
+   | `.sh` / `.bash` | `code-shell` | no `code-sh` skill |
+   | `.tl` / `.d.tl` | `code-tstl`  | no `code-tl` skill |
+
+   Additional content-based overrides for `.py` files:
+   - `import marimo` found → `code-marimo` instead of `code-py`
+   - `from shiny import` or `from shiny.express import` found → `code-shiny` instead of `code-py`
+
+   If no skill exists and no override applies, skip skill-based review and note it.
+
+2. Load the skill identified in step 1 via `Skill()`. Apply its rules throughout the review.
 3. Run verification commands from the skill (linters, formatters, tests)
 4. **Rule-by-rule manual review against the skill.** Linters only catch syntactic issues. You must
    catch judgment-based violations that linters miss — non-idiomatic patterns, wrong abstraction

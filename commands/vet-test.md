@@ -94,12 +94,21 @@ breaks, the test is coupled to implementation.
 
 ## Process
 
-1. Detect test files from path and determine language:
-   - `.py` files matching `test_*.py` or `*_test.py` → `test-py`
-   - `.lua` files matching `test_*.lua` or `*_test.lua` → `test-lua`
-   - `.js`/`.ts` files matching `*.test.js`, `*.spec.js`, etc. → `test-js`
-2. Load the matching `test-<lang>` skill (e.g., `test-py`, `test-lua`). If no `test-<lang>` skill
-   exists, fall back to `code-<lang>` (e.g., `code-lua`)
+1. Determine the skill: check `skills/` for `test-<ext>` where `<ext>` is the file extension. If
+   found, use it. Apply these overrides first for non-obvious mappings:
+
+   | Extension | Skill     | Reason             |
+   | --------- | --------- | ------------------ |
+   | `.js`     | `test-ts` | no `test-js` skill |
+
+   Additional content-based override for `.py` files:
+   - `import polars` or `import polars.testing` found → `test-polars` instead of `test-py`
+
+   If no `test-<ext>` skill exists and no override applies, fall back to `code-<ext>`. If neither
+   exists, skip skill review and note it.
+
+2. Load the skill identified in step 1 via `Skill()`. If the skill cross-references a `code-<lang>`
+   skill (e.g., `test-py` says "Also apply: `code-py` rules"), load that skill too.
 3. If the skill cross-references a `code-<lang>` skill (e.g., `test-py` says "Also apply: `code-py`
    rules"), load that skill too
 4. Run verification commands from both skills (linters, formatters, tests)
