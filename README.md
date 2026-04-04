@@ -11,6 +11,8 @@ commands, agents, hooks, and settings.
 
 | Command                                   | Description                                                                                                                                                                                                                                                                                                                                   |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`/fix`](commands/fix.md)                 | End-to-end bug fix: investigate root cause (opus agent), then implement via TDD (sonnet agents)                                                                                                                                                                                                                                               |
+| [`/investigate`](commands/investigate.md) | Systematic root cause investigation — diagnosis only, no fix                                                                                                                                                                                                                                                                                  |
 | [`/plan-commit`](commands/plan-commit.md) | Analyze uncommitted changes and suggest granular, logical commits for approval                                                                                                                                                                                                                                                                |
 | [`/preflight`](commands/preflight.md)     | Automated pre-commit review pipeline. Dispatches [`code-distill`](agents/code-distill.md), [`code-mend`](agents/code-mend.md), [`/vet-code`](commands/vet-code.md), [`/vet-test`](commands/vet-test.md), and [`vet-doc`](skills/vet-doc/SKILL.md) in parallel, scores every finding, auto-fixes verified issues, and iterates up to 3 rounds. |
 | [`/research`](commands/research.md)       | Enter research mode for fact-checking and verified answers                                                                                                                                                                                                                                                                                    |
@@ -64,10 +66,10 @@ commands, agents, hooks, and settings.
 
 #### Process
 
-| Skill                                  | Description                                        |
-| -------------------------------------- | -------------------------------------------------- |
-| [`debug`](skills/debug/SKILL.md)       | Systematic debugging before proposing fixes        |
-| [`research`](skills/research/SKILL.md) | Fact-checking and hallucination-resistant research |
+| Skill                                        | Description                                        |
+| -------------------------------------------- | -------------------------------------------------- |
+| [`investigate`](skills/investigate/SKILL.md) | Systematic root cause investigation before fixing  |
+| [`research`](skills/research/SKILL.md)       | Fact-checking and hallucination-resistant research |
 
 ### Agents
 
