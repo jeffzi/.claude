@@ -193,7 +193,7 @@ check_single_command() {
 	# Block git add with explicit plan file paths
 	if is_git_subcmd "add"; then
 		for pattern in "${PLAN_PATTERNS_GREP[@]}"; do
-			if [[ "$command" == *"$pattern"* ]]; then
+			if printf '%s' "$command" | grep -q "$pattern"; then
 				printf "Error: Cannot stage plan files matching '%s'. These are temporary analysis files.\n" "$pattern" >&2
 				exit 2
 			fi
