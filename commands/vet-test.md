@@ -112,7 +112,10 @@ breaks, the test is coupled to implementation.
 3. If the skill cross-references a `code-<lang>` skill (e.g., `test-py` says "Also apply: `code-py`
    rules"), load that skill too
 4. Run verification commands from both skills (linters, formatters, tests)
-5. **Rule-by-rule manual review against golden rules and loaded skills.** Linters only catch
+5. Load the `ast-grep` skill via `Skill(ast-grep)` for structural pattern matching. Use it to find
+   test anti-patterns that text grep misses — bare assertions, nested test functions, missing
+   setup/teardown, tests with no assertions.
+6. **Rule-by-rule manual review against golden rules and loaded skills.** Linters only catch
    syntactic issues. You must catch judgment-based violations that linters miss — redundant tests
    covering the same code path, naming that drifts from conventions, philosophy violations (testing
    implementation vs. behavior), structural anti-patterns (classes as grouping, loops in tests), and
@@ -160,7 +163,7 @@ breaks, the test is coupled to implementation.
    | "Testing _func directly boosts coverage" | Coverage via private imports is fake. Drive it through public API. |
    | "The mock returns the right value"       | That tests the mock, not the code. See false coverage in (g).      |
 
-6. Fix any issues found
+7. Fix any issues found
 
 For directories, find all test files recursively. **Only vet test files — never production code.**
 
