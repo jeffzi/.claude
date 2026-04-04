@@ -16,6 +16,7 @@ commands, agents, hooks, and settings.
 | [`/research`](commands/research.md)       | Enter research mode for fact-checking and verified answers                                                                                                                                                                                                                                                                                    |
 | [`/vet-code`](commands/vet-code.md)       | Review code files for skill rule violations                                                                                                                                                                                                                                                                                                   |
 | [`/vet-test`](commands/vet-test.md)       | Review test files for redundancy and AAA violations                                                                                                                                                                                                                                                                                           |
+| [`/vet-command`](commands/vet-command.md) | Review command `.md` files for quality and structure                                                                                                                                                                                                                                                                                          |
 | [`/upgrade-py`](commands/upgrade-py.md)   | Upgrade Python dependencies and sync versions                                                                                                                                                                                                                                                                                                 |
 | [`/upgrade-ts`](commands/upgrade-ts.md)   | Upgrade TypeScript dependencies and sync versions                                                                                                                                                                                                                                                                                             |
 | [`/setup-gsd`](commands/setup-gsd.md)     | Configure [GSD](https://github.com/gsd-build/get-shit-done) model overrides for a project                                                                                                                                                                                                                                                     |
@@ -65,6 +66,7 @@ commands, agents, hooks, and settings.
 
 | Skill                                  | Description                                        |
 | -------------------------------------- | -------------------------------------------------- |
+| [`debug`](skills/debug/SKILL.md)       | Systematic debugging before proposing fixes        |
 | [`research`](skills/research/SKILL.md) | Fact-checking and hallucination-resistant research |
 
 ### Agents
@@ -89,15 +91,36 @@ To bootstrap plugins on a fresh machine:
 bash plugins/setup.sh
 ```
 
+### GSD (Get Shit Done)
+
+[GSD](https://github.com/gsd-build/get-shit-done) is installed as a plugin for structured project
+execution — milestone planning, phased delivery, parallel workstreams, and verification. It provides
+its own skills, commands, and agents (prefixed with `gsd:`/`gsd-`).
+
+### Token Compression
+
+Two tools reduce token usage, stretching the Claude Code Max usage cap:
+
+| Tool                                                | Scope                                  | Mechanism                                                     | Savings |
+| --------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------- | ------- |
+| [RTK](https://github.com/rtk-ai/rtk)                | Bash output                            | Deterministic filtering, grouping, dedup                      | 60-90%  |
+| [Headroom](https://github.com/chopratejas/headroom) | All context (file reads, tool outputs) | AST-aware code compression, JSON crushing, KV-cache alignment | 47-92%  |
+
+RTK runs as a `PreToolUse` hook that rewrites Bash commands transparently. Headroom runs as a local
+proxy that compresses requests before they reach the Anthropic API.
+
 ### Hooks
 
 | Hook                                             | Description                                          |
 | ------------------------------------------------ | ---------------------------------------------------- |
 | [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh) | Blocks proceeding when a Bash command fails          |
-| [`git-safety.sh`](hooks/git-safety.sh)           | Blocks auto-push, plan file commits, destructive ops |
+| [`config-guard.sh`](hooks/config-guard.sh)       | Protects configuration files from unintended edits   |
+| [`desktop-notify.sh`](hooks/desktop-notify.sh)   | macOS notification when Claude finishes responding   |
+| [`git-guard.sh`](hooks/git-guard.sh)             | Blocks auto-push, plan file commits, destructive ops |
 | [`marimo-check.sh`](hooks/marimo-check.sh)       | Validates marimo notebooks on edit                   |
+| [`rtk-rewrite.sh`](hooks/rtk-rewrite.sh)         | Rewrites Bash commands to use RTK for token savings  |
 | [`shiny-check.sh`](hooks/shiny-check.sh)         | Smoke-tests staged Shiny apps before commit          |
-| [`worktree-safety.sh`](hooks/worktree-safety.sh) | Blocks exiting worktrees with uncommitted changes    |
+| [`worktree-guard.sh`](hooks/worktree-guard.sh)   | Blocks exiting worktrees with uncommitted changes    |
 
 ## License
 
