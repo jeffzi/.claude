@@ -2,9 +2,9 @@
 name: test-ts
 description: >
   Use when writing TypeScript tests with Vitest. Apply for mocking, fake timers, parametrization,
-  test isolation, flaky tests, toEqual vs toStrictEqual confusion, timer/promise deadlocks,
-  mock reset semantics, type-safe test factories, or any *.test.ts files. Not for production
-  TypeScript code — use code-ts for that.
+  property-based testing, test isolation, flaky tests, toEqual vs toStrictEqual confusion,
+  timer/promise deadlocks, mock reset semantics, type-safe test factories, or any *.test.ts files.
+  Not for production TypeScript code — use code-ts for that.
 ---
 
 # TypeScript Testing with Vitest
@@ -285,6 +285,16 @@ Vitest config recommendations, see `references/vitest-api.md`.
 | `toThrowError('')` for "any error"               | Empty string matches ALL errors (known bug). Use `toThrow()`  |
 | `expect.soft()` forgotten for multi-field checks | Collects all failures instead of stopping at first            |
 | `await sleep(100)` then assert                   | `await vi.waitFor(() => expect(...))`                         |
+
+## Data Testing Patterns
+
+| Tool               | Use For                                              |
+| ------------------ | ---------------------------------------------------- |
+| `fast-check`       | Property-based testing — prefer over hardcoded data  |
+| `zod`              | Schema validation for runtime data                   |
+| `expect.closeTo()` | Float comparisons with tolerance                     |
+| `msw`              | HTTP mocking (interceptor-based, no server patching) |
+| `@faker-js/faker`  | Realistic random test data                           |
 
 ## Verification
 
