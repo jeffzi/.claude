@@ -131,6 +131,26 @@
             "command": "$HOME/.claude/hooks/plan-skill-guard.sh"
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/gsd-read-guard.js\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $HOME/.claude/hooks/gsd-validate-commit.sh",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -150,6 +170,14 @@
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/gsd-check-update.js\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $HOME/.claude/hooks/gsd-session-state.sh"
           }
         ]
       }
@@ -172,6 +200,16 @@
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/gsd-context-monitor.js\"",
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $HOME/.claude/hooks/gsd-phase-boundary.sh",
+            "timeout": 5
           }
         ]
       }
