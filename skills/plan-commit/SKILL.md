@@ -1,16 +1,21 @@
 ---
+name: plan-commit
 description: >
-  Analyze uncommitted changes and suggest a plan of granular, logical commits.
+  Use when you have uncommitted changes and want to plan and execute granular, logical commits
+  before pushing. Not for a single obvious commit — use write-commit directly.
+model: haiku
+disable-model-invocation: true
+effort: medium
 ---
 
 # Plan Commits
 
 ## Context
 
-- All changes (staged, unstaged, untracked): !`git status --porcelain`
-- Current git diff (staged and unstaged): !`git diff HEAD`
-- Recent commits (for style reference): !`git log --oneline -10`
-- Current branch: !`git branch --show-current`
+- All changes (staged, unstaged, untracked): !`git status --porcelain 2>/dev/null`
+- Current git diff (staged and unstaged): !`git diff HEAD 2>/dev/null`
+- Recent commits (for style reference): !`git log --oneline -10 2>/dev/null`
+- Current branch: !`git branch --show-current 2>/dev/null`
 
 ## Your task
 
@@ -78,3 +83,11 @@ guidelines for the final message. Execute commits sequentially — each must suc
 If a commit fails, stop immediately and report the error. Do not continue with remaining commits.
 
 **Do not push.** The user will push when ready.
+
+## Common Mistakes
+
+| Mistake                                                             | Fix                                                                        |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| A file appears in multiple commits because it changed incrementally | Include it in the most relevant commit and note the constraint to the user |
+| Over-splitting one logical change into many trivial commits         | Group by purpose — three files serving the same goal belong in one commit  |
+| Pushing after executing the plan                                    | The skill ends at commit. Never push — the user controls that step         |

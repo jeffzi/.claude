@@ -5,9 +5,13 @@ description: >
   AAA violations, test desiderata, and language skill
   rule violations
 argument-hint: "[test file or directory]"
+model: sonnet
+effort: medium
 ---
 
 # Test Vet
+
+**Target:** $ARGUMENTS
 
 ## Overview
 
@@ -94,78 +98,59 @@ breaks, the test is coupled to implementation.
 
 ## Process
 
-1. Determine the skill: check `skills/` for `test-<ext>` where `<ext>` is the file extension. If
-   found, use it. Apply these overrides first for non-obvious mappings:
+The command is a **pure orchestrator**. The loaded test-X skill (plus any `code-<lang>` skill it
+cross-references) owns the language-specific rules, pitfalls, and patterns. The Golden Rules above
+are the cross-language baseline the command enforces **alongside** the skill's checklist — not
+instead of it.
 
-   | Extension | Skill     | Reason             |
-   | --------- | --------- | ------------------ |
-   | `.js`     | `test-ts` | no `test-js` skill |
+1. **Resolve the test and code skill(s).** If the caller already passed `TEST_SKILL` and
+   `CODE_SKILL` arguments, use them and skip this step. Otherwise, load
+   `Skill(resolve-lang-skills)`. Derive lang from the file's extension and check test file detection
+   patterns. `TEST_SKILL = test-{lang}` if the file matches test patterns, else `none`.
+   `CODE_SKILL = code-{lang}` plus any active project overlays (check project config once per
+   project root; reuse for subsequent files). If `TEST_SKILL` is `none`, skip skill-based test
+   review and apply only the Golden Rules. If `CODE_SKILL` is `none`, proceed without
+   cross-referenced code rules.
 
-   Additional content-based override for `.py` files:
-   - `import polars` or `import polars.testing` found → `test-polars` instead of `test-py`
+2. **Load all resolved skills via `Skill()`** — each `TEST_SKILL` entry first (most-specific first),
+   then each `CODE_SKILL` entry. Their mandatory rules, pitfall entries, and Instead-of/Use tables
+   become the checklist for steps 4–6, combined with the Golden Rules above.
 
-   If no `test-<ext>` skill exists and no override applies, fall back to `code-<ext>`. If neither
-   exists, skip skill review and note it.
+3. **Run verification commands from both skills** (linters, formatters, tests). Record pass/fail per
+   command.
 
-2. Load the skill identified in step 1 via `Skill()`. If the skill cross-references a `code-<lang>`
-   skill (e.g., `test-py` says "Also apply: `code-py` rules"), load that skill too.
-3. If the skill cross-references a `code-<lang>` skill (e.g., `test-py` says "Also apply: `code-py`
-   rules"), load that skill too
-4. Run verification commands from both skills (linters, formatters, tests)
-5. Load the `ast-grep` skill via `Skill(ast-grep)` for structural pattern matching. Use it to find
-   test anti-patterns that text grep misses — bare assertions, nested test functions, missing
-   setup/teardown, tests with no assertions.
-6. **Rule-by-rule manual review against golden rules and loaded skills.** Linters only catch
-   syntactic issues. You must catch judgment-based violations that linters miss — redundant tests
-   covering the same code path, naming that drifts from conventions, philosophy violations (testing
-   implementation vs. behavior), structural anti-patterns (classes as grouping, loops in tests), and
-   unnecessary complexity.
+4. **Rule-by-rule review against the combined checklist.** The checklist = Golden Rules above + the
+   loaded skill's mandatory rules, pitfall entries, and Instead-of/Use tables. For **each rule**,
+   scan every test function in the file for violations before moving to the next rule. Do not batch
+   rules. Flag deviations even when tests pass.
 
-   **Method — do not skip or abbreviate these sub-steps:**
-
-   - **(a)** Open each skill and enumerate its mandatory rules, pitfall entries, and best-practice
-     sections.
-   - **(b)** For **each rule**, scan every test function in the file for violations. Do not batch
-     rules or skim — check one rule at a time across the full file before moving to the next.
-   - **(c)** For merge/redundancy: apply the golden rule merge/keep-separate table pairwise across
-     all test functions. Do any two tests assert the same code path with trivially different inputs?
-     Could parametrize replace them? Are related edge cases split when they share setup and code
-     path? Flag trivial-behavior tests that aren't strictly necessary for coverage — each trivial
-     code path should be traversed only once across the suite.
-   - **(d)** For naming rules: verify every `test_*` name against the prescribed format. Flag drift
-     even when the name is "close enough."
-   - **(e)** Respect noted exceptions between skills (e.g., test functions don't need `-> None`
-     annotations).
-   - **(f)** For **AAA and desiderata** (always, regardless of language): verify every test follows
-     Arrange-Act-Assert with clear phase separation. Check test desiderata compliance — especially
-     behavioral, structure-insensitive, isolated, deterministic, and specific.
-   - **(g)** For **behavior vs. implementation**: check every mock, assertion, and import. Is the
-     test asserting internal method calls instead of observable outcomes? Does it import private
-     functions (`_helper`, `_parse`, etc.) directly? Would a pure refactor (same behavior, different
-     structure) break this test? Flag: direct tests of private functions, mocks of private
-     collaborators, exact call-count assertions on internals, and snapshot assertions that
-     over-specify.
+   Respect noted exceptions between skills (e.g., test functions may not need `-> None` annotations
+   per `test-py`).
 
    **Rationalization guard:** Zero violations in a non-trivial file is a signal to re-check, not a
-   sign of perfection. Go back to sub-step (b) and re-examine the top 3 most commonly violated rules
-   with fresh eyes before concluding the review.
+   sign of perfection. Re-examine the rules the skill marks as mandatory or most-commonly-violated,
+   plus AAA, merge/redundancy, and behavior-vs-implementation from the Golden Rules, before
+   concluding.
 
-   | Excuse                                   | Reality                                                            |
-   | ---------------------------------------- | ------------------------------------------------------------------ |
-   | "I scanned the file and found no issues" | Scanning ≠ rule-by-rule checking. Go back to (b).                  |
-   | "The linter would have caught this"      | Linters miss redundancy, naming, philosophy, structure.            |
-   | "Tests look reasonable"                  | "Reasonable" skips pairwise comparison. Do (c).                    |
-   | "Names are close enough"                 | Close enough ≠ compliant. Check each name in (d).                  |
-   | "It's just a trivial helper test"        | If trivial, does it need to exist? Check golden rules.             |
-   | "AAA is implied"                         | Implicit ≠ verified. Check phase separation in (f).                |
-   | "Each edge case deserves its own test"   | Same code path + different inputs = merge. See table.              |
-   | "I need to verify the mock was called"   | Assert the outcome, not the wiring. See (g).                       |
-   | "Testing _func directly boosts coverage" | Coverage via private imports is fake. Drive it through public API. |
-   | "The mock returns the right value"       | That tests the mock, not the code. See false coverage in (g).      |
+   | Excuse                                   | Reality                                                         |
+   | ---------------------------------------- | --------------------------------------------------------------- |
+   | "I scanned the file and found no issues" | Scanning ≠ rule-by-rule. Walk the combined checklist again.     |
+   | "The linter would have caught this"      | Linters miss redundancy, naming, philosophy, structure.         |
+   | "Tests look reasonable"                  | "Reasonable" skips pairwise comparison. Apply the merge table.  |
+   | "AAA is implied"                         | Implicit ≠ verified. Check phase separation per test.           |
+   | "Each edge case deserves its own test"   | Same code path + different inputs = merge. See Golden Rules.    |
+   | "I need to verify the mock was called"   | Assert the outcome, not the wiring. See behavior-vs-impl table. |
+   | "Testing _func directly boosts coverage" | Coverage via private imports is fake. Drive through public API. |
+   | "The mock returns the right value"       | That tests the mock, not the code. See false coverage note.     |
+   | "The skill's rules are obvious"          | Obvious ≠ applied. Cite the rule section for each check.        |
 
-7. Fix any issues found
+5. **Fix each issue**, citing which rule was violated (Golden Rule section or skill rule). Re-run
+   the verification commands from step 3 to confirm no regressions.
 
-For directories, find all test files recursively. **Only vet test files — never production code.**
+**Directory targets:** recurse into subdirectories and collect all test files. **Only vet test files
+— never production code.** Resolve overlays once per project root, derive `TEST_SKILL` and
+`CODE_SKILL` per file from extension and test patterns, and repeat steps 1–6 per file. Report
+findings per file, grouped by language.
 
 ## Output Rules
 

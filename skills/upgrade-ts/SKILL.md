@@ -6,11 +6,19 @@ allowed-tools: >
   Bash(npm outdated:*), Bash(npm install:*),
   Bash(npm list:*), Bash(npx tsc:*),
   Bash(npx biome:*), Bash(npx vitest:*)
+model: haiku
+disable-model-invocation: true
+effort: low
 ---
 
 # Upgrade All TypeScript Dependencies
 
 Upgrade all project dependencies while keeping package.json version ranges current.
+
+## Context
+
+- Outdated packages:
+  !`npm outdated 2>/dev/null || echo "(npm not available or no outdated packages)"`
 
 ## Task Tracking
 

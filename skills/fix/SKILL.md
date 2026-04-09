@@ -4,9 +4,13 @@ description: >
   Use when a bug, test failure, or regression needs both diagnosis and a fix.
   Use when root cause is unknown and you need end-to-end resolution.
 argument-hint: "[bug description, error message, or failing test]"
+model: haiku
+effort: medium
 ---
 
 # Fix
+
+**Bug report:** $ARGUMENTS
 
 End-to-end bug fix pipeline: investigate root cause, then implement the fix with TDD.
 
@@ -17,8 +21,8 @@ here. Dispatch the agent immediately — it does all the work.
 
 ### Phase 1: Investigation
 
-Immediately dispatch an opus agent (`model: opus`) to investigate the root cause. The agent loads
-the investigate skill via `Skill(investigate)` and runs all three phases.
+Immediately dispatch an opus agent (`model: opus, effort: high`) to investigate the root cause. The
+agent loads the investigate skill via `Skill(investigate)` and runs all three phases.
 
 **Agent prompt must include:**
 
@@ -48,3 +52,11 @@ verify.
 
 **Skip TDD if** the project has no test suite. In that case, implement the fix directly based on the
 root cause and verify manually.
+
+## Common Mistakes
+
+| Mistake                                         | Fix                                                                                                                                    |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Calling `/fix` when root cause is already known | Skip Phase 1 — confirm the root cause, then go straight to `Skill(tdd)`                                                                |
+| Treating a symptom as a confirmed root cause    | A confirmed root cause includes a specific file+line reference AND an explanation of why it fails — "tests fail in CI" doesn't qualify |
+| Calling `/fix` in a project with no test suite  | Phase 2 falls to direct implementation; document why TDD was skipped                                                                   |
