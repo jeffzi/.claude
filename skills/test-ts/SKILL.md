@@ -5,7 +5,6 @@ description: >
   property-based testing, test isolation, flaky tests, toEqual vs toStrictEqual confusion,
   timer/promise deadlocks, mock reset semantics, type-safe test factories, or any *.test.ts files.
   Not for production TypeScript code — use code-ts for that.
-paths: "**/*.test.ts, **/*.test.tsx, **/*.spec.ts, **/*.spec.tsx"
 user-invocable: false
 model: sonnet
 effort: medium
