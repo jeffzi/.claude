@@ -1,10 +1,15 @@
 {
   "env": {
     "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-    "AWS_PROFILE": "mcp-readonly"
+    "MAX_THINKING_TOKENS": "10000",
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "75",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "haiku"
   },
+  "model": "sonnet",
+  "effortLevel": "medium",
   "includeCoAuthoredBy": false,
+  "promptSuggestionEnabled": false,
+  "skipDangerousModePermissionPrompt": true,
   "permissions": {
     "allow": [
       "Glob",
@@ -23,7 +28,6 @@
       "Bash(which *)",
       "Bash(prek *)",
       "Bash(task *)",
-      "Bash(mypy *)",
       "Bash(pytest *)",
       "Bash(ruff *)",
       "Bash(uv *)",
@@ -115,15 +119,6 @@
         ]
       },
       {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/rtk-rewrite.sh"
-          }
-        ]
-      },
-      {
         "matcher": "EnterPlanMode",
         "hooks": [
           {
@@ -133,22 +128,11 @@
         ]
       },
       {
-        "matcher": "Write|Edit",
+        "matcher": "Read",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/gsd-read-guard.js\"",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash $HOME/.claude/hooks/gsd-validate-commit.sh",
-            "timeout": 5
+            "command": "~/.claude/read-once/hook.sh"
           }
         ]
       }
@@ -170,14 +154,6 @@
           {
             "type": "command",
             "command": "node \"$HOME/.claude/hooks/gsd-check-update.js\""
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash $HOME/.claude/hooks/gsd-session-state.sh"
           }
         ]
       }
@@ -224,21 +200,30 @@
           }
         ]
       }
+    ],
+    "PostCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/read-once/compact.sh"
+          }
+        ]
+      }
     ]
   },
   "statusLine": {
     "type": "command",
-    "command": "node \"$HOME/.claude/hooks/gsd-statusline.js\""
+    "command": "$HOME/.claude/statusline.sh"
   },
   "enabledPlugins": {
     "claude-md-management@claude-plugins-official": true,
     "lua-lsp@claude-plugins-official": true,
     "rust-analyzer-lsp@claude-plugins-official": true,
-    "scientific-skills@claude-scientific-skills": true,
-    "skill-creator@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
-    "ast-grep@ast-grep-marketplace": true
+    "pyright-lsp@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "claude-plugins-official": {
@@ -246,23 +231,6 @@
         "source": "github",
         "repo": "anthropics/claude-plugins-official"
       }
-    },
-    "claude-scientific-skills": {
-      "source": {
-        "source": "github",
-        "repo": "K-Dense-AI/claude-scientific-skills"
-      }
-    },
-    "ast-grep-marketplace": {
-      "source": {
-        "source": "github",
-        "repo": "ast-grep/agent-skill"
-      }
     }
-  },
-  "alwaysThinkingEnabled": true,
-  "effortLevel": "medium",
-  "promptSuggestionEnabled": false,
-  "skipDangerousModePermissionPrompt": true,
-  "model": "sonnet"
+  }
 }

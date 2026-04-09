@@ -18,7 +18,6 @@ commands, agents, hooks, and settings.
 | [`/research`](commands/research.md)       | Enter research mode for fact-checking and verified answers                                                                                                                                                                                                                                                                                    |
 | [`/vet-code`](commands/vet-code.md)       | Review code files for skill rule violations                                                                                                                                                                                                                                                                                                   |
 | [`/vet-test`](commands/vet-test.md)       | Review test files for redundancy and AAA violations                                                                                                                                                                                                                                                                                           |
-| [`/vet-command`](commands/vet-command.md) | Review command `.md` files for quality and structure                                                                                                                                                                                                                                                                                          |
 | [`/upgrade-py`](commands/upgrade-py.md)   | Upgrade Python dependencies and sync versions                                                                                                                                                                                                                                                                                                 |
 | [`/upgrade-ts`](commands/upgrade-ts.md)   | Upgrade TypeScript dependencies and sync versions                                                                                                                                                                                                                                                                                             |
 | [`/setup-gsd`](commands/setup-gsd.md)     | Configure [GSD](https://github.com/gsd-build/get-shit-done) model overrides for a project                                                                                                                                                                                                                                                     |
@@ -66,10 +65,11 @@ commands, agents, hooks, and settings.
 
 #### Process
 
-| Skill                                        | Description                                        |
-| -------------------------------------------- | -------------------------------------------------- |
-| [`investigate`](skills/investigate/SKILL.md) | Systematic root cause investigation before fixing  |
-| [`research`](skills/research/SKILL.md)       | Fact-checking and hallucination-resistant research |
+| Skill                                        | Description                                                             |
+| -------------------------------------------- | ----------------------------------------------------------------------- |
+| [`build`](skills/build/SKILL.md)             | End-to-end feature pipeline: brainstorm → plan → TDD with quality gates |
+| [`investigate`](skills/investigate/SKILL.md) | Systematic root cause investigation before fixing                       |
+| [`research`](skills/research/SKILL.md)       | Fact-checking and hallucination-resistant research                      |
 
 ### Agents
 
@@ -77,8 +77,7 @@ commands, agents, hooks, and settings.
 | ---------------------------------------- | ------------------------------------------------ |
 | [`code-mend`](agents/code-mend.md)       | Surgical fixes at specific file:line locations   |
 | [`code-distill`](agents/code-distill.md) | Reduce code complexity while preserving behavior |
-| [`tdd-red`](agents/tdd-red.md)           | Context-isolated test writer (RED phase)         |
-| [`tdd-green`](agents/tdd-green.md)       | Context-isolated implementer (GREEN phase)       |
+| [`tdd-cycle`](agents/tdd-cycle.md)       | Context-isolated RED-GREEN cycle agent           |
 
 ### Plugins
 
@@ -92,6 +91,17 @@ To bootstrap plugins on a fresh machine:
 ```sh
 bash plugins/setup.sh
 ```
+
+### Development Workflow
+
+Single-session tools compose into a lightweight pipeline. Escalate to GSD when a feature spans
+multiple sessions or needs persistent planning state.
+
+| Scope         | Tool                                              | When to use                                                     |
+| ------------- | ------------------------------------------------- | --------------------------------------------------------------- |
+| Bug fix       | [`/fix`](skills/fix/SKILL.md)                     | Root cause unknown — investigates then drives TDD               |
+| Small feature | [`/build`](skills/build/SKILL.md)                 | Single session — brainstorm, plan, implement with quality gates |
+| Large feature | [GSD](https://github.com/gsd-build/get-shit-done) | Multi-session — disk-persistent planning, cross-session context |
 
 ### GSD (Get Shit Done)
 
