@@ -5,11 +5,7 @@
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "75",
     "CLAUDE_CODE_SUBAGENT_MODEL": "haiku"
   },
-  "model": "sonnet",
-  "effortLevel": "medium",
   "includeCoAuthoredBy": false,
-  "promptSuggestionEnabled": false,
-  "skipDangerousModePermissionPrompt": true,
   "permissions": {
     "allow": [
       "Glob",
@@ -65,6 +61,7 @@
     ],
     "defaultMode": "plan"
   },
+  "model": "sonnet",
   "hooks": {
     "PreToolUse": [
       {
@@ -215,7 +212,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "$HOME/.claude/statusline.sh"
+    "command": "$HOME/.claude/scripts/statusline.sh"
   },
   "enabledPlugins": {
     "claude-md-management@claude-plugins-official": true,
@@ -232,5 +229,8 @@
         "repo": "anthropics/claude-plugins-official"
       }
     }
-  }
+  },
+  "effortLevel": "high",
+  "promptSuggestionEnabled": false,
+  "skipDangerousModePermissionPrompt": true
 }

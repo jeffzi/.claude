@@ -2,11 +2,6 @@
 
 ## Rules
 
-### RTK command chains
-
-When chaining commands with `&&`, prefix each segment: `rtk git add . && rtk git commit -m "msg"`,
-not just the first.
-
 ### Surface every issue — never skip silently
 
 **Surface every issue — never skip silently.** When you find a bug, smell, or inconsistency: stop,

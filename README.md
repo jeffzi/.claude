@@ -3,24 +3,9 @@
 [![CI](https://github.com/jeffzi/.claude/actions/workflows/pre-commit.yml/badge.svg)](https://github.com/jeffzi/.claude/actions/workflows/pre-commit.yml)
 
 Personal [Claude Code](https://docs.anthropic.com/en/docs/claude-code) configuration: skills,
-commands, agents, hooks, and settings.
+agents, hooks, and settings.
 
 ## Components
-
-### Commands
-
-| Command                                   | Description                                                                                                                                                                                                                                                                                                                                   |
-| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`/fix`](commands/fix.md)                 | End-to-end bug fix: investigate root cause (opus agent), then implement via TDD (sonnet agents)                                                                                                                                                                                                                                               |
-| [`/investigate`](commands/investigate.md) | Systematic root cause investigation — diagnosis only, no fix                                                                                                                                                                                                                                                                                  |
-| [`/plan-commit`](commands/plan-commit.md) | Analyze uncommitted changes and suggest granular, logical commits for approval                                                                                                                                                                                                                                                                |
-| [`/preflight`](commands/preflight.md)     | Automated pre-commit review pipeline. Dispatches [`code-distill`](agents/code-distill.md), [`code-mend`](agents/code-mend.md), [`/vet-code`](commands/vet-code.md), [`/vet-test`](commands/vet-test.md), and [`vet-doc`](skills/vet-doc/SKILL.md) in parallel, scores every finding, auto-fixes verified issues, and iterates up to 3 rounds. |
-| [`/research`](commands/research.md)       | Enter research mode for fact-checking and verified answers                                                                                                                                                                                                                                                                                    |
-| [`/vet-code`](commands/vet-code.md)       | Review code files for skill rule violations                                                                                                                                                                                                                                                                                                   |
-| [`/vet-test`](commands/vet-test.md)       | Review test files for redundancy and AAA violations                                                                                                                                                                                                                                                                                           |
-| [`/upgrade-py`](commands/upgrade-py.md)   | Upgrade Python dependencies and sync versions                                                                                                                                                                                                                                                                                                 |
-| [`/upgrade-ts`](commands/upgrade-ts.md)   | Upgrade TypeScript dependencies and sync versions                                                                                                                                                                                                                                                                                             |
-| [`/setup-gsd`](commands/setup-gsd.md)     | Configure [GSD](https://github.com/gsd-build/get-shit-done) model overrides for a project                                                                                                                                                                                                                                                     |
 
 ### Skills
 
@@ -54,43 +39,46 @@ commands, agents, hooks, and settings.
 
 | Skill                                                | Description                                          |
 | ---------------------------------------------------- | ---------------------------------------------------- |
+| [`write-agent`](skills/write-agent/SKILL.md)         | Author and review agent definition files             |
 | [`write-doc`](skills/write-doc/SKILL.md)             | Documentation structure and information architecture |
 | [`write-prose`](skills/write-prose/SKILL.md)         | Sentence-level clarity (Strunk's rules)              |
 | [`write-commit`](skills/write-commit/SKILL.md)       | Git commit message quality                           |
 | [`write-skill`](skills/write-skill/SKILL.md)         | Author and review SKILL.md files                     |
 | [`write-plan`](skills/write-plan/SKILL.md)           | Multi-step implementation plans                      |
-| [`vet-doc`](skills/vet-doc/SKILL.md)                 | Review docs for structural and prose issues          |
-| [`vet-skill`](skills/vet-skill/SKILL.md)             | Review SKILL.md files for quality and structure      |
 | [`write-changelog`](skills/write-changelog/SKILL.md) | Keep a Changelog standard for CHANGELOG.md           |
+
+#### Review
+
+| Skill                                    | Description                                     |
+| ---------------------------------------- | ----------------------------------------------- |
+| [`vet-code`](skills/vet-code/SKILL.md)   | Review code files for skill rule violations     |
+| [`vet-test`](skills/vet-test/SKILL.md)   | Review test files for redundancy and AAA issues |
+| [`vet-doc`](skills/vet-doc/SKILL.md)     | Review docs for structural and prose issues     |
+| [`vet-skill`](skills/vet-skill/SKILL.md) | Review SKILL.md files for quality and structure |
 
 #### Process
 
-| Skill                                        | Description                                                             |
-| -------------------------------------------- | ----------------------------------------------------------------------- |
-| [`build`](skills/build/SKILL.md)             | End-to-end feature pipeline: brainstorm → plan → TDD with quality gates |
-| [`investigate`](skills/investigate/SKILL.md) | Systematic root cause investigation before fixing                       |
-| [`research`](skills/research/SKILL.md)       | Fact-checking and hallucination-resistant research                      |
+| Skill                                                        | Description                                                             |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| [`build`](skills/build/SKILL.md)                             | End-to-end feature pipeline: brainstorm → plan → TDD with quality gates |
+| [`fix`](skills/fix/SKILL.md)                                 | Root cause investigation then TDD-driven fix                            |
+| [`preflight`](skills/preflight/SKILL.md)                     | Pre-commit review pipeline: vet, scan, auto-fix, iterate                |
+| [`plan-commit`](skills/plan-commit/SKILL.md)                 | Analyze uncommitted changes and suggest granular commits                |
+| [`investigate`](skills/investigate/SKILL.md)                 | Systematic root cause investigation — diagnosis only, no fix            |
+| [`research`](skills/research/SKILL.md)                       | Fact-checking and hallucination-resistant research                      |
+| [`resolve-lang-skills`](skills/resolve-lang-skills/SKILL.md) | Select appropriate code-_/test-_ skills for a given language            |
+| [`setup-gsd`](skills/setup-gsd/SKILL.md)                     | Configure GSD model overrides for a project                             |
+| [`upgrade-py`](skills/upgrade-py/SKILL.md)                   | Upgrade Python dependencies and sync versions                           |
+| [`upgrade-ts`](skills/upgrade-ts/SKILL.md)                   | Upgrade TypeScript dependencies and sync versions                       |
 
 ### Agents
 
 | Agent                                    | Description                                      |
 | ---------------------------------------- | ------------------------------------------------ |
+| [`bug-scanner`](agents/bug-scanner.md)   | Runtime correctness audit at specific locations  |
 | [`code-mend`](agents/code-mend.md)       | Surgical fixes at specific file:line locations   |
 | [`code-distill`](agents/code-distill.md) | Reduce code complexity while preserving behavior |
 | [`tdd-cycle`](agents/tdd-cycle.md)       | Context-isolated RED-GREEN cycle agent           |
-
-### Plugins
-
-Plugins are managed via [`plugins/manifest.json`](plugins/manifest.json) (which marketplaces and
-plugins to install). The auto-generated JSON files (`installed_plugins.json`,
-`known_marketplaces.json`) are gitignored since they contain volatile metadata (timestamps, absolute
-paths, SHAs).
-
-To bootstrap plugins on a fresh machine:
-
-```sh
-bash plugins/setup.sh
-```
 
 ### Development Workflow
 
@@ -111,28 +99,22 @@ its own skills, commands, and agents (prefixed with `gsd:`/`gsd-`).
 
 ### Token Compression
 
-Two tools reduce token usage, stretching the Claude Code Max usage cap:
-
-| Tool                                                | Scope                                  | Mechanism                                                     | Savings |
-| --------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------- | ------- |
-| [RTK](https://github.com/rtk-ai/rtk)                | Bash output                            | Deterministic filtering, grouping, dedup                      | 60-90%  |
-| [Headroom](https://github.com/chopratejas/headroom) | All context (file reads, tool outputs) | AST-aware code compression, JSON crushing, KV-cache alignment | 47-92%  |
-
-RTK runs as a `PreToolUse` hook that rewrites Bash commands transparently. Headroom runs as a local
-proxy that compresses requests before they reach the Anthropic API.
+[Headroom](https://github.com/chopratejas/headroom) reduces token usage, stretching the Claude Code
+Max usage cap. It runs as a local proxy that compresses requests before they reach the Anthropic API
+using AST-aware code compression, JSON crushing, and KV-cache alignment (47–92% savings).
 
 ### Hooks
 
-| Hook                                             | Description                                          |
-| ------------------------------------------------ | ---------------------------------------------------- |
-| [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh) | Blocks proceeding when a Bash command fails          |
-| [`config-guard.sh`](hooks/config-guard.sh)       | Protects configuration files from unintended edits   |
-| [`desktop-notify.sh`](hooks/desktop-notify.sh)   | macOS notification when Claude finishes responding   |
-| [`git-guard.sh`](hooks/git-guard.sh)             | Blocks auto-push, plan file commits, destructive ops |
-| [`marimo-check.sh`](hooks/marimo-check.sh)       | Validates marimo notebooks on edit                   |
-| [`rtk-rewrite.sh`](hooks/rtk-rewrite.sh)         | Rewrites Bash commands to use RTK for token savings  |
-| [`shiny-check.sh`](hooks/shiny-check.sh)         | Smoke-tests staged Shiny apps before commit          |
-| [`worktree-guard.sh`](hooks/worktree-guard.sh)   | Blocks exiting worktrees with uncommitted changes    |
+| Hook                                               | Description                                          |
+| -------------------------------------------------- | ---------------------------------------------------- |
+| [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh)   | Blocks proceeding when a Bash command fails          |
+| [`config-guard.sh`](hooks/config-guard.sh)         | Protects configuration files from unintended edits   |
+| [`desktop-notify.sh`](hooks/desktop-notify.sh)     | macOS notification when Claude finishes responding   |
+| [`git-guard.sh`](hooks/git-guard.sh)               | Blocks auto-push, plan file commits, destructive ops |
+| [`marimo-check.sh`](hooks/marimo-check.sh)         | Validates marimo notebooks on edit                   |
+| [`plan-skill-guard.sh`](hooks/plan-skill-guard.sh) | Enforces skill loading before plan mode              |
+| [`shiny-check.sh`](hooks/shiny-check.sh)           | Smoke-tests staged Shiny apps before commit          |
+| [`worktree-guard.sh`](hooks/worktree-guard.sh)     | Blocks exiting worktrees with uncommitted changes    |
 
 ## License
 
