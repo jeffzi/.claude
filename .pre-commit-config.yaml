@@ -53,7 +53,7 @@ repos:
     hooks:
       - id: sync-skills
         name: sync skills
-        entry: sync-skills.sh
+        entry: scripts/sync-skills.sh
         language: system
         pass_filenames: false
         stages: [pre-push]
