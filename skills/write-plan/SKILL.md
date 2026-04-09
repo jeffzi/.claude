@@ -4,6 +4,9 @@ description: >
   Use when you have a spec or requirements for a multi-step task, before touching code.
   Also use when asked to create an implementation plan or invoked via /write-plan.
   Not for single-task changes or quick bug fixes that need no plan.
+argument-hint: "[task or spec]"
+model: opus
+effort: high
 ---
 
 # Writing Plans
@@ -99,3 +102,14 @@ For plans with 4+ tasks, dispatch a reviewer subagent to check completeness, spe
 task decomposition. Max 3 review iterations, then surface to user. Reviewers are advisory.
 
 For smaller plans, review inline before presenting to the user.
+
+## Common Mistakes
+
+| Mistake                                                     | Reality                                                                    |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Tasks describe TDD steps ("write failing test", "run test") | Tasks describe **behaviors**, not test mechanics                           |
+| One task per file instead of per behavior group             | Group by coherent behavior, not by file boundary                           |
+| Implementation code or test assertions in the plan          | Plans describe what to build, not how to implement                         |
+| All changes in one task because they're related             | Independent subsystems → separate tasks (or separate plans)                |
+| Skipping the file structure section                         | Without file mapping, decomposition decisions are deferred and conflicting |
+| Plan documents the obvious (CRUD, standard patterns)        | Only document non-obvious constraints, gotchas, and dependencies           |

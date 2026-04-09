@@ -5,12 +5,23 @@ description: >
   files. Apply for new changelogs, release entries, or
   auditing existing changelogs against the Keep a Changelog
   standard. Not for release notes in documentation — use write-doc for that.
+argument-hint: "[version or date range]"
+allowed-tools: Read, Edit(CHANGELOG.md), Edit(**/CHANGELOG.md), Bash(git log:*), Bash(git tag:*), Bash(git describe:*)
+model: haiku
+effort: low
 ---
 
 # Changelog
 
 [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) rules for CHANGELOG.md files. Linters
 catch format; this catches judgment calls — entry curation, grouping, and readability.
+
+## Context
+
+- Last tag: !`git describe --tags --abbrev=0 2>/dev/null || echo "(no tags yet)"`
+- Commits since last tag:
+  !`git log $(git describe --tags --abbrev=0)..HEAD --oneline 2>/dev/null ||`
+  `git log --oneline | head -30 2>/dev/null`
 
 ## Rules
 
@@ -52,7 +63,7 @@ catch format; this catches judgment calls — entry curation, grouping, and read
    - **(c)** Q1–Q4 for every bullet point
 2. Fix violations found
 
-**Rationalization guard:** Zero violations in a non-trivial changelog → re-check S3, S8, T1, Q1.
+## Common Mistakes
 
 | Excuse                        | Reality                                              |
 | ----------------------------- | ---------------------------------------------------- |
@@ -60,6 +71,7 @@ catch format; this catches judgment calls — entry curation, grouping, and read
 | "Format looks roughly right"  | Roughly ≠ compliant. Check every heading against T1. |
 | "Entries are fine"            | Fine for devs ≠ fine for users. Check Q1 and Q4.     |
 | "Missing links don't matter"  | Links are required by the spec. Check S8.            |
+| "Zero violations"             | Re-check S3, S8, T1, Q1 before concluding clean.     |
 
 ## Output
 

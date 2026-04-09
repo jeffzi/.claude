@@ -5,6 +5,10 @@ description: >
   async test flakiness, Sendable mock issues, confirmation() usage, strict concurrency test
   errors, actor-isolated testing, exit tests, or any *Tests.swift files. Not for production
   Swift code patterns — use code-swift for that.
+paths: "**/*Tests.swift"
+user-invocable: false
+model: sonnet
+effort: medium
 ---
 
 # Swift Testing
@@ -13,10 +17,6 @@ description: >
 Swift Testing for new tests, XCTest only for UI automation and performance measurement.
 
 **Also apply:** `code-swift` rules.
-
-**TDD phase constraints (when invoked by a TDD agent):** RED phase (tdd-red) — write tests for ONE
-behavior per invocation, no horizontal slicing. GREEN phase (tdd-green) — do NOT modify test files,
-fix implementation only.
 
 ## Swift Testing vs XCTest Decision
 

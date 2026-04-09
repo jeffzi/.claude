@@ -6,6 +6,9 @@ description: >
   typescript-to-lua/dist/*, context.transformExpression causing infinite recursion, or need to
   choose between plain-object and class-based plugin shapes. Not for general TSTL application
   code — use code-tstl.
+user-invocable: false
+model: sonnet
+effort: medium
 ---
 
 # TSTL Plugin Development

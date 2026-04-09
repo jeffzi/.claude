@@ -5,10 +5,15 @@ description: |
   skill fails to trigger reliably, an agent ignores or rationalizes around rules under pressure, a
   skill description doesn't match triggering conditions, a SKILL.md is too long or bloated, or after
   writing a new skill to catch issues before deployment. Not for writing skills from scratch (use
-  write-skill) or eval/benchmark infrastructure (use skill-creator).
+  write-skill).
+argument-hint: "[skill dir or SKILL.md path]"
+model: sonnet
+effort: medium
 ---
 
 # Skill Review
+
+**Target:** $ARGUMENTS
 
 Review SKILL.md files systematically against activation, implementation, structural, security, and
 compliance standards.
@@ -16,8 +21,8 @@ compliance standards.
 ## How to review
 
 1. **Read the SKILL.md** in full, including any files in references/.
-2. **Identify the skill type** — discipline, technique, pattern, or reference (see write-skill's
-   type table). This determines which checklists apply.
+2. **Identify the skill type** — discipline, technique, pattern, or reference. Load
+   `Skill(write-skill)` to consult its type table. This determines which checklists apply.
 3. **Run through the checklists** in `references/checklists.md`, section by section. All skills get
    activation, implementation, structure, and security. Discipline skills also get the compliance
    checklist.
@@ -29,18 +34,21 @@ compliance standards.
 
 Flag these skill anti-patterns:
 
-| Anti-pattern                    | What to look for                                                  |
-| ------------------------------- | ----------------------------------------------------------------- |
-| Workflow summary in description | Description summarizes steps — Claude follows summary, skips body |
-| Narrative example               | Session-specific stories instead of general patterns              |
-| Multi-language dilution         | Same example in 5+ languages — mediocre quality, maintenance cost |
-| Code in flowcharts              | Implementation code inside diagrams — can't copy-paste            |
-| Generic labels                  | `helper1`, `step3`, `pattern4` — labels without semantic meaning  |
-| Over-documenting known things   | Standard library usage, common patterns Claude already knows      |
-| Missing boundary conditions     | No "when NOT to use" or "use X instead" routing                   |
-| Orphan references               | Reference files not linked from SKILL.md body                     |
-| Deep reference chains           | References that reference other references — Claude won't follow  |
-| Discipline without testing      | Enforcement rules without documented pressure test results        |
+| Anti-pattern                    | What to look for                                                        |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| Workflow summary in description | Description summarizes steps — Claude follows summary, skips body       |
+| Narrative example               | Session-specific stories instead of general patterns                    |
+| Multi-language dilution         | Same example in 5+ languages — mediocre quality, maintenance cost       |
+| Code in flowcharts              | Implementation code inside diagrams — can't copy-paste                  |
+| Generic labels                  | `helper1`, `step3`, `pattern4` — labels without semantic meaning        |
+| Over-documenting known things   | Standard library usage, common patterns Claude already knows            |
+| Missing boundary conditions     | No "when NOT to use" or "use X instead" routing                         |
+| Orphan references               | Reference files not linked from SKILL.md body                           |
+| Deep reference chains           | References that reference other references — Claude won't follow        |
+| Discipline without testing      | Enforcement rules without documented pressure test results              |
+| Prose delegation                | "Follow commit conventions" instead of `` Load `Skill(write-commit)` `` |
+| Kitchen-sink context            | Many shell injections dumping bulk data Claude may not need             |
+| Broken Skill() targets          | `Skill(name)` pointing to skills that don't exist or wrong spelling     |
 
 ## Common reviewer mistakes
 

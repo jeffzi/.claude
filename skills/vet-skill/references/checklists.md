@@ -1,6 +1,7 @@
 # Skill review checklists
 
 - [Activation checklist](#activation-checklist)
+- [Configuration checklist](#configuration-checklist)
 - [Implementation checklist](#implementation-checklist)
 - [Structure checklist](#structure-checklist)
 - [Security checklist](#security-checklist)
@@ -30,6 +31,56 @@ Will Claude find and load this skill?
 
 - [ ] Could not be confused with another skill's description
 - [ ] Boundary conditions stated ("Not for X -- use Y instead")
+
+## Configuration checklist
+
+Does the frontmatter match the skill's role? For field reference, load `Skill(write-skill)` and
+consult its `frontmatter.md` (write-skill is already invoked for remediation per step 4 of the
+review process).
+
+### Invocation controls
+
+- [ ] `disable-model-invocation: true` set on side-effecting skills users should trigger manually
+      (deploy, upgrade-\*, commit, setup-\*)
+- [ ] `user-invocable: false` set on reference-only skills that aren't meaningful slash commands
+      (language/test reference, background knowledge)
+- [ ] `argument-hint` set when skill accepts arguments (autocomplete expects it)
+
+### Tool scope
+
+- [ ] `allowed-tools` set on skills with predictable, narrow tool needs (read-only research, git-
+      scoped workflows)
+- [ ] Bash patterns are scoped (`Bash(git *)` not bare `Bash`) where possible
+- [ ] Edit patterns path-scoped where the skill only touches one file (`Edit(CHANGELOG.md)`)
+- [ ] Not over-restricted — composable skills leave tools open
+
+### Model selection
+
+- [ ] `model` set when skill has clear complexity tier (opus for architectural reasoning, haiku for
+      mechanical/short tasks, sonnet for judgment work)
+- [ ] No model override on skills where the session's default model should drive (TDD loops, general
+      orchestrators)
+
+### Auto-activation
+
+- [ ] `paths` set when skill applies to clear file-type patterns (language/test reference skills)
+- [ ] `paths` NOT set on workflow skills (they should be invokable regardless of cwd)
+- [ ] Path patterns don't clash with a sibling skill's patterns (e.g. code-ts and code-tstl)
+
+### Dynamic context injection
+
+- [ ] Skill uses `` !`cmd` `` injection where body would instruct Claude to "run X first" (git
+      status, diffs, outdated lists, PR data)
+- [ ] Injected commands suppress errors with `2>/dev/null` where failure is normal
+- [ ] `${CLAUDE_SKILL_DIR}` used when referencing bundled scripts (not hardcoded paths)
+
+### Subagent execution
+
+- [ ] `context: fork` only on skills with explicit task instructions (not reference content)
+- [ ] `agent` field specifies the right subagent type (`Explore` for read-only research, `Plan` for
+      design, `general-purpose` for tasks)
+- [ ] Not used on skills that need main-session continuity (research modes, constraint-setting
+      skills)
 
 ## Implementation checklist
 
@@ -62,6 +113,14 @@ Will Claude follow this skill effectively?
 - [ ] Reference files over 100 lines have a TOC at the top
 - [ ] References one level deep only (no chains of references referencing references)
 
+### Skill delegation
+
+- [ ] `Skill(name)` references point to skills that actually exist
+- [ ] Skill names in `Skill()` calls are spelled correctly (hyphens, not underscores)
+- [ ] Skill loads the dependency rather than describing it in prose ("Load `Skill(write-commit)`"
+      not "follow commit conventions")
+- [ ] Delegation targets do the work — SKILL.md doesn't duplicate the delegated skill's content
+
 ## Structure checklist
 
 ### File organization
@@ -79,6 +138,17 @@ Will Claude follow this skill effectively?
 - [ ] No narrative examples ("In session 2025-10-03, we found..." -- extract the general pattern)
 
 ## Security checklist
+
+### Shell injection safety
+
+- [ ] Every `` !`command` `` is read-only — no writes, deletes, resets, checkouts, or state
+      mutations (skill injects output into context, user cannot intercept)
+- [ ] No `!` command exposes secrets (`cat .env`, `printenv`, credential files)
+- [ ] Commands use targeted queries, not bulk dumps (`git log --oneline -10` not `git log --all`)
+- [ ] Commands suppress errors where failure is normal (`2>/dev/null`) so injection still produces
+      useful context
+- [ ] `${CLAUDE_SKILL_DIR}` used for bundled scripts (not hardcoded paths that break from other
+      working directories)
 
 ### Credential handling
 

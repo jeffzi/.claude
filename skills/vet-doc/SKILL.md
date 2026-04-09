@@ -7,9 +7,14 @@ description: |
   documentation", "audit the README", or when reviewing a PR that includes documentation changes.
   Not for inline code docstrings (use language-specific skills) or CLAUDE.md files (use
   claude-md-improver).
+argument-hint: "[doc file or directory]"
+model: sonnet
+effort: medium
 ---
 
 # Documentation Review
+
+**Target:** $ARGUMENTS
 
 Review documentation systematically against structural and prose quality standards.
 

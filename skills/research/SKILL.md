@@ -5,6 +5,10 @@ description: >-
   hallucination risk is high. Also use when the user says "fact-check", "verify this", "make sure
   this is accurate", "I need sources", or "don't make things up". Not for creative brainstorming or
   open-ended ideation.
+argument-hint: "[topic to research]"
+model: opus
+effort: high
+allowed-tools: Read, Grep, Glob, WebFetch, WebSearch
 ---
 
 # Research Mode

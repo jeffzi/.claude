@@ -7,6 +7,9 @@ description: >
   between Express and Core mode, handling long-running operations, or managing
   session cleanup. Not for Shinylive static-only
   deploys or Jupyter-style notebooks.
+user-invocable: false
+model: sonnet
+effort: medium
 ---
 
 # Shiny for Python
