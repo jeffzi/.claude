@@ -1,15 +1,23 @@
 ---
 name: upgrade-py
 description: Use when upgrading Python dependencies in lock file and pyproject.toml
+model: haiku
+effort: low
 allowed-tools: >
   Read, Grep, Edit, Bash(uv sync:*),
   Bash(uv pip list:*), Bash(uv tool run prek:*),
   Bash(uv run pytest:*)
+disable-model-invocation: true
 ---
 
 # Upgrade All Python Dependencies
 
 Upgrade all project dependencies while keeping pyproject.toml constraints in sync.
+
+## Context
+
+- Outdated packages:
+  !`uv pip list --outdated 2>/dev/null || echo "(uv not available or no outdated packages)"`
 
 ## Task Tracking
 

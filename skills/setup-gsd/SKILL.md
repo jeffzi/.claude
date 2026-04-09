@@ -3,7 +3,9 @@ name: setup-gsd
 description: >
   Use when setting up GSD model overrides for a new project.
   Run once after /gsd:new-project or /gsd:new-milestone.
-argument-hint: ""
+model: haiku
+effort: low
+disable-model-invocation: true
 ---
 
 # Setup GSD
@@ -17,7 +19,9 @@ Prefer opus for research-heavy agents, haiku for mechanical tasks.
   "gsd-phase-researcher": "opus",
   "gsd-debugger": "opus",
   "gsd-research-synthesizer": "haiku",
-  "gsd-nyquist-auditor": "haiku"
+  "gsd-nyquist-auditor": "haiku",
+  "gsd-doc-verifier": "haiku",
+  "gsd-user-profiler": "haiku"
 }
 ```
 

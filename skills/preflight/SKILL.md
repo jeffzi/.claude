@@ -4,6 +4,9 @@ description: >
   Use when about to commit changes, before code review,
   or when preparing a PR for submission
 argument-hint: Optional path or commit ref (defaults to changes since last push)
+disable-model-invocation: true
+model: sonnet
+effort: high
 ---
 
 # Preflight
@@ -12,23 +15,22 @@ Automated pre-commit review with iterative fix loop.
 
 **Core principle:** High precision over high recall. Only auto-fix verified issues (score ≥75).
 
-## When to Use
+## Context
 
-- Before committing changes
-- After completing feature work
-- Preparing for code review
+- Argument: $ARGUMENTS
+- Uncommitted changes: !`git status --porcelain`
+- Commits since last push:
+  !`git log @{u}..HEAD --oneline 2>/dev/null || echo "(no upstream or up to date)"`
 
-**Don't use:**
-
-- On unmodified files without explicit path
-- During rapid prototyping
+> **Note:** Context above is orientation only. Step 1's file collection is the authoritative source
+> of target files.
 
 **Announce at start:** "✈️ Preflight check initiated for [files/path]..."
 
 **Silent until Summary:** After the start announcement, output NOTHING until Step 5's Summary
 Report. No progress updates, no tool results, no "verification passed", no "no issues found". The
 spinner shows progress. If you're about to output text, that's a signal to keep working
-silently—user should never need to say "go on".
+silently—user should never need to say "continue".
 
 ## Execution Sequence
 
@@ -58,9 +60,13 @@ pending/in_progress, you are NOT done. Keep going.
 
 ### Step 1: Setup
 
+- [ ] Disambiguate argument (commit range vs commit ref vs path — see rules below)
 - [ ] Get target files (path arg or git diff)
-- [ ] Find CLAUDE.md conventions
-- [ ] Detect languages
+- [ ] Find CLAUDE.md conventions (3 locations below)
+- [ ] Load `Skill(resolve-lang-skills)`. For each target file, derive lang from its extension using
+      the Extension Map and classify using the Test File Detection patterns. Bucket: test-pattern
+      match → test files; known extension, not test → code files; `.md`, `README*`, `CHANGELOG*` →
+      doc files; unknown extension → skip.
 
 **Argument disambiguation:** if an argument is given:
 
@@ -102,17 +108,19 @@ stop.
 - [ ] Split target files into source files, test files, and documentation files (`.md`, `README*`,
       `CHANGELOG*`)
 - [ ] Dispatch agents in parallel (single message, one **Agent** tool call per non-empty bucket):
-  - **Agent A (implementation):** `model: sonnet` — "Simplify then review these implementation
-    files: [list]. First apply code-distill. Then invoke `/vet-code`. If vet-code made changes,
-    re-run `/vet-code` (max 3 passes total)."
-  - **Agent B (tests):** `model: sonnet` — "Simplify then review these test files: [list]. First
-    apply code-distill. Then invoke `/vet-test`. If vet-test made changes, re-run `/vet-test` (max 3
-    passes total)."
-  - **Agent C (docs):** `model: sonnet` — "Review these documentation files: [list]. Invoke
-    `/vet-doc` (which routes CHANGELOG.md to `write-changelog` rules automatically). If vet-doc made
-    changes, re-run `/vet-doc` (max 3 passes total)."
+  - **Agent A (implementation):** `model: sonnet` — "Distill then review these implementation files:
+    [list]. First dispatch a code-distill subagent (`Agent` tool, `subagent_type:
+    code-distill`)
+    on these files. Then load `Skill(vet-code)` and review them."
+  - **Agent B (tests):** `model: sonnet` — "Distill then review these test files: [list]. First
+    dispatch a code-distill subagent (`Agent` tool, `subagent_type: code-distill`) on these files.
+    Then load `Skill(vet-test)` and review them."
+  - **Agent C (docs):** `model: sonnet` — "Review these documentation files: [list]. Load
+    `Skill(vet-doc)` and review them (it routes CHANGELOG.md to `write-changelog` rules
+    automatically)."
 
-→ **TaskUpdate** task 2 to `completed`. **TaskUpdate** task 3 to `in_progress`. Continue silently.
+→ Wait for all step 2 agents to return, THEN **TaskUpdate** task 2 to `completed`. **TaskUpdate**
+task 3 to `in_progress`.
 
 ---
 
@@ -120,60 +128,62 @@ stop.
 
 **This is the core of preflight.** Cleanup was just preparation.
 
+**Review scope baseline:** Step 3 always reviews against the ORIGINAL diff captured in step 1, not
+the post-cleanup diff. Changes made by step 2 agents are invisible to step 3's review scope.
+
 Each iteration:
 
-1. **Launch review agents in parallel** using **Agent** tool (single message, multiple tool calls):
+1. **Launch review agents in parallel** using **Agent** tool (single message, one call per
+   applicable agent):
 
-   | Agent                | Focus                                                             | Model  | When                 |
-   | -------------------- | ----------------------------------------------------------------- | ------ | -------------------- |
-   | Bug Scanner          | Null access, off-by-one, leaks, races, logic errors               | opus   | If code files found  |
-   | CLAUDE.md Compliance | Convention violations                                             | sonnet | If conventions found |
-   | Doc Reviewer         | Structure, prose, accessibility, AI-writing, changelog compliance | sonnet | If doc files found   |
+   **Bug Scanner** (when code files exist)
+   - `subagent_type: bug-scanner` — do NOT set model, the agent defines its own
+   - Prompt:
+     `"Review these files for runtime correctness bugs.\n\nFiles: [code file
+     list]\n\nDiff:\n[diff from step 1]\n\nScope: [full if path-argument mode,
+     changed otherwise]"`
 
-   **Review scope depends on input mode:**
-   - **Path argument**: Review entire file(s) — flag any issues found
-   - **Commit ref (single)**: Review only changed lines — `git diff <ref>~1 <ref> -- <file>`
-   - **Commit range**: Review only changed lines — `git diff <from> <to> -- <file>`
-   - **No argument (since last push)**: Review only changed lines — use the same diff method from
-     Step 1 (`git diff @{push} -- <file>`, or the fallback if no upstream) to identify changed
-     lines, flag only issues in those lines
+   **CLAUDE.md Compliance** (when conventions found in step 1)
+   - `model: sonnet` — no subagent_type
+   - Prompt:
+     `"Check whether the changed code follows the project conventions below. For each
+     violation, output a ### Finding N block with fields: Issue, Location, Score (0–100), Reasoning.
+     Return 'No findings.' if clean.\n\nConventions:\n[CLAUDE.md contents]\n\nFiles: [target file
+     list]\n\nDiff:\n[diff from step 1]"`
 
-2. **Score issues with Haiku** — dispatch **Agent** tool with `model: haiku`:
+   **Review scope by input mode:**
+   - **Path argument**: scope = `full` — review entire file(s)
+   - **Commit ref / range / no-argument**: scope = `changed` — use diff from step 1, flag only
+     issues in changed lines
 
-   "Score each issue on this scale and return a JSON array of `{issue, location, score}`:
+2. **Consolidate findings** — no agent dispatch needed:
 
-   | Score    | Meaning            | Action       |
-   | -------- | ------------------ | ------------ |
-   | 0        | False positive     | Discard      |
-   | ~25      | Unverified         | Report only  |
-   | ~50      | Minor/nitpick      | Report only  |
-   | **≥ 75** | Verified important | **Auto-fix** |
-   | 100      | Definite, frequent | Auto-fix     |
+   - Collect all `### Finding N` blocks from both agents
+   - Discard findings with score 0 (false positives — see list below)
+   - Partition: score ≥ 75 → fix queue; score < 75 → report-only queue
 
-   Issues: [paste all issues from review agents]"
+   **False Positives (score = 0, discard):**
 
-3. **Fix issues with score ≥75** — dispatch agents in parallel (single message):
-   - Code issues → **Agent** tool with `subagent_type: code-mend`, `model: sonnet`
-   - Doc issues → **Agent** tool with `model: sonnet` — "Fix these documentation issues: [list].
-     Load Skill(write-doc) and Skill(write-prose) to guide fixes. For CHANGELOG.md, load
-     Skill(write-changelog) instead."
+   - Pre-existing issues not in your diff (no-argument mode only)
+   - Linter/typechecker would catch (unused imports, missing type hints, style violations)
+   - General quality without CLAUDE.md backing
+   - Silenced by ignore comments
+   - Stylistic prose preferences without `write-doc` rule backing
+
+3. **Fix issues with score ≥ 75** — for each finding in the fix queue, dispatch one **Agent** call
+   with `subagent_type: code-mend` (send all dispatches in a single parallel message — one call per
+   finding). Do NOT set model. Reformat the finding into code-mend's input format:
+
+   ```text
+   Issue: [description from finding]
+   Location: [file_path:line_number from finding]
+   Severity: [high if score ≥ 90, medium if score ≥ 75]
+   Suggested fix: [reasoning from finding]
+   ```
 
 4. **Decision point:**
-   - If fixes applied AND iterations < 3 → dispatch **vet agents in parallel** (single message, one
-     Agent per non-empty bucket):
-     - **Agent** `model: sonnet` — "Invoke `/vet-code` on these files: [list]"
-     - **Agent** `model: sonnet` — "Invoke `/vet-test` on these files: [list]" (if test files)
-     - **Agent** `model: sonnet` — "Invoke `/vet-doc` on these files: [list]" (if doc files) →
-       repeat from iteration step 1
+   - If fixes applied AND iterations < 3 → repeat from step 3.1
    - If no fixes OR iterations = 3 → proceed to Step 4
-
-**False Positives (score = 0, discard):**
-
-- Pre-existing issues not in your diff (no-argument mode only)
-- Linter/typechecker would catch (unused imports, missing type hints, style violations)
-- General quality without CLAUDE.md backing
-- Silenced by ignore comments
-- Stylistic prose preferences without `write-doc` rule backing
 
 ⚠️ **CHECKPOINT: Only exit loop when no fixes needed OR 3 iterations done.**
 
@@ -188,7 +198,7 @@ Each iteration:
 Dispatch a single **Agent** tool call with `model: opus`:
 
 "Review these files for correctness — bugs, logic errors, regressions. Read each file and report
-issues. Return a JSON array of `{issue, location, severity}` or empty array if clean.
+issues as plain text (issue, location, severity) or 'No findings.' if clean.
 
 Files: [list of files preflight modified during steps 2-3]"
 
@@ -226,7 +236,7 @@ Generate the final report. **This is your FIRST text output since the start anno
 - Total: [count]
 - Exit reason: [no changes / max iterations]
 
-## Issues Fixed (score >= 75)
+## Issues Fixed (score ≥ 75)
 
 | Issue | Location | Score | Agent |
 | ----- | -------- | ----- | ----- |
@@ -255,6 +265,9 @@ Generate the final report. **This is your FIRST text output since the start anno
 ## Common Mistakes
 
 - ❌ Sequential agent dispatch → use parallel (single message, multiple **Agent** tool calls)
-- ❌ Auto-fixing linter issues → run `ruff --fix` instead
+- ❌ Single code-mend call for all findings → one **Agent** call per finding, all dispatched in
+  parallel
+- ❌ Auto-fixing linter issues → run the project's configured linter/formatter instead (e.g.,
+  `ruff --fix`, `eslint --fix`)
 - ❌ Skipping "test files", "doc files", or "examples" → treat all files uniformly
 - ❌ Fixing pre-existing issues → only fix what's in your diff (no-argument mode only)
