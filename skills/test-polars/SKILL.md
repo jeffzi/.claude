@@ -5,6 +5,9 @@ description: >
   and assert_series_equal usage, null/NaN assertion pitfalls, expression isolation testing, schema
   mismatches in fixtures, non-deterministic group_by order, float tolerance, or any test files
   importing polars. Not for non-Polars Python tests — use test-py for that.
+user-invocable: false
+model: sonnet
+effort: medium
 ---
 
 # Testing Polars Code
@@ -13,10 +16,6 @@ description: >
 
 **Also apply:** `test-py` rules (pytest patterns), `code-py` rules. Exception: test functions don't
 need `-> None` annotations.
-
-**TDD phase constraints (when invoked by a TDD agent):** RED phase (tdd-red) — write tests for ONE
-behavior per invocation, no horizontal slicing. GREEN phase (tdd-green) — do NOT modify test files,
-fix implementation only.
 
 ## Mandatory Rules
 

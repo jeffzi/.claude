@@ -6,6 +6,9 @@ description: |
   sentence-level clarity. Also use when the user says "make this clearer", "tighten the prose",
   "improve the writing", or when text feels bloated, passive, or vague. Covers sentence-level
   clarity, not document structure — for organizing documentation, use write-doc instead.
+argument-hint: "[text or file to edit]"
+model: sonnet
+effort: medium
 ---
 
 # Writing Clearly and Concisely

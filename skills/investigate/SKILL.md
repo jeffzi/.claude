@@ -4,9 +4,14 @@ description: >
   Use when encountering any bug, test failure, crash, error, regression, or unexpected behavior,
   before proposing fixes. Also use when a fix attempt fails twice — stop guessing and start
   investigating. Use when you see a stack trace and don't understand the root cause.
+argument-hint: "[error message, symptom, or failing test]"
+model: opus
+effort: high
 ---
 
 # Systematic Investigation
+
+**Error / Symptom:** $ARGUMENTS
 
 **Violating the letter of the rules is violating the spirit of the rules.**
 
@@ -33,8 +38,7 @@ Gather evidence before forming any hypothesis.
 2. **Reproduce** — run the failing command yourself. If you can't reproduce, you can't verify a fix.
 3. **Check recent changes** — `git log --oneline -10`, `git diff`. Did something just change?
 4. **Trace data flow** — follow the actual values through the code path. Read the code, don't
-   assume. Load the `ast-grep` skill via `Skill(ast-grep)` for structural code search — it finds
-   patterns by AST structure (call sites, argument shapes, control flow) that text grep misses.
+   assume.
    - **Multi-component systems:** When the bug crosses service/process boundaries, log what enters
      and exits each component boundary. Run once to find WHERE it breaks, then analyze.
 5. **Check assumptions** — types, nullability, initialization order, environment differences.
@@ -158,3 +162,13 @@ under controlled conditions.
 Investigation answers "what's wrong and why." It does not fix anything. Once root cause is
 confirmed, hand off to TDD for the fix — the confirmed root cause statement becomes input for
 writing the failing test.
+
+## Pressure Testing
+
+RED phase failures this skill was designed to address:
+
+- Agents applying "obvious" fixes without diagnosing root cause
+- Stopping investigation after the first plausible hypothesis without confirming it
+- Cycling through guesses instead of following binary search / working-backwards patterns
+
+See the Rationalization Prevention and Biases tables above for captured rationalizations.

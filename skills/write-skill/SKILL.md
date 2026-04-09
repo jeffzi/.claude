@@ -4,8 +4,10 @@ description: |
   Use when creating new Claude Code skills, editing existing SKILL.md files, or designing skill
   descriptions for discovery. Also use when skills fail to trigger reliably, agents rationalize
   around rules under pressure, or you need to choose between skill types (discipline, technique,
-  pattern, reference). For review-only assessment against checklists, use vet-skill. Complements
-  skill-creator which handles eval/benchmark infrastructure.
+  pattern, reference). For review-only assessment against checklists, use vet-skill.
+argument-hint: "[skill name or purpose]"
+model: sonnet
+effort: medium
 ---
 
 # Writing Effective Skills
@@ -14,7 +16,22 @@ description: |
 write the skill addressing failures (GREEN), close loopholes (REFACTOR).
 
 If you didn't watch an agent fail without the skill, you don't know if the skill prevents the right
-failures. This skill covers _design_; use `skill-creator` for eval infrastructure and benchmarking.
+failures.
+
+## Development loop
+
+1. **Capture intent.** What should the skill enable? When should it trigger (user phrases,
+   symptoms)? What's the expected output? Write these down before drafting — unclear intent produces
+   unfocused skills.
+2. **Run failing scenarios without the skill** (RED). This is the Iron Law.
+3. **Draft the skill** addressing those failures (GREEN).
+4. **Pressure-test** — rerun under pressure, document rationalizations, close loopholes (REFACTOR).
+   See `references/pressure-testing.md`.
+5. **Validate triggers** — verify the description activates on should-trigger queries and ignores
+   should-not-trigger queries. See the trigger-validation section in `pressure-testing.md`.
+6. **Generalize, don't overfit.** When fixing failures, make the rule cover the whole category —
+   don't encode your exact test queries verbatim. The skill fails the next unseen paraphrase if you
+   do.
 
 ## When to create a skill
 
@@ -41,6 +58,8 @@ NO SKILL WITHOUT A FAILING TEST FIRST
 This applies to NEW skills AND EDITS to existing skills.
 
 Write skill before testing? Delete it. Start over. Edit skill without testing? Same violation.
+
+**Foundational principle:** Violating the letter of the rules is violating the spirit of the rules.
 
 No exceptions — not for "simple additions", "just a section", or "documentation updates." Don't keep
 untested changes as "reference."
@@ -70,6 +89,27 @@ only — no chains of references referencing references.
 
 Read `references/skill-structure.md` for the full structure template, file organization rules, and
 description optimization (CSO).
+
+## Frontmatter beyond name/description
+
+11 additional optional fields control invocation, tool access, model selection, subagent execution,
+and dynamic context injection. Match each to the skill's role:
+
+| Field                            | Use for                                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------------------------ |
+| `argument-hint`                  | Any skill that takes arguments (autocomplete hint)                                         |
+| `disable-model-invocation: true` | Side-effecting workflows (`/deploy`, `/upgrade-*`)                                         |
+| `user-invocable: false`          | Reference-only knowledge (`/code-py` isn't an action)                                      |
+| `allowed-tools`                  | Read-only skills, tool-scoped skills (`Bash(git *)`)                                       |
+| `model`                          | Reasoning-heavy (`opus`) or mechanical (`haiku`)                                           |
+| `effort`                         | Pin reasoning depth: `low` mechanical, `high` analytical — see `references/frontmatter.md` |
+| `paths`                          | Auto-activate when editing matching file types                                             |
+| `context: fork` + `agent`        | Long-running research/exploration tasks                                                    |
+| Shell injection (body syntax)    | Pre-inject git status, diffs, outdated lists, etc.                                         |
+
+Read `references/frontmatter.md` for the complete reference, `allowed-tools` syntax, string
+substitutions (`$ARGUMENTS`, `${CLAUDE_SKILL_DIR}`), subagent execution details, and the description
+truncation/budget rules.
 
 ## Writing for compliance
 
@@ -143,6 +183,7 @@ After writing ANY skill, STOP and complete this checklist before moving to the n
 - [ ] Keywords cover errors, symptoms, synonyms, tool names
 - [ ] One excellent code example (not multi-language)
 - [ ] Common mistakes section included
+- [ ] `effort` set explicitly — matches skill type (see `references/frontmatter.md`)
 - [ ] Ran scenarios WITH skill, agent now complies
 
 ### For discipline skills (additional)
@@ -159,9 +200,6 @@ After writing ANY skill, STOP and complete this checklist before moving to the n
 - [ ] Added explicit counters for each
 - [ ] Re-tested — agent still complies
 - [ ] Meta-tested to verify clarity
-
-**Use `skill-creator` for:** eval infrastructure, benchmark stats, blind A/B comparison, description
-optimization loops, and packaging.
 
 ## Attribution
 

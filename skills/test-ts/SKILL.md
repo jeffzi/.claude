@@ -5,6 +5,10 @@ description: >
   property-based testing, test isolation, flaky tests, toEqual vs toStrictEqual confusion,
   timer/promise deadlocks, mock reset semantics, type-safe test factories, or any *.test.ts files.
   Not for production TypeScript code — use code-ts for that.
+paths: "**/*.test.ts, **/*.test.tsx, **/*.spec.ts, **/*.spec.tsx"
+user-invocable: false
+model: sonnet
+effort: medium
 ---
 
 # TypeScript Testing with Vitest
@@ -14,10 +18,6 @@ Default to the strictest API (`toStrictEqual`, async timer variants, `expect.has
 loosen only when you have a reason.
 
 **Also apply:** `code-ts` rules. Exception: test helper functions don't need full JSDoc.
-
-**TDD phase constraints (when invoked by a TDD agent):** RED phase (tdd-red) — write tests for ONE
-behavior per invocation, no horizontal slicing. GREEN phase (tdd-green) — do NOT modify test files,
-fix implementation only.
 
 ## Mandatory Rules
 

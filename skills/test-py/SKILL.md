@@ -6,6 +6,10 @@ description: >
   testing, flaky tests, test isolation issues, data
   validation, AssertionError debugging, or any
   test_*.py files.
+paths: "**/test_*.py, **/*_test.py, **/tests/**/*.py, **/conftest.py"
+user-invocable: false
+model: sonnet
+effort: medium
 ---
 
 # Python Testing with pytest
@@ -13,10 +17,6 @@ description: >
 **Core principle**: Test behavior, not implementation. Every test follows Arrange-Act-Assert.
 
 **Also apply:** `code-py` rules. Exception: test functions don't need `-> None` annotations.
-
-**TDD phase constraints (when invoked by a TDD agent):** RED phase (tdd-red) — write tests for ONE
-behavior per invocation, no horizontal slicing. GREEN phase (tdd-green) — do NOT modify test files,
-fix implementation only.
 
 ## Domain Skill Detection
 

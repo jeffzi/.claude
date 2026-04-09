@@ -5,6 +5,10 @@ description: >
   "command not found" errors, or scripts failing silently. Apply for
   automation, hooks, CI/CD, CLI tools, or any .sh files. Not for fish, zsh,
   or PowerShell — Bash/sh only. Applies to *.sh and *.bash files.
+paths: "**/*.sh, **/*.bash, **/*.zsh"
+user-invocable: false
+model: sonnet
+effort: medium
 ---
 
 # Shell Scripting - Bash Best Practices

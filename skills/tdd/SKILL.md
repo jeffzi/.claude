@@ -4,9 +4,14 @@ description: >
   Use when implementing any feature, behavior change, or bug fix in a project with a test suite.
   Also use when asked to follow TDD or invoked via /tdd. Use when you think "I'll add tests later"
   — that's rationalization. Not for projects without a test suite.
+argument-hint: "[feature or behavior to implement]"
+model: sonnet
+effort: high
 ---
 
 # Test-Driven Development (TDD)
+
+**Feature / Behavior:** $ARGUMENTS
 
 ## Table of Contents
 
@@ -15,14 +20,12 @@ description: >
 - [Plans and TDD](#plans-and-tdd)
 - [The Iron Law](#the-iron-law)
 - [Architecture: Context-Isolated Subagents](#architecture-context-isolated-subagents)
-- [Language Detection](#language-detection)
+- [Resolving Language and Framework Skills](#resolving-language-and-framework-skills)
 - [Batching: Cohesive vs. Unrelated](#batching-cohesive-vs-unrelated)
 - [Orchestration Flow](#orchestration-flow)
 - [Red-Green-Refactor](#red-green-refactor)
 - [Circuit Breaker](#circuit-breaker)
-- [Good Tests](#good-tests)
-- [Common Rationalizations](#common-rationalizations)
-- [Red Flags](#red-flags--stop-and-start-over)
+- [Good Tests, Rationalizations, and Red Flags](#good-tests-rationalizations-and-red-flags)
 - [Example: Bug Fix](#example-bug-fix)
 - [Verification Checklist](#verification-checklist)
 - [When Stuck](#when-stuck)
@@ -55,79 +58,46 @@ Thinking "skip TDD just this once"? Stop. That's rationalization.
 
 ## Plans and TDD
 
-**Before creating any plan, load `/write-plan`.** Always. No exceptions.
+**Before creating any plan, load `Skill(write-plan)`.** Always. No exceptions.
 
-When the project has a test suite, plans describe **behaviors to implement** — not implementation
-details, not file paths with line numbers, not specific code changes. The RED agent needs to figure
-out the API on its own (that's the point of context isolation). The GREEN agent needs to figure out
-the implementation guided only by failing tests. When a plan prescribes implementation details, both
-agents are compromised. Each plan task ends with **"Use `/tdd` for implementation."** — no inline
-RED/GREEN steps, no test assertions, no implementation code, no "change X at line Y."
+When the project has a test suite, plans describe **behaviors to implement** — not file paths, line
+numbers, or code changes. Implementation details compromise both agents' context isolation. Each
+plan task ends with **"Use `/tdd` for implementation."** — no inline RED/GREEN steps, no test
+assertions, no implementation code.
 
 When the project has no test suite, plans describe implementation directly (files, approach,
 specific changes) — TDD constraints don't apply.
 
-**Good (with test suite):** "Accept hud.duration as a positive number, default 0.5. Reject
-non-positive and non-number values. Use `/tdd` for implementation."
-
-**Good (no test suite):** "Add duration validation in prepare.lua. HUD.new reads config.duration,
-stores as self._duration. Reject non-positive and non-number values."
-
-**Bad (with test suite):** "Update prepare.lua:614 to skip duration from trigger-flag check,
-validate as positive number. HUD.new reads config.duration, stores as self._duration." — prescribes
-implementation when TDD should drive it.
+**Good:** "Accept hud.duration as a positive number, default 0.5. Use `/tdd` for implementation."
+**Bad:** "Update prepare.lua:614, validate as positive number." — prescribes implementation.
 
 ## The Iron Law
 
-```text
-NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
-```
-
-Write code before the test? Delete it. Start over.
-
-**No exceptions:**
-
-- Don't keep it as "reference"
-- Don't "adapt" it while writing tests
-- Don't look at it
-- Delete means delete
-
-Implement fresh from tests. Period.
+No production code without a failing test first. See `references/philosophy.md` for the full
+principles, rationalizations table, and red flags checklist.
 
 ## Architecture: Context-Isolated Subagents
 
-TDD in a single context window is compromised — the LLM designs tests around the implementation it's
-already planning. This skill enforces context isolation by dispatching separate agents for RED and
-GREEN phases. Each agent sees only what it needs.
+Context isolation prevents the LLM from designing tests around planned implementation.
 
-| Phase    | Agent        | Can see                       | Cannot see/modify                           |
-| -------- | ------------ | ----------------------------- | ------------------------------------------- |
-| RED      | `tdd-red`    | Tests, type stubs, public API | Implementation source                       |
-| GREEN    | `tdd-green`  | Everything                    | Cannot modify test files                    |
-| REFACTOR | `/preflight` | Everything                    | N/A (runs code-distill, vet-code, vet-test) |
+| Phase     | Agent                            | Can see (Phase 1 / Phase 2)                      | Cannot see/modify                          |
+| --------- | -------------------------------- | ------------------------------------------------ | ------------------------------------------ |
+| RED-GREEN | `tdd-cycle`                      | Phase 1: tests, stubs, public API / Phase 2: all | Phase 1: impl source / Phase 2: test files |
+| REFACTOR  | 2 parallel tracks (if ≥50 lines) | Everything                                       | N/A (see REFACTOR section)                 |
 
 ### Mandatory Entry Point
 
-**NEVER dispatch `tdd-red` or `tdd-green` agents directly.** This skill is the orchestrator.
-Dispatching agents without this skill means no orchestration flow, no phase verification, no circuit
-breaker, and no structured data passing between phases.
+**NEVER dispatch `tdd-cycle` directly.** This skill is the orchestrator — without it, no phase
+verification, no circuit breaker, no structured data passing.
 
-Thinking "I know the pattern, I'll just dispatch agents myself"? That's rationalization. Invoke
-`/tdd` first.
+## Resolving Language and Framework Skills
 
-## Language Detection
+Before the **first** RED-GREEN cycle, load `Skill(resolve-lang-skills)` and resolve TEST_SKILL and
+CODE_SKILL once. Cache and reuse across all cycles — never re-resolve per project. Pass `none` when
+no skill matches. See `references/orchestration-flow.md` for full resolution steps.
 
-Detect from file extensions and config files:
-
-| Signal           | Language   | Test runner      | Skill        |
-| ---------------- | ---------- | ---------------- | ------------ |
-| `pyproject.toml` | Python     | `uv run pytest`  | `test-py`    |
-| `package.json`   | TypeScript | `npx vitest run` | `test-ts`    |
-| `*.rockspec`     | Lua        | `busted`         | `test-lua`   |
-| `Package.swift`  | Swift      | `swift test`     | `test-swift` |
-
-Other languages: follow the same RED-GREEN-REFACTOR pattern with the project's existing test
-framework.
+`tdd-cycle` resolves TEST_COMMAND and FULL_SUITE_COMMAND during its RED phase — the orchestrator
+uses these for independent GREEN verification.
 
 ## Batching: Cohesive vs. Unrelated
 
@@ -161,8 +131,8 @@ see `references/orchestration-flow.md`.
 
 ### RED — Write Failing Tests
 
-The `tdd-red` agent writes tests for one behavior group — a single behavior or a cohesive batch (see
-Batching section above). Each individual test still covers one thing.
+The `tdd-cycle` agent's RED phase writes tests for one behavior group — a single behavior or a
+cohesive batch (see Batching section above). Each individual test still covers one thing.
 
 **Good** — Three tests, one RED-GREEN cycle (all fail because CatalogEntry doesn't exist yet):
 
@@ -196,23 +166,24 @@ def test_catalog_entry_rejects_invalid_type():
 - Each individual test covers one thing — clear name describing behavior
 - Real code (no mocks unless unavoidable)
 
-### Verify RED — Watch It Fail
+### Verify RED — Inspect FAILURE_OUTPUT
 
-**MANDATORY. Never skip.**
+**MANDATORY. Never skip.** The agent runs both phases internally, so you cannot re-run the failing
+state. Instead, inspect `FAILURE_OUTPUT` from the agent's combined output.
 
 Confirm:
 
-- Test fails (not errors)
 - Failure message is expected
 - Fails because feature missing (not typos)
 
-**Test passes?** Behavior already exists. Report to user.
+**`STATUS: PASSED_UNEXPECTEDLY`?** Behavior already exists. Report to user and ask: skip or revise
+scope?
 
-**Test errors?** Fix error, re-run until it fails correctly.
+**`STATUS: STUCK + PHASE: RED`?** Test writing failed. Report diagnostics to user.
 
 ### GREEN — Minimal Code
 
-The `tdd-green` agent writes simplest code to pass the test.
+The `tdd-cycle` agent's GREEN phase writes simplest code to pass the test.
 
 **Good** — Just enough to pass:
 
@@ -248,7 +219,8 @@ Don't add features, refactor other code, or "improve" beyond the test.
 
 ### Verify GREEN — Watch It Pass
 
-**MANDATORY.**
+**MANDATORY. Run TEST_COMMAND and FULL_SUITE_COMMAND yourself** — do not rely solely on tdd-cycle's
+report.
 
 Confirm:
 
@@ -260,24 +232,21 @@ Confirm:
 
 **Other tests fail?** Fix regressions now.
 
-### REFACTOR — Clean Up
+### REFACTOR — Clean Up (after the last cycle)
 
-Split changed files into implementation files and test files. Dispatch two agents in parallel:
+REFACTOR runs **once** after all RED-GREEN cycles complete, not per-cycle.
 
-- **Agent A (impl):** general-purpose agent. "Simplify then review these implementation files:
-  [list]. First apply code-distill (reduce complexity, DRY, naming, dead code). Then invoke
-  `/vet-code` on the same files. If vet-code made changes, run `/vet-code` once more (max 2
-  passes)."
-- **Agent B (tests):** general-purpose agent. "Simplify then review these test files: [list]. First
-  apply code-distill (reduce complexity, DRY, naming, dead code). Then invoke `/vet-test` on the
-  same files. If vet-test made changes, run `/vet-test` once more (max 2 passes)."
+Compute total insertions across all files modified/added during this `/tdd` invocation using
+`git diff --stat`. If total insertions are **< 50 lines**, skip REFACTOR entirely.
 
-Each agent runs distill -> vet -> (if changes) vet again, sequentially in its own context. The vet
-benefits from seeing what was simplified, and a second pass catches improvements created by the
-first.
+If **≥ 50 lines**, split changed files into impl and test files. Run two tracks in parallel:
 
-After both agents complete, re-run the test suite if either agent made changes. Keep tests green.
-Don't add behavior. Run `/preflight` before committing.
+- **Impl track:** dispatch `code-distill` on impl files; then dispatch `vet-code` on the result (→
+  `vet-code` again if changes were made, max 2 passes)
+- **Test track:** dispatch `code-distill` on test files; then dispatch `vet-test` on the result (→
+  `vet-test` again if changes were made, max 2 passes)
+
+Re-run FULL_SUITE_COMMAND if either agent made changes.
 
 ### Repeat
 
@@ -287,8 +256,8 @@ Next behavior group. One vertical slice (or cohesive batch) per cycle.
 
 ### Tier 1: After 3 failed GREEN attempts
 
-The `tdd-green` agent switches to a fundamentally different approach (different algorithm,
-alternative API, restructured logic).
+The `tdd-cycle` agent's GREEN phase switches to a fundamentally different approach (different
+algorithm, alternative API, restructured logic).
 
 ### Tier 2: After 5 total GREEN failures
 
@@ -298,72 +267,16 @@ Agent reports STUCK with diagnostics. Orchestrator presents to user with options
 - Try manual implementation
 - Skip this behavior for now
 
-## Good Tests
+## Good Tests, Rationalizations, and Red Flags
 
-| Quality          | Good                                | Bad                                                 |
-| ---------------- | ----------------------------------- | --------------------------------------------------- |
-| **Minimal**      | One thing. "and" in name? Split it. | `test('validates email and domain and whitespace')` |
-| **Clear**        | Name describes behavior             | `test('test1')`                                     |
-| **Shows intent** | Demonstrates desired API            | Obscures what code should do                        |
-
-## Common Rationalizations
-
-| Excuse                                   | Reality                                                                                          |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| "Too simple to test"                     | Simple code breaks. Test takes 30 seconds.                                                       |
-| "I'll test after"                        | Tests passing immediately prove nothing.                                                         |
-| "Tests after achieve same goals"         | Tests-after = "what does this do?" Tests-first = "what should this do?"                          |
-| "Already manually tested"                | Ad-hoc, no record, can't re-run.                                                                 |
-| "Deleting X hours is wasteful"           | Sunk cost fallacy. Keeping unverified code is technical debt.                                    |
-| "Keep as reference, write tests first"   | You'll adapt it. That's testing after. Delete means delete.                                      |
-| "Need to explore first"                  | Fine. Throw away exploration, start with TDD.                                                    |
-| "Test hard = design unclear"             | Listen to test. Hard to test = hard to use.                                                      |
-| "TDD will slow me down"                  | TDD faster than debugging. Pragmatic = test-first.                                               |
-| "This is a new feature, not a bug fix"   | TDD applies to features too.                                                                     |
-| "I need to see the whole picture first"  | That's exploration. Delete it, start with TDD.                                                   |
-| "Existing code has no tests"             | You're improving it. Add tests for existing code.                                                |
-| "I can orchestrate the agents myself"    | The skill IS the orchestrator. Invoke `/tdd`.                                                    |
-| "The plan already has RED/GREEN steps"   | Plans describe behaviors, not test/impl details. Use `/tdd`.                                     |
-| "The plan template shows inline code"    | Plan templates with inline test/impl code don't apply to TDD. Describe behaviors + "Use `/tdd`". |
-| "I already know RED-GREEN-REFACTOR"      | Knowing the pattern ≠ following the discipline. Invoke the skill.                                |
-| "Each test needs its own cycle"          | Cohesive tests (same function, same failure reason) batch together. Don't waste cycles.          |
-| "I'll batch these unrelated tests"       | Different modules/failure reasons = separate cycles. Batching ≠ dumping everything together.     |
-| "Let me read the source first"           | The RED agent reads what it needs. You describe behaviors.                                       |
-| "I'll write the test inline, faster"     | Context isolation exists for a reason. Dispatch `tdd-red`.                                       |
-| "Just one quick cycle, no plan needed"   | Multi-behavior tasks need a plan. Each task describes a behavior + "Use `/tdd`."                 |
-| "Plan needs impl details so agents know" | Plans describe behaviors. Agents figure out the how — that's the point of isolation.             |
-
-## Red Flags — STOP and Start Over
-
-- Code before test
-- Test after implementation
-- Test passes immediately
-- Can't explain why test failed
-- Tests added "later"
-- Rationalizing "just this once"
-- "I already manually tested it"
-- "Tests after achieve the same purpose"
-- "It's about spirit not ritual"
-- "Keep as reference" or "adapt existing code"
-- "Already spent X hours, deleting is wasteful"
-- "TDD is dogmatic, I'm being pragmatic"
-- "This is different because..."
-- Dispatching `tdd-red`/`tdd-green` without invoking `/tdd` first
-- Orchestrator reading implementation source files
-- Orchestrator writing test code instead of dispatching `tdd-red`
-- Dispatching agents without a plan for multi-behavior tasks
-- Dispatching agents from plan mode instead of writing plan tasks
-- Plan with implementation details (file paths, line numbers, specific code changes)
-- Plan with inline RED/GREEN steps (test assertions + implementation code)
-- Following a plan template that inlines test assertions and implementation code
-
-**All of these mean: Delete code. Start over with TDD.**
+See `references/philosophy.md` for the good tests checklist, common rationalizations table, and
+architectural red flags that mean "delete code, start over."
 
 ## Example: Bug Fix
 
 **Bug:** Empty email accepted
 
-**RED** (via tdd-red agent)
+**RED** (via tdd-cycle agent, RED phase)
 
 ```typescript
 test('rejects empty email', async () => {
@@ -378,7 +291,7 @@ test('rejects empty email', async () => {
 FAIL: expected 'Email required', got undefined
 ```
 
-**GREEN** (via tdd-green agent)
+**GREEN** (via tdd-cycle agent, GREEN phase)
 
 ```typescript
 function submitForm(data: FormData) {
@@ -395,22 +308,23 @@ function submitForm(data: FormData) {
 PASS
 ```
 
-**REFACTOR** — Run /preflight. Extract validation for multiple fields if needed.
+**REFACTOR** — Run code-distill + vet agents if ≥50 lines changed. Extract validation for multiple
+fields if needed.
 
 ## Verification Checklist
 
 Before marking work complete:
 
 - [ ] Every new function/method has a test
-- [ ] Watched each test fail before implementing (via tdd-red agent)
+- [ ] Watched each test fail before implementing (confirmed via FAILURE_OUTPUT from tdd-cycle)
 - [ ] Each test failed for expected reason (feature missing, not typo)
-- [ ] Wrote minimal code to pass each test (via tdd-green agent)
+- [ ] Wrote minimal code to pass each test (via tdd-cycle agent)
 - [ ] All tests pass
 - [ ] Output pristine (no errors, warnings)
 - [ ] Tests use real code (mocks only if unavoidable)
 - [ ] Showed test output proving pass (not "should pass" — actual output)
 - [ ] Edge cases and errors covered
-- [ ] /preflight passed on all changed files
+- [ ] REFACTOR ran (if ≥50 lines changed) or skipped with reason logged
 
 Can't check all boxes? You skipped TDD. Start over.
 
@@ -422,23 +336,27 @@ Can't check all boxes? You skipped TDD. Start over.
 | Test too complicated           | Design too complicated. Simplify interface.                          |
 | Must mock everything           | Code too coupled. Use dependency injection.                          |
 | Test setup huge                | Extract helpers. Still complex? Simplify design.                     |
-| tdd-red can't find API         | Add type stubs or update `__init__.py` exports.                      |
-| tdd-green hits circuit breaker | Review test assumptions. Consider adjusting test scope.              |
+| tdd-cycle can't find API       | Add type stubs or update `__init__.py` exports.                      |
+| tdd-cycle hits circuit breaker | Review test assumptions. Consider adjusting test scope.              |
 
 ## Debugging Integration
 
-Bug found? Write failing test reproducing it via tdd-red. Follow TDD cycle. Test proves fix and
-prevents regression.
-
-Never fix bugs without a test.
+Bug discovered mid-session? Write a failing test via tdd-cycle before fixing. For standalone bug
+reports (unknown root cause), use `/fix` first — it investigates, then drives TDD.
 
 ## Testing Anti-Patterns
 
-When adding mocks or test utilities, read `references/testing-anti-patterns.md` to avoid common
-pitfalls:
-
-- Testing mock behavior instead of real behavior
-- Adding test-only methods to production classes
-- Mocking without understanding dependencies
+Before adding mocks or test utilities, read `references/testing-anti-patterns.md`.
 
 No exceptions without your human partner's permission.
+
+## Pressure Testing
+
+RED phase failures this skill was designed to address:
+
+- Agents writing implementation first, then retrofitting tests
+- Batching unrelated behaviors into one RED-GREEN cycle to "save time"
+- Orchestrators reading source files during Phase 1 to "understand the API"
+- Agents dispatching tdd-cycle directly, bypassing the orchestrator
+
+See `references/philosophy.md` for the full rationalization table and red flags.

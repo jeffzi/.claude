@@ -5,6 +5,10 @@ description: >
   Use when you think code is "just a quick script" or "types slow me down" - these are symptoms
   this skill applies. Not for TypeScript-to-Lua — use code-tstl. Not for TSTL plugins — use
   code-tstl-plugin. For tests, also load test-ts. Applies to *.ts and *.tsx files.
+paths: "**/*.ts, **/*.tsx"
+user-invocable: false
+model: sonnet
+effort: medium
 ---
 
 # TypeScript - Production-Quality Code

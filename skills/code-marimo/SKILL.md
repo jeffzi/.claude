@@ -11,6 +11,9 @@ description: >
   code-py alone. Not for notebooks needing side
   effects with manual execution order, variable
   redeclaration across cells, or implicit state.
+user-invocable: false
+model: sonnet
+effort: medium
 ---
 
 # Marimo Reactive Notebooks

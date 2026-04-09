@@ -4,6 +4,10 @@ description: >
   Use when writing Lua tests with busted. Apply for assertions, spies/stubs, test isolation,
   before_each/setup patterns, coverage with luacov, or any *_test.lua files. Not for production
   Lua code — use code-lua for that.
+paths: "**/*_test.lua, **/spec/**/*.lua"
+user-invocable: false
+model: sonnet
+effort: medium
 ---
 
 # Lua Testing with Busted
@@ -12,10 +16,6 @@ description: >
 
 **Also apply:** `code-lua` rules. Exception: test helper functions don't need full LuaLS
 annotations.
-
-**TDD phase constraints (when invoked by a TDD agent):** RED phase (tdd-red) — write tests for ONE
-behavior per invocation, no horizontal slicing. GREEN phase (tdd-green) — do NOT modify test files,
-fix implementation only.
 
 ## Mandatory Rules
 

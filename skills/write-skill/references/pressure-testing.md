@@ -11,6 +11,7 @@
 - [Meta-testing](#meta-testing)
 - [Signs of a bulletproof skill](#signs-of-a-bulletproof-skill)
 - [Worked example: TDD skill](#worked-example-tdd-skill)
+- [Trigger validation](#trigger-validation) — verify description activates on the right prompts
 - [Testing checklist](#testing-checklist)
 
 ---
@@ -204,6 +205,67 @@ Re-tested: agent chose A (delete it). Cited the new principle directly. Meta-tes
 I should follow it."
 
 Bulletproof achieved after 2 REFACTOR iterations.
+
+## Trigger validation
+
+Separate from pressure-testing: this validates the **description**, not the rules. A bulletproof
+skill that never activates is worthless. Applies to every skill, not just discipline skills.
+
+### Build the query set
+
+Write **8-10 should-trigger queries** — realistic user prompts where the skill MUST activate:
+
+- Phrase queries the way users actually ask (not the way the description is written)
+- Include paraphrases of the core use case
+- Include edge-case triggers the description mentions
+- Include the symptoms/error messages listed in the description
+
+Write **8-10 should-not-trigger queries** — prompts that are adjacent but shouldn't activate:
+
+- Tasks handled by sibling skills ("review this test" → vet-test, not vet-code)
+- Superficially similar but wrong domain ("Python bug" → fix/investigate, not code-py)
+- Queries that mention the skill's keywords but have different intent
+- The skill's explicit "not for" boundaries from the description
+
+### Run the validation
+
+For each query, ask: does this match the skill description Claude sees? You don't need subagent
+infrastructure — read the description as Claude would and score each query:
+
+- **True positive**: should-trigger query + description clearly matches → pass
+- **False negative**: should-trigger query + description doesn't match → description misses a
+  trigger term
+- **False positive**: should-not-trigger query + description matches → description is too broad or
+  lacks "not for" boundaries
+- **True negative**: should-not-trigger query + description doesn't match → pass
+
+### Fix failures
+
+| Failure          | Fix                                                                          |
+| ---------------- | ---------------------------------------------------------------------------- |
+| False negatives  | Add missing trigger terms, symptoms, or user-phrased examples to description |
+| False positives  | Add "Not for X — use Y instead" routing, or narrow scope                     |
+| Borderline cases | Tighten wording, front-load the primary use case                             |
+
+**Generalize, don't overfit.** If you add a trigger for one specific query, make sure the new
+wording covers the whole category. Don't turn the description into a laundry list of the exact
+queries you tested — that fails on the next unseen paraphrase.
+
+### Example trigger set for `vet-code`
+
+**Should-trigger (add these as confirmed activation paths):**
+
+- "review this code"
+- "check my Python module for issues"
+- "is this idiomatic?"
+- "did I miss anything in this TypeScript file?"
+
+**Should-not-trigger (add "Not for X" if any match):**
+
+- "write tests for this" → test-\*
+- "fix this bug" → fix
+- "explain what this does" → (no skill — conversational)
+- "review the README" → vet-doc
 
 ## Testing checklist
 

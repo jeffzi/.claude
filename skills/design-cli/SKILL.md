@@ -5,6 +5,8 @@ description: >-
   adding subcommands or flags, writing help text, structuring output for
   humans and machines, or handling errors and configuration in command-line
   programs. Not for GUI or TUI design.
+model: sonnet
+effort: medium
 ---
 
 # CLI Interface Design

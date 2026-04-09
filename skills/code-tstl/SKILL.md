@@ -6,6 +6,9 @@ description: >
   Use when you see "while loop" where a numeric for should be, or Map/Set where LuaMap/LuaSet
   belongs - these are symptoms this skill applies. Not for standard TypeScript — use code-ts.
   Not for TSTL plugin development — use code-tstl-plugin.
+user-invocable: false
+model: sonnet
+effort: medium
 ---
 
 # TSTL - TypeScript-to-Lua for Lua 5.1

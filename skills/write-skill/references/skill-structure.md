@@ -12,7 +12,7 @@
 
 ## Frontmatter
 
-Only two fields: `name` and `description`. Max 1024 characters total.
+The two most important fields are `name` and `description`. Get these right first.
 
 ```yaml
 ---
@@ -24,7 +24,13 @@ description: |
 ```
 
 - `name`: letters, numbers, hyphens only — no parentheses or special characters
-- `description`: third person, starts with "Use when...", describes _triggering conditions_ only
+- `description`: third person, starts with "Use when...", describes _triggering conditions_ only.
+  Front-load the key use case — descriptions are truncated at 250 chars per entry in the skill
+  listing.
+
+**11 additional optional fields** control invocation, tool access, model selection, subagent
+execution, auto-activation paths, and dynamic context injection. See
+[frontmatter.md](frontmatter.md) for the full reference.
 
 ## Body sections
 

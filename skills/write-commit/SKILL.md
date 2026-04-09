@@ -6,6 +6,10 @@ description: >
   execution. Apply when tempted to write vague messages
   like "fix bug" or "update code", or when unsure
   whether a commit needs a body. Not for PR descriptions or changelog entries.
+argument-hint: "[optional scope or context]"
+allowed-tools: Read, Grep, Bash(git *)
+model: haiku
+effort: low
 ---
 
 # Commit Messages
