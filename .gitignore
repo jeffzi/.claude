@@ -8,6 +8,7 @@
 !dprint.json
 !.markdownlint-cli2.jsonc
 !settings.json
+!skills.json
 !README.md
 !CLAUDE.md
 
@@ -51,6 +52,10 @@ skills/brainstorming/
 # Allow local marketplace
 !local-marketplace/
 !local-marketplace/**
+
+# Allow docs
+!docs/
+!docs/**
 
 # Allow agents
 !agents/
