@@ -96,6 +96,16 @@ Invoke `write-prose` for the full reference. Flag these common issues:
 - [ ] **"See above" / "As mentioned earlier"** — readers arrive mid-page from search
 - [ ] **Inconsistent terminology** — same concept called different names
 
+## Rationalization guard
+
+| Excuse                                                         | Reality                                                                            |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| "I read it and it seemed clear to me"                          | Clarity to the author ≠ clarity to the audience. Walk the checklists item by item. |
+| "It's documentation, not code — less strict standards apply"   | Documentation bugs mislead users. Apply every checklist item.                      |
+| "The AI-writing checklist doesn't apply — the author is human" | You cannot reliably determine authorship. Run the checklist regardless.            |
+| "Zero issues in a well-written doc"                            | Re-examine accessibility, link text, and AI vocabulary before concluding.          |
+| "The user just wants a quick pass"                             | Every pass is a full pass. Partial reviews ship undetected problems.               |
+
 ## Anti-pattern detection
 
 Flag these documentation anti-patterns:

@@ -20,17 +20,15 @@ effort: high
 - [Plans and TDD](#plans-and-tdd)
 - [The Iron Law](#the-iron-law)
 - [Architecture: Context-Isolated Subagents](#architecture-context-isolated-subagents)
-- [Resolving Language and Framework Skills](#resolving-language-and-framework-skills)
+- [Language Skill Dispatch](#language-skill-dispatch)
 - [Batching: Cohesive vs. Unrelated](#batching-cohesive-vs-unrelated)
 - [Orchestration Flow](#orchestration-flow)
 - [Red-Green-Refactor](#red-green-refactor)
 - [Circuit Breaker](#circuit-breaker)
-- [Good Tests, Rationalizations, and Red Flags](#good-tests-rationalizations-and-red-flags)
 - [Example: Bug Fix](#example-bug-fix)
 - [Verification Checklist](#verification-checklist)
 - [When Stuck](#when-stuck)
 - [Debugging Integration](#debugging-integration)
-- [Testing Anti-Patterns](#testing-anti-patterns)
 
 ## Overview
 
@@ -90,11 +88,17 @@ Context isolation prevents the LLM from designing tests around planned implement
 **NEVER dispatch `tdd-cycle` directly.** This skill is the orchestrator — without it, no phase
 verification, no circuit breaker, no structured data passing.
 
-## Resolving Language and Framework Skills
+## Language Skill Dispatch
 
-Before the **first** RED-GREEN cycle, load `Skill(resolve-lang-skills)` and resolve TEST_SKILL and
-CODE_SKILL once. Cache and reuse across all cycles — never re-resolve per project. Pass `none` when
-no skill matches. See `references/orchestration-flow.md` for full resolution steps.
+Before the **first** RED-GREEN cycle, load `Skill(test-core)`. That hub contains the universal
+testing principles (AAA, behavior-not-implementation, parametrize-over-loops, mocking anti-patterns)
+that every `tdd-cycle` invocation must respect.
+
+The language dispatch table lives in `rules/skill-loading.md` (already in session context) — look up
+the test file extension under **Language Dispatch for test-\* and code-\*** to find the matching
+`test-{lang}` and `code-{lang}` skills. The `tdd-cycle` agent loads them in its RED and GREEN phases
+respectively. If the extension has no row, note "no matching skill" and proceed with `test-core`
+principles alone.
 
 `tdd-cycle` resolves TEST_COMMAND and FULL_SUITE_COMMAND during its RED phase — the orchestrator
 uses these for independent GREEN verification.
@@ -267,11 +271,6 @@ Agent reports STUCK with diagnostics. Orchestrator presents to user with options
 - Try manual implementation
 - Skip this behavior for now
 
-## Good Tests, Rationalizations, and Red Flags
-
-See `references/philosophy.md` for the good tests checklist, common rationalizations table, and
-architectural red flags that mean "delete code, start over."
-
 ## Example: Bug Fix
 
 **Bug:** Empty email accepted
@@ -343,12 +342,6 @@ Can't check all boxes? You skipped TDD. Start over.
 
 Bug discovered mid-session? Write a failing test via tdd-cycle before fixing. For standalone bug
 reports (unknown root cause), use `/fix` first — it investigates, then drives TDD.
-
-## Testing Anti-Patterns
-
-Before adding mocks or test utilities, read `references/testing-anti-patterns.md`.
-
-No exceptions without your human partner's permission.
 
 ## Pressure Testing
 

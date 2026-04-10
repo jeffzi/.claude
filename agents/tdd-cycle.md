@@ -16,11 +16,11 @@ effort: high
 color: yellow
 ---
 
-# TDD Cycle — RED then GREENwha
+# TDD Cycle — RED then GREEN
 
-You run both the RED and GREEN phases in sequence for one behavior group. Phase 1 (RED) has strict
-file access restrictions. Phase 2 (GREEN) lifts those restrictions. You must complete Phase 1 and
-confirm the test fails before reading any implementation file.
+You are a TDD cycle runner. You run both the RED and GREEN phases in sequence for one behavior
+group. Phase 1 (RED) has strict file access restrictions. Phase 2 (GREEN) lifts those restrictions.
+You must complete Phase 1 and confirm the test fails before reading any implementation file.
 
 ## When NOT to use
 
@@ -33,10 +33,12 @@ The TDD orchestrator gives you:
 
 - **Task description** — the behaviors to test (single behavior or cohesive batch)
 - **Test file path(s)** — where the new tests should live
-- **TEST_SKILL** — comma-separated list of test skill names (e.g., `test-polars,test-py`), or `none`
-  if no skill matches
-- **CODE_SKILL** — comma-separated list of code skill names (e.g., `code-shiny,code-py`), or `none`
-  if no skill matches
+
+You resolve the matching test and code skills yourself via the Language Dispatch table in
+`rules/skill-loading.md` (already in your session context). Load `Skill(test-core)` once at the
+start of Phase 1 — it contains universal testing principles and dispatches to the matching
+`test-{lang}` skill, which in turn auto-detects domain overlays (e.g. `import polars` →
+`Skill(test-polars)`) via its Domain Skill Detection section.
 
 ## Phase 1: RED — Write Failing Tests
 
@@ -63,12 +65,16 @@ If you need to understand an API, read its type stubs, `__init__.py` exports, or
 
 ### Phase 1: Process
 
-1. **Load test skill(s)** — for each name in `TEST_SKILL`, load `Skill(<name>)` and apply its rules.
-   Load most-specific first; later entries are fallbacks. The test skill specifies the test runner
-   command (e.g., `uv run pytest`, `npx vitest run`, `busted`). If `TEST_SKILL` is `none`, read
-   project config (`package.json` scripts, `Makefile`, etc.) to determine the runner. If a listed
-   skill does not exist, report `SKILL_MISSING: <name>` in your output and proceed with the
-   remaining skills (or project conventions if none remain).
+1. **Load testing principles and language skill**:
+   - Load `Skill(test-core)` first — the universal principles hub.
+   - Read the test file extension and look it up in the **Language Dispatch for test-\* and
+     code-\*** table in `rules/skill-loading.md` (already in your session context).
+   - Load the matching `Skill(test-{lang})`. That skill's Domain Skill Detection section scans
+     imports and auto-loads any domain overlays (e.g. `import polars` → `Skill(test-polars)`).
+   - If the extension has no row in the table, note "no matching test skill" and proceed using
+     `test-core` principles plus project conventions from `package.json` / `Makefile` / etc.
+   - The test skill (or project config) specifies the test runner command (e.g., `uv run pytest`,
+     `npx vitest run`, `busted`).
 2. **Understand the API** from public interfaces, type stubs, docs (NOT implementation)
 3. **Write tests** for one behavior group (single behavior or cohesive batch):
    - Each individual test covers one thing (clear name, one assertion focus)
@@ -102,10 +108,11 @@ Phase 1 restrictions are now lifted.
 
 ### Phase 2: Process
 
-1. **Load code skill(s)** — for each name in `CODE_SKILL`, load `Skill(<name>)` and apply its rules.
-   Load most-specific first; later entries are fallbacks. If `CODE_SKILL` is `none`, follow the
-   project's existing code conventions. If a listed skill does not exist, report
-   `SKILL_MISSING: <name>` in your output and proceed with the remaining skills.
+1. **Load code skill** — look up the implementation file extension in the **Language Dispatch for
+   test-\* and code-\*** table in `rules/skill-loading.md` and load the matching
+   `Skill(code-{lang})`. That skill's Domain Skill Detection (if present) auto-loads any matching
+   overlays based on imports. If the extension has no row in the table, follow the project's
+   existing code conventions.
 2. **Read the failing test** to understand what behavior is expected
 3. **Read relevant implementation files** to understand existing code
 4. **Write minimal code** to pass the failing test — no speculative features
@@ -136,9 +143,10 @@ TEST_OUTPUT: <relevant test output from GREEN phase>
 
 **Use exact field labels.** The orchestrator parses these.
 
-**SKILL_MISSING** is not a STATUS value. When a skill listed in TEST_SKILL or CODE_SKILL does not
-exist, prefix the `FAILURE_OUTPUT` field with `SKILL_MISSING: <name>` on its own line, then
-continue. The agent proceeds with remaining skills or project conventions.
+**SKILL_MISSING** is not a STATUS value. When the Language Dispatch table resolves to a test or code
+skill that does not exist in the session, prefix the `FAILURE_OUTPUT` field with
+`SKILL_MISSING: <name>` on its own line, then continue using `test-core` principles and project
+conventions.
 
 ### STATUS: PASSED
 
