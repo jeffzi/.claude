@@ -14,7 +14,10 @@ effort: medium
 
 # Lua Coding
 
-**Core principle:** Every function gets type annotations. Quick code becomes production code.
+**This skill extends `Skill(code-core)`.** `code-core` is the primary entry point; this skill is
+loaded by `code-core` based on the rules-file dispatch table.
+
+**Core principle:** Every function gets type annotations.
 
 ## Formatting
 
@@ -71,7 +74,6 @@ effects, or public API.
 | `if x then` for nil check                | `if x ~= nil then`                      |
 | `ipairs()` in performance-critical paths | `for i = 1, #t do`                      |
 | Chained `..` with 4+ strings             | `table.concat()`                        |
-| `assert.are.equal()` (dots)              | `assert.are_equal()` (underscores)      |
 | `require "mod"`                          | `require("mod")`                        |
 | `local f = function()`                   | `local function f()`                    |
 | Comments explaining WHAT code does       | Only explain WHY                        |
@@ -127,41 +129,11 @@ end
 
 **Naming:** `module_function` (e.g., `math_random`, `table_insert`)
 
-## Testing with Busted
-
-Tests in `tests/` with `*_test.lua` suffix.
-
-```lua
-describe("PlayerManager", function()
-   it("creates player with default health", function()
-      local player = PlayerManager.new("test")
-      assert.are_equal(100, player.health)
-   end)
-end)
-```
-
-- One `describe` per module, **flat structure** - no nested `describe` blocks
-- Use `before_each` for shared setup, `pending("reason")` for planned tests
-
-### Test Design
-
-**MVP tests: minimum tests, maximum coverage.**
-
-All code paths must be covered. Use `luacov` to verify - uncovered lines mean missing tests.
-
-| Merge when                            | Keep separate when    |
-| ------------------------------------- | --------------------- |
-| Same code path, different inputs      | Different code paths  |
-| Related edge cases (nil, empty, zero) | Complex setup differs |
-| Same behavior across APIs             | Tests need isolation  |
-
 ## Rationalizations That Mean Failure
 
 | Excuse                    | Reality                                           |
 | ------------------------- | ------------------------------------------------- |
 | "Too simple for types"    | Type annotations catch bugs at write-time.        |
-| "Just prototyping"        | Prototypes become production. No shortcuts.       |
-| "Would add in production" | Quick code IS production code.                    |
 | "ipairs is more readable" | Readability doesn't matter if your code stutters. |
 | "This table is temporary" | Temporary tables cause GC spikes. Reuse them.     |
 

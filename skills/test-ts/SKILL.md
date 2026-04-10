@@ -12,44 +12,31 @@ effort: medium
 
 # TypeScript Testing with Vitest
 
-**Core principle:** Test behavior, not implementation. Every test follows Arrange-Act-Assert.
-Default to the strictest API (`toStrictEqual`, async timer variants, `expect.hasAssertions`) —
+**This skill extends `Skill(test-core)`.** Universal principles (AAA, behavior-vs-implementation,
+merge rules, parametrization, mocking anti-patterns) live in `test-core`. This file adds Vitest- and
+TypeScript-specific syntax, pitfalls, and APIs.
+
+**Default to the strictest API** (`toStrictEqual`, async timer variants, `expect.hasAssertions`) —
 loosen only when you have a reason.
 
 **Also apply:** `code-ts` rules. Exception: test helper functions don't need full JSDoc.
 
+## Domain Skill Detection
+
+When reviewing or writing test files, check imports for domain-specific libraries. If detected, load
+the corresponding skill for library-specific testing patterns:
+
+No overlay skills currently defined for TypeScript. When a TypeScript overlay skill is added, list
+its trigger imports here.
+
+Only load skills that are actually installed. If a skill fails to load, continue without it.
+
 ## Mandatory Rules
 
-### 1. Arrange-Act-Assert Structure
+### 1. Describe-Block Naming Pattern
 
-```typescript
-// BAD: mixed up
-it("creates user", () => {
-  expect(createUser("Alice").name).toBe("Alice");
-  const user = new User("Bob");
-  expect(user.isValid()).toBe(true);
-});
-
-// GOOD: clear AAA with blank-line separators
-it("sets name on created user", () => {
-  const name = "Alice";
-
-  const user = createUser(name);
-
-  expect(user.name).toBe(name);
-});
-```
-
-### 2. Descriptive Test Names
-
-Format: `<unit> <when condition> <expected outcome>`
-
-```typescript
-it("process rejects when executor throws after all retries", ...)
-it("getStats returns all zeros for empty queue", ...)
-```
-
-Use `describe` blocks to mirror this format at the suite level — group by unit, then condition:
+Use `describe` blocks to mirror `<unit> <when condition> <expected outcome>` at the suite level —
+group by unit, then condition:
 
 ```typescript
 describe("Queue", () => {
@@ -63,7 +50,7 @@ describe("Queue", () => {
 });
 ```
 
-### 3. `toStrictEqual` Over `toEqual` for Objects
+### 2. `toStrictEqual` Over `toEqual` for Objects
 
 `toEqual` silently ignores `undefined` properties, class/prototype differences, and sparse arrays.
 Use `toStrictEqual` as your default — it catches structural mismatches that `toEqual` hides.
@@ -79,7 +66,7 @@ expect({ a: 1, b: undefined }).toStrictEqual({ a: 1 }); // FAILS ← correct
 Reserve `toEqual` only when you intentionally want loose matching (e.g., ignoring extra `undefined`
 fields from optional properties).
 
-### 4. Always Use Async Timer APIs
+### 3. Always Use Async Timer APIs
 
 Sync `vi.advanceTimersByTime()` fires timers but **does not flush microtasks** between callbacks.
 When timer callbacks contain Promises, `.then()`, or `await`, the sync variant silently skips them —
@@ -97,7 +84,7 @@ await vi.advanceTimersByTimeAsync(1000);
 `vi.advanceTimersToNextTimerAsync()`. The sync variants exist only for purely synchronous timer
 callbacks.
 
-### 5. Fake Timers Cleanup in `afterEach`
+### 4. Fake Timers Cleanup in `afterEach`
 
 Never call `vi.useRealTimers()` inline at the end of a test. If the test throws before that line,
 fake timers leak into subsequent tests causing bizarre failures.
@@ -121,7 +108,7 @@ it("times out", async () => {
 });
 ```
 
-### 6. `expect.hasAssertions()` for Callback/Event Tests
+### 5. `expect.hasAssertions()` for Callback/Event Tests
 
 Without this, a test with assertions inside a callback that never fires passes silently:
 
@@ -161,7 +148,7 @@ void queue.process(executor); // intentional fire-and-forget
 const [task] = await startedPromise;
 ```
 
-### 7. No `as` Casts in Tests — Use Factories
+### 6. No `as` Casts in Tests — Use Factories
 
 `as` casts hide missing fields. When the type gains a new required field, the factory forces a
 single update; casts silently create invalid objects.
@@ -192,61 +179,30 @@ const r = result.result as { nested: { value: number } };
 expect(result.result).toStrictEqual({ nested: { value: 42 } });
 ```
 
-### 8. No Loops in Test Bodies
+### 7. Parametrize with `it.each` / `test.for`
 
-Use `test.for` (Vitest 2.x+) or `test.each` — they show all cases and run independently.
+`test-core` § 6 says: parametrize whenever the same assertion runs against varying inputs. In
+Vitest:
 
 ```typescript
-// BAD: stops at first failure, no per-case reporting
-for (const id of ids) {
-  expect(id).toMatch(/^[0-9a-f-]+$/);
-}
-
-// GOOD: each case is a separate test
-test.for([
-  { input: "valid@email.com", valid: true },
-  { input: "not-an-email", valid: false },
-])("validates $input", ({ input, valid }) => {
-  expect(validateEmail(input)).toBe(valid);
+it.each([
+  { expr: "void 0",      expected: false },
+  { expr: "typeof x",    expected: false },
+  { expr: "(a + b)",     expected: false },
+  { expr: "x as number", expected: false },
+])("hasSideEffects($expr) → $expected", ({ expr, expected }) => {
+  expect(hasSideEffects(parseExpr(expr))).toBe(expected);
 });
 ```
 
-When `test.for`/`test.each` is overkill (e.g., checking 2–3 items), just write separate `expect`
-calls — no loop needed.
+**Default to `it.each`** (alias: `test.each`) — Jest-compatible, widest familiarity. Use `test.for`
+only when you need:
 
-### 9. MVP Tests — Minimum Tests, Maximum Coverage
+- **Array rows that shouldn't be spread** — `test.each([[1,2],[3,4]])` spreads each row into
+  separate args; `test.for` passes the row as-is.
+- **`TestContext` access** — `test.for` receives context as its second arg (concurrent snapshots).
 
-```typescript
-// BAD: separate tests for same code path
-it("rejects null", () => { expect(() => fn(null)).toThrow(); });
-it("rejects empty", () => { expect(() => fn("")).toThrow(); });
-
-// GOOD: merge related validations
-it("rejects invalid input", () => {
-  expect(() => fn(null)).toThrow();
-  expect(() => fn("")).toThrow();
-});
-```
-
-| Merge when                          | Keep separate when    |
-| ----------------------------------- | --------------------- |
-| Same code path, different inputs    | Different code paths  |
-| Related edge cases (null, empty, 0) | Complex setup differs |
-| Same behavior across APIs           | Tests need isolation  |
-
-### 10. Mock at Boundaries Only
-
-```typescript
-// BAD: mocking internal function
-vi.spyOn(service, "_parseResponse").mockReturnValue({});
-
-// GOOD: mock the external HTTP call
-vi.mock("./api-client", () => ({
-  default: { fetch: vi.fn().mockResolvedValue({ data: [] }) },
-}));
-```
-
-### 11. Type-Level Tests with `expectTypeOf`
+### 8. Type-Level Tests with `expectTypeOf`
 
 Runtime tests don't catch type regressions. Use `expectTypeOf` for compile-time assertions:
 
@@ -274,7 +230,6 @@ Vitest config recommendations, see `references/vitest-api.md`.
 | `as` casts in test data                          | Factory functions with `Partial<T>` overrides                 |
 | Assertions inside callbacks without guard        | `expect.hasAssertions()` or `events.once()`                   |
 | Manual try/catch for promise assertions          | `await expect(fn()).resolves.toBe(v)` / `.rejects.toThrow()`  |
-| `for` loops in test body                         | `test.for` / `test.each` or separate expects                  |
 | Runtime "type tests"                             | `expectTypeOf` for compile-time assertions                    |
 | `vi.mock` factory referencing imports            | `vi.hoisted()` for factory-accessible variables               |
 | `vi.importActual` without `await`                | `async (importOriginal) => ({ ...(await importOriginal()) })` |
@@ -315,6 +270,5 @@ npx tsc --noEmit         # Type check
 | "I'll clean up timers at the end"    | If the test throws, cleanup never runs. `afterEach` always runs.                |
 | "`as` cast is just for tests"        | Tests are contracts. A cast hides broken contracts. Use factories.              |
 | "The event listener definitely runs" | Without `hasAssertions`, a never-called listener = green test.                  |
-| "Loop is cleaner than parametrize"   | Loop stops at first failure and hides which case broke.                         |
 | "Runtime type check is enough"       | It proves nothing about compile-time safety. Use `expectTypeOf`.                |
 | "`resetAllMocks` clears everything"  | It doesn't unmock modules and restores originals in Vitest 3.x.                 |

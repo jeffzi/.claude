@@ -12,10 +12,12 @@ effort: medium
 
 # Testing Polars Code
 
-**Core principle:** Test behavior, not implementation. Every test follows Arrange-Act-Assert.
+**This skill extends `Skill(test-core)` via `Skill(test-py)`.** Universal principles (AAA,
+behavior-vs-implementation, merge rules, parametrize-over-loops, mocking anti-patterns) live in
+`test-core`; pytest syntax, fixtures, and plugins live in `test-py`. This file adds Polars-specific
+assertion APIs, schema handling, null/NaN semantics, and pipeline testing patterns.
 
-**Also apply:** `test-py` rules (pytest patterns), `code-py` rules. Exception: test functions don't
-need `-> None` annotations.
+**Also apply:** `code-py` rules. Exception: test functions don't need `-> None` annotations.
 
 ## Mandatory Rules
 

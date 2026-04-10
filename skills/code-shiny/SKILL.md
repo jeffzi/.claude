@@ -14,6 +14,9 @@ effort: medium
 
 # Shiny for Python
 
+**This skill extends `Skill(code-py)`.** `code-py` is the base for general Python standards; this
+skill adds Shiny-specific reactive patterns on top.
+
 **Core principle:** Reactivity is a graph, not a sequence. Every output and effect re-executes when
 its reactive inputs change — understanding what is and isn't reactive is the entire skill.
 

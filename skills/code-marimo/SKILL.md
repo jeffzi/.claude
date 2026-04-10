@@ -6,8 +6,7 @@ description: >
   working with marimo files (.py notebooks). Also use
   when encountering marimo errors like "multiple
   definitions", "circular dependency", or "variable
-  redeclaration". Load alongside code-py for Python
-  standards. Not for standard Python scripts — use
+  redeclaration". Not for standard Python scripts — use
   code-py alone. Not for notebooks needing side
   effects with manual execution order, variable
   redeclaration across cells, or implicit state.
@@ -17,6 +16,9 @@ effort: medium
 ---
 
 # Marimo Reactive Notebooks
+
+**This skill extends `Skill(code-py)`.** `code-py` is the base for general Python standards; this
+skill adds marimo-specific reactive notebook rules on top.
 
 ## Overview
 

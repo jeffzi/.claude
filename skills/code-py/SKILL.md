@@ -13,12 +13,13 @@ effort: medium
 
 # Pythonic Code - Python Best Practices
 
+**This skill extends `Skill(code-core)`.** `code-core` is the primary entry point; this skill is
+loaded by `code-core` based on the rules-file dispatch table.
+
 ## Overview
 
 Write production-quality Python code using type hints, modern features (3.10+), and Pythonic idioms.
-**Core principle:** Every Python function gets type hints. Quick code becomes production code—write
-it correctly the first time. Check `pyproject.toml` `requires-python` for version-specific syntax
-(e.g., PEP 758 in 3.14+).
+Check `pyproject.toml` `requires-python` for version-specific syntax (e.g., PEP 758 in 3.14+).
 
 ## Domain Skill Detection
 
@@ -34,20 +35,6 @@ load the corresponding skill for library-specific best practices:
 Only load skills that are actually installed. If a skill fails to load, continue without it.
 
 ## Mandatory Rules
-
-### No Obvious Comments
-
-**Never explain what code does. Only explain WHY for non-obvious business logic.**
-
-```python
-# ✗ FORBIDDEN - Obvious comments
-total = 0  # Initialize total to zero
-for item in items:  # Loop through each item
-    total += item  # Add item to total
-
-# ✓ CORRECT - Self-documenting code
-total = sum(items)
-```
 
 ### Imports at Top of File
 
@@ -323,13 +310,11 @@ async def main() -> None:
 
 ## Rationalizations That Mean You're About to Fail
 
-| Excuse                                 | Reality                                                       |
-| -------------------------------------- | ------------------------------------------------------------- |
-| "No type hints - keeping it simple"    | Type hints ARE simple. They catch bugs at write-time.         |
-| "Would add in production code, but..." | Quick code IS production code. Write it right the first time. |
-| "This is the classic approach"         | Classic = outdated. Use modern Python features.               |
-| "Felt more natural"                    | Natural ≠ Pythonic. Follow EAFP and idioms.                   |
-| "Just prototyping"                     | Prototypes become production. No shortcuts.                   |
+| Excuse                              | Reality                                               |
+| ----------------------------------- | ----------------------------------------------------- |
+| "No type hints - keeping it simple" | Type hints ARE simple. They catch bugs at write-time. |
+| "This is the classic approach"      | Classic = outdated. Use modern Python features.       |
+| "Felt more natural"                 | Natural ≠ Pythonic. Follow EAFP and idioms.           |
 
 ## Verification
 

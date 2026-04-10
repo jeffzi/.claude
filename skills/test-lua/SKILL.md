@@ -12,34 +12,25 @@ effort: medium
 
 # Lua Testing with Busted
 
-**Core principle:** Test behavior, not implementation. Every test follows Arrange-Act-Assert.
+**This skill extends `Skill(test-core)`.** `test-core` is the primary entry point; this skill is
+loaded by `test-core` based on the rules-file dispatch table.
 
 **Also apply:** `code-lua` rules. Exception: test helper functions don't need full LuaLS
 annotations.
 
+## Domain Skill Detection
+
+When reviewing or writing test files, check imports/requires for domain-specific libraries. If
+detected, load the corresponding skill for library-specific testing patterns:
+
+No overlay skills currently defined for Lua. When a Lua overlay skill is added, list its trigger
+modules here.
+
+Only load skills that are actually installed. If a skill fails to load, continue without it.
+
 ## Mandatory Rules
 
-### 1. Arrange-Act-Assert Structure
-
-```lua
--- BAD: mixed up
-it("creates player", function()
-   assert.are_equal(100, PlayerManager.new("test").health)
-   local p = PlayerManager.new("other")
-   assert.is_true(p:is_alive())
-end)
-
--- GOOD: clear AAA with blank-line separators
-it("creates player with default health", function()
-   local name = "test"
-
-   local player = PlayerManager.new(name)
-
-   assert.are_equal(100, player.health)
-end)
-```
-
-### 2. Descriptive Test Names
+### 1. Descriptive Test Names
 
 Format: `<unit> <when condition> <expected outcome>`
 
@@ -50,7 +41,7 @@ it("take_damage when health reaches zero marks player as dead", ...)
 
 One `describe` per module. Flat structure — no nested `describe` blocks.
 
-### 3. `are_same` Over `are_equal` for Tables
+### 2. `are_same` Over `are_equal` for Tables
 
 `are_equal` checks reference identity for tables. `are_same` does deep comparison — use it as your
 default for table assertions.
@@ -65,7 +56,7 @@ assert.are_same({ 1, 2, 3 }, result)
 
 Reserve `are_equal` for primitives (numbers, strings, booleans) and intentional reference checks.
 
-### 4. Use `before_each` for Shared Setup
+### 3. Use `before_each` for Shared Setup
 
 Isolation over speed. Prefer `before_each` (runs per test) over `setup` (runs once per describe).
 
@@ -105,7 +96,7 @@ end)
 
 Use `setup`/`teardown` only for truly expensive one-time operations (file I/O, process spawning).
 
-### 5. Generate Parameterized Tests at Describe Level
+### 4. Generate Parameterized Tests at Describe Level
 
 Loops **inside** an `it` block hide failures. Generate separate `it` blocks instead.
 
@@ -132,39 +123,7 @@ end
 When parameterization is overkill (2-3 values on the same code path), just write separate `assert`
 calls — no loop needed.
 
-### 6. MVP Tests — Minimum Tests, Maximum Coverage
-
-```lua
--- BAD: separate tests for same code path
-it("rejects nil", function()
-   assert.has_error(function() fn(nil) end)
-end)
-it("rejects empty string", function()
-   assert.has_error(function() fn("") end)
-end)
-
--- GOOD: merge related validations
-it("rejects invalid input", function()
-   assert.has_error(function() fn(nil) end)
-   assert.has_error(function() fn("") end)
-end)
-```
-
-| Merge when                            | Keep separate when    |
-| ------------------------------------- | --------------------- |
-| Same code path, different inputs      | Different code paths  |
-| Related edge cases (nil, empty, zero) | Complex setup differs |
-| Same behavior across APIs             | Tests need isolation  |
-
-### 7. Mock at Boundaries Only
-
-```lua
--- BAD: mocking internal function
-stub(parser, "_normalize")
-
--- GOOD: mock the external dependency
-stub(http_client, "get").returns({ status = 200, body = "{}" })
-```
+### 5. Always Revert Spies/Stubs
 
 Always revert spies/stubs in `after_each` to prevent leaks:
 

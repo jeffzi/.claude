@@ -63,10 +63,11 @@ pending/in_progress, you are NOT done. Keep going.
 - [ ] Disambiguate argument (commit range vs commit ref vs path — see rules below)
 - [ ] Get target files (path arg or git diff)
 - [ ] Find CLAUDE.md conventions (3 locations below)
-- [ ] Load `Skill(resolve-lang-skills)`. For each target file, derive lang from its extension using
-      the Extension Map and classify using the Test File Detection patterns. Bucket: test-pattern
-      match → test files; known extension, not test → code files; `.md`, `README*`, `CHANGELOG*` →
-      doc files; unknown extension → skip.
+- [ ] Bucket each target file using the **Language Dispatch for test-\* and code-\*** table in
+      `rules/skill-loading.md` (already in session context). For each file, look up its extension:
+      if the file path matches one of the test-pattern globs for that row → test files; known
+      extension but not matching a test pattern → code files; `.md`, `README*`, `CHANGELOG*` → doc
+      files; extension not in the table → skip.
 
 **Argument disambiguation:** if an argument is given:
 

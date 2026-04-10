@@ -5,7 +5,7 @@ description: >
   Use when you think code is "just a quick script" or "types slow me down" - these are symptoms
   this skill applies. Not for TypeScript-to-Lua — use code-tstl. Not for TSTL plugins — use
   code-tstl-plugin. For tests, also load test-ts. Applies to *.ts and *.tsx files.
-paths: "**/*.ts, **/*.tsx"
+paths: "**/*.ts, **/*.tsx, **/*.mts, **/*.cts"
 user-invocable: false
 model: sonnet
 effort: medium
@@ -13,8 +13,10 @@ effort: medium
 
 # TypeScript - Production-Quality Code
 
-**Core principle:** No `as` casts, no `any` leaks, no floating promises. Quick code becomes
-production code — write it correctly the first time.
+**This skill extends `Skill(code-core)`.** `code-core` is the primary entry point; this skill is
+loaded by `code-core` based on the rules-file dispatch table.
+
+**Core principle:** No `as` casts, no `any` leaks, no floating promises.
 
 ## Domain Skill Detection
 
@@ -118,20 +120,6 @@ async function getData() {
     return fallback();
   }
 }
-```
-
-### No Obvious Comments
-
-Only explain **WHY** for non-obvious decisions. Never explain what code does.
-
-```typescript
-// BAD
-/** Loads config from disk. */       // obvious from function name
-const port = config.port ?? 3000;   // use default if no port
-
-// GOOD
-// Port 0 is valid in Node but unreliable in CI — default to 3000.
-const port = config.port ?? 3000;
 ```
 
 ### Use `import type` for Type-Only Imports
@@ -268,7 +256,6 @@ function area(shape: Shape): number {
 | ----------------------------------- | ---------------------------------------------------------------------------------------- |
 | "Quick `as` cast, I'll fix later"   | You won't. `as` hides bugs that crash at runtime.                                        |
 | "Types slow me down"                | Types catch bugs at write-time. Debugging is slower.                                     |
-| "Just prototyping"                  | Prototypes become production. No shortcuts.                                              |
 | "This is too simple for validation" | `JSON.parse` returns `any`. One leak infects the chain.                                  |
 | "`readonly` makes it immutable"     | Erased at runtime. Use `Object.freeze()`.                                                |
 | "`private` keeps it safe"           | Erased at runtime. Use `#private` fields.                                                |
