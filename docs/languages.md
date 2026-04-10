@@ -99,11 +99,13 @@ See `skills/test-py/SKILL.md` for a working canonical example.
 ### Step 4 — Update README tables
 
 Add one row to the **Code** skills table and one row to the **Testing** skills table in `README.md`.
-Follow the existing format. Example:
+Follow the existing `Skill | Description` format. Example rows:
 
-```text
+```markdown
+| Skill                                    | Description                                   |
+| ---------------------------------------- | --------------------------------------------- |
 | [`code-rust`](skills/code-rust/SKILL.md) | Rust: ownership rules, error handling, Clippy |
-| [`test-rust`](skills/test-rust/SKILL.md) | Rust tests with the built-in test harness |
+| [`test-rust`](skills/test-rust/SKILL.md) | Rust tests with the built-in test harness     |
 ```
 
 ### Step 5 — Verify dispatch
