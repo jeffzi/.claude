@@ -1,0 +1,23 @@
+{
+  "K-Dense-AI/claude-scientific-skills": {
+    "skills_dir": "scientific-skills",
+    "skills": [
+      "literature-review",
+      "markdown-mermaid-writing",
+      "paper-lookup",
+      "polars",
+      "pymc",
+      "scikit-learn",
+      "scikit-survival",
+      "statistical-analysis",
+      "statsmodels"
+    ]
+  },
+  "blader/humanizer": {
+    "root_skill": "humanizer"
+  },
+  "obra/superpowers": {
+    "skills_dir": "skills",
+    "skills": ["brainstorming"]
+  }
+}
