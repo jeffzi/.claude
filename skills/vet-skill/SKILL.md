@@ -58,6 +58,16 @@ Flag these skill anti-patterns:
 - Treating long descriptions as critical when they're within the 1024-char limit and specific
 - Flagging absence of pressure-testing evidence for technique/reference skills
 
+## Rationalization guard
+
+| Excuse                                                         | Reality                                                                                                            |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| "The skill works fine — no need to vet it"                     | Skills degrade silently. Vet after every substantive edit, not just on failure.                                    |
+| "It's a reference skill — compliance checklist doesn't apply"  | Correct; skip compliance. But activation, implementation, structure, and security still apply to every skill type. |
+| "The description is long but specific"                         | Length within limit ≠ quality. A long description can still summarize workflow — check the exact wording.          |
+| "Zero findings in a mature skill"                              | Re-examine trigger quality, `Skill()` reference targets, and security before concluding zero issues.               |
+| "I know this skill; I don't need to walk every checklist item" | Familiarity causes over-skip. Walk the checklist section by section; don't rely on memory.                         |
+
 ## Severity classification
 
 - **Critical** — Skill will not trigger (broken frontmatter, missing description), security

@@ -23,18 +23,15 @@ When `/tdd` is invoked, determine the entry point before doing anything else:
 ```text
 LOOP (one behavior group per cycle):
 
-  RESOLVE SKILLS (once per session, before first RED):
-    0. Load Skill(resolve-lang-skills). Derive lang from test file extension.
-       Compute TEST_SKILL = test-{lang}, CODE_SKILL = code-{lang}.
-       Read project config once for overlays; prepend active overlays.
-       Cache — reuse for all subsequent cycles.
+  LOAD PRINCIPLES (once per session, before first RED):
+    0. Load Skill(test-core). tdd-cycle will load the matching test-{lang}
+       and code-{lang} skills itself via the Language Dispatch table in
+       rules/skill-loading.md.
 
   RED-GREEN:
     1. Dispatch tdd-cycle agent (model: sonnet, effort: high) with:
        - Task description (what behaviors to test -- may be a cohesive batch)
        - Relevant test file paths
-       - TEST_SKILL: <resolved value>
-       - CODE_SKILL: <resolved value>
     2. Capture from tdd-cycle output: TEST_FILE, TEST_NAME, TEST_COMMAND,
        FULL_SUITE_COMMAND, FAILURE_OUTPUT, IMPLEMENTATION_FILES, TEST_OUTPUT, STATUS
     3. Handle non-PASSED statuses:
@@ -80,7 +77,7 @@ carefully. If truly absent, report to user: "agent output missing required field
 **Orchestrator -> tdd-cycle:**
 
 ```text
-Task description, test file paths, TEST_SKILL, CODE_SKILL
+Task description, test file paths
 ```
 
 **tdd-cycle -> Orchestrator:**

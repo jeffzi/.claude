@@ -61,7 +61,7 @@
     ],
     "defaultMode": "plan"
   },
-  "model": "sonnet",
+  "model": "opus",
   "hooks": {
     "PreToolUse": [
       {
@@ -175,16 +175,6 @@
             "timeout": 10
           }
         ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash $HOME/.claude/hooks/gsd-phase-boundary.sh",
-            "timeout": 5
-          }
-        ]
       }
     ],
     "Stop": [
@@ -230,7 +220,7 @@
       }
     }
   },
-  "effortLevel": "high",
+  "effortLevel": "medium",
   "promptSuggestionEnabled": false,
   "skipDangerousModePermissionPrompt": true
 }

@@ -63,9 +63,6 @@ The plan must describe **behaviors to implement**, not implementation details. E
 
 ### Phase 3: Execute
 
-Before the first task, load `Skill(resolve-lang-skills)` once to resolve `TEST_SKILL` and
-`CODE_SKILL`. Cache and reuse across all tasks.
-
 For each task in the plan:
 
 #### Step 1: Implement
@@ -126,4 +123,3 @@ After all tasks complete:
 | Skipping spec review because "TDD already verified it" | TDD verifies the test passes. Spec review verifies the right thing was built. |
 | Proceeding after STUCK                                 | Surface diagnostics to user. Don't retry blindly.                             |
 | Running Phase 3 without approved plan                  | Phases 1–2 gates exist to prevent building the wrong thing.                   |
-| Re-resolving lang skills per task                      | Resolve once before Phase 3, cache and reuse.                                 |
