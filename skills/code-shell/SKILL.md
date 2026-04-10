@@ -5,13 +5,16 @@ description: >
   "command not found" errors, or scripts failing silently. Apply for
   automation, hooks, CI/CD, CLI tools, or any .sh files. Not for fish, zsh,
   or PowerShell — Bash/sh only. Applies to *.sh and *.bash files.
-paths: "**/*.sh, **/*.bash, **/*.zsh"
+paths: "**/*.sh, **/*.bash"
 user-invocable: false
 model: sonnet
 effort: medium
 ---
 
 # Shell Scripting - Bash Best Practices
+
+**This skill extends `Skill(code-core)`.** `code-core` is the primary entry point; this skill is
+loaded by `code-core` based on the rules-file dispatch table.
 
 ## Overview
 
@@ -20,19 +23,16 @@ features. Based on [Google Shell Style Guide](https://google.github.io/styleguid
 with safety patterns from
 [SixArm Unix Shell Tactics](https://github.com/SixArm/unix-shell-script-tactics).
 
-**Core principle:** Every script uses strict mode. Quick scripts become production scripts—write
-them correctly the first time.
+**Core principle:** Every script uses strict mode.
 
 ## When to Use
 
 Use for ALL shell scripts, including:
 
-- "Quick" automation scripts
+- Automation scripts
 - Git hooks and CI/CD scripts
 - CLI wrapper tools
 - Any `.sh` file
-
-Don't skip because code seems simple, "just a one-liner", or "I'll fix it later".
 
 ## Quick Reference
 
@@ -225,13 +225,12 @@ die() {
 
 ## Rationalizations That Mean You're About to Fail
 
-| Excuse                          | Reality                                           |
-| ------------------------------- | ------------------------------------------------- |
-| "Just a quick script"           | Quick scripts become production. Use strict mode. |
-| "It works on my machine"        | Use `#!/usr/bin/env bash` for portability.        |
-| "I'll add error handling later" | You won't. Add `set -euo pipefail` now.           |
-| "Quoting is ugly"               | Unquoted variables cause bugs. Quote everything.  |
-| "echo is simpler"               | `printf` is reliable. `echo` behavior varies.     |
+| Excuse                          | Reality                                          |
+| ------------------------------- | ------------------------------------------------ |
+| "It works on my machine"        | Use `#!/usr/bin/env bash` for portability.       |
+| "I'll add error handling later" | You won't. Add `set -euo pipefail` now.          |
+| "Quoting is ugly"               | Unquoted variables cause bugs. Quote everything. |
+| "echo is simpler"               | `printf` is reliable. `echo` behavior varies.    |
 
 ## Verification
 

@@ -14,6 +14,12 @@ effort: medium
 
 # Swift — Production-Quality Code
 
+**This skill extends `Skill(code-core)`.** `code-core` is the primary entry point; this skill is
+loaded by `code-core` based on the rules-file dispatch table.
+
+**Types are mandatory** — covered by Swift's type system and strict concurrency; the rules below are
+the Swift-specific applications.
+
 **Core principle:** Swift 6.2 changed the concurrency default — code runs on the caller's executor
 by default; opt into concurrency with `@concurrent`. Use `Mutex` for thread-safe state, not
 `@unchecked Sendable`. Check `Package.swift` for the Swift tools version and language mode before
@@ -71,19 +77,6 @@ final class Cache: Sendable {
 **When `@unchecked Sendable` is justified:** immutable-after-init classes, types wrapping C/ObjC
 APIs with documented thread safety, or types already protected by a lock where Mutex can't be used
 (e.g., NSLock interop). Always document the invariant.
-
-### No Obvious Comments
-
-Only explain **WHY** for non-obvious decisions. Never explain what code does.
-
-```swift
-// ❌ FORBIDDEN
-var total = 0  // Initialize total to zero
-for item in items { total += item }  // Add each item
-
-// ✅ Self-documenting
-let total = items.reduce(0, +)
-```
 
 ## Concurrency Patterns
 

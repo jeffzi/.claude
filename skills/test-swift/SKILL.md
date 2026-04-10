@@ -13,10 +13,20 @@ effort: medium
 
 # Swift Testing
 
-**Core principle:** Test behavior, not implementation. Every test follows Arrange-Act-Assert. Use
-Swift Testing for new tests, XCTest only for UI automation and performance measurement.
+**This skill extends `Skill(test-core)`.** `test-core` is the primary entry point; this skill is
+loaded by `test-core` based on the rules-file dispatch table.
 
 **Also apply:** `code-swift` rules.
+
+## Domain Skill Detection
+
+When reviewing or writing test files, check imports for domain-specific libraries. If detected, load
+the corresponding skill for library-specific testing patterns:
+
+No overlay skills currently defined for Swift. When a Swift overlay skill is added, list its trigger
+imports here.
+
+Only load skills that are actually installed. If a skill fails to load, continue without it.
 
 ## Swift Testing vs XCTest Decision
 
@@ -32,27 +42,7 @@ Both coexist in the same file. **Never mix assertions** — no `XCTAssert` in `@
 
 ## Mandatory Rules
 
-### 1. Arrange-Act-Assert Structure
-
-```swift
-// BAD: mixed up
-@Test func user() {
-    #expect(createUser("Alice").name == "Alice")
-    let user = User("Bob")
-    #expect(user.isValid)
-}
-
-// GOOD: clear AAA
-@Test func createUserSetsName() {
-    let name = "Alice"
-
-    let user = createUser(name)
-
-    #expect(user.name == name)
-}
-```
-
-### 2. Concrete Expected Values in Parameterized Tests
+### 1. Concrete Expected Values in Parameterized Tests
 
 **Never compute expected values from the same logic as the implementation.** Use literal values:
 
@@ -73,7 +63,7 @@ func greeting(day: Day, expected: String) {
 }
 ```
 
-### 3. Never Use zip() for Parameterized Arguments
+### 2. Never Use zip() for Parameterized Arguments
 
 `zip()` silently drops test cases when arrays have different lengths:
 
@@ -91,7 +81,7 @@ func cook(_ ingredient: Ingredient, into dish: Dish) { ... }
 func cook(_ ingredient: Ingredient, into dish: Dish) { ... }
 ```
 
-### 4. `.serialized` for Shared State
+### 3. `.serialized` for Shared State
 
 Parameterized tests run in parallel by default. Use `.serialized` when they share state:
 
@@ -105,7 +95,7 @@ func applyMigration(_ migration: Migration) async throws { ... }
 struct DatabaseTests { ... }
 ```
 
-### 5. TestScoping for Setup/Teardown
+### 4. TestScoping for Setup/Teardown
 
 Use `init`/`deinit` for simple cases. For shared setup across suites, use **`TestTrait` +
 `TestScoping`** (NOT `CustomExecutionTrait` — that doesn't exist):
@@ -134,7 +124,7 @@ struct UserRepositoryTests {
 }
 ```
 
-### 6. Sendable Mocks — Actor or Mutex, Not @unchecked
+### 5. Sendable Mocks — Actor or Mutex, Not @unchecked
 
 **Actor-based (preferred)** — automatically Sendable, all access is `await`:
 
@@ -163,7 +153,7 @@ final class MockCache: Sendable {
 
 `@unchecked Sendable` is last resort — only in test targets where mocks are sequential.
 
-### 7. @MainActor XCTestCase Needs Sendable
+### 6. @MainActor XCTestCase Needs Sendable
 
 ```swift
 // ❌ Missing Sendable — "sending main actor-isolated value" warnings
@@ -179,15 +169,7 @@ final class ViewModelTests: XCTestCase, Sendable {
 }
 ```
 
-### 8. MVP Tests — Minimum Tests, Maximum Coverage
-
-| Merge when                       | Keep separate when    |
-| -------------------------------- | --------------------- |
-| Same code path, different inputs | Different code paths  |
-| Related edge cases (nil, empty)  | Complex setup differs |
-| Same behavior across APIs        | Tests need isolation  |
-
-### 9. Mock at Boundaries Only
+### 7. Mock at Boundaries Only
 
 Mock external I/O (HTTP, database, file system). Test internal logic through the public API. Prefer
 **closure-based test doubles** over protocol explosion:
