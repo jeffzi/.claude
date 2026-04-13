@@ -141,6 +141,22 @@ Full list: [testdesiderata.com](https://testdesiderata.com/).
 | **Clear**        | Name describes behavior             | `test('test1')`                                     |
 | **Shows intent** | Demonstrates desired API            | Obscures what code should do                        |
 
+## When Adding Coverage
+
+Adding tests to an existing feature (coverage gap-filling, not new behavior) has its own rules:
+
+- **Never modify implementation files.** Coverage work is test-only. If the implementation needs to
+  change to be testable, STOP and surface it — don't silently refactor.
+- **STOP and REPORT bugs — don't work around them.** If a test reveals a bug, surface it and let the
+  user decide. Do not write a test that encodes the buggy behavior as "expected," and do not tweak
+  inputs to dodge the failure.
+- **Maximize coverage, minimize test volume.** Parametrize across inputs that share a code path
+  rather than adding separate test functions. Apply the
+  [merge table](#5-minimum-tests-maximum-coverage).
+- **Extend existing test files.** If the feature already has a test file, add cases there. Do not
+  create `*_coverage`, `*_extra`, or similar parallel files dedicated solely to raising coverage —
+  they fragment the suite and hide intent.
+
 ## Mocking Anti-Patterns
 
 Before adding a mock, before writing a test that asserts on a mock, or before reviewing a file that
