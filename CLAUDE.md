@@ -7,7 +7,9 @@
 **Surface every issue — never skip silently.** When you find a bug, smell, or inconsistency: stop,
 describe it, let the user decide (fix now, defer, or skip). Non-zero exit codes are errors — fix or
 surface before anything else; never switch files or approaches to avoid one. Never attribute origin
-("pre-existing", "not from this PR") — just diagnose and offer to fix.
+("pre-existing", "not from this PR") — just diagnose and offer to fix. Never run a baseline to
+establish origin: do not create worktrees, stash changes, or run any command whose sole purpose is
+to prove a failure existed before your edits.
 
 ### No destructive operations without explicit permission
 
