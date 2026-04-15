@@ -32,11 +32,38 @@ new feature") — those are really separate tasks and deserve separate commits.
 **Never auto-commit during plan execution.** The user must review all changes before any commit is
 made. If a plan requires multiple commits, surface this during planning and get explicit approval.
 
+## Conventional Commits (required)
+
+Every subject **must** follow [Conventional Commits](https://www.conventionalcommits.org/) format:
+
+```text
+<type>(<scope>)!: <description>
+```
+
+- **type** (required): `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`,
+  `chore`, `revert`.
+- **scope** (optional): affected area in parens, e.g. `feat(auth):`.
+- **!** (optional): marks a breaking change. A `BREAKING CHANGE:` (or `BREAKING-CHANGE:`) footer is
+  optional when `!` is present, required when it isn't.
+- **description**: lowercase, imperative, no trailing period (house rule — stricter than the spec).
+
+**Footer syntax**: `<token>: <value>` or `<token> #<value>`. Multi-word tokens use hyphens
+(`Acked-by`, `Refs`, `Reviewed-by`).
+
+Examples: `fix(api): reject empty email on signup` · `feat!: drop node 18 support` ·
+`refactor(parser): extract token stream helper`.
+
+A commit without a valid type is invalid — rewrite before committing.
+
+**Reverts**: use `revert: <subject of reverted commit>` and add a `Refs: <sha>` footer pointing to
+the reverted commit. **Merge commits**: keep git's default `Merge …` subject — Conventional Commits
+does not apply.
+
 ## Subject Lines
 
-Keep under **50 characters**. Describe the **concrete effect** — what changed from a user's
-perspective — not the implementation steps. The body explains _why_; the subject explains _what
-happened_.
+Keep the full subject (prefix + description) under **72 characters**; keep the description alone
+under **50**. Describe the **concrete effect** — what changed from a user's perspective — not the
+implementation steps. The body explains _why_; the subject explains _what happened_.
 
 | Test                | How to apply                                                           |
 | ------------------- | ---------------------------------------------------------------------- |
@@ -44,15 +71,15 @@ happened_.
 | "If applied" test   | "If applied, this commit will ___" — meaningful to an outsider?        |
 | Motivation test     | Does it read as "in order to ___"? Too abstract — name the effect.     |
 
-Scope to the affected area when not generic: `net/http: handle foo when bar`.
+Scope to the affected area when not generic: `fix(net/http): handle foo when bar`.
 
-| Implementation-focused (bad)                   | Effect-focused (good)                            |
-| ---------------------------------------------- | ------------------------------------------------ |
-| Refactor load_data() to use list comprehension | Speed up data loading by 40% for large CSV files |
-| Change query to use index                      | Fix 10-second page load on user dashboard        |
-| Add import_key() function                      | Add support for importing GPG keys               |
-| Fix BUG-9284                                   | Fix buy button disappearing on Mondays           |
-| Allow doc:sync on sensitive models             | Fix doc:sync failing on sensitive TOTP models    |
+| Implementation-focused (bad)                   | Effect-focused (good)                                  |
+| ---------------------------------------------- | ------------------------------------------------------ |
+| Refactor load_data() to use list comprehension | perf(loader): speed up CSV load by 40% on large files  |
+| Change query to use index                      | perf(dashboard): fix 10-second page load               |
+| Add import_key() function                      | feat(keys): import GPG keys via --import-key           |
+| Fix BUG-9284                                   | fix(checkout): stop buy button disappearing on Mondays |
+| Allow doc:sync on sensitive models             | fix(doc-sync): handle sensitive TOTP models            |
 
 ## Body
 
