@@ -3,12 +3,39 @@ name: plan-commit
 description: >
   Use when you have uncommitted changes and want to plan and execute granular, logical commits
   before pushing. Not for a single obvious commit — use write-commit directly.
+argument-hint: "[path ...] [--exclude path ...]"
 model: haiku
 disable-model-invocation: true
 effort: medium
 ---
 
 # Plan Commits
+
+## Arguments
+
+Parse `ARGUMENTS` (injected at the bottom) before doing anything else.
+
+- **Positional paths** — any token not starting with `--`: restrict scope to only these
+  files/directories.
+- **`--exclude <path>`** — repeatable: remove matching files from scope.
+
+Build two lists from the parsed arguments:
+
+- **INCLUDE** — explicit paths (empty = all changed files are in scope)
+- **EXCLUDE** — paths to remove from scope (empty = nothing excluded)
+
+Examples:
+
+| Invocation                                   | Effect                           |
+| -------------------------------------------- | -------------------------------- |
+| `/plan-commit`                               | all changed files                |
+| `/plan-commit skills/`                       | only files under `skills/`       |
+| `/plan-commit --exclude settings.json`       | all files except `settings.json` |
+| `/plan-commit skills/ --exclude skills/foo/` | `skills/` minus `skills/foo/`    |
+
+Apply the filter immediately: for the rest of this skill, **in-scope files** means the changed files
+that pass the INCLUDE/EXCLUDE rules. Silently ignore out-of-scope files — do not mention them in the
+plan or commit them.
 
 ## Context
 
@@ -19,10 +46,10 @@ effort: medium
 
 ## Your task
 
-Analyze all uncommitted changes (staged, unstaged, and untracked files) and organize them into a
-plan of **granular, logical commits** — each capturing one coherent unit of work.
+Analyze all **in-scope** uncommitted changes and organize them into a plan of **granular, logical
+commits** — each capturing one coherent unit of work.
 
-If there are no uncommitted changes (all context commands return empty), inform the user and stop.
+If there are no in-scope uncommitted changes after applying the filter, inform the user and stop.
 
 ### Step 1: Load the write-commit skill
 
@@ -30,7 +57,8 @@ Invoke `Skill(write-commit)` to load commit message guidelines before proceeding
 
 ### Step 2: Analyze and group changes
 
-Read the diffs and untracked files. Group them by logical purpose:
+Read the diffs and untracked files. **Only consider in-scope files** (per the INCLUDE/EXCLUDE filter
+resolved in the Arguments section). Group them by logical purpose:
 
 - Changes that serve the same goal belong together (e.g. a function + its test + its import).
 - Unrelated changes should be separate commits (e.g. a bug fix and a new feature).
@@ -86,8 +114,9 @@ If a commit fails, stop immediately and report the error. Do not continue with r
 
 ## Common Mistakes
 
-| Mistake                                                             | Fix                                                                        |
-| ------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| A file appears in multiple commits because it changed incrementally | Include it in the most relevant commit and note the constraint to the user |
-| Over-splitting one logical change into many trivial commits         | Group by purpose — three files serving the same goal belong in one commit  |
-| Pushing after executing the plan                                    | The skill ends at commit. Never push — the user controls that step         |
+| Mistake                                                             | Fix                                                                         |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| A file appears in multiple commits because it changed incrementally | Include it in the most relevant commit and note the constraint to the user  |
+| Over-splitting one logical change into many trivial commits         | Group by purpose — three files serving the same goal belong in one commit   |
+| Pushing after executing the plan                                    | The skill ends at commit. Never push — the user controls that step          |
+| Including out-of-scope files in a commit                            | Re-read the INCLUDE/EXCLUDE filter; stage only files that passed the filter |
