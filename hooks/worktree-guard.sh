@@ -8,13 +8,13 @@ set -euo pipefail
 # Prevents losing in-progress work after context compression.
 
 # Skip if not in a git repo
-git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+git --no-optional-locks rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
 # Check for uncommitted changes (staged, unstaged, untracked)
 dirty=false
-git diff --quiet 2>/dev/null || dirty=true
-git diff --cached --quiet 2>/dev/null || dirty=true
-[[ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]] && dirty=true
+git --no-optional-locks diff --quiet 2>/dev/null || dirty=true
+git --no-optional-locks diff --cached --quiet 2>/dev/null || dirty=true
+[[ -n "$(git --no-optional-locks ls-files --others --exclude-standard 2>/dev/null)" ]] && dirty=true
 
 if $dirty; then
 	printf "BLOCKED: Worktree has uncommitted changes. Commit your work before exiting.\n" >&2

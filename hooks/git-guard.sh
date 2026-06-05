@@ -19,7 +19,7 @@ full_command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 [[ -z "$full_command" ]] && exit 0
 
 # Skip if not in a git repo
-git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+git --no-optional-locks rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
 # ╭────────────────────────────────────────────────────────────╮
 # │                  Git Command Parsing                       │
@@ -111,13 +111,9 @@ check_destructive_operations() {
 		block_destructive "git --no-verify" "Skipping hooks is forbidden."
 
 	# ── Checkout / Switch ────────────────────────────────────────
-	# git checkout -- <path> or checkout . (discard changes)
-	is_git_subcmd "checkout" && [[ "$command" =~ [[:space:]](--([[:space:]]|$)|\.([[:space:]]|$)) ]] &&
-		block_destructive "git checkout (discard)" "Discards uncommitted changes permanently."
-
-	# git checkout -f / --force (force-switch discards uncommitted changes)
-	is_git_subcmd "checkout" && [[ "$command" =~ [[:space:]](-f|--force)([[:space:]]|$) ]] &&
-		block_destructive "git checkout --force" "Force-checkout discards uncommitted changes."
+	# git checkout is banned entirely — use git switch (branches) or git restore --staged (unstage)
+	is_git_subcmd "checkout" &&
+		block_destructive "git checkout" "Banned. Use 'git switch' for branches, 'git restore --staged' for unstaging."
 
 	# git switch -f / --force / --discard-changes
 	is_git_subcmd "switch" && [[ "$command" =~ [[:space:]](-f|--force|--discard-changes)([[:space:]]|$) ]] &&
@@ -170,7 +166,7 @@ check_destructive_operations() {
 	# ── Rebase ───────────────────────────────────────────────────
 	# git rebase with uncommitted changes
 	if is_git_subcmd "rebase"; then
-		git diff --quiet 2>/dev/null && git diff --cached --quiet 2>/dev/null && return 0
+		git --no-optional-locks diff --quiet 2>/dev/null && git --no-optional-locks diff --cached --quiet 2>/dev/null && return 0
 		block_destructive "git rebase (dirty)" "Rebasing with uncommitted changes risks losing work."
 	fi
 }
@@ -202,17 +198,17 @@ check_single_command() {
 		# Block broad adds (git add ., git add -A, git add -a, git add --all) if plan files would be included
 		if [[ "$command" =~ [[:space:]](\.|-[aA]|--all)([[:space:]]|$) ]]; then
 			local root
-			root=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+			root=$(git --no-optional-locks rev-parse --show-toplevel 2>/dev/null) || return 0
 			local pending_files
-			pending_files=$(git -C "$root" ls-files --others --modified --exclude-standard 2>/dev/null)
+			pending_files=$(git --no-optional-locks -C "$root" ls-files --others --modified --exclude-standard 2>/dev/null)
 			check_plan_files "$pending_files" || exit 2
 		fi
 
-		# Block force-add with broad scope (bypasses all gitignore rules)
-		if [[ "$command" =~ [[:space:]](-f|--force)([[:space:]]|$) ]] &&
-			[[ "$command" =~ [[:space:]](\.|-[aA]|--all)([[:space:]]|$) ]]; then
-			block_destructive "git add --force (broad)" \
-				"Force-adding with broad scope bypasses gitignore and may track unwanted files."
+		# Block all force-adds — -f/--force bypasses gitignore, the only
+		# reason to use it is to track ignored files, which is forbidden.
+		if [[ "$command" =~ [[:space:]](-f|--force)([[:space:]]|$) ]]; then
+			block_destructive "git add --force" \
+				"Force-adding bypasses gitignore rules. Never track ignored files."
 		fi
 
 		# Check explicitly named paths against gitignore (local + global + .git/info/exclude)
@@ -237,7 +233,7 @@ check_single_command() {
 			esac
 		done
 		for _path in "${_add_paths[@]}"; do
-			if git check-ignore -q -- "$_path" 2>/dev/null; then
+			if git --no-optional-locks check-ignore -q -- "$_path" 2>/dev/null; then
 				block_destructive "git add (gitignored)" \
 					"'$_path' matches a gitignore rule (local or global). Do not track ignored files."
 			fi
@@ -250,9 +246,9 @@ check_single_command() {
 		printf "STOP: You MUST load Skill(write-commit) before committing. If you have not loaded it yet, abort and load it now.\n" >&2
 
 		local root
-		root=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+		root=$(git --no-optional-locks rev-parse --show-toplevel 2>/dev/null) || return 0
 		local staged_files
-		staged_files=$(git -C "$root" diff --cached --name-only 2>/dev/null)
+		staged_files=$(git --no-optional-locks -C "$root" diff --cached --name-only 2>/dev/null)
 		check_plan_files "$staged_files" || exit 2
 	fi
 
@@ -267,9 +263,9 @@ check_single_command() {
 			[[ "$word" == "remove" ]] && found_remove=true
 		done
 		if [[ -n "$wt_path" && -d "$wt_path" ]]; then
-			if ! git -C "$wt_path" diff --quiet 2>/dev/null ||
-				! git -C "$wt_path" diff --cached --quiet 2>/dev/null ||
-				[[ -n "$(git -C "$wt_path" ls-files --others --exclude-standard 2>/dev/null)" ]]; then
+			if ! git --no-optional-locks -C "$wt_path" diff --quiet 2>/dev/null ||
+				! git --no-optional-locks -C "$wt_path" diff --cached --quiet 2>/dev/null ||
+				[[ -n "$(git --no-optional-locks -C "$wt_path" ls-files --others --exclude-standard 2>/dev/null)" ]]; then
 				block_destructive "git worktree remove (dirty)" \
 					"Worktree at '$wt_path' has uncommitted changes. Commit work before removing."
 			fi

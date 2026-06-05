@@ -10,7 +10,7 @@ set -euo pipefail
 command -v uvx >/dev/null || exit 0
 
 # Get staged Python files
-staged_files=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep '\.py$' || true)
+staged_files=$(git --no-optional-locks diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep '\.py$' || true)
 
 [[ -z "$staged_files" ]] && exit 0
 
