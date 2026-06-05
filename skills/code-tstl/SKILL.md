@@ -75,6 +75,37 @@ const enemies = new LuaMap<string, Enemy>();
 
 Use ES6 `Map`/`Set` **only** when you specifically need insertion-order preservation.
 
+### Use `LuaTable` Instead of TypeScript Arrays
+
+TypeScript arrays are 0-indexed; TSTL emits `[i + 1]` on every numeric index access to bridge the
+gap to Lua's 1-based tables. That arithmetic fires on **every read and write in hot loops**.
+
+```typescript
+// BAD: 0-indexed array — TSTL adds +1 on every access
+const enemies: Enemy[] = [];
+for (const i of $range(1, enemies.length)) {
+  const e = enemies[i]; // transpiles to: enemies[i + 1]
+}
+
+// GOOD: LuaTable — native 1-based indexing, zero arithmetic overhead
+const enemies = new LuaTable<number, Enemy>();
+for (const i of $range(1, enemies.length())) {
+  const e = enemies.get(i); // transpiles to: enemies[i]
+}
+```
+
+Key API differences vs TypeScript arrays:
+
+| Operation   | TypeScript array | LuaTable equivalent            |
+| ----------- | ---------------- | ------------------------------ |
+| Get element | `arr[i]`         | `tbl.get(i)`                   |
+| Set element | `arr[i] = v`     | `tbl.set(i, v)`                |
+| Length      | `arr.length`     | `tbl.length()`                 |
+| Append      | `arr.push(v)`    | `tbl.set(tbl.length() + 1, v)` |
+
+**Exception:** When iterating with `for...of` (not indexed access), TSTL uses `ipairs` — no `+1` is
+added. The rule applies to any code that indexes by a numeric variable.
+
 ### Use `const enum` — Always
 
 Regular enums create a runtime lookup table. `const enum` inlines values directly — zero allocation,
@@ -194,10 +225,11 @@ slower than inline code in Lua 5.1).
 const result = enemies.filter(e => e.isAlive).map(e => e.position);
 
 // GOOD: single pass, zero temporaries, native for
-const result: Position[] = [];
-for (const i of $range(1, enemies.length)) {
-  const e = enemies[i - 1];
-  if (e.isAlive) { result.push(e.position); }
+const result = new LuaTable<number, Position>();
+let resultLen = 0;
+for (const i of $range(1, enemies.length())) {
+  const e = enemies.get(i)!;
+  if (e.isAlive) { resultLen++; result.set(resultLen, e.position); }
 }
 ```
 
@@ -278,6 +310,7 @@ just do the wrong thing:
 | Trap                             | Instead                                                         |
 | -------------------------------- | --------------------------------------------------------------- |
 | `for (let i = 0; ...)`           | `for (const i of $range(start, end))`                           |
+| `T[]` / `Array<T>`               | `new LuaTable<number, T>()`                                     |
 | `new Map()` / `new Set()`        | `new LuaMap()` / `new LuaSet()`                                 |
 | `class` for hot-path entities    | Interface + free functions                                      |
 | `continue` in loops              | Invert condition                                                |
@@ -325,6 +358,7 @@ Key TSTL settings:
 | Excuse                              | Reality                                                                               |
 | ----------------------------------- | ------------------------------------------------------------------------------------- |
 | "Standard `for` is fine"            | Transpiles to `while` — 2-100x slower. Use `$range()`.                                |
+| "Arrays are natural TypeScript"     | TSTL adds `[i + 1]` on every indexed access. Use `LuaTable`.                          |
 | "Map is more familiar"              | `Map` is a heavy polyfill. `LuaMap` is a raw table.                                   |
 | "Classes are cleaner"               | Classes are 12x slower method dispatch. Use interfaces.                               |
 | "`continue` works in TS"            | Compile error in Lua 5.1. Invert the condition.                                       |
