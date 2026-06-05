@@ -7,7 +7,7 @@ description: >
 paths: "**/*.{ext}"
 user-invocable: false
 model: sonnet
-effort: medium
+effort: high
 ---
 
 # {Lang} Code — {Lang} Best Practices

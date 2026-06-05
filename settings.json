@@ -59,14 +59,18 @@
       "Read(**/*.key)",
       "Read(**/*.secret)"
     ],
-    "defaultMode": "plan"
+    "defaultMode": "auto"
   },
-  "model": "opus",
+  "model": "claude-opus-4-6",
   "hooks": {
     "PreToolUse": [
       {
         "matcher": "Bash(git *)",
         "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/git-lock-guard.sh"
+          },
           {
             "type": "command",
             "command": "$HOME/.claude/hooks/git-guard.sh"
@@ -76,6 +80,10 @@
       {
         "matcher": "Bash(git commit*)",
         "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/git-commit-guard.sh"
+          },
           {
             "type": "command",
             "command": "$HOME/.claude/hooks/marimo-check.sh"
@@ -102,15 +110,10 @@
             "type": "command",
             "command": "$HOME/.claude/hooks/config-guard.sh",
             "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
+          },
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/gsd-prompt-guard.js\"",
+            "command": "$HOME/.claude/hooks/cross-repo-guard.sh",
             "timeout": 5
           }
         ]
@@ -134,27 +137,8 @@
         ]
       }
     ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/gsd-setup-config.sh",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/gsd-check-update.js\""
-          }
-        ]
-      }
-    ],
+    "UserPromptSubmit": [],
+    "SessionStart": [],
     "PostToolUse": [
       {
         "matcher": "Bash",
@@ -162,27 +146,6 @@
           {
             "type": "command",
             "command": "$HOME/.claude/hooks/bash-exit-guard.sh",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "Bash|Edit|Write|MultiEdit|Agent|Task",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/.claude/hooks/gsd-context-monitor.js\"",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/desktop-notify.sh",
             "timeout": 5
           }
         ]
@@ -210,7 +173,8 @@
     "rust-analyzer-lsp@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
-    "pyright-lsp@claude-plugins-official": true
+    "pyright-lsp@claude-plugins-official": true,
+    "clangd-lsp@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "claude-plugins-official": {
@@ -220,7 +184,10 @@
       }
     }
   },
-  "effortLevel": "medium",
+  "effortLevel": "high",
   "promptSuggestionEnabled": false,
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "autoCompactEnabled": true,
+  "agentPushNotifEnabled": true,
+  "skipAutoPermissionPrompt": true
 }
