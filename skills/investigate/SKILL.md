@@ -18,7 +18,6 @@ effort: high
 ## When NOT to Use
 
 - Root cause is already known and you have a failing test — go straight to TDD
-- GSD project debugging with persistent state — use `/gsd:debug` instead
 - Configuration or environment issues — just fix the config
 
 ## The Iron Law
