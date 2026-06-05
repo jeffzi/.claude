@@ -1,10 +1,10 @@
 ---
 name: plan-commit
 description: >
-  Use when you have uncommitted changes and want to plan and execute granular, logical commits
+  Use when you have uncommitted changes and want to organize, split, or plan atomic commits
   before pushing. Not for a single obvious commit — use write-commit directly.
 argument-hint: "[path ...] [--exclude path ...]"
-model: haiku
+model: sonnet
 disable-model-invocation: true
 effort: medium
 ---
@@ -61,6 +61,14 @@ Read the diffs and untracked files. **Only consider in-scope files** (per the IN
 resolved in the Arguments section). Group them by logical purpose:
 
 - Changes that serve the same goal belong together (e.g. a function + its test + its import).
+- **Never create a `test:` commit separate from its implementation — no exceptions.** A test-only
+  commit split from the feature/fix it validates is not atomic: it can't pass without the
+  implementation, and the implementation can't be verified without the test. Bundle them:
+  `feat(X): add Y` with both production code and its tests.
+- **Never create a `docs:` commit for documentation that accompanies a behavior change.** If a
+  commit changes user-facing behavior and the repo has in-repo docs affected by that change, update
+  them in the same commit. A docs-only follow-up means the docs were wrong between the two commits.
+  Trivial internal refactors with no user-facing effect don't need doc updates.
 - Unrelated changes should be separate commits (e.g. a bug fix and a new feature).
 - Prefer fewer, meaningful commits over many trivial ones. Don't split just to split.
 - Respect file boundaries only when they align with purpose boundaries.
@@ -118,5 +126,16 @@ If a commit fails, stop immediately and report the error. Do not continue with r
 | ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | A file appears in multiple commits because it changed incrementally | Include it in the most relevant commit and note the constraint to the user  |
 | Over-splitting one logical change into many trivial commits         | Group by purpose — three files serving the same goal belong in one commit   |
+| Splitting tests into a `test:` commit separate from the feature/fix | Tests validate the implementation — bundle them in the same commit          |
+| Splitting doc updates into a `docs:` commit after the feature/fix   | If the commit changes user-facing behavior, update affected docs with it    |
 | Pushing after executing the plan                                    | The skill ends at commit. Never push — the user controls that step          |
 | Including out-of-scope files in a commit                            | Re-read the INCLUDE/EXCLUDE filter; stage only files that passed the filter |
+
+## Rationalization Guard
+
+| Excuse                                                    | Reality                                                                      |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| "The tests are substantial enough to be their own commit" | Size doesn't change atomicity — a test without its implementation can't pass |
+| "Separating tests makes the diff easier to review"        | Reviewers need to see tests alongside the code they validate                 |
+| "The docs update is independent of the code change"       | If the docs describe the changed behavior, they're the same unit of work     |
+| "I'll keep each commit focused by splitting by file type" | Group by purpose, not file type — `.test.ts` + `.ts` serving one goal = 1    |

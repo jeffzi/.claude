@@ -150,6 +150,15 @@ explicit "commit" request during an active plan is not an exception to this rule
 
 5. **Commit** — `git commit -m "..."` using a HEREDOC to preserve formatting.
 
+6. **Verify** — immediately after `git commit`, run in parallel:
+   - `git log --oneline -1` — confirm the commit SHA and subject match what was intended
+   - `git show --stat HEAD` — confirm exactly the intended files appear in the commit, no more, no
+     less
+
+   If the commit SHA is absent (command failed silently), or the file list doesn't match what was
+   staged, **stop and surface the discrepancy** before continuing. Do not proceed to the next commit
+   or any subsequent step until this is resolved.
+
 ## Rationalization Guard
 
 A commit message that technically avoids the listed anti-patterns but still obscures intent violates
