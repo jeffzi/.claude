@@ -4,7 +4,7 @@ description: >
   Use when writing or reviewing {Lang} tests with {runner}. Applies to {test-file-patterns}.
 user-invocable: false
 model: sonnet
-effort: medium
+effort: high
 ---
 
 # {Lang} Testing with {Runner}

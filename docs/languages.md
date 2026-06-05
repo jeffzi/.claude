@@ -144,7 +144,7 @@ description: >
   like "...". Not for standard {Lang} — use code-{lang} alone.
 user-invocable: false
 model: sonnet
-effort: medium
+effort: high
 ---
 
 # {Lib} for {Lang}
