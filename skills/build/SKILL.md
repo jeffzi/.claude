@@ -2,7 +2,7 @@
 name: build
 description: >
   Use when building a new feature, component, or non-trivial behavior change end-to-end in a single
-  session. Not for bug fixes (use /fix) or multi-session features (use GSD).
+  session. Not for bug fixes (use /fix).
 argument-hint: "[feature or behavior to build]"
 disable-model-invocation: true
 model: sonnet
@@ -17,16 +17,14 @@ End-to-end feature pipeline: brainstorm → plan → implement with quality gate
 
 ## When to Use
 
-| Scope                          | Tool                                                  |
-| ------------------------------ | ----------------------------------------------------- |
-| Bug fix                        | `/fix` — investigates root cause, then TDD            |
-| Small feature (single session) | `/build` — this skill                                 |
-| Large feature (multi-session)  | GSD — disk-persistent planning, cross-session context |
+| Scope                          | Tool                                       |
+| ------------------------------ | ------------------------------------------ |
+| Bug fix                        | `/fix` — investigates root cause, then TDD |
+| Small feature (single session) | `/build` — this skill                      |
 
 **Not for:**
 
 - Bug fixes — root cause needs investigation first, use `/fix`
-- Features requiring multiple sessions or parallel workstreams — use GSD
 
 ## Skip Logic
 
@@ -95,7 +93,7 @@ Check `SPEC_STATUS` in the response:
 
 #### Step 3: Code quality review (gate)
 
-Dispatch in parallel (two independent agents, `model: sonnet, effort: medium`):
+Dispatch in parallel (two independent agents, `model: sonnet, effort: high`):
 
 - **Agent A:** `/vet-code` on `IMPLEMENTATION_FILES`
 - **Agent B:** `/vet-test` on `TEST_FILE`

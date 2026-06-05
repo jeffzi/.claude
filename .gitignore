@@ -61,9 +61,6 @@ skills/brainstorming/
 !agents/
 !agents/**
 
-# GSD (auto-installed by npx, don't track)
-gsd*
-
 # Exclude junk (after whitelist so these take precedence)
 .DS_Store
 **/*-docs/
