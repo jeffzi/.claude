@@ -33,11 +33,28 @@ TypeScript projects use `lefthook`. All other projects use `prek`. Never assume
 
 ### No internal tooling leaks in user-facing output
 
-Never expose internal tooling details (skill/agent names, GSD IDs, phase IDs, `.planning/` paths,
-orchestrator references) in commits, PRs, code comments, or any user-facing output. Describe **what
-was built or fixed**, not the process.
+Never expose internal tooling details (skill/agent names, `.planning/` paths, orchestrator
+references) in commits, PRs, code comments, or any user-facing output. Describe **what was built or
+fixed**, not the process.
 
 ### Verify before claiming completion
 
 Never claim tests pass, builds succeed, or work is complete without running the verification command
 and showing its output in the same message. "Should work" is not verification.
+
+### Comment/docstring length and shape
+
+Comments and docstrings — including new ones you write, not just existing ones — may be
+multi-paragraph, use lists, code fences, section headers, and blank lines. Docstrings render as
+markdown in most tooling; inline comments can follow the same rules when the content calls for it.
+
+Do not:
+
+- Collapse or reflow a multi-line comment/docstring into one line.
+- Cram prose into one long line to avoid stacking `//`/`#` markers.
+- Delete blank lines inside a docstring to make it "single-paragraph".
+- Drop examples, caveats, or rationale to hit a length target.
+
+"One short line max" elsewhere is aspirational and does not override this rule. The
+default-no-comments guidance governs whether to write a comment; once warranted, length and
+structure follow the content.

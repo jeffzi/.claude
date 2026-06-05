@@ -71,18 +71,18 @@ Some skills are synced from external repositories. Run
 
 #### Process
 
-| Skill                                            | Description                                                             |
-| ------------------------------------------------ | ----------------------------------------------------------------------- |
-| [`brainstorming`](skills/brainstorming/SKILL.md) | Explore intent and design space before implementing features            |
-| [`build`](skills/build/SKILL.md)                 | End-to-end feature pipeline: brainstorm → plan → TDD with quality gates |
-| [`fix`](skills/fix/SKILL.md)                     | Root cause investigation then TDD-driven fix                            |
-| [`preflight`](skills/preflight/SKILL.md)         | Pre-commit review pipeline: vet, scan, auto-fix, iterate                |
-| [`plan-commit`](skills/plan-commit/SKILL.md)     | Analyze uncommitted changes and suggest granular commits                |
-| [`investigate`](skills/investigate/SKILL.md)     | Systematic root cause investigation — diagnosis only, no fix            |
-| [`research`](skills/research/SKILL.md)           | Fact-checking and hallucination-resistant research                      |
-| [`setup-gsd`](skills/setup-gsd/SKILL.md)         | Configure GSD model overrides for a project                             |
-| [`upgrade-py`](skills/upgrade-py/SKILL.md)       | Upgrade Python dependencies and sync versions                           |
-| [`upgrade-ts`](skills/upgrade-ts/SKILL.md)       | Upgrade TypeScript dependencies and sync versions                       |
+| Skill                                                            | Description                                                                 |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| [`brainstorming`](skills/brainstorming/SKILL.md)                 | Explore intent and design space before implementing features                |
+| [`build`](skills/build/SKILL.md)                                 | End-to-end feature pipeline: brainstorm → plan → TDD with quality gates     |
+| [`fix`](skills/fix/SKILL.md)                                     | Root cause investigation then TDD-driven fix                                |
+| [`preflight`](skills/preflight/SKILL.md)                         | Pre-commit review pipeline: vet, scan, auto-fix, iterate                    |
+| [`receiving-code-review`](skills/receiving-code-review/SKILL.md) | Decide what to implement from review feedback (PR comments, agent findings) |
+| [`plan-commit`](skills/plan-commit/SKILL.md)                     | Analyze uncommitted changes and suggest granular commits                    |
+| [`investigate`](skills/investigate/SKILL.md)                     | Systematic root cause investigation — diagnosis only, no fix                |
+| [`research`](skills/research/SKILL.md)                           | Fact-checking and hallucination-resistant research                          |
+| [`upgrade-py`](skills/upgrade-py/SKILL.md)                       | Upgrade Python dependencies and sync versions                               |
+| [`upgrade-ts`](skills/upgrade-ts/SKILL.md)                       | Upgrade TypeScript dependencies and sync versions                           |
 
 #### Analysis
 
@@ -97,29 +97,22 @@ Some skills are synced from external repositories. Run
 
 ### Agents
 
-| Agent                                    | Description                                      |
-| ---------------------------------------- | ------------------------------------------------ |
-| [`bug-scanner`](agents/bug-scanner.md)   | Runtime correctness audit at specific locations  |
-| [`code-mend`](agents/code-mend.md)       | Surgical fixes at specific file:line locations   |
-| [`code-distill`](agents/code-distill.md) | Reduce code complexity while preserving behavior |
-| [`tdd-cycle`](agents/tdd-cycle.md)       | Context-isolated RED-GREEN cycle agent           |
+| Agent                                    | Description                                                 |
+| ---------------------------------------- | ----------------------------------------------------------- |
+| [`bug-scanner`](agents/bug-scanner.md)   | Runtime correctness audit at specific locations             |
+| [`code-mend`](agents/code-mend.md)       | Surgical fixes at specific file:line locations              |
+| [`code-distill`](agents/code-distill.md) | Reduce code complexity while preserving behavior            |
+| [`doc-reviewer`](agents/doc-reviewer.md) | Review docs for structure, clarity, completeness, and prose |
+| [`tdd-cycle`](agents/tdd-cycle.md)       | Context-isolated RED-GREEN cycle agent                      |
 
 ### Development Workflow
 
-Single-session tools compose into a lightweight pipeline. Escalate to GSD when a feature spans
-multiple sessions or needs persistent planning state.
+Single-session tools compose into a lightweight pipeline.
 
-| Scope         | Tool                                              | When to use                                                     |
-| ------------- | ------------------------------------------------- | --------------------------------------------------------------- |
-| Bug fix       | [`/fix`](skills/fix/SKILL.md)                     | Root cause unknown — investigates then drives TDD               |
-| Small feature | [`/build`](skills/build/SKILL.md)                 | Single session — brainstorm, plan, implement with quality gates |
-| Large feature | [GSD](https://github.com/gsd-build/get-shit-done) | Multi-session — disk-persistent planning, cross-session context |
-
-### GSD (Get Shit Done)
-
-[GSD](https://github.com/gsd-build/get-shit-done) is installed as a plugin for structured project
-execution — milestone planning, phased delivery, parallel workstreams, and verification. It provides
-its own skills, commands, and agents (prefixed with `gsd:`/`gsd-`).
+| Scope         | Tool                              | When to use                                                     |
+| ------------- | --------------------------------- | --------------------------------------------------------------- |
+| Bug fix       | [`/fix`](skills/fix/SKILL.md)     | Root cause unknown — investigates then drives TDD               |
+| Small feature | [`/build`](skills/build/SKILL.md) | Single session — brainstorm, plan, implement with quality gates |
 
 ### Token Compression
 
@@ -129,16 +122,18 @@ using AST-aware code compression, JSON crushing, and KV-cache alignment (47–92
 
 ### Hooks
 
-| Hook                                               | Description                                          |
-| -------------------------------------------------- | ---------------------------------------------------- |
-| [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh)   | Blocks proceeding when a Bash command fails          |
-| [`config-guard.sh`](hooks/config-guard.sh)         | Protects configuration files from unintended edits   |
-| [`desktop-notify.sh`](hooks/desktop-notify.sh)     | macOS notification when Claude finishes responding   |
-| [`git-guard.sh`](hooks/git-guard.sh)               | Blocks auto-push, plan file commits, destructive ops |
-| [`marimo-check.sh`](hooks/marimo-check.sh)         | Validates marimo notebooks on edit                   |
-| [`plan-skill-guard.sh`](hooks/plan-skill-guard.sh) | Enforces skill loading before plan mode              |
-| [`shiny-check.sh`](hooks/shiny-check.sh)           | Smoke-tests staged Shiny apps before commit          |
-| [`worktree-guard.sh`](hooks/worktree-guard.sh)     | Blocks exiting worktrees with uncommitted changes    |
+| Hook                                               | Description                                                   |
+| -------------------------------------------------- | ------------------------------------------------------------- |
+| [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh)   | Blocks proceeding when a Bash command fails                   |
+| [`config-guard.sh`](hooks/config-guard.sh)         | Protects configuration files from unintended edits            |
+| [`cross-repo-guard.sh`](hooks/cross-repo-guard.sh) | Blocks writes to paths outside the session's repository       |
+| [`git-commit-guard.sh`](hooks/git-commit-guard.sh) | Blocks commit messages containing internal tooling references |
+| [`git-guard.sh`](hooks/git-guard.sh)               | Blocks auto-push, plan file commits, destructive ops          |
+| [`git-lock-guard.sh`](hooks/git-lock-guard.sh)     | Absorbs `.git/index.lock` races from parallel agents/sessions |
+| [`marimo-check.sh`](hooks/marimo-check.sh)         | Validates marimo notebooks on edit                            |
+| [`plan-skill-guard.sh`](hooks/plan-skill-guard.sh) | Enforces skill loading before plan mode                       |
+| [`shiny-check.sh`](hooks/shiny-check.sh)           | Smoke-tests staged Shiny apps before commit                   |
+| [`worktree-guard.sh`](hooks/worktree-guard.sh)     | Blocks exiting worktrees with uncommitted changes             |
 
 ## License
 
