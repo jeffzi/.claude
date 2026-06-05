@@ -157,6 +157,12 @@ expect_block "git apply -R" "$REPO" "git apply -R patch.diff"
 expect_block "git apply --reverse" "$REPO" "git apply --reverse patch.diff"
 expect_allow "git apply patch" "$REPO" "git apply patch.diff"
 
+printf "\n── Add (force-add) ──────────────────────────────────────────────────────────\n"
+expect_block "git add -f file" "$REPO" "git add -f some-file"
+expect_block "git add --force file" "$REPO" "git add --force some-file"
+expect_block "git add -f ." "$REPO" "git add -f ."
+expect_block "git add --force -A" "$REPO" "git add --force -A"
+
 printf "\n── Add (plan file protection) ───────────────────────────────────────────────\n"
 expect_block "git add explicit plan file" "$PLAN_REPO" "git add .claude/plans/phase.md"
 expect_allow "git add normal file" "$REPO" "git add README"
