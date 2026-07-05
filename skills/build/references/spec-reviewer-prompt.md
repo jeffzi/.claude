@@ -77,11 +77,7 @@ Agent tool (general-purpose, model: sonnet):
 
 ## Orchestrator Handling
 
-After dispatching this subagent, parse `SPEC_STATUS` from the first line of the response:
-
-- `SPEC_STATUS: PASS` → proceed to code quality review (Step 3)
-- `SPEC_STATUS: FAIL` → dispatch a fresh sonnet agent to fix the listed issues (provide the ISSUES
-  list + implementation files). Then re-dispatch this spec reviewer. After **2 failed iterations**,
-  stop and surface to the user with the full ISSUES list.
+On `SPEC_STATUS: FAIL`, the orchestrator routes remediation by issue prefix — see build's Phase 3
+FAIL path (canonical spec in `build/SKILL.md`). Do not duplicate the routing logic here.
 
 **Never** proceed to code quality review with an open `SPEC_STATUS: FAIL`.
