@@ -261,6 +261,17 @@ npx tsc --noEmit         # Type check
 
 **Task is NOT complete until all pass.**
 
+### Capturing test output without re-running
+
+Pipe through `tee` so the output is saved and visible in one execution. If the summary lines aren't
+immediately visible, grep the file — never re-run the command just to filter output:
+
+```bash
+npx vitest run 2>&1 | tee /tmp/test-out.txt | tail -30
+# if you need to extract specific lines afterward:
+grep -E "^(Test Files|Tests|Duration)" /tmp/test-out.txt
+```
+
 ## Rationalizations
 
 | Excuse                               | Reality                                                                         |
