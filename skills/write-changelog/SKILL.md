@@ -48,12 +48,13 @@ catch format; this catches judgment calls — entry curation, grouping, and read
 
 ### Entry Quality (Q1–Q4)
 
-| #  | Rule                                                                                     |
-| -- | ---------------------------------------------------------------------------------------- |
-| Q1 | Curated for humans — no jargon, commit hashes, or slang                                  |
-| Q2 | Consistent sentence-case capitalization                                                  |
-| Q3 | Notable changes only — not every commit.                                                 |
-| Q4 | Describe what changed for users, not implementation ("Add dark mode" not "Refactor CSS") |
+| #  | Rule                                                                                                                         |
+| -- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Q1 | Curated for humans — no jargon, commit hashes, or slang                                                                      |
+| Q2 | Consistent sentence-case capitalization                                                                                      |
+| Q3 | Notable changes only — not every commit.                                                                                     |
+| Q4 | Describe what changed for users, not implementation ("Add dark mode" not "Refactor CSS")                                     |
+| Q5 | Drop entries that only affect contributors, not consumers (CI, test infra, dev scripts, internal benchmarks, doc reshuffles) |
 
 ## Process
 
