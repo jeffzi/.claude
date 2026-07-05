@@ -5,8 +5,8 @@ description: >
   AAA violations, test desiderata, and language skill
   rule violations
 argument-hint: "[test file or directory]"
-model: sonnet
-effort: medium
+model: opus
+effort: high
 ---
 
 # Test Vet

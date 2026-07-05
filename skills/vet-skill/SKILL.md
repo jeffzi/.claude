@@ -7,8 +7,8 @@ description: |
   writing a new skill to catch issues before deployment. Not for writing skills from scratch (use
   write-skill).
 argument-hint: "[skill dir or SKILL.md path]"
-model: sonnet
-effort: medium
+model: opus
+effort: high
 ---
 
 # Skill Review

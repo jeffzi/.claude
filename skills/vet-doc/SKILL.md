@@ -8,8 +8,8 @@ description: |
   Not for inline code docstrings (use language-specific skills) or CLAUDE.md files (use
   claude-md-improver).
 argument-hint: "[doc file or directory]"
-model: sonnet
-effort: medium
+model: opus
+effort: high
 ---
 
 # Documentation Review

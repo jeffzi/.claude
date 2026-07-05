@@ -2,8 +2,8 @@
 name: vet-code
 description: Use when reviewing code files for idiom, type, and structural violations the linter won't catch
 argument-hint: "[file or directory]"
-model: sonnet
-effort: medium
+model: opus
+effort: high
 ---
 
 # Code Vet
