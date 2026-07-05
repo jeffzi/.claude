@@ -67,7 +67,9 @@ pending/in_progress, you are NOT done. Keep going.
       `rules/skill-loading.md` (already in session context). For each file, look up its extension:
       if the file path matches one of the test-pattern globs for that row → test files; known
       extension but not matching a test pattern → code files; `.md`, `README*`, `CHANGELOG*` → doc
-      files; extension not in the table → skip.
+      files; extension not in the table → still review: test files if the filename matches a generic
+      test pattern (`test_*`, `*_test.*`, `*.test.*`, `*_spec.*`, `*Tests.*`), otherwise code files
+      (`vet-code`/`vet-test` fall back to hub-only review when no dispatch row exists).
 
 **Argument disambiguation:** if an argument is given:
 
@@ -110,12 +112,10 @@ stop.
       `CHANGELOG*`)
 - [ ] Dispatch agents in parallel (single message, one **Agent** tool call per non-empty bucket):
   - **Agent A (implementation):** `model: sonnet` — "Distill then review these implementation files:
-    [list]. First dispatch a code-distill subagent (`Agent` tool, `subagent_type:
-    code-distill`)
-    on these files. Then load `Skill(vet-code)` and review them."
-  - **Agent B (tests):** `model: sonnet` — "Distill then review these test files: [list]. First
-    dispatch a code-distill subagent (`Agent` tool, `subagent_type: code-distill`) on these files.
-    Then load `Skill(vet-test)` and review them."
+    [list]. First load `Skill(distill-code)` and apply it to these files. Then load
+    `Skill(vet-code)` and review them."
+  - **Agent B (tests):** `model: sonnet` — "Distill then review these test files: [list]. First load
+    `Skill(distill-code)` and apply it to these files. Then load `Skill(vet-test)` and review them."
   - **Agent C (docs):** `model: sonnet` — "Review these documentation files: [list]. Load
     `Skill(vet-doc)` and review them (it routes CHANGELOG.md to `write-changelog` rules
     automatically)."
@@ -129,8 +129,10 @@ task 3 to `in_progress`.
 
 **This is the core of preflight.** Cleanup was just preparation.
 
-**Review scope baseline:** Step 3 always reviews against the ORIGINAL diff captured in step 1, not
-the post-cleanup diff. Changes made by step 2 agents are invisible to step 3's review scope.
+**Review scope baseline:** Step 2 agents fix files, so re-capture the diff now — re-run the step 1
+collection commands; in commit-ref/range mode also include `git diff -- <target files>` to pick up
+step 2's working-tree edits. Review agents get current line numbers, and cleanup edits are in scope
+like any other unreviewed change.
 
 Each iteration:
 
@@ -149,7 +151,8 @@ Each iteration:
    - Prompt:
      `"Check whether the changed code follows the project conventions below. For each
      violation, output a ### Finding N block with fields: Issue, Location, Score (0–100), Reasoning.
-     Return 'No findings.' if clean.\n\nConventions:\n[CLAUDE.md contents]\n\nFiles: [target file
+     Return 'No findings.' if clean. Do NOT run tests, linters, or any shell commands — this is a
+     read-only review.\n\nConventions:\n[CLAUDE.md contents]\n\nFiles: [target file
      list]\n\nDiff:\n[diff from step 1]"`
 
    **Review scope by input mode:**
@@ -172,8 +175,8 @@ Each iteration:
    - Stylistic prose preferences without `write-doc` rule backing
 
 3. **Fix issues with score ≥ 75** — for each finding in the fix queue, dispatch one **Agent** call
-   with `subagent_type: code-mend` (send all dispatches in a single parallel message — one call per
-   finding). Do NOT set model. Reformat the finding into code-mend's input format:
+   with `subagent_type: code-mender` (send all dispatches in a single parallel message — one call
+   per finding). Do NOT set model. Reformat the finding into code-mender's input format:
 
    ```text
    Issue: [description from finding]
@@ -194,20 +197,41 @@ Each iteration:
 
 ### Step 4: Final Verification
 
-**Skip this step if preflight made no modifications during steps 2-3** — proceed directly to Step 5.
+**Skip this step only if preflight applied no fixes AND the review-fix loop produced no report-only
+findings (score < 75)** — proceed directly to Step 5. Otherwise there are claims to verify.
 
-Dispatch a single **Agent** tool call with `model: opus`:
+Two kinds of claim feed this step, and both go to `claim-reviewer`:
 
-"Review these files for correctness — bugs, logic errors, regressions. Read each file and report
-issues as plain text (issue, location, severity) or 'No findings.' if clean.
+- **Fix claims** — every fix applied in steps 2-3 asserts an issue was resolved. Verify it held
+  rather than trusting the fix report.
+- **Unfixed-finding claims** — every report-only finding (score < 75) asserts an issue _exists_ but
+  was too uncertain to auto-fix. Let the reviewer adjudicate whether it is real.
 
-Files: [list of files preflight modified during steps 2-3]"
+Dispatch a single **Agent** tool call with `subagent_type: claim-reviewer` (do NOT set model — the
+agent defines its own). Pass one claim per fix and one per report-only finding:
 
-The agent reads files in its own context — do NOT pass diffs or prior state. No success claims
-without fresh command output. "Should pass" is not evidence.
+```text
+Claim N: [issue from the finding] is now resolved at [file:line], and the surrounding code is intact
+Location: [file:line of the fix]
+Stated evidence: [what code-mender reported changing]
 
-Issues from this step are **report-only** — no automated fix attempt. They go into the summary as
-verification findings.
+Claim M: [issue from the finding] exists at [file:line]
+Location: [file:line of the finding]
+```
+
+The agent re-reads each location in its own context and returns a `### Claim N` block per claim
+(`Verdict: Verified | Refuted | Unsubstantiated`, `Score`, `Evidence`, `Reasoning`). Do NOT pass
+diffs or prior state beyond the claim text — the agent re-derives evidence from the files.
+
+**Consolidate the verdicts** — report-only, no automated re-fix:
+
+- _Fix claim_ `Refuted` (≥ 75) → the fix did not hold; record as a verification finding.
+- _Fix claim_ `Unsubstantiated` (≥ 75) → the fix could not be confirmed; record as a verification
+  finding.
+- _Unfixed-finding claim_ `Verified` (≥ 75) → the uncertain finding is real after all; escalate it
+  to a verification finding so the user sees it.
+- _Unfixed-finding claim_ `Refuted` → confirmed false positive; drop it.
+- Anything else (verdict below score 75, or a `Verified` fix claim) → nothing to report.
 
 → **TaskUpdate** task 4 to `completed`. **TaskUpdate** task 5 to `in_progress`.
 
@@ -249,8 +273,8 @@ Generate the final report. **This is your FIRST text output since the start anno
 
 ## Verification Findings
 
-| Issue | Location | Severity |
-| ----- | -------- | -------- |
+| Claim | Location | Verdict | Score |
+| ----- | -------- | ------- | ----- |
 
 ## Status
 
@@ -266,7 +290,7 @@ Generate the final report. **This is your FIRST text output since the start anno
 ## Common Mistakes
 
 - ❌ Sequential agent dispatch → use parallel (single message, multiple **Agent** tool calls)
-- ❌ Single code-mend call for all findings → one **Agent** call per finding, all dispatched in
+- ❌ Single code-mender call for all findings → one **Agent** call per finding, all dispatched in
   parallel
 - ❌ Auto-fixing linter issues → run the project's configured linter/formatter instead (e.g.,
   `ruff --fix`, `eslint --fix`)

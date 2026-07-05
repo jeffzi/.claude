@@ -50,6 +50,10 @@ validation. Step 4: Run test. Step 5: Commit."
 Every plan starts with:
 
 ```markdown
+---
+type: plan
+---
+
 # [Feature Name] Implementation Plan
 
 **Goal:** [One sentence describing what this builds]
@@ -85,6 +89,25 @@ Every plan starts with:
 **Implementation:** Use `/tdd` for implementation.
 ```
 
+## Final Verification Task
+
+Every plan ends with this task, verbatim except for the claims:
+
+```markdown
+### Final Task: Verify Implementation
+
+After all tasks are complete and their tests pass, dispatch a single **Agent** call with
+`subagent_type: claim-reviewer` (do NOT set model — the agent defines its own). Extract one claim
+per behavior this plan specifies, stated as implemented fact:
+
+Claim N: [behavior from Task M, e.g. "email validation rejects empty, malformed, and duplicate
+emails"] Location: [file the task created/modified]
+
+For any `Refuted` or `Unsubstantiated` verdict, fix the gap and re-verify that claim once; if it
+still fails, surface it to the user. Mechanical claims (tests pass, build green) are not for the
+reviewer — verify those by running the commands directly.
+```
+
 ## What Goes in a Plan vs. What Doesn't
 
 | In the plan                | NOT in the plan              |
@@ -98,10 +121,42 @@ Every plan starts with:
 
 ## Plan Review
 
-For plans with 4+ tasks, dispatch a reviewer subagent to check completeness, spec alignment, and
-task decomposition. Max 3 review iterations, then surface to user. Reviewers are advisory.
+For plans with 4+ tasks, dispatch one **Agent** call with `subagent_type: general-purpose`, passing
+the spec and the draft plan, to check completeness, spec alignment, and task decomposition. Max 3
+review iterations, then surface to user. Reviewers are advisory.
+
+This review is independent of claim verification below — send both agents in a single message so
+they run in parallel.
 
 For smaller plans, review inline before presenting to the user.
+
+## Verify Plan Claims
+
+A plan asserts facts about the codebase — files it will modify already exist, named symbols are
+present, the current code behaves as described, a pattern to follow lives where the plan says. A
+plan built on a stale or wrong assumption sends the implementer down a dead end. Before presenting
+the plan, verify these factual claims independently.
+
+Dispatch a single **Agent** tool call with `subagent_type: claim-reviewer` (do NOT set model — the
+agent defines its own). Extract one claim per checkable assertion the plan makes about existing
+code:
+
+```text
+Claim N: [the plan's factual assertion about the codebase]
+Location: [file:line or symbol the claim names, if any]
+```
+
+The agent returns a `### Claim N` block per claim (`Verdict: Verified | Refuted | Unsubstantiated`,
+`Score`, `Evidence`, `Reasoning`). For any `Refuted` or `Unsubstantiated` verdict, re-check the
+claim against the code once: if the reviewer is right, correct the plan — fix the path, re-scope the
+task, or drop the assumption — before presenting it; if your re-check confirms the claim, keep it
+and cite the confirming evidence in the plan. Do not feed the agent claims about code the plan will
+_create_; it can only verify what exists now.
+
+## Checkpoint
+
+After the plan is approved and written to disk, confirm the artifact path for handoff to downstream
+tools.
 
 ## Common Mistakes
 
