@@ -27,6 +27,7 @@ corresponding skill:
 | Detection pattern                                                             | Skill to load      |
 | ----------------------------------------------------------------------------- | ------------------ |
 | `import * as tstl from "typescript-to-lua"` with `tstl.Plugin` implementation | `code-tstl-plugin` |
+| `import { ... } from "ecstatic"` (ECS game code)                              | `code-ecstatic`    |
 
 Only load skills that are actually installed. If a skill fails to load, continue without it.
 
