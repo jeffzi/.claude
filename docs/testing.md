@@ -230,17 +230,9 @@ Cross-language testing principles (the "what makes a good test" content) live in
 The RED-GREEN-REFACTOR loop pseudocode, entry-point logic, and phase data contracts. Pure
 orchestration, no philosophy.
 
-Phase data contracts (abridged):
-
-```text
-tdd-cycle → orchestrator:
-  STATUS: PASSED | STUCK | PASSED_UNEXPECTEDLY | TEST_FLAWED
-  PHASE: RED | GREEN         (when STATUS is STUCK)
-  TEST_FILE, TEST_NAME, TEST_COMMAND, FULL_SUITE_COMMAND
-  FAILURE_OUTPUT             (RED phase output, always)
-  IMPLEMENTATION_FILES       (when STATUS is PASSED)
-  TEST_OUTPUT                (GREEN phase output, when STATUS is PASSED)
-```
+The tdd-cycle output contract (STATUS values and per-status fields) is owned by
+`agents/tdd-cycle.md` § Output Format — the single source of truth. It is deliberately not restated
+here; restated copies drift.
 
 ### `vet-test`
 
