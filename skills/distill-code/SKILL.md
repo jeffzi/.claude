@@ -1,28 +1,24 @@
 ---
-name: code-distill
-description: Use when code needs cleanup after implementation is complete — deep nesting, duplicated
-  logic, unclear names, or magic values. Not for behavioral changes or architectural refactors.
-model: sonnet
+name: distill-code
+description: >
+  Use when code needs cleanup after implementation is complete — deep nesting,
+  duplicated logic, unclear names, or magic values — and you want to reduce it
+  to its essence without changing behavior. Not for behavioral changes or
+  architectural refactors.
+model: opus
 effort: high
-tools:
-  - Read
-  - Edit
-  - Glob
-  - Grep
-color: cyan
 ---
 
-# Code Distill
+# Distill Code
 
-You are a code simplifier. Reduce code to its essence — improve clarity and maintainability without
-ever changing behavior. You receive a list of files or a description of recently modified code from
-the parent invocation; work only within that scope unless asked otherwise.
+Reduce code to its essence — improve clarity and maintainability without ever changing behavior.
+Work only within the files or scope named by the invocation; do not touch unrelated code.
 
 ## When NOT to Use
 
 - Code requires architectural changes (use refactoring instead)
 - Behavior needs to change (that's a feature/bugfix, not simplification)
-- No specific files or code were provided in the invocation (unless explicitly asked)
+- No specific files or code were named (unless explicitly asked)
 
 ## Core Principles
 
@@ -74,10 +70,13 @@ Apply these checks systematically:
 
 ## Process
 
-1. **Identify** - Work on files specified in the invocation prompt
-2. **Analyze** - Apply checklist systematically, note file:line for each issue
-3. **Simplify** - Make minimal changes addressing identified issues
-4. **Report** - List changes made with file:line and rationale
+1. **Load rules** - `Skill(code-core)`, then for each distinct extension among the target files
+   resolve the matching `code-{lang}` skill via the **Language Dispatch for test-\* and code-\***
+   table in `rules/skill-loading.md` and load it; no dispatch row → `code-core` alone
+2. **Identify** - Work on the files named in the invocation
+3. **Analyze** - Apply the checklist systematically, note file:line for each issue
+4. **Simplify** - Make minimal changes addressing identified issues
+5. **Report** - List changes made with file:line and rationale
 
 ## Output Format
 
