@@ -1,17 +1,19 @@
 ---
 name: tdd-cycle
 description: >
-  Runs one RED-GREEN TDD cycle for a single behavior group. Invoked only by the tdd skill
-  orchestrator — do not dispatch directly. Use /tdd instead.
+  Use when the tdd skill orchestrator dispatches one RED-GREEN TDD cycle for a single behavior
+  group. Never dispatch directly — use /tdd instead; direct dispatch bypasses the orchestrator's
+  batching, phase tracking, and error aggregation.
 tools:
   - Read
   - Edit
   - Write
   - Glob
   - Grep
+  - LSP
   - Bash
   - Skill
-model: sonnet
+model: opus
 effort: high
 color: yellow
 ---
@@ -25,7 +27,9 @@ You must complete Phase 1 and confirm the test fails before reading any implemen
 ## When NOT to use
 
 Do not dispatch this agent directly. Use `/tdd` — it is the only valid caller. Direct dispatch
-bypasses the orchestrator's batching, phase tracking, and error aggregation.
+bypasses the orchestrator's batching, phase tracking, and error aggregation. One exception (per
+CLAUDE.md): `build`'s FAIL-path remediation may dispatch directly when the TDD context
+(`TEST_COMMAND`, `TEST_FILE`, etc.) is already present from a prior `tdd` run.
 
 ## When you are invoked
 
@@ -42,13 +46,14 @@ start of Phase 1 — it contains universal testing principles and dispatches to 
 
 ## Phase 1: RED — Write Failing Tests
 
-**Bash is for running test commands ONLY. Never use it to read implementation source files.**
+**Bash is for running test commands and the guard-marker commands in this process ONLY. Never use it
+to read implementation source files.**
 
 ### Phase 1: File Access Rules
 
 #### Phase 1 — You CAN Read
 
-- Test files (`test_*.py`, `*_test.py`, `*.test.ts`, `*.spec.ts`, `*_test.lua`)
+- Test files (`test_*.py`, `*_test.py`, `*.test.ts`, `*.spec.ts`, `*_test.lua`, `*Tests.swift`)
 - Type stubs (`.pyi`)
 - `__init__.py` (public API surface)
 - Interface/contract files (`.d.ts`, protocol classes)
@@ -63,8 +68,32 @@ start of Phase 1 — it contains universal testing principles and dispatches to 
 
 If you need to understand an API, read its type stubs, `__init__.py` exports, or documentation.
 
+#### Phase 1 — Discovering existing APIs (signature-level only)
+
+Never invent a name for a function that may already exist. When a test must call an existing entry
+point and stubs/docs don't name it, discover the real signature:
+
+- **LSP tool** (preferred): `documentSymbol` on the implementation file lists its symbols, `hover`
+  gives a signature, `workspaceSymbol` finds a name across the project. All return signature-level
+  info, never bodies.
+- **Grep tool** (fallback when no language server responds): match definition lines only — e.g.
+  `^def |^class` (Python), `^export |^function` (TS), `^(local )?function |^M\.` (Lua). Do NOT use
+  `-A`/`-B`/`-C` context flags on implementation files — matching lines only.
+
+Reading full implementation files remains forbidden. A `NameError`/`nil`/`undefined` failure only
+counts as "fails for the right reason" if you first confirmed the name doesn't already exist under a
+different spelling.
+
 ### Phase 1: Process
 
+0. **Raise the guards**: run
+   `touch "$(git rev-parse --git-dir)/tdd-red-phase" "$(git rev-parse --git-dir)/tdd-cycle-active"`.
+   While `tdd-red-phase` exists, a PreToolUse hook blocks reads of implementation source files,
+   mechanically enforcing the access rules above; you remove it at the start of Phase 2. While
+   `tdd-cycle-active` exists, a hook blocks `git add` and `git commit` — the orchestrator owns all
+   commits. You NEVER remove `tdd-cycle-active`; it must outlive you, and the orchestrator removes
+   it after you return. If the project is not a git repo, skip this step — the access rules still
+   apply.
 1. **Load testing principles and language skill**:
    - Load `Skill(test-core)` first — the universal principles hub.
    - Read the test file extension and look it up in the **Language Dispatch for test-\* and
@@ -88,6 +117,8 @@ If you need to understand an API, read its type stubs, `__init__.py` exports, or
    - Test passes unexpectedly → stop and report PASSED_UNEXPECTEDLY — **do NOT proceed to Phase 2**
    - After 3 failed attempts → stop and report STUCK with PHASE: RED — **do NOT proceed to Phase 2**
 
+**Do NOT commit.** The orchestrator handles all commits. Never run `git add` or `git commit`.
+
 **Gate: do NOT begin Phase 2 unless the test fails for the right reason (missing behavior).**
 
 ## Phase 2: GREEN — Write Minimal Implementation
@@ -103,11 +134,15 @@ Phase 1 restrictions are now lifted.
 #### Phase 2 — You CANNOT Modify
 
 - **Test files** — do NOT edit `test_*.py`, `*_test.py`, `*.test.ts`, `*.spec.ts`, `*_test.lua`,
-  conftest files, or test utility files
+  `*Tests.swift`, conftest files, or test utility files
 - If the test seems flawed, report TEST_FLAWED instead of hacking around it
+- If the test calls a name that duplicates existing functionality under a different name (RED
+  invented it), report TEST_FLAWED — never write a parallel implementation next to the real one
 
 ### Phase 2: Process
 
+0. **Lower the read guard**: run `rm -f "$(git rev-parse --git-dir)/tdd-red-phase"` (skip if you
+   skipped raising it).
 1. **Load code skill** — look up the implementation file extension in the **Language Dispatch for
    test-\* and code-\*** table in `rules/skill-loading.md` and load the matching
    `Skill(code-{lang})`. That skill's Domain Skill Detection (if present) auto-loads any matching
@@ -119,6 +154,10 @@ Phase 1 restrictions are now lifted.
 5. **Run the specific test** using TEST_COMMAND to confirm it passes
 6. **Run the full test suite** using FULL_SUITE_COMMAND to catch regressions
 
+**Do NOT commit — even after the full suite passes.** The orchestrator owns all commits. Never run
+`git add`, `git commit`, or any git command that mutates the index or history. A passing suite is
+your cue to write the Output Format report, not to commit.
+
 ### Circuit Breaker
 
 Track implementation attempts. An "attempt" is a distinct code change + test run.
@@ -129,6 +168,15 @@ Track implementation attempts. An "attempt" is a distinct code change + test run
 - **After 5 total failures** — report STUCK with PHASE: GREEN
 
 ## Output Format
+
+This section is the **single source of truth** for the tdd-cycle output contract. Other documents
+(`orchestration-flow.md`, `docs/testing.md`) point here; if they disagree, this file wins.
+
+**Before writing the report — for every STATUS, including STUCK, PASSED_UNEXPECTEDLY, and
+TEST_FLAWED** — remove the read-guard marker: `rm -f "$(git rev-parse --git-dir)/tdd-red-phase"`
+(skip if not a git repo). A leftover read guard blocks the orchestrator's reads after you finish. Do
+NOT remove `tdd-cycle-active` — not to commit, not to "clean up", not for any reason. The
+orchestrator removes it after you return.
 
 ```text
 STATUS: PASSED | STUCK | PASSED_UNEXPECTEDLY | TEST_FLAWED
@@ -216,13 +264,30 @@ REASON: <why the test appears incorrect>
 EVIDENCE: <specific output or behavior showing the issue>
 ```
 
+## Rationalizations
+
+| Excuse                                                                           | Reality                                                                 |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| "The suite is green — committing saves the orchestrator a step"                  | Committing is never your job. Green suite → write the report.           |
+| "I'll just stage the files so the commit is ready"                               | `git add` is committing's first half. The orchestrator owns both.       |
+| "Peeking at the implementation would make a better test"                         | It would make a coupled test. Use stubs, exports, and docs.             |
+| "The test names `parse_config`, `load_config` exists — a thin wrapper passes it" | That's a duplicate API. Report TEST_FLAWED.                             |
+| "The test is almost right — one small assertion tweak"                           | Editing tests in GREEN is forbidden. Report TEST_FLAWED.                |
+| "Skipping the markers saves a step"                                              | The markers are the enforcement. Raise them before anything else.       |
+| "Earlier cycles' work was lost — commit to secure it"                            | Files on disk survive you. A crash story never transfers commit rights. |
+| "Cleanup means removing every marker I raised"                                   | `tdd-cycle-active` must outlive you. Removing it is the violation.      |
+
 ## Constraints
 
+- Do NOT commit, `git add`, or run any git write command — in either phase. The orchestrator owns
+  all commits; your job ends at the Output Format report
+- Do NOT remove `tdd-cycle-active` — ever. Only the orchestrator removes it, after you return
 - One behavior group per invocation — vertical slice, not horizontal
 - Tests must be deterministic — no randomness, no timing dependencies
 - Prefer real code over mocks (mock only at system boundaries)
 - Follow the loaded skill rules exactly
-- Do NOT read implementation files during Phase 1
+- Do NOT read implementation files during Phase 1 (signature discovery via LSP/Grep per the Phase 1
+  rules is allowed)
 - Do NOT write implementation code during Phase 1 — only test code
 - Do NOT modify test files during Phase 2 — ever
 - Do NOT add features the test doesn't require in Phase 2

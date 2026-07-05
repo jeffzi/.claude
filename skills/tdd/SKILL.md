@@ -5,7 +5,7 @@ description: >
   Also use when asked to follow TDD or invoked via /tdd. Use when you think "I'll add tests later"
   — that's rationalization. Not for projects without a test suite.
 argument-hint: "[feature or behavior to implement]"
-model: sonnet
+model: opus
 effort: high
 ---
 
@@ -58,16 +58,18 @@ Thinking "skip TDD just this once"? Stop. That's rationalization.
 
 **Before creating any plan, load `Skill(write-plan)`.** Always. No exceptions.
 
-When the project has a test suite, plans describe **behaviors to implement** — not file paths, line
-numbers, or code changes. Implementation details compromise both agents' context isolation. Each
-plan task ends with **"Use `/tdd` for implementation."** — no inline RED/GREEN steps, no test
-assertions, no implementation code.
+When the project has a test suite, plans describe **behaviors to implement** plus the files they
+touch (`write-plan`'s Files section) — never line numbers, inline code, or prescribed
+implementations. Those details compromise the agents' context isolation; file paths do not (the
+orchestrator hands `tdd-cycle` the test file paths anyway). Each plan task ends with **"Use `/tdd`
+for implementation."** — no inline RED/GREEN steps, no test assertions, no implementation code.
 
 When the project has no test suite, plans describe implementation directly (files, approach,
 specific changes) — TDD constraints don't apply.
 
-**Good:** "Accept hud.duration as a positive number, default 0.5. Use `/tdd` for implementation."
-**Bad:** "Update prepare.lua:614, validate as positive number." — prescribes implementation.
+**Good:** "Modify `hud/prepare.lua`: accept hud.duration as a positive number, default 0.5. Use
+`/tdd` for implementation." **Bad:** "Update prepare.lua:614, validate as positive number." —
+prescribes implementation.
 
 ## The Iron Law
 
@@ -173,12 +175,12 @@ def test_catalog_entry_rejects_invalid_type():
 ### Verify RED — Inspect FAILURE_OUTPUT
 
 **MANDATORY. Never skip.** The agent runs both phases internally, so you cannot re-run the failing
-state. Instead, inspect `FAILURE_OUTPUT` from the agent's combined output.
+state. `FAILURE_OUTPUT` is the evidence that substitutes for it: the failure message must be
+expected, and it must fail because the feature is missing (not typos).
 
-Confirm:
-
-- Failure message is expected
-- Fails because feature missing (not typos)
+The agent NEVER commits — you commit after verification passes, in TDD order (test files first, then
+implementation files; see the orchestration flow). Never ask the agent for a commit or instruct it
+to make one.
 
 **`STATUS: PASSED_UNEXPECTEDLY`?** Behavior already exists. Report to user and ask: skip or revise
 scope?
@@ -245,10 +247,14 @@ Compute total insertions across all files modified/added during this `/tdd` invo
 
 If **≥ 50 lines**, split changed files into impl and test files. Run two tracks in parallel:
 
-- **Impl track:** dispatch `code-distill` on impl files; then dispatch `vet-code` on the result (→
-  `vet-code` again if changes were made, max 2 passes)
-- **Test track:** dispatch `code-distill` on test files; then dispatch `vet-test` on the result (→
-  `vet-test` again if changes were made, max 2 passes)
+- **Impl track:** dispatch `code-distiller` on impl files; then dispatch a `general-purpose` agent
+  prompted to load `Skill(vet-code)` and run it on the result (again if changes were made, max 2
+  passes)
+- **Test track:** dispatch `code-distiller` on test files; then dispatch a `general-purpose` agent
+  prompted to load `Skill(vet-test)` and run it on the result (again if changes were made, max 2
+  passes)
+
+`vet-code` and `vet-test` are skills, not agents — never pass them as `subagent_type`.
 
 Re-run FULL_SUITE_COMMAND if either agent made changes.
 
@@ -307,7 +313,7 @@ function submitForm(data: FormData) {
 PASS
 ```
 
-**REFACTOR** — Run code-distill + vet agents if ≥50 lines changed. Extract validation for multiple
+**REFACTOR** — Run code-distiller + vet tracks if ≥50 lines changed. Extract validation for multiple
 fields if needed.
 
 ## Verification Checklist
@@ -317,6 +323,8 @@ Before marking work complete:
 - [ ] Every new function/method has a test
 - [ ] Watched each test fail before implementing (confirmed via FAILURE_OUTPUT from tdd-cycle)
 - [ ] Each test failed for expected reason (feature missing, not typo)
+- [ ] Committed each cycle yourself in TDD order (tests first, then implementation) — the agent
+      never commits
 - [ ] Wrote minimal code to pass each test (via tdd-cycle agent)
 - [ ] All tests pass
 - [ ] Output pristine (no errors, warnings)

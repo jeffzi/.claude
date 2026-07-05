@@ -61,7 +61,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "claude-opus-4-6",
+  "model": "fable",
   "hooks": {
     "PreToolUse": [
       {
@@ -110,11 +110,6 @@
             "type": "command",
             "command": "$HOME/.claude/hooks/config-guard.sh",
             "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/cross-repo-guard.sh",
-            "timeout": 5
           }
         ]
       },
@@ -128,11 +123,30 @@
         ]
       },
       {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/plan-claim-guard.sh"
+          }
+        ]
+      },
+      {
         "matcher": "Read",
         "hooks": [
           {
             "type": "command",
             "command": "~/.claude/read-once/hook.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/tdd-red-guard.sh",
+            "timeout": 5
           }
         ]
       }
@@ -174,7 +188,8 @@
     "typescript-lsp@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
     "pyright-lsp@claude-plugins-official": true,
-    "clangd-lsp@claude-plugins-official": true
+    "clangd-lsp@claude-plugins-official": true,
+    "ponytail@ponytail": true
   },
   "extraKnownMarketplaces": {
     "claude-plugins-official": {
@@ -182,10 +197,17 @@
         "source": "github",
         "repo": "anthropics/claude-plugins-official"
       }
+    },
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
+      }
     }
   },
-  "effortLevel": "high",
+  "effortLevel": "medium",
   "promptSuggestionEnabled": false,
+  "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
   "autoCompactEnabled": true,
   "agentPushNotifEnabled": true,

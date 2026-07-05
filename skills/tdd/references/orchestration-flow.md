@@ -29,11 +29,14 @@ LOOP (one behavior group per cycle):
        rules/skill-loading.md.
 
   RED-GREEN:
-    1. Dispatch tdd-cycle agent (model: sonnet, effort: high) with:
+    1. Dispatch tdd-cycle agent (model/effort come from its frontmatter -- do not override) with:
        - Task description (what behaviors to test -- may be a cohesive batch)
        - Relevant test file paths
     2. Capture from tdd-cycle output: TEST_FILE, TEST_NAME, TEST_COMMAND,
        FULL_SUITE_COMMAND, FAILURE_OUTPUT, IMPLEMENTATION_FILES, TEST_OUTPUT, STATUS
+       Then clear the cycle commit guard the agent raised:
+       rm -f "$(git rev-parse --git-dir)/tdd-cycle-active"
+       (while it exists, a hook blocks all git add/commit -- including yours)
     3. Handle non-PASSED statuses:
        - PASSED_UNEXPECTEDLY -> behavior already exists; report to user;
          ask: skip (next behavior) or revise test scope?
@@ -47,6 +50,10 @@ LOOP (one behavior group per cycle):
        b. Run TEST_COMMAND yourself -- verify specific tests pass
        c. Run FULL_SUITE_COMMAND yourself -- verify full suite passes (no regressions)
        d. If verification fails -> report to user; do not proceed
+       e. Commit the cycle (the agent NEVER commits -- you own this):
+          load Skill(write-commit), then commit in TDD order:
+          - stage TEST_FILE(s) only -> commit (tests first)
+          - stage IMPLEMENTATION_FILES -> commit
 
   CONTINUE:
     5. Ask user: more behaviors to implement? -> loop or exit
@@ -60,8 +67,10 @@ REFACTOR (once, after last cycle):
   12. If >= 50 insertions:
       - Split all changed files into implementation files and test files
       - Run two tracks in parallel. For each track:
-        1. Dispatch code-distill agent (model: sonnet, effort: medium) on the files
-        2. Dispatch vet-code (impl track) or vet-test (test track) on the same files (model: sonnet, effort: medium)
+        1. Dispatch code-distiller agent on the files
+        2. Dispatch a general-purpose agent prompted to load Skill(vet-code) (impl track)
+           or Skill(vet-test) (test track) and run it on the same files
+           (vet-code/vet-test are skills, not agents -- never pass as subagent_type)
         3. If vet made changes, dispatch vet again (max 2 passes)
       - If any fixes applied, re-run FULL_SUITE_COMMAND to confirm tests still green
 ```
@@ -71,8 +80,9 @@ REFACTOR (once, after last cycle):
 Only structured data passes between phases -- never reasoning or analysis.
 
 **Orchestrator validation:** If any required field (TEST_FILE, TEST_NAME, TEST_COMMAND,
-FULL_SUITE_COMMAND, STATUS) is missing from agent output, do NOT proceed. Re-read the output
-carefully. If truly absent, report to user: "agent output missing required field: `{field}`".
+FULL_SUITE_COMMAND, STATUS -- plus IMPLEMENTATION_FILES when STATUS is PASSED) is missing from agent
+output, do NOT proceed. Re-read the output carefully. If truly absent, report to user: "agent output
+missing required field: `{field}`".
 
 **Orchestrator -> tdd-cycle:**
 
@@ -82,17 +92,9 @@ Task description, test file paths
 
 **tdd-cycle -> Orchestrator:**
 
-```text
-STATUS: PASSED | STUCK | PASSED_UNEXPECTEDLY | TEST_FLAWED
-PHASE: RED | GREEN      (only when STATUS is STUCK)
-TEST_FILE: <path>
-TEST_NAME: <name(s)>
-TEST_COMMAND: <command>
-FULL_SUITE_COMMAND: <command>
-FAILURE_OUTPUT: <output from RED phase>     (prefixed with "SKILL_MISSING: <name>" if a listed skill was not found)
-IMPLEMENTATION_FILES: <files modified>   (only when STATUS is PASSED)
-TEST_OUTPUT: <output from GREEN phase>   (only when STATUS is PASSED)
-```
+The field-by-field contract (STATUS values, per-status field sets, examples) is owned by
+`agents/tdd-cycle.md` § Output Format -- the single source of truth. Do not restate it here; if this
+file and the agent file ever disagree, the agent file wins.
 
 **Accumulated across all cycles (for REFACTOR):**
 

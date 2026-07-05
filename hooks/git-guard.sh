@@ -94,6 +94,23 @@ check_plan_files() {
 }
 
 # ╭────────────────────────────────────────────────────────────╮
+# │                  TDD Cycle Commit Guard                    │
+# ╰────────────────────────────────────────────────────────────╯
+
+# While a tdd-cycle agent runs (marker created/removed by the agent per
+# agents/tdd-cycle.md), commits and staging are forbidden — the orchestrator
+# owns all commits.
+check_tdd_cycle_marker() {
+	local subcmd="$1" git_dir
+	git_dir=$(git --no-optional-locks rev-parse --git-dir 2>/dev/null) || return 0
+	[[ -f "$git_dir/tdd-cycle-active" ]] || return 0
+	printf "BLOCKED: git %s — a tdd-cycle agent is running and the orchestrator owns all commits.\n" "$subcmd" >&2
+	printf "If you ARE the tdd-cycle agent: do not commit or stage; write your report instead.\n" >&2
+	printf "If no tdd-cycle agent is running (stale marker), remove '%s/tdd-cycle-active' and retry.\n" "$git_dir" >&2
+	exit 2
+}
+
+# ╭────────────────────────────────────────────────────────────╮
 # │           Destructive Operations Protection                │
 # ╰────────────────────────────────────────────────────────────╯
 
@@ -179,6 +196,11 @@ check_destructive_operations() {
 # Sets global $command so is_git_subcmd and regex checks work.
 check_single_command() {
 	command="$1"
+
+	# Block staging and commits while a tdd-cycle agent is running
+	if is_git_subcmd "add" || is_git_subcmd "commit"; then
+		check_tdd_cycle_marker "$(get_git_subcmd "$command")"
+	fi
 
 	# Block push operations
 	if is_git_subcmd "push"; then
