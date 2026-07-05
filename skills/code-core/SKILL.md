@@ -37,7 +37,8 @@ The leaf skill owns the language-specific syntax for each of these. The rule is 
 ### 2. No Obvious Comments — Explain Why, Not What
 
 Self-documenting code makes the _what_ obvious. Comments are for the _why_: non-obvious decisions,
-trade-offs, invariants, references to external context (ticket number, paper, spec section).
+trade-offs, invariants, references to external context (ticket number, paper, spec section). Never
+reference line numbers — they drift on the next edit; name the invariant, function, or symbol.
 
 ````text
 # BAD — restates the code
@@ -45,9 +46,15 @@ total = 0  # initialize total
 for item in items:  # loop through items
     total += item  # add to total
 
+# BAD — line number drifts on next edit
+# see line 42 for the retry logic
+
 # GOOD — explains a non-obvious constraint
 # Use 4095 not 4096: kernel reserves the top page in this range (see POSIX §12.2.3)
 LIMIT = 4095
+
+# GOOD — names the function, not the line
+# see validate_token() for the retry logic
 ```text
 
 Delete comments before refactoring a function, then add them back only where the new code can't

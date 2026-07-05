@@ -16,6 +16,14 @@ to prove a failure existed before your edits.
 Never run any command that could destroy, overwrite, or discard uncommitted work. Always ask the
 user first and explain why.
 
+### Skill loading is mandatory — no exceptions
+
+**Before every action in the skill-loading table (`rules/skill-loading.md`), load the skill first.**
+Plan mode = `Skill(write-plan)`. Writing code = `Skill(code-core)`. Tests = `Skill(test-core)`.
+Every time, even if loaded earlier, even if already in plan mode, even after compaction. "Already in
+plan mode" does not mean the skill is loaded — plan mode is system state, the skill is the
+instructions for how to use it. Editing a plan file without the skill loaded is always wrong.
+
 ### TDD
 
 When the project has a test suite, no production code before a failing test. A test suite anywhere
@@ -24,7 +32,9 @@ in the project qualifies. No test suite at all → skip TDD.
 - **Bug or regression** (unknown root cause): use `/fix` — it investigates first, then drives TDD.
 - **New feature** (root cause irrelevant): load `Skill(tdd)` directly and start the red–green cycle.
 
-Never dispatch `tdd-cycle` directly.
+Never dispatch `tdd-cycle` directly. Exception: build's FAIL-path remediation may dispatch
+`tdd-cycle` directly when the TDD context (`TEST_COMMAND`, `TEST_FILE`, etc.) is already present
+from a prior `tdd` run.
 
 ### Pre-commit hooks: `prek` or `lefthook`
 
@@ -37,10 +47,38 @@ Never expose internal tooling details (skill/agent names, `.planning/` paths, or
 references) in commits, PRs, code comments, or any user-facing output. Describe **what was built or
 fixed**, not the process.
 
+### Never re-run a command to filter output you already have
+
+If command output is already in context, extract what you need from it — don't re-execute. When you
+anticipate needing to examine output multiple ways, capture it once with `tee`:
+
+```bash
+<command> 2>&1 | tee /tmp/out.txt | tail -30
+# later, if needed:
+grep -E "..." /tmp/out.txt
+```
+
+Re-running a command solely to change the filter is always wrong: it wastes time, doubles side
+effects.
+
+**Background commands:** the completion notification carries only the exit code — the output is not
+in context. Always `tee` to a file when running a command in the background, then `Read` the file on
+completion instead of re-running:
+
+```bash
+# run_in_background: true
+<command> 2>&1 | tee /tmp/out.txt
+# on notification: Read /tmp/out.txt — never re-run
+```
+
 ### Verify before claiming completion
 
 Never claim tests pass, builds succeed, or work is complete without running the verification command
 and showing its output in the same message. "Should work" is not verification.
+
+**This includes commits.** Never commit until the full verification suite has run and passed — the
+order is implement → verify → commit, never implement → commit → verify. One failing check means no
+commit.
 
 ### Comment/docstring length and shape
 
