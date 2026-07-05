@@ -198,9 +198,11 @@ a non-exhaustive list that still misses extensionless shebangs, `code-shell` aut
 `paths: "**/*.sh, **/*.bash"` glob in SKILL frontmatter.
 
 **This is a historical exception — do not copy this pattern.** New languages should follow the
-5-step sequence above using the dispatch table. The trade-off with `code-shell` is that it cannot be
-discovered by orchestrators that resolve only from the table (there is no `test-shell` and shell
-files have no standardized test infrastructure in these projects).
+5-step sequence above using the dispatch table. The trade-off with `code-shell` is that table-driven
+orchestrators cannot resolve a leaf skill for it — they fall back to hub-only review (`code-core`
+alone), with `code-shell` activating via its `paths:` glob only when the file is actually read
+(there is no `test-shell` and shell files have no standardized test infrastructure in these
+projects).
 
 ### `code-tstl` — two-layer overlay
 
@@ -251,3 +253,12 @@ After adding a language, run through this list before declaring it supported:
   alongside the skills.
 - **Copying `code-shell`'s `paths:`-only pattern.** `paths:` activation was an exception for a
   language with no clean extension boundary. New languages use the dispatch table.
+
+## See Also
+
+This doc covers the **content overlay** architecture — DSD answers "which rules apply to _this
+file_?" by detecting import patterns. A different problem has a different pattern:
+[`docs/process-harness.md`](process-harness.md) covers **process skills** (project-agnostic
+methodology) that need project-specific _tooling config_ — "which commands for _this project_?".
+That pattern reads a harness file from a well-known path instead of dispatching on file content. The
+`harden` skill is the canonical example.
