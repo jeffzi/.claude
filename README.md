@@ -9,9 +9,10 @@ agents, hooks, and settings.
 
 ### Skills
 
-Some skills are synced from external repositories. Run
-[`scripts/sync-skills.sh`](scripts/sync-skills.sh) to install or update them; the source map is in
-[`skills.json`](skills.json).
+Some skills are synced from external repositories via
+[`npx skills`](https://github.com/vercel-labs/skills). Run
+[`scripts/sync-skills.sh`](scripts/sync-skills.sh) to install or update them; the script's `add`
+commands are the source map.
 
 #### Code
 
@@ -76,6 +77,7 @@ Some skills are synced from external repositories. Run
 | [`brainstorming`](skills/brainstorming/SKILL.md)                 | Explore intent and design space before implementing features                |
 | [`build`](skills/build/SKILL.md)                                 | End-to-end feature pipeline: brainstorm → plan → TDD with quality gates     |
 | [`fix`](skills/fix/SKILL.md)                                     | Root cause investigation then TDD-driven fix                                |
+| [`harden`](skills/harden/SKILL.md)                               | Bug-hunting audit + DRY pass with diff-gated execution                      |
 | [`preflight`](skills/preflight/SKILL.md)                         | Pre-commit review pipeline: vet, scan, auto-fix, iterate                    |
 | [`receiving-code-review`](skills/receiving-code-review/SKILL.md) | Decide what to implement from review feedback (PR comments, agent findings) |
 | [`plan-commit`](skills/plan-commit/SKILL.md)                     | Analyze uncommitted changes and suggest granular commits                    |
@@ -97,13 +99,12 @@ Some skills are synced from external repositories. Run
 
 ### Agents
 
-| Agent                                    | Description                                                 |
-| ---------------------------------------- | ----------------------------------------------------------- |
-| [`bug-scanner`](agents/bug-scanner.md)   | Runtime correctness audit at specific locations             |
-| [`code-mend`](agents/code-mend.md)       | Surgical fixes at specific file:line locations              |
-| [`code-distill`](agents/code-distill.md) | Reduce code complexity while preserving behavior            |
-| [`doc-reviewer`](agents/doc-reviewer.md) | Review docs for structure, clarity, completeness, and prose |
-| [`tdd-cycle`](agents/tdd-cycle.md)       | Context-isolated RED-GREEN cycle agent                      |
+| Agent                                        | Description                                      |
+| -------------------------------------------- | ------------------------------------------------ |
+| [`bug-scanner`](agents/bug-scanner.md)       | Runtime correctness audit at specific locations  |
+| [`code-mender`](agents/code-mender.md)       | Surgical fixes at specific file:line locations   |
+| [`code-distiller`](agents/code-distiller.md) | Reduce code complexity while preserving behavior |
+| [`tdd-cycle`](agents/tdd-cycle.md)           | Context-isolated RED-GREEN cycle agent           |
 
 ### Development Workflow
 
@@ -122,18 +123,19 @@ using AST-aware code compression, JSON crushing, and KV-cache alignment (47–92
 
 ### Hooks
 
-| Hook                                               | Description                                                   |
-| -------------------------------------------------- | ------------------------------------------------------------- |
-| [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh)   | Blocks proceeding when a Bash command fails                   |
-| [`config-guard.sh`](hooks/config-guard.sh)         | Protects configuration files from unintended edits            |
-| [`cross-repo-guard.sh`](hooks/cross-repo-guard.sh) | Blocks writes to paths outside the session's repository       |
-| [`git-commit-guard.sh`](hooks/git-commit-guard.sh) | Blocks commit messages containing internal tooling references |
-| [`git-guard.sh`](hooks/git-guard.sh)               | Blocks auto-push, plan file commits, destructive ops          |
-| [`git-lock-guard.sh`](hooks/git-lock-guard.sh)     | Absorbs `.git/index.lock` races from parallel agents/sessions |
-| [`marimo-check.sh`](hooks/marimo-check.sh)         | Validates marimo notebooks on edit                            |
-| [`plan-skill-guard.sh`](hooks/plan-skill-guard.sh) | Enforces skill loading before plan mode                       |
-| [`shiny-check.sh`](hooks/shiny-check.sh)           | Smoke-tests staged Shiny apps before commit                   |
-| [`worktree-guard.sh`](hooks/worktree-guard.sh)     | Blocks exiting worktrees with uncommitted changes             |
+| Hook                                               | Description                                                                     |
+| -------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh)   | Blocks proceeding when a Bash command fails                                     |
+| [`config-guard.sh`](hooks/config-guard.sh)         | Protects configuration files from unintended edits                              |
+| [`git-commit-guard.sh`](hooks/git-commit-guard.sh) | Blocks commit messages containing internal tooling references                   |
+| [`git-guard.sh`](hooks/git-guard.sh)               | Blocks auto-push, plan file commits, destructive ops, commits during TDD cycles |
+| [`git-lock-guard.sh`](hooks/git-lock-guard.sh)     | Absorbs `.git/index.lock` races from parallel agents/sessions                   |
+| [`marimo-check.sh`](hooks/marimo-check.sh)         | Validates marimo notebooks on edit                                              |
+| [`plan-claim-guard.sh`](hooks/plan-claim-guard.sh) | Reminds to verify plan claims before exiting plan mode                          |
+| [`plan-skill-guard.sh`](hooks/plan-skill-guard.sh) | Enforces skill loading before plan mode                                         |
+| [`shiny-check.sh`](hooks/shiny-check.sh)           | Smoke-tests staged Shiny apps before commit                                     |
+| [`tdd-red-guard.sh`](hooks/tdd-red-guard.sh)       | Blocks reading implementation source during TDD RED phase                       |
+| [`worktree-guard.sh`](hooks/worktree-guard.sh)     | Blocks exiting worktrees with uncommitted changes                               |
 
 ## License
 
