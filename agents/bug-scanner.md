@@ -10,6 +10,8 @@ tools:
   - Read
   - Glob
   - Grep
+  - LSP
+  - Bash
 color: red
 ---
 

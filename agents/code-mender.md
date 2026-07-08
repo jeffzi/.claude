@@ -11,6 +11,8 @@ tools:
   - Edit
   - Glob
   - Grep
+  - LSP
+  - Bash
 color: cyan
 ---
 
