@@ -47,6 +47,11 @@ Never expose internal tooling details (skill/agent names, `.planning/` paths, or
 references) in commits, PRs, code comments, or any user-facing output. Describe **what was built or
 fixed**, not the process.
 
+### No `ponytail:` comments
+
+Never add `ponytail:` comments to code. These are internal markers from the `/ponytail-review` skill
+and must not appear in committed code.
+
 ### Never re-run a command to filter output you already have
 
 If command output is already in context, extract what you need from it — don't re-execute. When you
