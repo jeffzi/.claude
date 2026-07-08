@@ -63,12 +63,13 @@ commands are the source map.
 
 #### Review
 
-| Skill                                    | Description                                     |
-| ---------------------------------------- | ----------------------------------------------- |
-| [`vet-code`](skills/vet-code/SKILL.md)   | Review code files for skill rule violations     |
-| [`vet-test`](skills/vet-test/SKILL.md)   | Review test files for redundancy and AAA issues |
-| [`vet-doc`](skills/vet-doc/SKILL.md)     | Review docs for structural and prose issues     |
-| [`vet-skill`](skills/vet-skill/SKILL.md) | Review SKILL.md files for quality and structure |
+| Skill                                          | Description                                     |
+| ---------------------------------------------- | ----------------------------------------------- |
+| [`vet-code`](skills/vet-code/SKILL.md)         | Review code files for skill rule violations     |
+| [`vet-test`](skills/vet-test/SKILL.md)         | Review test files for redundancy and AAA issues |
+| [`vet-doc`](skills/vet-doc/SKILL.md)           | Review docs for structural and prose issues     |
+| [`vet-comments`](skills/vet-comments/SKILL.md) | Standardize comment style, banners, and anchors |
+| [`vet-skill`](skills/vet-skill/SKILL.md)       | Review SKILL.md files for quality and structure |
 
 #### Process
 
