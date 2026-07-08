@@ -6,7 +6,6 @@ description: >
   execution. Apply when tempted to write vague messages
   like "fix bug" or "update code", or when unsure
   whether a commit needs a body. Not for PR descriptions or changelog entries.
-argument-hint: "[optional scope or context]"
 allowed-tools: Read, Grep, Bash(git *)
 model: haiku
 effort: low
@@ -86,6 +85,11 @@ Scope to the affected area when not generic: `fix(net/http): handle foo when bar
 Most commits need only a subject line. **Skip the body** for single-purpose fixes, renames,
 dependency bumps, small refactors — any change where the subject tells the full story.
 
+**Never use the body to narrate the diff or justify bundling.** "Also does X, since both touch the
+same file" restates what the diff shows and explains commit logistics, not motivation. If the only
+thing the body would say is _what else is in this commit_ or _why things were grouped together_,
+delete it — the subject and diff already cover that.
+
 **Write a body** (1–3 sentences) when a future reader couldn't reconstruct the reasoning from the
 diff alone:
 
@@ -102,14 +106,15 @@ footer, not as the message.
 
 ## Anti-Patterns
 
-| Pattern                               | Problem                                                        |
-| ------------------------------------- | -------------------------------------------------------------- |
-| "Fix bug", "update code", "misc"      | Zero information — forces everyone to read the diff            |
-| "Fix JIRA-1234" (ticket only)         | Requires browser + tracker; breaks when tracker migrates       |
-| "Change X from 5 to 10"               | Narrates the diff — explain _why_ the constant changed         |
-| "Allow X on Y" / "Enable X for Z"     | Reads as motivation, not effect — name what concretely changed |
-| "Address review comments"             | Meaningless outside PR context                                 |
-| Auto-committing during plan execution | User loses ability to review before commit; hard to undo       |
+| Pattern                                  | Problem                                                        |
+| ---------------------------------------- | -------------------------------------------------------------- |
+| "Fix bug", "update code", "misc"         | Zero information — forces everyone to read the diff            |
+| "Fix JIRA-1234" (ticket only)            | Requires browser + tracker; breaks when tracker migrates       |
+| "Change X from 5 to 10"                  | Narrates the diff — explain _why_ the constant changed         |
+| "Allow X on Y" / "Enable X for Z"        | Reads as motivation, not effect — name what concretely changed |
+| "Address review comments"                | Meaningless outside PR context                                 |
+| Body narrates diff or justifies bundling | "Also bumps X since both touch Y" — logistics, not motivation  |
+| Auto-committing during plan execution    | User loses ability to review before commit; hard to undo       |
 
 ## No internal tooling leaks
 
@@ -126,16 +131,24 @@ When the user **explicitly** asks to commit (in any phrasing — "commit", "comm
 this"). **Never execute this during plan execution** — the user must review all changes first. An
 explicit "commit" request during an active plan is not an exception to this rule.
 
-0. **Verify before committing** — if this commit includes code changes (not docs-only or config),
-   run the project's test command and confirm it passes. No commit without fresh passing evidence.
-   If tests fail, fix first. If no test suite exists, skip this step.
+Pre-commit verification (tests, lint, type-check) is enforced by the global rules — it must pass
+**before** this skill is loaded. This skill owns message composition and the commit workflow, not
+verification.
 
-1. **Gather context** — run in parallel:
-   - `git status`
-   - `git diff --cached --name-only` ← what is already staged
-   - `git diff HEAD`
-   - `git branch --show-current`
-   - `git log --oneline -10`
+### Context (auto-injected)
+
+!`git status 2>/dev/null`
+
+!`git diff --cached --name-only 2>/dev/null`
+
+!`git diff HEAD 2>/dev/null`
+
+!`git branch --show-current 2>/dev/null`
+
+!`git log --oneline -10 2>/dev/null`
+
+1. **Review injected context** — the git state above is already available. Verify it matches
+   expectations before composing the message.
 
 2. **Compose the message** — apply all rules above before writing a single word of the subject.
 
@@ -159,7 +172,19 @@ explicit "commit" request during an active plan is not an exception to this rule
    staged, **stop and surface the discrepancy** before continuing. Do not proceed to the next commit
    or any subsequent step until this is resolved.
 
+## Red Flags — Stop Before Committing
+
+- Auto-committing without the user's explicit approval
+- Writing a body that narrates the diff ("changed X to Y", "also bumps Z")
+- Subject describes implementation steps instead of the concrete effect
+- Commit bundles unrelated changes that deserve separate commits
+- Referencing internal tooling (skill names, `.planning/` paths, agent names)
+- Committing without fresh verification evidence in the current conversation
+
 ## Rationalization Guard
+
+**Foundational principle:** Violating the letter of these rules is violating the spirit of the
+rules.
 
 A commit message that technically avoids the listed anti-patterns but still obscures intent violates
 the spirit of these rules. If a future reader would need to open the diff to understand what

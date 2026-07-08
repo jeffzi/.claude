@@ -114,6 +114,10 @@ Options:
 
 ### Step 5: Execute (only after approval)
 
+Pre-commit verification (tests, lint, type-check) is assumed complete before this skill is invoked —
+do **not** re-run the test suite per commit. The changes are already tested; this skill organizes
+them, it does not re-verify them.
+
 For each commit in the approved plan, stage only the listed files and commit. Use `write-commit`
 guidelines for the final message. Execute commits sequentially — each must succeed before the next.
 If a commit fails, stop immediately and report the error. Do not continue with remaining commits.
