@@ -107,6 +107,19 @@ commands are the source map.
 | [`code-distiller`](agents/code-distiller.md) | Reduce code complexity while preserving behavior |
 | [`tdd-cycle`](agents/tdd-cycle.md)           | Context-isolated RED-GREEN cycle agent           |
 
+### Rules
+
+Always-on rules live in `rules/` and are auto-loaded into every conversation. Rules with `paths:`
+frontmatter activate only when matching files are in context.
+
+| Rule                                                  | Description                                                    |
+| ----------------------------------------------------- | -------------------------------------------------------------- |
+| [`code-exploration`](rules/code-exploration.md)       | Orient before drilling: structure-first reading policy         |
+| [`no-cross-repo-edits`](rules/no-cross-repo-edits.md) | Block edits outside the session's git root                     |
+| [`no-destructive-ops`](rules/no-destructive-ops.md)   | Block commands that discard uncommitted work                   |
+| [`receiving-feedback`](rules/receiving-feedback.md)   | Verify feedback before implementing; no performative agreement |
+| [`skill-loading`](rules/skill-loading.md)             | Mandatory skill loading before every matching action           |
+
 ### Development Workflow
 
 Single-session tools compose into a lightweight pipeline.

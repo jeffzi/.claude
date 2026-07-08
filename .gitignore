@@ -39,6 +39,10 @@ skills/humanizer/
 skills/brainstorming/
 skills/fallow/
 
+# Allow rules
+!rules/
+!rules/**
+
 # Allow hooks
 !hooks/
 !hooks/**
