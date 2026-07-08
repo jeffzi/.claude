@@ -116,6 +116,17 @@ Single-session tools compose into a lightweight pipeline.
 | Bug fix       | [`/fix`](skills/fix/SKILL.md)     | Root cause unknown — investigates then drives TDD               |
 | Small feature | [`/build`](skills/build/SKILL.md) | Single session — brainstorm, plan, implement with quality gates |
 
+### Status Line
+
+[`scripts/statusline.sh`](scripts/statusline.sh) renders a custom status line showing model name,
+project directory, context window usage bar, and rate limit pacing. Rate limits display the 5-hour
+window as a countdown (`⏳2h`) and the 7-day window as an absolute reset date (`⏳Jul12 09:00`).
+Pace emoji (🔥 / 🐢) appear above 50% usage when the burn rate diverges from an even linear spend.
+
+```text
+.claude │ Opus 4.6 ▓▓▓▓▓▓▓▓▓░░░░░░░░░░░ 45% │ 5h:72% (🔥 ⏳2h) │ 7d:89% (🐢 ⏳Jul13 09:00)
+```
+
 ### Token Compression
 
 [Headroom](https://github.com/chopratejas/headroom) reduces token usage, extending the Claude Code
