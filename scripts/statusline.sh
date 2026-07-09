@@ -6,6 +6,9 @@ input=$(cat)
 MODEL=$(printf '%s' "$input" | jq -r '.model.display_name')
 DIR=$(printf '%s' "$input" | jq -r '.workspace.current_dir')
 PCT=$(printf '%s' "$input" | jq -r '.context_window.used_percentage // 0' | cut -d. -f1)
+# 0 until this session makes its first API call. rate_limits is carried over from
+# the previous session until then, so a 0 here means the limit data is stale.
+API_MS=$(printf '%s' "$input" | jq -r '.cost.total_api_duration_ms // 0')
 FIVE_H=$(printf '%s' "$input" | jq -r '.rate_limits.five_hour.used_percentage // empty')
 FIVE_H_RESET=$(printf '%s' "$input" | jq -r '.rate_limits.five_hour.resets_at // empty')
 WEEK=$(printf '%s' "$input" | jq -r '.rate_limits.seven_day.used_percentage // empty')
@@ -34,6 +37,7 @@ fmt_reset_countdown() {
 fmt_reset_absolute() {
 	local reset_epoch="$1"
 	[[ -z "$reset_epoch" ]] && return
+	((reset_epoch <= $(date +%s))) && return # stale/past reset — don't render a bygone date
 	date -r "$reset_epoch" '+%b%d %H:%M'
 }
 
@@ -91,7 +95,7 @@ fi
 
 # Rate limits — absent before first API response or for non-subscribers
 LIMITS=""
-if [[ -n "$FIVE_H" ]]; then
+if ((API_MS > 0)) && [[ -n "$FIVE_H" ]]; then
 	FH_INT=$(printf '%.0f' "$FIVE_H")
 	fh_pace=$(fmt_pace "$FH_INT" "$FIVE_H_RESET" 18000)
 	fh_reset=$(fmt_reset_countdown "$FIVE_H_RESET")
@@ -99,7 +103,7 @@ if [[ -n "$FIVE_H" ]]; then
 	[[ -n "$fh_pace" || -n "$fh_reset" ]] && fh_detail=" (${fh_pace}${fh_pace:+ }${fh_reset:+⏳${fh_reset}})"
 	LIMITS=" │ 5h:${FH_INT}%${fh_detail}"
 fi
-if [[ -n "$WEEK" ]]; then
+if ((API_MS > 0)) && [[ -n "$WEEK" ]]; then
 	WK_INT=$(printf '%.0f' "$WEEK")
 	wk_pace=$(fmt_pace "$WK_INT" "$WEEK_RESET" 604800)
 	wk_reset=$(fmt_reset_absolute "$WEEK_RESET")
