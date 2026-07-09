@@ -66,6 +66,7 @@ fmt_pace() {
 }
 
 GREEN='\033[32m'
+GRAY='\033[38;5;238m'
 YELLOW='\033[33m'
 RED='\033[31m'
 BLINK='\033[5m'
@@ -77,7 +78,8 @@ FILLED=$((PCT * BAR_WIDTH / 100))
 EMPTY=$((BAR_WIDTH - FILLED))
 printf -v FILL "%${FILLED}s"
 printf -v PAD "%${EMPTY}s"
-BAR="${FILL// /▓}${PAD// /░}"
+BAR="${FILL// /█}"
+TRACK="${PAD// /█}"
 
 # Zone: color thresholds (💀 only at 90%+)
 if [[ "$PCT" -ge 90 ]]; then
@@ -113,4 +115,4 @@ if ((API_MS > 0)) && [[ -n "$WEEK" ]]; then
 	LIMITS="${LIMITS} │ 7d:${WK_INT}%${wk_detail}"
 fi
 
-printf '%b\n' "${DIR##*/} │ ${MODEL} ${CTX_COLOR}${BAR} ${PCT}%${EMOJI}${RESET}${LIMITS}"
+printf '%b\n' "${DIR##*/} │ ${MODEL} ${CTX_COLOR}${BAR}${GRAY}${TRACK}${RESET} ${CTX_COLOR}${PCT}%${EMOJI}${RESET}${LIMITS}"
