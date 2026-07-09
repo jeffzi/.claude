@@ -65,7 +65,6 @@ fmt_pace() {
 	fi
 }
 
-DIM='\033[2m'
 GREEN='\033[32m'
 YELLOW='\033[33m'
 RED='\033[31m'
@@ -114,4 +113,4 @@ if ((API_MS > 0)) && [[ -n "$WEEK" ]]; then
 	LIMITS="${LIMITS} │ 7d:${WK_INT}%${wk_detail}"
 fi
 
-printf '%b\n' "${DIM}${DIR##*/}${RESET} │ ${DIM}${MODEL}${RESET} ${CTX_COLOR}${BAR} ${PCT}%${EMOJI}${RESET}${LIMITS}"
+printf '%b\n' "${DIR##*/} │ ${MODEL} ${CTX_COLOR}${BAR} ${PCT}%${EMOJI}${RESET}${LIMITS}"
