@@ -4,6 +4,8 @@ set -euo pipefail
 input=$(cat)
 
 MODEL=$(printf '%s' "$input" | jq -r '.model.display_name')
+EFFORT=$(printf '%s' "$input" | jq -r '.effort.level // empty')
+[[ -n "$EFFORT" ]] && MODEL="$MODEL ($EFFORT)"
 DIR=$(printf '%s' "$input" | jq -r '.workspace.current_dir')
 PCT=$(printf '%s' "$input" | jq -r '.context_window.used_percentage // 0' | cut -d. -f1)
 # 0 until this session makes its first API call. rate_limits is carried over from
