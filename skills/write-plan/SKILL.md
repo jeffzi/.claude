@@ -121,7 +121,7 @@ reviewer — verify those by running the commands directly.
 
 ## Plan Review
 
-For plans with 4+ tasks, dispatch one **Agent** call with `subagent_type: general-purpose`, passing
+For plans with 2+ tasks, dispatch one **Agent** call with `subagent_type: general-purpose`, passing
 the spec and the draft plan, to check completeness, spec alignment, and task decomposition. Max 3
 review iterations, then surface to user. Reviewers are advisory.
 
