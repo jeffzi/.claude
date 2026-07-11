@@ -12,7 +12,7 @@ tools:
   - Grep
   - LSP
   - Bash
-color: yellow
+color: purple
 ---
 
 # Claim Reviewer

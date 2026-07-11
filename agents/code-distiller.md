@@ -2,7 +2,7 @@
 name: code-distiller
 description: Use when code needs cleanup after implementation is complete — deep nesting, duplicated
   logic, unclear names, or magic values. Not for behavioral changes or architectural refactors.
-model: opus
+model: sonnet
 effort: high
 tools:
   - Skill

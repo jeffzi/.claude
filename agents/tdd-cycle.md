@@ -15,7 +15,7 @@ tools:
   - Skill
 model: opus
 effort: high
-color: yellow
+color: orange
 ---
 
 # TDD Cycle — RED then GREEN

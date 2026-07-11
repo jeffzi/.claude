@@ -13,7 +13,7 @@ tools:
   - Grep
   - LSP
   - Bash
-color: cyan
+color: green
 ---
 
 # Code Mender
