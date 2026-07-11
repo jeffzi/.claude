@@ -104,16 +104,6 @@
         ]
       },
       {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/config-guard.sh",
-            "timeout": 5
-          }
-        ]
-      },
-      {
         "matcher": "EnterPlanMode",
         "hooks": [
           {
@@ -182,7 +172,6 @@
     "command": "$HOME/.claude/scripts/statusline.sh"
   },
   "enabledPlugins": {
-    "claude-md-management@claude-plugins-official": true,
     "lua-lsp@claude-plugins-official": true,
     "rust-analyzer-lsp@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,

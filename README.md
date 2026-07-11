@@ -151,7 +151,6 @@ using AST-aware code compression, JSON crushing, and KV-cache alignment (47–92
 | Hook                                               | Description                                                                     |
 | -------------------------------------------------- | ------------------------------------------------------------------------------- |
 | [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh)   | Blocks proceeding when a Bash command fails                                     |
-| [`config-guard.sh`](hooks/config-guard.sh)         | Protects configuration files from unintended edits                              |
 | [`git-commit-guard.sh`](hooks/git-commit-guard.sh) | Blocks commit messages containing internal tooling references                   |
 | [`git-guard.sh`](hooks/git-guard.sh)               | Blocks auto-push, plan file commits, destructive ops, commits during TDD cycles |
 | [`git-lock-guard.sh`](hooks/git-lock-guard.sh)     | Absorbs `.git/index.lock` races from parallel agents/sessions                   |
