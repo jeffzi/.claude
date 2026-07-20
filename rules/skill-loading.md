@@ -8,7 +8,7 @@ loaded".
 | ----------------------------------------- | ------------------------------------------------------------------------------- |
 | EnterPlanMode or writing a plan           | `Skill(write-plan)`                                                             |
 | Writing code                              | `Skill(code-core)` (hub — loads the language skill via Language Dispatch below) |
-| Writing or reviewing tests                | `Skill(test-core)` (hub — loads the language skill via Language Dispatch below) |
+| Writing tests                             | `Skill(test-core)` (hub — loads the language skill via Language Dispatch below) |
 | Running TDD cycle                         | `Skill(tdd)` (hub load + RED-GREEN orchestration)                               |
 | Reviewing tests                           | `Skill(vet-test)` (hub load + code-* + review checklist)                        |
 | User explicitly asks to commit            | `Skill(write-commit)`                                                           |
@@ -20,12 +20,13 @@ than silently skipping the step.
 
 ## Language Dispatch for `test-*` and `code-*`
 
-| Ext(s)                | Test skill | Code skill | Test file patterns         |
-| --------------------- | ---------- | ---------- | -------------------------- |
-| .py, .pyi             | test-py    | code-py    | `test_*.py`, `*_test.py`   |
-| .ts, .tsx, .mts, .cts | test-ts    | code-ts    | `*.test.ts`, `*.spec.ts`   |
-| .lua                  | test-lua   | code-lua   | `*_test.lua`, `*_spec.lua` |
-| .swift                | test-swift | code-swift | `*Tests.swift`             |
+| Ext(s)                | Test skill            | Code skill | Test file patterns         |
+| --------------------- | --------------------- | ---------- | -------------------------- |
+| .py, .pyi             | test-py               | code-py    | `test_*.py`, `*_test.py`   |
+| .ts, .tsx, .mts, .cts | test-ts               | code-ts    | `*.test.ts`, `*.spec.ts`   |
+| .lua                  | test-lua              | code-lua   | `*_test.lua`, `*_spec.lua` |
+| .swift                | test-swift            | code-swift | `*Tests.swift`             |
+| .sh, .bash            | none (test-core only) | code-shell | `test_*.sh`                |
 
 Overlays load automatically via base-skill Domain Skill Detection (e.g. `test-py` detects
 `import polars` → `Skill(test-polars)`; `code-py` detects `import polars` → `Skill(polars)`). The

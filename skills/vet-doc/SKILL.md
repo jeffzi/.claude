@@ -1,12 +1,12 @@
 ---
 name: vet-doc
 description: |
-  Use when reviewing READMEs, guides, tutorials, reference docs, CHANGELOG.md, or any documentation
-  file for structural issues, prose quality violations, and anti-patterns. Also use after writing
-  docs to catch issues before publishing, when the user says "review the docs", "check the
-  documentation", "audit the README", or when reviewing a PR that includes documentation changes.
-  Not for inline code docstrings (use language-specific skills) or CLAUDE.md files (use
-  claude-md-improver).
+  Use when reviewing READMEs, guides, tutorials, reference docs, CHANGELOG.md, CLAUDE.md, or any
+  documentation file for structural issues, prose quality violations, and anti-patterns. Also use
+  after writing docs to catch issues before publishing, when the user says "review the docs", "check
+  the documentation", "audit the README", "audit CLAUDE.md", "improve CLAUDE.md", or when reviewing
+  a PR that includes documentation changes. Not for inline code docstrings (use language-specific
+  skills).
 argument-hint: "[doc file or directory]"
 model: opus
 effort: high
@@ -26,6 +26,9 @@ Review documentation systematically against structural and prose quality standar
 3. **Route by type:**
    - **CHANGELOG.md** → invoke `write-changelog` for structure and entry quality rules. Skip the
      general checklists below — `write-changelog` is the sole authority.
+   - **CLAUDE.md** (including `.claude.local.md`, `.claude.md`) → run the CLAUDE.md checklist below.
+     Skip the general structure/prose checklists — CLAUDE.md files have their own quality criteria.
+     Still run the AI-writing checklist.
    - **All other docs** → continue with the checklists below.
 4. **Run through the checklists** below, section by section.
 5. **Invoke skills as needed** — invoke `write-doc` for structural rules, invoke `write-prose` for
@@ -96,6 +99,63 @@ Invoke `write-prose` for the full reference. Flag these common issues:
 - [ ] **"See above" / "As mentioned earlier"** — readers arrive mid-page from search
 - [ ] **Inconsistent terminology** — same concept called different names
 
+## CLAUDE.md checklist
+
+When the target is a CLAUDE.md file (or `.claude.local.md`, `.claude.md`), use this checklist
+instead of the general structure/prose checklists. Read `references/claude-md-quality.md` for
+scoring rubric, templates, and update guidelines.
+
+### Discovery
+
+Before reviewing a single file, find all CLAUDE.md files in the repository:
+
+```bash
+find . -name "CLAUDE.md" -o -name ".claude.md" -o -name ".claude.local.md" 2>/dev/null | head -50
+```
+
+Review each file individually, but flag duplication or conflicts across files.
+
+### Quality criteria
+
+Score each file against six criteria (see `references/claude-md-quality.md` for point weights):
+
+- [ ] **Commands/workflows** — are build, test, lint, dev commands documented and copy-paste ready?
+- [ ] **Architecture clarity** — can Claude understand the codebase structure from this file? Key
+      directories, module relationships, entry points.
+- [ ] **Non-obvious patterns** — are gotchas, quirks, workarounds, and "why we do it this way"
+      captured?
+- [ ] **Conciseness** — is every line earning its place? No filler, no restating obvious code, no
+      redundancy with code comments.
+- [ ] **Currency** — do commands work, do file paths exist, does the tech stack description match
+      reality? Cross-reference against the actual codebase.
+- [ ] **Actionability** — are instructions executable? Commands copy-paste ready, paths real, steps
+      concrete — not vague or theoretical.
+
+### Common issues
+
+- [ ] Commands that would fail (wrong paths, missing dependencies, renamed scripts)
+- [ ] References to deleted or renamed files/directories
+- [ ] Copy-paste from templates without project-specific customization
+- [ ] Generic best practices not specific to this project ("always write tests", "use meaningful
+      names")
+- [ ] Verbose explanations where a one-liner suffices
+- [ ] Obvious code info restated ("UserService handles user operations")
+- [ ] One-off fixes documented that are unlikely to recur
+- [ ] `TODO` items never completed
+- [ ] Duplicate information across multiple CLAUDE.md files in the same repo
+
+### Output for CLAUDE.md reviews
+
+Use the standard output format below, but replace `**Document type**` with `**CLAUDE.md type**`
+(root, package, local, global) and add a quality score line:
+
+```text
+**Quality score**: XX/100 (Grade: A/B/C/D/F)
+```
+
+When proposing updates, show diffs with a "Why this helps" line for each change. See
+`references/claude-md-quality.md` for update guidelines and templates by project type.
+
 ## Rationalization guard
 
 | Excuse                                                         | Reality                                                                            |
@@ -110,16 +170,20 @@ Invoke `write-prose` for the full reference. Flag these common issues:
 
 Flag these documentation anti-patterns:
 
-| Anti-pattern               | What to look for                                                     |
-| -------------------------- | -------------------------------------------------------------------- |
-| FAQ as primary docs        | FAQ section doing the job of tutorials or how-to guides              |
-| Wall of text               | Long sections with no headings or structural breaks                  |
-| Installation-first README  | README that jumps to install before explaining what/why              |
-| Internal docs as user docs | Class hierarchies, implementation details exposed to users           |
-| Screenshot-heavy           | Text/code shown as screenshots instead of actual text                |
-| Mixed doc types            | Tutorial mid-stream switches to reference, or vice versa             |
-| Stale content              | Version numbers, links, or instructions that no longer match reality |
-| Overcrowded admonitions    | More than 3-4 callouts per page                                      |
+| Anti-pattern                | What to look for                                                     |
+| --------------------------- | -------------------------------------------------------------------- |
+| FAQ as primary docs         | FAQ section doing the job of tutorials or how-to guides              |
+| Wall of text                | Long sections with no headings or structural breaks                  |
+| Installation-first README   | README that jumps to install before explaining what/why              |
+| Internal docs as user docs  | Class hierarchies, implementation details exposed to users           |
+| Screenshot-heavy            | Text/code shown as screenshots instead of actual text                |
+| Mixed doc types             | Tutorial mid-stream switches to reference, or vice versa             |
+| Stale content               | Version numbers, links, or instructions that no longer match reality |
+| Overcrowded admonitions     | More than 3-4 callouts per page                                      |
+| Template boilerplate        | CLAUDE.md with placeholder sections not customized for the project   |
+| Generic advice in CLAUDE.md | Universal best practices instead of project-specific context         |
+| Verbose CLAUDE.md           | Paragraphs where a one-liner would do — context window is precious   |
+| Obvious restated            | CLAUDE.md documenting what class/function names already say          |
 
 ## AI-writing checklist
 
