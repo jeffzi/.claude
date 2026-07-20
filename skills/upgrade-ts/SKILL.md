@@ -5,9 +5,8 @@ allowed-tools: >
   Read, Grep, Edit, Bash(npm update:*),
   Bash(npm outdated:*), Bash(npm install:*),
   Bash(npm list:*), Bash(npx tsc:*),
-  Bash(npx biome:*), Bash(npx vitest:*)
+  Bash(npx oxlint:*), Bash(npx oxfmt:*), Bash(npx vitest:*)
 model: haiku
-disable-model-invocation: true
 effort: low
 ---
 
@@ -45,7 +44,7 @@ Update tasks with TaskUpdate as you progress:
   bumps while documenting the minimum minor version required. For 0.x, same rule applies: installed
   0.5.3 → `^0.5.0`.
 - **Exact** (no prefix, `X.Y.Z`) — only for tools that must match exact versions across config files
-  (e.g., biome version pinned in both package.json and biome.json).
+  (e.g., a tool whose exact version another config file must reference).
 - **Floor** (`>=X.Y.Z`) — for peerDependencies only. No upper bound, since peer deps should be
   permissive and let the consumer choose the version.
 
@@ -75,8 +74,8 @@ Update tasks with TaskUpdate as you progress:
 7. Run `npx tsc --noEmit` to verify type checking passes. Fix any type errors introduced by upgraded
    packages.
 
-8. Run `npx biome check --write .` and fix any remaining issues (run again if files were modified by
-   auto-fixes)
+8. Run `npx oxlint --fix` and `npx oxfmt`, then fix any remaining issues (run again if files were
+   modified by auto-fixes)
 
 9. Run `npx vitest run` to verify all tests still pass (if test files exist)
 
