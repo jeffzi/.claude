@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=https://json.schemastore.org/lefthook.json
+pre-commit:
+  commands:
+    lint:
+      glob: "**/*.{ts,tsx,mts,cts,js}"
+      run: npx oxlint --fix {staged_files}
+      stage_fixed: true
+    md:
+      glob: "**/*.md"
+      run: npx markdownlint-cli2 --fix {staged_files}
+      stage_fixed: true
+    fmt:
+      glob: "**/*.{ts,tsx,mts,cts,js,json,jsonc,md,yml,yaml}"
+      # oxfmt errors when every staged file is ignored; oxlint exits 0 and needs no guard
+      run: npx oxfmt --no-error-on-unmatched-pattern {staged_files}
+      stage_fixed: true
+    type:
+      glob: "**/*.{ts,tsx,mts,cts}"
+      run: npm run check:type
+    quality:
+      glob: "**/*.{ts,tsx,mts,cts,js,json}"
+      run: npm run check:quality
+    typelint:
+      glob: "**/*.{ts,tsx,mts,cts}"
+      run: npm run check:typelint
+    spelling:
+      glob: "**/*.{ts,tsx,mts,cts,md}"
+      run: npx cspell --no-progress --no-summary {staged_files}
+    actions:
+      glob: ".github/workflows/*.yml"
+      run: actionlint {staged_files} && zizmor {staged_files}
+
+commit-msg:
+  commands:
+    commitlint:
+      run: npx commitlint --edit {1}
+
+pre-push:
+  commands:
+    check:
+      run: npm run check
+    test:
+      glob: "**/*.{ts,tsx,mts,cts}"
+      run: npm test
