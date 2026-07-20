@@ -41,6 +41,7 @@ commands are the source map.
 | [`test-lua`](skills/test-lua/SKILL.md)       | Lua tests with busted                                                           |
 | [`test-polars`](skills/test-polars/SKILL.md) | Polars DataFrame assertions and fixtures                                        |
 | [`test-swift`](skills/test-swift/SKILL.md)   | Swift tests with Swift Testing and XCTest                                       |
+| [`stryker-js`](skills/stryker-js/SKILL.md)   | Mutation testing with StrykerJS for JS/TS projects                              |
 
 > To add a language skill pair (`code-*` and `test-*`) or library overlay, follow
 > [`docs/languages.md`](docs/languages.md).
@@ -63,13 +64,15 @@ commands are the source map.
 
 #### Review
 
-| Skill                                          | Description                                     |
-| ---------------------------------------------- | ----------------------------------------------- |
-| [`vet-code`](skills/vet-code/SKILL.md)         | Review code files for skill rule violations     |
-| [`vet-test`](skills/vet-test/SKILL.md)         | Review test files for redundancy and AAA issues |
-| [`vet-doc`](skills/vet-doc/SKILL.md)           | Review docs for structural and prose issues     |
-| [`vet-comments`](skills/vet-comments/SKILL.md) | Standardize comment style, banners, and anchors |
-| [`vet-skill`](skills/vet-skill/SKILL.md)       | Review SKILL.md files for quality and structure |
+| Skill                                                        | Description                                                    |
+| ------------------------------------------------------------ | -------------------------------------------------------------- |
+| [`vet-code`](skills/vet-code/SKILL.md)                       | Review code files for skill rule violations                    |
+| [`vet-test`](skills/vet-test/SKILL.md)                       | Review test files for redundancy and AAA issues                |
+| [`vet-doc`](skills/vet-doc/SKILL.md)                         | Review docs for structural and prose issues                    |
+| [`vet-comments`](skills/vet-comments/SKILL.md)               | Standardize comment style, banners, and anchors                |
+| [`vet-skill`](skills/vet-skill/SKILL.md)                     | Review SKILL.md files for quality and structure                |
+| [`scan-bug`](skills/scan-bug/SKILL.md)                       | Scan for runtime bugs: null access, leaks, races, logic errors |
+| [`scan-simplification`](skills/scan-simplification/SKILL.md) | Scan for over-engineering and unneeded complexity              |
 
 #### Process
 
@@ -86,6 +89,9 @@ commands are the source map.
 | [`research`](skills/research/SKILL.md)                           | Fact-checking and hallucination-resistant research                          |
 | [`upgrade-py`](skills/upgrade-py/SKILL.md)                       | Upgrade Python dependencies and sync versions                               |
 | [`upgrade-ts`](skills/upgrade-ts/SKILL.md)                       | Upgrade TypeScript dependencies and sync versions                           |
+| [`setup-ts`](skills/setup-ts/SKILL.md)                           | Scaffold or update shared TS tooling config (oxlint, tsconfig, etc.)        |
+| [`distill-code`](skills/distill-code/SKILL.md)                   | Reduce code complexity after implementation (nesting, duplication, naming)  |
+| [`fallow`](skills/fallow/SKILL.md)                               | Codebase intelligence: risk, duplication, complexity, dead code (TS/JS)     |
 
 #### Analysis
 
@@ -106,19 +112,23 @@ commands are the source map.
 | [`code-mender`](agents/code-mender.md)       | Surgical fixes at specific file:line locations   |
 | [`code-distiller`](agents/code-distiller.md) | Reduce code complexity while preserving behavior |
 | [`tdd-cycle`](agents/tdd-cycle.md)           | Context-isolated RED-GREEN cycle agent           |
+| [`claim-reviewer`](agents/claim-reviewer.md) | Verify claims against the codebase independently |
 
 ### Rules
 
 Always-on rules live in `rules/` and are auto-loaded into every conversation. Rules with `paths:`
 frontmatter activate only when matching files are in context.
 
-| Rule                                                  | Description                                                    |
-| ----------------------------------------------------- | -------------------------------------------------------------- |
-| [`code-exploration`](rules/code-exploration.md)       | Orient before drilling: structure-first reading policy         |
-| [`no-cross-repo-edits`](rules/no-cross-repo-edits.md) | Block edits outside the session's git root                     |
-| [`no-destructive-ops`](rules/no-destructive-ops.md)   | Block commands that discard uncommitted work                   |
-| [`receiving-feedback`](rules/receiving-feedback.md)   | Verify feedback before implementing; no performative agreement |
-| [`skill-loading`](rules/skill-loading.md)             | Mandatory skill loading before every matching action           |
+| Rule                                                    | Description                                                    |
+| ------------------------------------------------------- | -------------------------------------------------------------- |
+| [`code-exploration`](rules/code-exploration.md)         | Orient before drilling: structure-first reading policy         |
+| [`no-cross-repo-edits`](rules/no-cross-repo-edits.md)   | Block edits outside the session's git root                     |
+| [`no-destructive-ops`](rules/no-destructive-ops.md)     | Block commands that discard uncommitted work                   |
+| [`receiving-feedback`](rules/receiving-feedback.md)     | Verify feedback before implementing; no performative agreement |
+| [`skill-loading`](rules/skill-loading.md)               | Mandatory skill loading before every matching action           |
+| [`no-migration-bias`](rules/no-migration-bias.md)       | Migration cost is one factor, not a veto                       |
+| [`no-unilateral-action`](rules/no-unilateral-action.md) | Decisions and questions route through the user                 |
+| [`no-unrequested-edits`](rules/no-unrequested-edits.md) | Report first, edit only on explicit request                    |
 
 ### Development Workflow
 
@@ -160,6 +170,7 @@ using AST-aware code compression, JSON crushing, and KV-cache alignment (47–92
 | [`shiny-check.sh`](hooks/shiny-check.sh)           | Smoke-tests staged Shiny apps before commit                                     |
 | [`tdd-red-guard.sh`](hooks/tdd-red-guard.sh)       | Blocks reading implementation source during TDD RED phase                       |
 | [`worktree-guard.sh`](hooks/worktree-guard.sh)     | Blocks exiting worktrees with uncommitted changes                               |
+| [`collab-reminder.sh`](hooks/collab-reminder.sh)   | Re-injects propose-decisions / answer-first policy on every prompt              |
 
 ## License
 
