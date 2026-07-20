@@ -16,6 +16,7 @@ user first and explain why. This includes but is not limited to:
 - **File overwriting**: Reading content from git history (`git show`, `git cat-file`) and writing it
   back via Write/Edit tools or shell redirects (`git show HEAD:file > file`) to revert a file.
 - **File deletion**: `rm`, `rm -rf`, `unlink`, or any command that removes files.
-- **Shell redirects**: Truncating files via `> file` or `echo "" > file`.
+- **Shell redirects**: Truncating project files via `> file` or `echo "" > file` — scratch/temp
+  capture files (`/tmp/*`, scratchpad) are exempt.
 - **Worktrees**: `git worktree remove` or `ExitWorktree` when the worktree has uncommitted changes.
   Always commit work before leaving a worktree.

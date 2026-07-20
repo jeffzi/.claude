@@ -14,7 +14,7 @@ to prove a failure existed before your edits.
 ### No destructive operations without explicit permission
 
 Never run any command that could destroy, overwrite, or discard uncommitted work. Always ask the
-user first and explain why.
+user first and explain why. Full operation list: `rules/no-destructive-ops.md`.
 
 ### Skill loading is mandatory — no exceptions
 
@@ -29,7 +29,8 @@ instructions for how to use it. Editing a plan file without the skill loaded is 
 When the project has a test suite, no production code before a failing test. A test suite anywhere
 in the project qualifies. No test suite at all → skip TDD.
 
-- **Bug or regression** (unknown root cause): use `/fix` — it investigates first, then drives TDD.
+- **Bug or regression** (unknown root cause): use `/fix` — it investigates first, then drives TDD. A
+  bug report alone is read-only (`rules/no-unrequested-edits.md`); `/fix` requires a fix request.
 - **New feature** (root cause irrelevant): load `Skill(tdd)` directly and start the red–green cycle.
 
 Never dispatch `tdd-cycle` directly. Exception: build's FAIL-path remediation may dispatch
@@ -46,11 +47,6 @@ TypeScript projects use `lefthook`. All other projects use `prek`. Never assume
 Never expose internal tooling details (skill/agent names, `.planning/` paths, orchestrator
 references) in commits, PRs, code comments, or any user-facing output. Describe **what was built or
 fixed**, not the process.
-
-### No `ponytail:` comments
-
-Never add `ponytail:` comments to code. These are internal markers from the `/ponytail-review` skill
-and must not appear in committed code.
 
 ### Never re-run a command to filter output you already have
 
