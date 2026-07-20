@@ -141,8 +141,27 @@
         ]
       }
     ],
-    "UserPromptSubmit": [],
-    "SessionStart": [],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/collab-reminder.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/collab-reminder.sh"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Bash",
@@ -177,8 +196,7 @@
     "typescript-lsp@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
     "pyright-lsp@claude-plugins-official": true,
-    "clangd-lsp@claude-plugins-official": true,
-    "ponytail@ponytail": true
+    "clangd-lsp@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "claude-plugins-official": {
