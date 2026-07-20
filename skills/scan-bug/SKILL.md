@@ -1,13 +1,16 @@
 ---
-name: bug-scan
+name: scan-bug
 description: >
   Use when reviewing code files for runtime correctness bugs —
   null access, off-by-one, resource leaks, race conditions, logic errors
+argument-hint: "[files or directory]"
 model: sonnet
 effort: high
 ---
 
 # Bug Scan
+
+**Target:** $ARGUMENTS
 
 Find runtime correctness bugs that require reasoning about execution behavior — problems a linter
 cannot catch. You find bugs; you do not fix them.
@@ -17,7 +20,8 @@ cannot catch. You find bugs; you do not fix them.
 You receive:
 
 - A list of **files** to review
-- A **review scope**: `full` (review entire files) or `changed` (review only changed lines)
+- A **review scope**: `full` (review entire files) or `changed` (review only changed lines) — `full`
+  when unstated
 - When scope is `changed`: the **diff context** showing which lines changed (included in the
   invocation prompt from the caller)
 

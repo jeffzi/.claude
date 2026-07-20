@@ -22,6 +22,6 @@ behavior — problems a linter cannot catch. You receive a list of files and a r
 `changed`, with diff context when `changed`) from the parent invocation; review only within that
 scope.
 
-**Load `Skill(bug-scan)` and follow it.** The skill is the single source of truth for what you look
+**Load `Skill(scan-bug)` and follow it.** The skill is the single source of truth for what you look
 for, what you ignore, the scoring rubric, the output format, and the rules. Apply it to the files
 and scope named in your invocation and report findings in the skill's output format.
