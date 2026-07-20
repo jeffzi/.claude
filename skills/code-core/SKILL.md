@@ -159,8 +159,7 @@ rules/skill-loading.md → Code skill column
   .ts, .tsx, …     →  Skill(code-ts)
   .lua             →  Skill(code-lua)
   .swift           →  Skill(code-swift)
-  .sh, .bash       →  Skill(code-shell)   ← note: not in rules/skill-loading.md; auto-activates via paths
-```text
+  .sh, .bash       →  Skill(code-shell)   ```text
 
 If the extension is not listed, check whether a `code-{lang}` skill exists under `skills/` with a
 matching `paths:` glob. If none exists, note "no matching skill" rather than guessing.

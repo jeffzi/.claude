@@ -87,6 +87,9 @@ type: plan
 **Notes:** [Non-obvious constraints, dependencies on prior tasks, gotchas]
 
 **Implementation:** Use `/tdd` for implementation.
+
+**Verify before commit:** After the task is complete, dispatch a `claim-reviewer` agent with this
+task's behavioral claims before committing. Fix any `Refuted`/`Unsubstantiated` verdicts first.
 ```
 
 ## Final Verification Task
@@ -96,17 +99,46 @@ Every plan ends with this task, verbatim except for the claims:
 ```markdown
 ### Final Task: Verify Implementation
 
-After all tasks are complete and their tests pass, dispatch a single **Agent** call with
+After all tasks are committed, run a final whole-plan review. Dispatch a single **Agent** call with
 `subagent_type: claim-reviewer` (do NOT set model — the agent defines its own). Extract one claim
-per behavior this plan specifies, stated as implemented fact:
+per behavior across **all** tasks, stated as implemented fact:
 
 Claim N: [behavior from Task M, e.g. "email validation rejects empty, malformed, and duplicate
 emails"] Location: [file the task created/modified]
 
-For any `Refuted` or `Unsubstantiated` verdict, fix the gap and re-verify that claim once; if it
-still fails, surface it to the user. Mechanical claims (tests pass, build green) are not for the
-reviewer — verify those by running the commands directly.
+This catches cross-task integration issues that per-task verification misses (e.g. Task 3 broke Task
+1's behavior). For any `Refuted` or `Unsubstantiated` verdict, fix the gap and re-verify that claim
+once; if it still fails, surface it to the user. Mechanical claims (tests pass, build green) are not
+for the reviewer — verify those by running the commands directly.
 ```
+
+## Test-Only Plans
+
+When every task's deliverable is test code — fixing, adding, or repairing tests with **no
+production-code changes** — the red-green cycle does not apply: there is no production behavior to
+drive from a failing test, and the tests are themselves the deliverable. `/tdd` is the **only** step
+a test-only plan may omit. Adapt the task template; drop nothing else:
+
+- **Implementation:** replace `Use /tdd` with the concrete change the task makes.
+- **Verify before commit** and **Final Task:** `claim-reviewer` **still runs — no plan ever skips
+  it.** A passing suite is a mechanical claim (run it directly) and does **not** prove a test
+  asserts the right thing; a green test can check the wrong behavior. Extract claims about what each
+  test now exercises and asserts (e.g. "the bucketing test covers all three buckets") and let the
+  independent review verify them.
+
+No matter how thoroughly the main agent reviewed its own work, independent review is required. The
+factual claim-verification pass below also runs regardless: a test-only plan still asserts facts
+about existing code.
+
+These are bright-line rules — "lean", "low-risk", "just tests", and "that's how we do it here" are
+not exceptions. The rationalizations that surface under pressure, and why each fails:
+
+| Excuse                                                      | Reality                                                                                                                                                                                                                            |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "A green suite proves the tests assert the right thing"     | Running the suite proves the tests _pass_, never that they assert the _correct_ behavior — a test can pass while checking the wrong thing. That gap is a behavioral claim, never mechanical; it is exactly `claim-reviewer`'s job. |
+| "Convention here is to skip review on test-only fixes"      | Any plan that skipped it was non-compliant. Precedent is not permission.                                                                                                                                                           |
+| "I already read every cited line, so the pass is redundant" | You verified your own work; independent review catches what your reading missed. Confidence is not evidence.                                                                                                                       |
+| "Low-risk cleanup — the reviewer's time is expensive"       | Risk and cost do not change the rule. `claim-reviewer` runs on every plan.                                                                                                                                                         |
 
 ## What Goes in a Plan vs. What Doesn't
 
@@ -118,6 +150,8 @@ reviewer — verify those by running the commands directly.
 | Non-obvious constraints    | Commit messages              |
 | Architecture decisions     | TDD mechanics                |
 |                            | Internal skill/agent names   |
+| Execution directives       |                              |
+| (`/tdd`, `claim-reviewer`) |                              |
 
 ## Plan Review
 
@@ -136,6 +170,11 @@ A plan asserts facts about the codebase — files it will modify already exist, 
 present, the current code behaves as described, a pattern to follow lives where the plan says. A
 plan built on a stale or wrong assumption sends the implementer down a dead end. Before presenting
 the plan, verify these factual claims independently.
+
+This pass is **mandatory** and runs no matter how carefully you read the code while investigating.
+"I already verified each cited line myself during investigation" is not grounds to skip it — that is
+you checking your own work, which is exactly what an independent pass exists to catch. Confidence is
+not evidence. Dispatch the agent every time, including for test-only plans.
 
 Dispatch a single **Agent** tool call with `subagent_type: claim-reviewer` (do NOT set model — the
 agent defines its own). Extract one claim per checkable assertion the plan makes about existing
