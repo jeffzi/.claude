@@ -6,10 +6,7 @@ description: >
   a prototype" - these are symptoms this skill applies. Not for TypeScript-to-Lua (TSTL)
   projects — use code-tstl. For Lua tests with busted, also load test-lua. Applies to *.lua
   files.
-paths: "**/*.lua"
 user-invocable: false
-model: sonnet
-effort: medium
 ---
 
 # Lua Coding

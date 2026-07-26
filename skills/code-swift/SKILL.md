@@ -6,10 +6,7 @@ description: >
   this skill applies. Also use when encountering Swift 6.x strict concurrency errors, Sendable
   warnings, or actor isolation issues. Applies to any *.swift file. For test files (*Tests.swift),
   also load test-swift. Not for Swift test patterns — use test-swift for that.
-paths: "**/*.swift"
 user-invocable: false
-model: sonnet
-effort: medium
 ---
 
 # Swift — Production-Quality Code

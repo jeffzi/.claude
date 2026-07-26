@@ -5,8 +5,6 @@ description: >
   duplicated logic, unclear names, or magic values — and you want to reduce it
   to its essence without changing behavior. Not for behavioral changes or
   architectural refactors.
-model: opus
-effort: high
 ---
 
 # Distill Code

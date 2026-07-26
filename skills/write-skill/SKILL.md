@@ -4,10 +4,9 @@ description: |
   Use when creating new Claude Code skills, editing existing SKILL.md files, or designing skill
   descriptions for discovery. Also use when skills fail to trigger reliably, agents rationalize
   around rules under pressure, or you need to choose between skill types (discipline, technique,
-  pattern, reference). For review-only assessment against checklists, use vet-skill.
+  pattern, reference). To review an existing skill against the checklists and fix what it finds,
+  use /revise-skill.
 argument-hint: "[skill name or purpose]"
-model: sonnet
-effort: medium
 ---
 
 # Writing Effective Skills
@@ -95,21 +94,42 @@ description optimization (CSO).
 11 additional optional fields control invocation, tool access, model selection, subagent execution,
 and dynamic context injection. Match each to the skill's role:
 
-| Field                            | Use for                                                                                    |
-| -------------------------------- | ------------------------------------------------------------------------------------------ |
-| `argument-hint`                  | Any skill that takes arguments (autocomplete hint)                                         |
-| `disable-model-invocation: true` | Side-effecting workflows (`/deploy`, `/upgrade-*`)                                         |
-| `user-invocable: false`          | Reference-only knowledge (`/code-py` isn't an action)                                      |
-| `allowed-tools`                  | Read-only skills, tool-scoped skills (`Bash(git *)`)                                       |
-| `model`                          | Reasoning-heavy (`opus`) or mechanical (`haiku`)                                           |
-| `effort`                         | Pin reasoning depth: `low` mechanical, `high` analytical — see `references/frontmatter.md` |
-| `paths`                          | Auto-activate when editing matching file types                                             |
-| `context: fork` + `agent`        | Long-running research/exploration tasks                                                    |
-| Shell injection (body syntax)    | Pre-inject git status, diffs, outdated lists, etc.                                         |
+| Field                            | Use for                                                              |
+| -------------------------------- | -------------------------------------------------------------------- |
+| `argument-hint`                  | Any skill that takes arguments (autocomplete hint)                   |
+| `disable-model-invocation: true` | Side-effecting workflows (`/deploy`, `/upgrade-*`)                   |
+| `user-invocable: false`          | Reference-only knowledge (`/code-py` isn't an action)                |
+| `allowed-tools`                  | Read-only skills, tool-scoped skills (`Bash(git *)`)                 |
+| `model`                          | Slash-invoked skills only, and only with a stated reason — see below |
+| `effort`                         | Slash-invoked skills only, and only with a stated reason — see below |
+| `paths`                          | Auto-activate when editing matching file types                       |
+| `context: fork` + `agent`        | Long-running research/exploration tasks                              |
+| Shell injection (body syntax)    | Pre-inject git status, diffs, outdated lists, etc.                   |
 
 Read `references/frontmatter.md` for the complete reference, `allowed-tools` syntax, string
 substitutions (`$ARGUMENTS`, `${CLAUDE_SKILL_DIR}`), subagent execution details, and the description
 truncation/budget rules.
+
+### `model` and `effort` are slash-path only
+
+Both fields take effect only when the user types `/skill-name`. Loaded through the `Skill()` tool,
+or reached inside a subagent, both are **inert** — the surrounding turn's model and effort govern.
+
+This matters twice over:
+
+- **A load-only skill should declare neither.** `code-core`, `test-core`, and the language leaves
+  are reached through `Skill()`, so a `model:` line there changes nothing and tells the next reader
+  something false.
+- **A live declaration overrides the user's `/model` choice for the whole turn.** That needs a
+  stated reason — a genuine quality floor for the workflow, not "this skill feels important".
+  Liveness alone is not a reason.
+
+`disable-model-invocation: true` settles the question in one direction: slash is the only path, so
+the declaration is always live and always needs its reason.
+
+The upstream docs say both fields apply "when this skill is active", with no invocation-path
+qualifier — do not take that as license to declare them on load-only skills.
+`references/frontmatter.md` has the criterion table and the per-path verification method.
 
 ## Writing for compliance
 
@@ -183,7 +203,8 @@ After writing ANY skill, STOP and complete this checklist before moving to the n
 - [ ] Keywords cover errors, symptoms, synonyms, tool names
 - [ ] One excellent code example (not multi-language)
 - [ ] Common mistakes section included
-- [ ] `effort` set explicitly — matches skill type (see `references/frontmatter.md`)
+- [ ] `model`/`effort` declared only if the skill is slash-invoked, and each has a stated reason;
+      otherwise both omitted (see `references/frontmatter.md`)
 - [ ] Ran scenarios WITH skill, agent now complies
 
 ### For discipline skills (additional)

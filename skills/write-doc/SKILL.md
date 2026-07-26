@@ -10,8 +10,6 @@ description: |
   code-ts. Not for CHANGELOG.md files — use write-changelog. For sentence-level prose clarity,
   use write-prose instead.
 argument-hint: "[doc type or target file]"
-model: sonnet
-effort: medium
 ---
 
 # Writing Documentation

@@ -7,8 +7,6 @@ description: >
   "what can we delete" / "is this over-engineered" requests.
 argument-hint: "[files or directory]"
 allowed-tools: Read, Glob, Grep, Bash(grep:*), Bash(rg:*), Bash(wc:*), Bash(find:*)
-model: sonnet
-effort: high
 ---
 
 # Simplification Scan
@@ -66,7 +64,7 @@ If there is nothing to cut, say `Lean already.` and stop.
 ## Boundaries
 
 - Over-engineering and complexity only. Correctness bugs and security holes → `scan-bug`; style and
-  idiom → `vet-code`. Both out of scope here.
+  idiom → the `vet-code` agent. Both out of scope here.
 - A single smoke test or `assert`-based self-check is the minimum, not bloat — never flag it for
   deletion.
 - Input validation at trust boundaries, error handling that prevents data loss, security measures,

@@ -4,8 +4,6 @@ description: >
   Use when reviewing code files for runtime correctness bugs —
   null access, off-by-one, resource leaks, race conditions, logic errors
 argument-hint: "[files or directory]"
-model: sonnet
-effort: high
 ---
 
 # Bug Scan
@@ -30,7 +28,7 @@ identify which functions/blocks to focus on.
 
 ## When NOT to Use
 
-- **Style, idiom, or structure review** — use `vet-code`
+- **Style, idiom, or structure review** — use the `vet-code` agent
 - **Surgical fixes to known issues** — use `code-mender`
 
 ## What you look for
@@ -47,12 +45,13 @@ identify which functions/blocks to focus on.
 
 Do not flag any of the following — they belong to other tools:
 
-- Style, idiom, or naming conventions (vet-code's domain)
+- Style, idiom, or naming conventions (the `vet-code` agent's domain)
 - Missing type annotations or docstrings
 - Unused imports or variables (linter's domain)
 - General code quality without a concrete bug scenario
 - Issues silenced by ignore/suppress comments
-- Pre-existing issues outside the diff (when scope is `changed`)
+- Pre-existing issues outside the diff (when scope is `changed`) — the caller supplies the scope;
+  never widen it on your own judgment
 
 ## Scoring
 
@@ -72,7 +71,7 @@ you cannot confirm reachability, score 25-50.
 **Score 0 (discard) when:**
 
 - A linter or typechecker would catch it
-- The issue is outside the diff (changed-lines scope only)
+- The issue is outside the diff (when scope is `changed`) — the caller sets the scope, not you
 - No concrete execution scenario triggers the bug
 - An ignore/suppress comment covers it
 

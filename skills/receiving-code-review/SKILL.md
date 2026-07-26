@@ -1,7 +1,6 @@
 ---
 name: receiving-code-review
-description: Use when receiving structured code-review feedback — PR comments, a reviewer's findings, or output from a review agent — and deciding what to implement. Apply before acting on suggestions, especially when feedback is unclear, multi-item, or technically questionable. Not for producing reviews (use vet-code / bug-scanner / preflight for that).
-effort: high
+description: Use when receiving structured code-review feedback — PR comments, a reviewer's findings, or output from a review agent — and deciding what to implement. Apply before acting on suggestions, especially when feedback is unclear, multi-item, or technically questionable. Not for producing reviews (use the vet-code or bug-scanner agent, or preflight, for that).
 ---
 
 # Code Review Reception

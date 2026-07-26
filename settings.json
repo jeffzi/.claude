@@ -1,9 +1,6 @@
 {
   "env": {
-    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
-    "MAX_THINKING_TOKENS": "10000",
-    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "75",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "haiku"
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "0"
   },
   "includeCoAuthoredBy": false,
   "permissions": {
@@ -193,7 +190,7 @@
   "enabledPlugins": {
     "lua-lsp@claude-plugins-official": true,
     "rust-analyzer-lsp@claude-plugins-official": true,
-    "typescript-lsp@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": false,
     "swift-lsp@claude-plugins-official": true,
     "pyright-lsp@claude-plugins-official": true,
     "clangd-lsp@claude-plugins-official": true

@@ -11,8 +11,6 @@ description: >
   effects with manual execution order, variable
   redeclaration across cells, or implicit state.
 user-invocable: false
-model: sonnet
-effort: medium
 ---
 
 # Marimo Reactive Notebooks

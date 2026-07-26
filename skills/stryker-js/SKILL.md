@@ -7,7 +7,6 @@ description: |
   "why does this mutant survive when a test asserts exactly that?" Not for ordinary line-coverage
   work.
 argument-hint: "[source glob to mutate]"
-effort: high
 ---
 
 # StrykerJS Mutation Testing

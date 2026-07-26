@@ -5,8 +5,6 @@ description: |
   fail to trigger, return malformed output, or request tools they lack. For skills (instructions
   loaded into the main context), use write-skill instead.
 argument-hint: "[agent name or purpose]"
-model: sonnet
-effort: medium
 ---
 
 # Writing Effective Subagents
@@ -181,7 +179,7 @@ Required: `name`, `description`. Quick decisions for the common optional fields:
 
 | Field           | Default       | Pick differently when                                                                                     |
 | --------------- | ------------- | --------------------------------------------------------------------------------------------------------- |
-| `model`         | inherits      | Reasoning-heavy → `sonnet`; mechanical lookup → `haiku`                                                   |
+| `model`         | inherits      | Reasoning-heavy → `opus`; judgment on bounded input → `sonnet`; mechanical lookup → `haiku`               |
 | `tools`         | all inherited | ALWAYS restrict — set an explicit allowlist                                                               |
 | `memory`        | none          | Agent benefits from persistent learning across runs                                                       |
 | `isolation`     | none          | Modifies files + parallel runs could conflict → `worktree`                                                |
@@ -189,6 +187,31 @@ Required: `name`, `description`. Quick decisions for the common optional fields:
 | `effort`        | inherits      | **Always pin.** Unset inherits session effort, silently degrades. `high` for reasoning, `low` for lookups |
 | `color`         | none          | Visual identification in multi-agent sessions                                                             |
 | `initialPrompt` | none          | First message the agent should self-submit at startup                                                     |
+
+### How `model` actually resolves
+
+Four things can set an agent's model. The first one present wins:
+
+1. **`CLAUDE_CODE_SUBAGENT_MODEL`** in the environment or `settings.json` `env`
+2. **The `model` parameter on the dispatching `Agent` call**
+3. **The agent's `model:` frontmatter**
+4. **The session model**
+
+The env var is the trap: it outranks even an explicit per-call `model`, so a stray
+`CLAUDE_CODE_SUBAGENT_MODEL: haiku` silently downgrades every agent in the repo while every
+frontmatter file still reads `opus`. Check it before concluding an agent's declaration is wrong.
+
+Because frontmatter sits at rank 3, a caller that passes `model` overrides it. Agents meant to
+govern their own tier should be dispatched with **no `model` parameter**, and the calling skill
+should say so — the house phrasing is "do NOT set model — the agent defines its own".
+
+Unlike skill frontmatter, agent `model`/`effort` are live on every dispatch path. There is no
+slash-only qualifier.
+
+**Verify what resolved:** read `.message.model` in `<session>/subagents/agent-<agentId>.jsonl`,
+keyed by the sibling `.meta.json`'s `toolUseId`. Treat `resolvedModel` as a cross-check only — it is
+known to misreport dispatches. (For the skill side, the instrument is different: top-level
+`.message.model` on the invoking turn. See `write-skill/references/frontmatter.md`.)
 
 **Fields that do NOT exist for agents** (common confusion with skills):
 
@@ -249,7 +272,8 @@ After writing ANY agent, STOP and complete this checklist before shipping.
 - [ ] `name`: letters, numbers, hyphens only
 - [ ] `description`: ≤ 250 chars, third person, no workflow summary
 - [ ] `tools`: explicit allowlist (not "all tools")
-- [ ] `model`: chosen deliberately, not default-copied
+- [ ] `model`: chosen deliberately, not default-copied — and `CLAUDE_CODE_SUBAGENT_MODEL` confirmed
+      absent, since it silently outranks this field
 - [ ] `effort`: pinned explicitly — never left unset
 
 ### Body

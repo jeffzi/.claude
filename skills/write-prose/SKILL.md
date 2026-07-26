@@ -7,8 +7,6 @@ description: |
   "improve the writing", or when text feels bloated, passive, or vague. Covers sentence-level
   clarity, not document structure — for organizing documentation, use write-doc instead.
 argument-hint: "[text or file to edit]"
-model: sonnet
-effort: medium
 ---
 
 # Writing Clearly and Concisely
@@ -77,8 +75,9 @@ William Strunk Jr.'s _The Elements of Style_ (1918) teaches you to write clearly
 
 ## Bottom Line
 
-Writing for humans? Apply the rules above. Dispatch a subagent with the draft and these rules to
-copyedit when context is tight.
+Writing for humans? Apply the rules above. When context is tight, dispatch a `general-purpose`
+subagent with `model: sonnet` carrying the draft and these rules to copyedit — it checks supplied
+text against supplied rules, so the cheaper tier is the right one.
 
 ## Attribution
 

@@ -6,8 +6,6 @@ description: >
   mismatches in fixtures, non-deterministic group_by order, float tolerance, or any test files
   importing polars. Not for non-Polars Python tests — use test-py for that.
 user-invocable: false
-model: sonnet
-effort: medium
 ---
 
 # Testing Polars Code

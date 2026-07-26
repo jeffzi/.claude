@@ -5,8 +5,6 @@ description: >
   structure, test desiderata, merge/redundancy rules, false-coverage detection, parametrization, and
   mocking anti-patterns. Not for TDD orchestration — use `Skill(tdd)`.
 user-invocable: false
-model: sonnet
-effort: medium
 ---
 
 # Test Core — Cross-Language Testing Principles
@@ -199,11 +197,11 @@ STOP and re-check if any of these are true:
 
 This skill is loaded by three callers, each using the principles for a different purpose:
 
-| Caller     | Purpose                                                             |
-| ---------- | ------------------------------------------------------------------- |
-| `tdd`      | RED phase — write tests that follow these principles from the start |
-| `vet-test` | Review — walk a combined checklist over every test function         |
-| Direct use | Any hand-written test outside a TDD cycle                           |
+| Caller           | Purpose                                                             |
+| ---------------- | ------------------------------------------------------------------- |
+| `tdd`            | RED phase — write tests that follow these principles from the start |
+| `vet-test` agent | Review — walks a combined checklist over every test function        |
+| Direct use       | Any hand-written test outside a TDD cycle                           |
 
 Language skills (`test-py`, `test-ts`, `test-lua`, `test-swift`, overlays like `test-polars`) add
 language-specific syntax and pitfalls on top — they do **not** restate these principles.
