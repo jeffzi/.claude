@@ -222,7 +222,7 @@ Write **8-10 should-trigger queries** — realistic user prompts where the skill
 
 Write **8-10 should-not-trigger queries** — prompts that are adjacent but shouldn't activate:
 
-- Tasks handled by sibling skills ("review this test" → vet-test, not vet-code)
+- Tasks handled by sibling skills ("review this test" → revise-test, not revise-code)
 - Superficially similar but wrong domain ("Python bug" → fix/investigate, not code-py)
 - Queries that mention the skill's keywords but have different intent
 - The skill's explicit "not for" boundaries from the description
@@ -251,7 +251,7 @@ infrastructure — read the description as Claude would and score each query:
 wording covers the whole category. Don't turn the description into a laundry list of the exact
 queries you tested — that fails on the next unseen paraphrase.
 
-### Example trigger set for `vet-code`
+### Example trigger set for `revise-code`
 
 **Should-trigger (add these as confirmed activation paths):**
 
@@ -265,7 +265,7 @@ queries you tested — that fails on the next unseen paraphrase.
 - "write tests for this" → test-\*
 - "fix this bug" → fix
 - "explain what this does" → (no skill — conversational)
-- "review the README" → vet-doc
+- "review the README" → revise-doc
 
 ## Testing checklist
 

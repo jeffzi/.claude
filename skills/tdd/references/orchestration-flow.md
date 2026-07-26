@@ -29,7 +29,7 @@ LOOP (one behavior group per cycle):
        rules/skill-loading.md.
 
   RED-GREEN:
-    1. Dispatch tdd-cycle agent (model/effort come from its frontmatter -- do not override) with:
+    1. Dispatch tdd-cycle agent (do NOT set model -- the agent defines its own) with:
        - Task description (what behaviors to test -- may be a cohesive batch)
        - Relevant test file paths
     2. Capture from tdd-cycle output: TEST_FILE, TEST_NAME, TEST_COMMAND,
@@ -67,11 +67,11 @@ REFACTOR (once, after last cycle):
   12. If >= 50 insertions:
       - Split all changed files into implementation files and test files
       - Run two tracks in parallel. For each track:
-        1. Dispatch code-distiller agent on the files
-        2. Dispatch a general-purpose agent prompted to load Skill(vet-code) (impl track)
-           or Skill(vet-test) (test track) and run it on the same files
-           (vet-code/vet-test are skills, not agents -- never pass as subagent_type)
-        3. If vet made changes, dispatch vet again (max 2 passes)
+        1. Dispatch code-distiller agent on the files -- do NOT set model, the agent
+           defines its own
+        2. Dispatch subagent_type: vet-code (impl track) or vet-test (test track) on the
+           same files -- do NOT set model, the agent defines its own
+        3. The reviewers are read-only; apply their findings in the main context
       - If any fixes applied, re-run FULL_SUITE_COMMAND to confirm tests still green
 ```
 

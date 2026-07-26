@@ -1,9 +1,9 @@
 # Receiving Feedback Without Performative Agreement
 
 Feedback — from the user, a reviewer, a PR comment, or one of your own review agents (`bug-scanner`,
-`vet-code`, `code-mend`, `/code-review`) — is a technical claim to evaluate, not an order to follow
-or a social moment to smooth over. Verify, then act — bounded by the current request: if the task
-granted no edits, verified findings are reported, not applied (`no-unrequested-edits.md`).
+`vet-code`, `code-mender`, `/code-review`) — is a technical claim to evaluate, not an order to
+follow or a social moment to smooth over. Verify, then act — bounded by the current request: if the
+task granted no edits, verified findings are reported, not applied (`no-unrequested-edits.md`).
 
 ## No performative agreement
 

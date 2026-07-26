@@ -93,9 +93,9 @@ obvious).
      ├── test-lua         ← leaf: busted, spies, parametrized tests
      └── test-swift       ← leaf: Swift Testing, XCTest, concurrency
 
- tdd      ─first-step→  Skill(test-core)  (hub does the rest)
- vet-test ─first-step→  Skill(test-core)
-               └─also→  rules dispatch → Skill(code-{lang})  (code-side review)
+ tdd            ─first-step→  Skill(test-core)  (hub does the rest)
+ vet-test agent ─first-step→  Skill(test-core)   (loaded inside the agent)
+                     └─also→  rules dispatch → Skill(code-{lang})  (code-side review)
 ```
 
 `test-core` is the single entry point for all test work. It owns universal principles inline and
@@ -103,9 +103,9 @@ dispatches to the matching language skill based on the file extension looked up 
 `rules/skill-loading.md`. Loading is one-directional: `test-core` → `test-{lang}`. Language skills
 never load `test-core` back.
 
-`tdd` and `vet-test` are orchestrators of _when_ tests are written and reviewed. `test-core` defines
-_what_ a good test looks like. This is why they are peers of the language skills, not parents of the
-testing philosophy.
+`tdd` and the `vet-test` agent are orchestrators of _when_ tests are written and reviewed.
+`test-core` defines _what_ a good test looks like. This is why they are peers of the language
+skills, not parents of the testing philosophy.
 
 ### Language dispatch
 
@@ -122,8 +122,8 @@ and code-\***.
 Each column serves a different caller:
 
 - `test-core`, `tdd`, `tdd-cycle` → **Test skill** column
-- `vet-code`, `tdd` (code side) → **Code skill** column
-- `preflight`, `vet-test` → **Test file patterns** column
+- `vet-code` agent, `tdd` (code side) → **Code skill** column
+- `preflight`, `vet-test` agent → **Test file patterns** column
 
 Same row, different cells. One source of truth for every language.
 
@@ -234,16 +234,19 @@ The tdd-cycle output contract (STATUS values and per-status fields) is owned by
 `agents/tdd-cycle.md` § Output Format — the single source of truth. It is deliberately not restated
 here; restated copies drift.
 
-### `vet-test`
+### `vet-test` agent
 
-Review orchestrator. Owns the review _process_, not the review _criteria_. Process:
+Read-only review agent (`agents/vet-test.md`), dispatched as `subagent_type: vet-test`. Owns the
+review _process_, not the review _criteria_. Process:
 
 1. Load `Skill(test-core)` — cascades to `test-{lang}` and overlays via DSD
 2. Look up the target extension in the rules-file Language Dispatch table → `code-{lang}`
 3. Load `Skill(code-{lang})`
-4. Run verification commands from both skills
-5. Walk the combined checklist rule-by-rule (not scanning)
-6. Fix each issue, re-run verification
+4. Walk the combined checklist rule-by-rule (not scanning)
+5. Return `### Finding N` blocks — Issue, Location, Score, Reasoning
+
+The agent has no `Edit`, `Write`, or `Bash` tools: it reports, and the caller fixes. `/revise-test`
+is the interactive entry point that dispatches it and then applies the findings.
 
 `vet-test` does not contain inline testing principles. The checklist is `test-core` principles plus
 language-skill rules plus code idioms.

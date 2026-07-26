@@ -43,8 +43,8 @@ automatically when the base leaf detects a matching import pattern (Domain Skill
 is one-directional — leaves never load their hub back, and overlays never load their base leaf back.
 
 The `rules/skill-loading.md` Language Dispatch table is the **single source of truth** that feeds
-every orchestrator: `vet-code`, `vet-test`, `tdd`, `tdd-cycle`, `preflight`, `fix`, `build`. A row
-in that table is all that is needed; no orchestrator requires individual changes.
+every orchestrator: the `vet-code` and `vet-test` agents, `tdd`, `tdd-cycle`, `preflight`, `fix`,
+`build`. A row in that table is all that is needed; no orchestrator requires individual changes.
 
 ## Decision tree
 
@@ -110,18 +110,20 @@ Follow the existing `Skill | Description` format. Example rows:
 
 ### Step 5 — Verify dispatch
 
-Run `vet-code` and `vet-test` against a small sample file with the new extension:
+Run the reviewers against a small sample file with the new extension:
 
 ```bash
-/vet-code path/to/sample.{ext}
-/vet-test path/to/sample_test.{ext}
+/revise-code path/to/sample.{ext}
+/revise-test path/to/sample_test.{ext}
 ```
 
-Confirm both dispatch correctly to the new `code-{lang}` and `test-{lang}` skills. If either reports
-"no matching skill", the dispatch row or the skill filename does not match.
+Each command dispatches its reviewer agent, which resolves the language from the dispatch table.
+Confirm both resolve to the new `code-{lang}` and `test-{lang}` skills — the agents report the
+skills they loaded on the first line of their findings. If either reports "no matching skill", the
+dispatch row or the skill filename does not match.
 
-> **No orchestrator changes are needed.** `vet-code`, `vet-test`, `tdd`, `tdd-cycle`, `preflight`,
-> `fix`, and `build` all resolve languages through the rules-file dispatch table.
+> **No orchestrator changes are needed.** The `vet-code` and `vet-test` agents, `tdd`, `tdd-cycle`,
+> `preflight`, `fix`, and `build` all resolve languages through the rules-file dispatch table.
 
 ## Adding an overlay for an existing language
 
@@ -179,11 +181,11 @@ there is no reason to load the overlay into context.
 A rule that applies to every language belongs in the hub, not in any leaf.
 
 - **Production-code rule** → add to `code-core/SKILL.md` (under Mandatory Rules, Rationalizations,
-  or Red Flags — whichever fits). All callers — `vet-code`, `tdd` GREEN, direct writing — pick it up
-  through the hub. If a language has a specialized mechanism for the new rule, add an example row to
-  that leaf's relevant section.
+  or Red Flags — whichever fits). All callers — the `vet-code` agent, `tdd` GREEN, direct writing —
+  pick it up through the hub. If a language has a specialized mechanism for the new rule, add an
+  example row to that leaf's relevant section.
 - **Testing anti-pattern** → add to `test-core/references/anti-patterns.md`. All callers — `tdd`,
-  `vet-test`, direct test writing — pick it up through the hub.
+  the `vet-test` agent, direct test writing — pick it up through the hub.
 
 See [`docs/coding.md`](coding.md) §"Design decisions" and [`docs/testing.md`](testing.md) §"Design
 decisions" for criteria on when a rule qualifies as universal vs. language-specific.
@@ -234,7 +236,7 @@ After adding a language, run through this list before declaring it supported:
 - [ ] Both leaves have a `## Verification` section with concrete commands
 - [ ] `README.md` Code Skills table updated
 - [ ] `README.md` Testing Skills table updated
-- [ ] `vet-code` and `vet-test` run successfully against a sample file of the new extension
+- [ ] `/revise-code` and `/revise-test` run successfully against a sample file of the new extension
 
 ## Common mistakes
 

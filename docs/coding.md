@@ -118,8 +118,8 @@ If any of these are true, stop before proceeding:
      ├── code-swift       ← leaf: strict concurrency, Sendable, typed throws
      └── code-shell       ← leaf: bash/sh only; auto-activates via paths glob (see §Design decisions)
 
- vet-code     ─first-step→  Skill(code-core)  (hub does the rest)
- tdd (GREEN)  ─first-step→  Skill(code-core)
+ vet-code agent ─first-step→  Skill(code-core)  (loaded inside the agent; hub does the rest)
+ tdd (GREEN)    ─first-step→  Skill(code-core)
 ```
 
 `code-core` is the single entry point for all production-code work. It owns universal rules inline
@@ -127,9 +127,9 @@ and dispatches to the matching language skill based on the file extension looked
 `rules/skill-loading.md`. Loading is one-directional: `code-core` → `code-{lang}`. Language skills
 never load `code-core` back.
 
-`vet-code` and `tdd` (GREEN phase) are consumers of _when_ the rules are applied. `code-core`
-defines _what_ production-grade code looks like. This is why they are peers of the language skills,
-not parents of the philosophy.
+The `vet-code` agent and `tdd` (GREEN phase) are consumers of _when_ the rules are applied.
+`code-core` defines _what_ production-grade code looks like. This is why they are peers of the
+language skills, not parents of the philosophy.
 
 ### Language dispatch
 
@@ -147,7 +147,7 @@ Each column serves a different caller:
 
 - `code-core`, `tdd` (code side) → **Code skill** column
 - `test-core`, `tdd` (test side) → **Test skill** column
-- `vet-test`, `preflight` → **Test file patterns** column
+- `vet-test` agent, `preflight` → **Test file patterns** column
 
 Same row, different cells. One source of truth for every language.
 
@@ -248,15 +248,18 @@ they load at import-detection time by the base leaf.
   Attached to `code-ts`. Extends `code-ts` (not `code-core`) — the only two-layer case.
 - **`code-tstl-plugin`**: TSTL visitor transforms, printer overrides. Attached to `code-tstl`.
 
-### `vet-code`
+### `vet-code` agent
 
-Review orchestrator. Owns the review _process_, not the review _criteria_. Process:
+Read-only review agent (`agents/vet-code.md`), dispatched as `subagent_type: vet-code`. Owns the
+review _process_, not the review _criteria_. Process:
 
 1. Load `Skill(code-core)` — hub dispatches to `code-{lang}` and overlays via DSD
-2. Run verification commands from the loaded skills
-3. Walk the combined checklist rule-by-rule (not scanning) for each mandatory rule, pitfall entry,
+2. Walk the combined checklist rule-by-rule (not scanning) for each mandatory rule, pitfall entry,
    and Instead-of/Use table from the loaded skills
-4. Fix each issue, re-run verification
+3. Return `### Finding N` blocks — Issue, Location, Score, Reasoning
+
+The agent has no `Edit`, `Write`, or `Bash` tools: it reports, and the caller fixes. `/revise-code`
+is the interactive entry point that dispatches it and then applies the findings.
 
 `vet-code` does not contain inline code principles. The checklist is `code-core` principles plus
 language-skill rules and idioms.
@@ -302,7 +305,7 @@ through the harness's built-in auto-activation, without requiring shebang detect
 
 This is an intentional exception. New languages must follow the dispatch-table route — do not copy
 this pattern. The trade-off is that `code-shell` does not appear in `rules/skill-loading.md`, so
-orchestrators that resolve languages from the table (like `vet-test`, since there is no
+orchestrators that resolve languages from the table (like the `vet-test` agent, since there is no
 `test-shell`) cannot discover it automatically.
 
 ### The `code-tstl` two-layer overlay
@@ -341,6 +344,6 @@ and examples.
 ### Adding a new universal rule
 
 Add it to `code-core` inline (under Mandatory Rules, Rationalizations, or Red Flags — whichever
-fits). All callers — `vet-code`, `tdd` GREEN, direct writing — pick it up immediately through the
-hub. No leaf changes needed unless a language has a specialized mechanism for the new rule (add an
+fits). All callers — the `vet-code` agent, `tdd` GREEN, direct writing — pick it up through the hub.
+No leaf changes needed unless a language has a specialized mechanism for the new rule (add an
 example row to the leaf's relevant section).
