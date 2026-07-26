@@ -7,6 +7,34 @@ agents, hooks, and settings.
 
 ## Components
 
+### Where `model` and `effort` take effect
+
+Skills and agents resolve these two fields differently, and the difference decides whether a
+declaration is worth writing at all.
+
+**Skill frontmatter is slash-path only.** `model` and `effort` apply when the user types
+`/skill-name`. Loaded through the `Skill()` tool, or reached inside a subagent, both are inert — the
+surrounding turn governs. So the hubs and language leaves (`code-core`, `test-core`, `code-py`, …)
+declare neither: they are only ever loaded, never invoked. A live declaration overrides the user's
+`/model` choice for the whole turn, so it needs a stated reason.
+
+The upstream docs describe both fields as applying "when this skill is active", with no
+invocation-path qualifier. That is why this is written down here.
+
+**Agent frontmatter is live on every dispatch**, but four things can set it. First present wins:
+
+1. `CLAUDE_CODE_SUBAGENT_MODEL` (environment or `settings.json` `env`)
+2. The `model` parameter on the dispatching `Agent` call
+3. The agent's `model:` frontmatter
+4. The session model
+
+The env var outranks even an explicit per-call value — a stray `CLAUDE_CODE_SUBAGENT_MODEL: haiku`
+downgrades every agent while the frontmatter still reads `opus`. Callers that want an agent to
+govern its own tier pass no `model` parameter.
+
+Authoring rules live in [`write-skill`](skills/write-skill/SKILL.md) and
+[`write-agent`](skills/write-agent/SKILL.md).
+
 ### Skills
 
 Some skills are synced from external repositories via
@@ -66,13 +94,16 @@ commands are the source map.
 
 | Skill                                                        | Description                                                    |
 | ------------------------------------------------------------ | -------------------------------------------------------------- |
-| [`vet-code`](skills/vet-code/SKILL.md)                       | Review code files for skill rule violations                    |
-| [`vet-test`](skills/vet-test/SKILL.md)                       | Review test files for redundancy and AAA issues                |
-| [`vet-doc`](skills/vet-doc/SKILL.md)                         | Review docs for structural and prose issues                    |
-| [`vet-comments`](skills/vet-comments/SKILL.md)               | Standardize comment style, banners, and anchors                |
-| [`vet-skill`](skills/vet-skill/SKILL.md)                     | Review SKILL.md files for quality and structure                |
+| [`revise-code`](skills/revise-code/SKILL.md)                 | Review code for idiom/type/structure violations, then fix      |
+| [`revise-test`](skills/revise-test/SKILL.md)                 | Review tests for redundancy and AAA issues, then fix           |
+| [`revise-doc`](skills/revise-doc/SKILL.md)                   | Review docs for structural and prose issues, then fix          |
+| [`revise-comments`](skills/revise-comments/SKILL.md)         | Review comment style, banners, and anchors, then fix           |
+| [`revise-skill`](skills/revise-skill/SKILL.md)               | Review SKILL.md files for quality and structure, then fix      |
 | [`scan-bug`](skills/scan-bug/SKILL.md)                       | Scan for runtime bugs: null access, leaks, races, logic errors |
 | [`scan-simplification`](skills/scan-simplification/SKILL.md) | Scan for over-engineering and unneeded complexity              |
+
+Each `/revise-*` command dispatches the matching read-only `vet-*` agent, then applies what it
+finds. Dispatch the agent directly when you want findings without edits.
 
 #### Process
 
@@ -106,13 +137,24 @@ commands are the source map.
 
 ### Agents
 
-| Agent                                        | Description                                      |
-| -------------------------------------------- | ------------------------------------------------ |
-| [`bug-scanner`](agents/bug-scanner.md)       | Runtime correctness audit at specific locations  |
-| [`code-mender`](agents/code-mender.md)       | Surgical fixes at specific file:line locations   |
-| [`code-distiller`](agents/code-distiller.md) | Reduce code complexity while preserving behavior |
-| [`tdd-cycle`](agents/tdd-cycle.md)           | Context-isolated RED-GREEN cycle agent           |
-| [`claim-reviewer`](agents/claim-reviewer.md) | Verify claims against the codebase independently |
+| Agent                                                        | Description                                             |
+| ------------------------------------------------------------ | ------------------------------------------------------- |
+| [`bug-scanner`](agents/bug-scanner.md)                       | Runtime correctness audit at specific locations         |
+| [`simplification-scanner`](agents/simplification-scanner.md) | Dead code, single-use abstractions, stdlib replacements |
+| [`vet-code`](agents/vet-code.md)                             | Review code against idiom, type, and structure rules    |
+| [`vet-test`](agents/vet-test.md)                             | Review tests for redundancy, AAA, and drift             |
+| [`vet-doc`](agents/vet-doc.md)                               | Review docs for structure, prose, accessibility         |
+| [`vet-comments`](agents/vet-comments.md)                     | Review comment style, banners, and anchors              |
+| [`vet-skill`](agents/vet-skill.md)                           | Review SKILL.md files for quality and structure         |
+| [`code-mender`](agents/code-mender.md)                       | Surgical fixes at specific file:line locations          |
+| [`code-distiller`](agents/code-distiller.md)                 | Reduce code complexity while preserving behavior        |
+| [`tdd-cycle`](agents/tdd-cycle.md)                           | Context-isolated RED-GREEN cycle agent                  |
+| [`claim-reviewer`](agents/claim-reviewer.md)                 | Verify claims against the codebase independently        |
+
+The five `vet-*` agents are read-only — no `Edit`, `Write`, or `Bash`. They return `### Finding N`
+blocks — each carrying a confidence score (0/25/50/80/100) and a domain impact tag — and never touch
+a file; the paired `revise-*` skill gates on the score, orders the fix queue by impact, and applies
+the fixes.
 
 ### Rules
 
@@ -126,8 +168,8 @@ frontmatter activate only when matching files are in context.
 | [`no-destructive-ops`](rules/no-destructive-ops.md)     | Block commands that discard uncommitted work                   |
 | [`receiving-feedback`](rules/receiving-feedback.md)     | Verify feedback before implementing; no performative agreement |
 | [`skill-loading`](rules/skill-loading.md)               | Mandatory skill loading before every matching action           |
-| [`no-migration-bias`](rules/no-migration-bias.md)       | Migration cost is one factor, not a veto                       |
-| [`no-unilateral-action`](rules/no-unilateral-action.md) | Decisions and questions route through the user                 |
+| [`decision-policy`](rules/decision-policy.md)           | Durable fix by default; ask only when the answer changes work  |
+| [`no-unilateral-action`](rules/no-unilateral-action.md) | Questions route through the user                               |
 | [`no-unrequested-edits`](rules/no-unrequested-edits.md) | Report first, edit only on explicit request                    |
 
 ### Development Workflow
