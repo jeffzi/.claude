@@ -5,8 +5,6 @@ description: >
   comment policy, mandatory types, error surfacing, verification gates, and universal
   rationalizations. Not for test code — use `Skill(test-core)`.
 user-invocable: false
-model: sonnet
-effort: medium
 ---
 
 # Production Code — Cross-Language Principles
@@ -40,7 +38,25 @@ Self-documenting code makes the _what_ obvious. Comments are for the _why_: non-
 trade-offs, invariants, references to external context (ticket number, paper, spec section). Never
 reference line numbers — they drift on the next edit; name the invariant, function, or symbol.
 
-````text
+**A _why_ binds the current code.** It tells the next editor what changing this would break. History
+does not: a previous implementation, a dropped dependency, an alternative considered and rejected,
+the backstory of a decision — those belong in the changelog, the PR, or the docs, which are built to
+carry them. The reader of a source file should not have to learn what the code used to be.
+
+Same subject, opposite verdicts — the difference is whether it constrains the next edit:
+
+```text
+# GOOD — binds the next edit
+# Do not reintroduce cli-width: stream.columns covers every Node version we support.
+
+# BAD — narrates the past
+# We originally reached for cli-width, but dropped the dependency in the 0.4 cycle.
+```
+
+When a constraint is buried in past tense, keep the constraint and drop the narration — don't delete
+both.
+
+```text
 # BAD — restates the code
 total = 0  # initialize total
 for item in items:  # loop through items
@@ -55,7 +71,7 @@ LIMIT = 4095
 
 # GOOD — names the function, not the line
 # see validate_token() for the retry logic
-```text
+```
 
 Delete comments before refactoring a function, then add them back only where the new code can't
 speak for itself. If you find yourself writing "this is because...", write the comment. If you find
@@ -130,6 +146,7 @@ If any of these are true, stop before proceeding:
 
 - A function signature has no type annotations in a typed language.
 - A comment describes what the next line of code does.
+- A comment tells the reader what the code used to be, or which alternative was rejected.
 - An async operation's result is discarded without a handler.
 - A `TODO` references behavior that must exist for the feature to work.
 - The verification commands have not been run since the last edit.
@@ -142,7 +159,7 @@ If any of these are true, stop before proceeding:
 | Caller                                | How code-core is loaded                                                      |
 | ------------------------------------- | ---------------------------------------------------------------------------- |
 | `rules/skill-loading.md` action table | Loaded automatically when writing code — hub dispatches to leaf              |
-| `vet-code`                            | Step 1: load `Skill(code-core)`; hub dispatches to the matching leaf         |
+| `vet-code` agent                      | Loads `Skill(code-core)` in its own context; hub dispatches to the leaf      |
 | `tdd` (code/GREEN side)               | Should load `Skill(code-core)` before writing production code in GREEN phase |
 
 **Overlays** (e.g., `code-shiny`, `code-marimo`, `code-tstl`, `polars`) are loaded by the base
@@ -159,8 +176,8 @@ rules/skill-loading.md → Code skill column
   .ts, .tsx, …     →  Skill(code-ts)
   .lua             →  Skill(code-lua)
   .swift           →  Skill(code-swift)
-  .sh, .bash       →  Skill(code-shell)   ```text
+  .sh, .bash       →  Skill(code-shell)
+```
 
 If the extension is not listed, check whether a `code-{lang}` skill exists under `skills/` with a
 matching `paths:` glob. If none exists, note "no matching skill" rather than guessing.
-````
