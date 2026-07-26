@@ -5,8 +5,6 @@ description: >
   Also use when asked to follow TDD or invoked via /tdd. Use when you think "I'll add tests later"
   — that's rationalization. Not for projects without a test suite.
 argument-hint: "[feature or behavior to implement]"
-model: opus
-effort: high
 ---
 
 # Test-Driven Development (TDD)
@@ -247,16 +245,16 @@ Compute total insertions across all files modified/added during this `/tdd` invo
 
 If **≥ 50 lines**, split changed files into impl and test files. Run two tracks in parallel:
 
-- **Impl track:** dispatch `code-distiller` on impl files; then dispatch a `general-purpose` agent
-  prompted to load `Skill(vet-code)` and run it on the result (again if changes were made, max 2
-  passes)
-- **Test track:** dispatch `code-distiller` on test files; then dispatch a `general-purpose` agent
-  prompted to load `Skill(vet-test)` and run it on the result (again if changes were made, max 2
-  passes)
+- **Impl track:** dispatch `code-distiller` on impl files; then dispatch `subagent_type: vet-code`
+  on the result
+- **Test track:** dispatch `code-distiller` on test files; then dispatch `subagent_type: vet-test`
+  on the result
 
-`vet-code` and `vet-test` are skills, not agents — never pass them as `subagent_type`.
+Do NOT set model on either reviewer dispatch — the agents define their own. They load `code-core` /
+`test-core` and the language leaf inside their own context, so pass no skill in the prompt.
 
-Re-run FULL_SUITE_COMMAND if either agent made changes.
+The reviewers are read-only: they return `### Finding N` blocks and change nothing. Apply their
+findings in the main context, then re-run FULL_SUITE_COMMAND if either track applied changes.
 
 ### Repeat
 

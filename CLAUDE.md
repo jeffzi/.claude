@@ -9,7 +9,8 @@ describe it, let the user decide (fix now, defer, or skip). Non-zero exit codes 
 surface before anything else; never switch files or approaches to avoid one. Never attribute origin
 ("pre-existing", "not from this PR") — just diagnose and offer to fix. Never run a baseline to
 establish origin: do not create worktrees, stash changes, or run any command whose sole purpose is
-to prove a failure existed before your edits.
+to prove a failure existed before your edits. Surface as a one-line finding — never escalate an
+out-of-scope issue into a decision point or plan (`rules/decision-policy.md`).
 
 ### No destructive operations without explicit permission
 
@@ -23,6 +24,14 @@ Plan mode = `Skill(write-plan)`. Writing code = `Skill(code-core)`. Tests = `Ski
 Every time, even if loaded earlier, even if already in plan mode, even after compaction. "Already in
 plan mode" does not mean the skill is loaded — plan mode is system state, the skill is the
 instructions for how to use it. Editing a plan file without the skill loaded is always wrong.
+
+### Skill-prescribed agent dispatch is pre-approved
+
+**Invoking a skill or command is the request for every agent it prescribes, in the number and
+grouping it prescribes.** When a loaded skill, command, or rule prescribes launching an agent,
+dispatch it — never ask for approval, never do the work inline instead, and never present inline
+work as an agent's result. Agents you invent on your own initiative still need the user's request.
+Full rule: `rules/skill-loading.md`.
 
 ### TDD
 

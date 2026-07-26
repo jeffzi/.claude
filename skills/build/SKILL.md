@@ -5,7 +5,7 @@ description: >
   session. Not for bug fixes (use /fix).
 argument-hint: "[feature or behavior to build]"
 disable-model-invocation: true
-model: sonnet
+model: opus
 effort: high
 ---
 
@@ -123,23 +123,26 @@ Check the response for a `SPEC_STATUS` field:
 Every issue in the `ISSUES:` list has a `Missing:`, `Extra:`, or `Misunderstood:` prefix. Route each
 type differently:
 
-- **`Missing:`** → requirement not implemented. Dispatch a `tdd-cycle` agent for the missing
-  behavior. Reuse existing test files where the behavior belongs in an already-tested module; create
-  new test files for new concerns. When ambiguous, prefer a new file — a misplaced test is harder to
-  fix than an extra file.
+- **`Missing:`** → requirement not implemented. Dispatch a `tdd-cycle` agent (do NOT set model — the
+  agent defines its own) for the missing behavior. Reuse existing test files where the behavior
+  belongs in an already-tested module; create new test files for new concerns. When ambiguous,
+  prefer a new file — a misplaced test is harder to fix than an extra file.
 - **`Extra:`** → YAGNI violation. Dispatch a fixer subagent (`model: sonnet, effort: high`) to
   remove the unneeded code.
-- **`Misunderstood:`** → wrong interpretation. Dispatch a fixer subagent; if the correct
-  interpretation is ambiguous, surface to the user rather than guess.
+- **`Misunderstood:`** → wrong interpretation. Dispatch a fixer subagent
+  (`model: sonnet, effort:
+  high`); if the correct interpretation is ambiguous, surface to the user
+  rather than guess.
 
 **Mixed-issue handling** (a single FAIL can carry all three prefixes):
 
-1. **Default — independent issues:** dispatch `tdd-cycle` for each `Missing:` behavior first (adds
-   code + tests), then **one** fixer subagent for the `Extra:` + `Misunderstood:` set (batched —
-   they remove/change code).
+1. **Default — independent issues:** dispatch `tdd-cycle` (no model) for each `Missing:` behavior
+   first (adds code + tests), then **one** fixer subagent (`model: sonnet, effort: high`) for the
+   `Extra:` + `Misunderstood:` set (batched — they remove/change code).
 2. **When a `Missing:` behavior builds on code a `Misunderstood:` issue corrects** (same function or
    region — check the `file:line` refs): fix the `Misunderstood:` issue **first**, so `tdd-cycle`
-   writes tests against the corrected foundation. Handle `Extra:` removals in the same fixer pass.
+   writes tests against the corrected foundation. Handle `Extra:` removals in that same
+   `model: sonnet, effort: high` fixer pass.
 3. Re-run `TEST_COMMAND` after all fixes to confirm tests still pass. If a fix breaks a just-built
    test, surface to the user rather than retrying.
 4. Re-dispatch the spec reviewer **once**.
@@ -149,15 +152,16 @@ on the same file.
 
 #### Step 3: Code quality review (gate)
 
-Dispatch in parallel (two independent agents, `model: sonnet, effort: high`):
+Dispatch in parallel (two independent **Agent** calls — do NOT set model, the agents define their
+own):
 
-- **Agent A:** `/vet-code` on implementation files from the TDD phase
-- **Agent B:** `/vet-test` on test files from the TDD phase
+- **Agent A:** `subagent_type: vet-code` on implementation files from the TDD phase
+- **Agent B:** `subagent_type: vet-test` on test files from the TDD phase
 
-For each finding, apply the fix directly in the main context — vet-code/vet-test findings are code
-quality issues, not new behaviors, so no TDD cycle is required. After all fixes are applied, re-run
-the test suite to confirm tests still pass. If tests fail, revert the offending fix and surface to
-the user.
+Both reviewers are read-only. For each finding they return, apply the fix directly in the main
+context — these are code quality issues, not new behaviors, so no TDD cycle is required. After all
+fixes are applied, re-run the test suite to confirm tests still pass. If tests fail, revert the
+offending fix and surface to the user.
 
 #### Step 4: Mark task complete
 

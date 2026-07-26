@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Fires on ExitPlanMode — reminds Claude to verify plan claims first.
+# Fires on ExitPlanMode — blocks until verification agents have run.
 
 printf >&2 '%s\n' \
-	"STOP: Before presenting this plan, you MUST dispatch Agent(subagent_type: claim-reviewer)" \
-	"to verify the plan's factual claims about the codebase. If you have already dispatched it" \
-	"and incorporated its verdicts, proceed."
+	"STOP — Pre-Exit Gate. Both must be done before ExitPlanMode:" \
+	"" \
+	"1. claim-reviewer agent: dispatched and verdicts incorporated into the plan." \
+	"2. Plan review agent (2+ tasks): general-purpose agent dispatched and feedback incorporated." \
+	"" \
+	"Look for agent results in the conversation. If you cannot find them — especially after" \
+	"compaction — dispatch now. 'I already verified' is not evidence; agent results are."
 
 exit 0
