@@ -16,26 +16,62 @@ are optional; only `description` is recommended.
 
 ## Fields
 
-| Field                      | Purpose                                                                                                                            |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `name`                     | Display name. Defaults to directory name. Lowercase letters, numbers, hyphens only (max 64 chars).                                 |
-| `description`              | What the skill does and when to use it. Front-load the key use case — truncated at 250 chars per entry.                            |
-| `argument-hint`            | Autocomplete hint shown when typing `/skill-name`. Example: `[issue-number]` or `[filename] [format]`.                             |
-| `disable-model-invocation` | `true` prevents Claude from auto-loading. Manual `/name` invocation only. Default: `false`.                                        |
-| `user-invocable`           | `false` hides from the `/` menu. Claude can still auto-load. Default: `true`.                                                      |
-| `allowed-tools`            | Tools Claude can use without permission prompts when skill is active. Space-separated or YAML list.                                |
-| `model`                    | Model override when skill is active. E.g., `haiku`, `sonnet`, `opus`, or full model ID.                                            |
-| `effort`                   | Effort level override. `low`, `medium`, `high`, `max`. **Always set** — unset inherits session effort, risking silent degradation. |
-| `context`                  | Set to `fork` to run in an isolated subagent context.                                                                              |
-| `agent`                    | Subagent type when `context: fork` is set. `Explore`, `Plan`, `general-purpose`, or custom agent.                                  |
-| `hooks`                    | Hooks scoped to this skill's lifecycle.                                                                                            |
-| `paths`                    | Glob patterns that auto-activate the skill when matching files are in play. Comma-separated or YAML list.                          |
-| `shell`                    | `bash` (default) or `powershell` for `!` commands.                                                                                 |
+| Field                      | Purpose                                                                                                                          |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                     | Display name. Defaults to directory name. Lowercase letters, numbers, hyphens only (max 64 chars).                               |
+| `description`              | What the skill does and when to use it. Front-load the key use case — truncated at 250 chars per entry.                          |
+| `argument-hint`            | Autocomplete hint shown when typing `/skill-name`. Example: `[issue-number]` or `[filename] [format]`.                           |
+| `disable-model-invocation` | `true` prevents Claude from auto-loading. Manual `/name` invocation only. Default: `false`.                                      |
+| `user-invocable`           | `false` hides from the `/` menu. Claude can still auto-load. Default: `true`.                                                    |
+| `allowed-tools`            | Tools Claude can use without permission prompts when skill is active. Space-separated or YAML list.                              |
+| `model`                    | Model override, **slash invocation only**. E.g., `haiku`, `sonnet`, `opus`, or full model ID. See below.                         |
+| `effort`                   | Effort level override, **slash invocation only**. `low`, `medium`, `high`, `max`. See below.                                     |
+| `context`                  | Set to `fork` to run in an isolated subagent context.                                                                            |
+| `agent`                    | Subagent type when `context: fork` is set. `Explore`, `Plan`, `general-purpose`, or custom agent.                                |
+| `hooks`                    | Hooks scoped to this skill's lifecycle.                                                                                          |
+| `paths`                    | Glob patterns that auto-activate the skill when matching files are in play. Comma-separated or YAML list. Trades away `Skill()`. |
+| `shell`                    | `bash` (default) or `powershell` for `!` commands.                                                                               |
+
+### `model` and `effort` apply on the slash path only
+
+Both fields take effect only when the user invokes the skill as `/skill-name`. They are **inert**
+when the skill is loaded through the `Skill()` tool, and inert inside a subagent — in both cases the
+surrounding turn's model and effort govern, and the declaration does nothing.
+
+The upstream docs do not carry this qualifier. `references/claude/skills.md` describes both fields
+as applying "when this skill is active", and `references/claude/effort.md` as applying "for the
+duration of that skill's execution". Neither distinguishes the invocation path. The observed
+behavior does: a skill declaring `model: sonnet`, loaded via `Skill()` in an opus session, runs
+every subsequent turn on opus.
+
+**Verify which happened, split by path:**
+
+| Path                | Where to read the effective model                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Slash-invoked skill | Top-level `.message.model` on the assistant records of the invoking turn, in the session JSONL. No `resolvedModel` field. |
+| Dispatched agent    | `.message.model` in `<session>/subagents/agent-<agentId>.jsonl`, keyed by the sibling `.meta.json`'s `toolUseId`.         |
+
+Treat `resolvedModel` as a cross-check only — it is absent from skill turns and misreports
+dispatches.
+
+### When to declare them
+
+A live declaration **overrides the user's `/model` choice for the entire turn**. That is a real
+cost, so it needs a real justification.
+
+| Reachable by                                     | Action                                                                       |
+| ------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Slash only (`disable-model-invocation: true`)    | Always live. Declare **only** with a stated reason; otherwise omit both.     |
+| `Skill()` and slash, slash-invoked in practice   | Declare **only** with a stated reason; otherwise omit both.                  |
+| `Skill()` and slash, effectively never slash-run | **Omit both.** The declaration is dead weight that misleads the next reader. |
+
+A stated reason means a genuine quality floor for the workflow — "this skill adjudicates a diff and
+the cheap tier gets it wrong". Liveness alone is not a reason. Load-only skills (`code-core`,
+`test-core`, the language leaves) should carry neither field.
 
 ### `effort` selection guide
 
-If `effort` is omitted, the skill inherits the session's effort setting. A `low`-effort session
-silently degrades every loaded skill. Always pin explicitly.
+When you do declare `effort` on a slash-invoked skill:
 
 | Skill type                          | Recommended     | Reasoning                                  |
 | ----------------------------------- | --------------- | ------------------------------------------ |
@@ -66,6 +102,39 @@ paths: # YAML list
   - "**/test_*.py"
   - "**/conftest.py"
 ```
+
+### `paths` removes the skill from explicit `Skill()` dispatch
+
+Declaring `paths` makes the skill path-activated **instead of** registry-listed, not in addition to
+it. A skill with `paths` does not appear in the available-skills listing, and calling it by name
+fails:
+
+```text
+Skill(code-ts)
+→ Error: Unknown skill: code-ts. Did you mean code-tstl?
+```
+
+The file is present and its frontmatter is valid — `paths` is a recognized key. It simply is not
+reachable by name until a matching file is in play, which is too late for any instruction that says
+"load this skill first."
+
+That makes `paths` incompatible with hub-and-leaf dispatch. `rules/skill-loading.md` and
+`code-core`'s Language Dispatch table both instruct an explicit `Skill(code-{lang})` call, and the
+hub fires before any source file has been read — so the leaf is guaranteed absent at exactly the
+moment it is needed. This is not hypothetical: every `code-*` and `test-*` leaf carried `paths`
+until the keys were removed, which is why TypeScript tests worked (`test-ts` never had one) while
+TypeScript production code did not.
+
+**Choose one:**
+
+| Goal                                       | Setting                                         |
+| ------------------------------------------ | ----------------------------------------------- |
+| Another skill or rule loads it by name     | Omit `paths`. Explicit dispatch needs the name. |
+| Fires on its own when a file type shows up | Use `paths`. Never call it via `Skill()`.       |
+
+Auto-activation and named dispatch are mutually exclusive. Wanting both means picking named dispatch
+and letting the hub decide, since the hub can always reach a registered skill but nothing can reach
+an unregistered one.
 
 ---
 

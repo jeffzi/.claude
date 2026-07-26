@@ -4,7 +4,8 @@ description: Use when setting up shared TypeScript tooling config in a project (
 argument-hint: init | update
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion, Bash(cp:*), Bash(ls:*), Bash(mkdir:*), Bash(ln:*), Bash(diff:*), Skill
-effort: high
+model: sonnet
+effort: medium
 ---
 
 # setup-ts

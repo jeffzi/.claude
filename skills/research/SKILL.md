@@ -6,8 +6,6 @@ description: >-
   this is accurate", "I need sources", or "don't make things up". Not for creative brainstorming or
   open-ended ideation.
 argument-hint: "[topic to research]"
-model: opus
-effort: high
 allowed-tools: Read, Grep, Glob, WebFetch, WebSearch
 ---
 

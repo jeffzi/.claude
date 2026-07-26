@@ -5,8 +5,6 @@ description: >
   Also use when asked to create an implementation plan or invoked via /write-plan.
   Not for single-task changes or quick bug fixes that need no plan.
 argument-hint: "[task or spec]"
-model: opus
-effort: high
 ---
 
 # Writing Plans
@@ -155,9 +153,11 @@ not exceptions. The rationalizations that surface under pressure, and why each f
 
 ## Plan Review
 
-For plans with 2+ tasks, dispatch one **Agent** call with `subagent_type: general-purpose`, passing
-the spec and the draft plan, to check completeness, spec alignment, and task decomposition. Max 3
-review iterations, then surface to user. Reviewers are advisory.
+For plans with 2+ tasks, dispatch one **Agent** call with `subagent_type: general-purpose` and
+`model: sonnet`, passing the spec and the draft plan, to check completeness, spec alignment, and
+task decomposition. The model is pinned because this agent checks a written plan against a supplied
+spec rather than diagnosing anything. Max 3 review iterations, then surface to user. Reviewers are
+advisory.
 
 This review is independent of claim verification below — send both agents in a single message so
 they run in parallel.

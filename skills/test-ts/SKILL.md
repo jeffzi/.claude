@@ -6,8 +6,6 @@ description: >
   timer/promise deadlocks, mock reset semantics, type-safe test factories, or any *.test.ts files.
   Not for production TypeScript code — use code-ts for that.
 user-invocable: false
-model: sonnet
-effort: medium
 ---
 
 # TypeScript Testing with Vitest

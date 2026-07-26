@@ -6,8 +6,8 @@ allowed-tools: >
   Bash(npm outdated:*), Bash(npm install:*),
   Bash(npm list:*), Bash(npx tsc:*),
   Bash(npx oxlint:*), Bash(npx oxfmt:*), Bash(npx vitest:*)
-model: haiku
-effort: low
+model: sonnet
+effort: medium
 ---
 
 # Upgrade All TypeScript Dependencies

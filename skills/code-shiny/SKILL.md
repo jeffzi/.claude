@@ -8,8 +8,6 @@ description: >
   session cleanup. Not for Shinylive static-only
   deploys or Jupyter-style notebooks.
 user-invocable: false
-model: sonnet
-effort: medium
 ---
 
 # Shiny for Python

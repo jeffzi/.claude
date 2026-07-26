@@ -5,10 +5,7 @@ description: >
   async test flakiness, Sendable mock issues, confirmation() usage, strict concurrency test
   errors, actor-isolated testing, exit tests, or any *Tests.swift files. Not for production
   Swift code patterns — use code-swift for that.
-paths: "**/*Tests.swift"
 user-invocable: false
-model: sonnet
-effort: medium
 ---
 
 # Swift Testing

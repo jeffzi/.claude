@@ -1,8 +1,8 @@
 ---
 name: upgrade-py
 description: Use when upgrading Python dependencies in lock file and pyproject.toml
-model: haiku
-effort: low
+model: sonnet
+effort: medium
 allowed-tools: >
   Read, Grep, Edit, Bash(uv sync:*),
   Bash(uv pip list:*), Bash(uv tool run prek:*),

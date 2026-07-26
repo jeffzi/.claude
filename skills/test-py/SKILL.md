@@ -6,10 +6,7 @@ description: >
   testing, flaky tests, test isolation issues, data
   validation, AssertionError debugging, or any
   test_*.py files.
-paths: "**/test_*.py, **/*_test.py, **/tests/**/*.py, **/conftest.py"
 user-invocable: false
-model: sonnet
-effort: medium
 ---
 
 # Python Testing with pytest

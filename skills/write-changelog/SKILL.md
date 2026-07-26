@@ -7,8 +7,6 @@ description: >
   standard. Not for release notes in documentation — use write-doc for that.
 argument-hint: "[version or date range]"
 allowed-tools: Read, Edit(CHANGELOG.md), Edit(**/CHANGELOG.md), Bash(git log:*), Bash(git tag:*), Bash(git describe:*)
-model: haiku
-effort: low
 ---
 
 # Changelog

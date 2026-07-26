@@ -4,8 +4,8 @@ description: >
   Use when a bug, test failure, or regression needs both diagnosis and a fix.
   Use when root cause is unknown and you need end-to-end resolution.
 argument-hint: "[bug description, error message, or failing test]"
-model: haiku
-effort: medium
+model: opus
+effort: high
 ---
 
 # Fix
