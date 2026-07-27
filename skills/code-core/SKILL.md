@@ -73,6 +73,13 @@ LIMIT = 4095
 # see validate_token() for the retry logic
 ```
 
+**Line-anchored suppressions bind to their target line.** `*-ignore-next-line`,
+`eslint-disable-next-line`, `# noqa`, `@ts-expect-error` and kin suppress the line immediately after
+(or on) them. When editing near one — including adding the explanatory comment these suppressions
+should carry — keep the suppression directly above its target; the explanation goes above the
+suppression or on its own line, never between the suppression and the code it covers. Splitting that
+pair silently un-suppresses the target and can turn a passing check red.
+
 Delete comments before refactoring a function, then add them back only where the new code can't
 speak for itself. If you find yourself writing "this is because...", write the comment. If you find
 yourself writing "this does...", delete it.
@@ -121,6 +128,16 @@ Common traps:
 - Linting and type-checking are separate commands — run both.
 - Tests exist in a subdirectory you didn't touch — run the whole suite, not just the touched file.
 - Pre-commit hooks run a subset of checks — run the full check independently.
+
+### 6. Project Conventions Bind Like These Rules
+
+The project's CLAUDE.md (and files it imports, such as AGENTS.md) may state its own conventions —
+output routing, naming, module layout, annotation requirements. Where present, they join this
+skill's rules with equal force: writing code, follow them; reviewing code, cite them exactly like a
+skill rule (`CLAUDE.md: "<quoted convention>"`). A stated project convention is never a "style
+preference" — the project already made that decision. Only imperative rules about code content
+qualify: command references, build instructions, and architecture notes are documentation, not
+conventions, and bind nothing.
 
 ## Universal Rationalizations
 

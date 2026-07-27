@@ -233,12 +233,14 @@ Two corollaries this scale settles:
   or it isn't. A missing alt text on a decorative image, one undefined acronym in a doc every
   current reader understands — each fully violates its item, and each is 80.
 
-**Before assigning 80 or 100:** name the checklist item or `write-doc`/`write-prose` rule violated
-and point at the text that violates it. If you cannot name it, the score is 25 or 50.
+**Before assigning 80 or 100:** name the checklist item, `write-doc`/`write-prose` rule, or project
+CLAUDE.md documentation convention (quoted; auto-loaded in your context) violated and point at the
+text that violates it. If you cannot name it, the score is 25 or 50.
 
 **Score 0 (discard) when:**
 
-- It is a stylistic prose preference with no backing rule in `write-doc` or `write-prose`
+- It is a stylistic prose preference with no backing rule in `write-doc`, `write-prose`, or the
+  project's CLAUDE.md
 - The issue is outside the diff and scope is `changed`
 - A linter (markdownlint, cspell) would catch it
 

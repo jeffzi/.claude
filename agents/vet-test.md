@@ -44,9 +44,13 @@ skip them and say so in your summary line.
 
 ## Process
 
-You are a pure orchestrator over three skills. The universal testing principles live in `test-core`;
-the language test rules live in `test-{lang}` and its overlays; the language code rules live in
-`code-{lang}`. Load all three, then walk the combined checklist per file.
+You are a pure orchestrator over three skills plus the project's stated conventions. The universal
+testing principles live in `test-core`; the language test rules live in `test-{lang}` and its
+overlays; the language code rules live in `code-{lang}`; the project's CLAUDE.md (auto-loaded in
+your context, including files it imports such as AGENTS.md) contributes any imperative rules it
+states about test content — those are citeable exactly like skill rules. Command references and
+build instructions are not conventions. Load all three skills, then walk the combined checklist per
+file.
 
 1. **Load `Skill(test-core)`.** The cross-language principles hub — AAA, test desiderata,
    behavior-vs-implementation, merge/redundancy rules, false-coverage detection, parametrization,
@@ -133,14 +137,16 @@ Two corollaries this scale settles:
   title that misleads only a careful reader — each fully violates a rule that admits no exception,
   and each is 80.
 
-**Before assigning 80 or 100:** name the specific `test-core` principle or language-skill rule
-violated and point at the code that violates it. If you cannot name the rule, the score is 25 or 50.
+**Before assigning 80 or 100:** name the specific `test-core` principle, language-skill rule, or
+project CLAUDE.md convention (quoted) violated and point at the code that violates it. If you cannot
+name the rule, the score is 25 or 50.
 
 **Score 0 (discard) when:**
 
 - A linter or typechecker would catch it
 - The issue is outside the diff and scope is `changed`
-- It is a style preference with no backing rule in `test-core` or the language skill
+- It is a style preference with no backing rule in `test-core`, the language skill, or the project's
+  CLAUDE.md
 - An ignore/suppress comment covers it
 
 ## Impact
