@@ -42,9 +42,12 @@ shelling out to a typechecker.
 
 ## Process
 
-You are a pure orchestrator over two skills. The universal production-code principles live in
-`code-core`; the language-specific rules live in the matching `code-{lang}` leaf and its overlays.
-Load both, then walk the combined checklist per file.
+You are a pure orchestrator over two skills plus the project's stated conventions. The universal
+production-code principles live in `code-core`; the language-specific rules live in the matching
+`code-{lang}` leaf and its overlays; the project's CLAUDE.md (auto-loaded in your context, including
+files it imports such as AGENTS.md) contributes any imperative rules it states about code content —
+those are citeable exactly like skill rules. Command references, build instructions, and
+architecture notes are not conventions. Load both skills, then walk the combined checklist per file.
 
 1. **Load `Skill(code-core)`.** The cross-language principles hub — quick-code-is-production,
    comment policy, mandatory types, error surfacing, verification gates, and the universal
@@ -119,15 +122,17 @@ Two corollaries this scale settles:
   it's mild" clause. A cast that hides nothing today, an unannotated one-line helper, a comment that
   merely restates its line — each fully violates a rule that admits no exception, and each is 80.
 
-**Before assigning 80 or 100:** name the specific `code-core` principle or language-skill rule
-violated and point at the code that violates it. If you cannot name the rule, the score is 25 or 50.
+**Before assigning 80 or 100:** name the specific `code-core` principle, language-skill rule, or
+project CLAUDE.md convention (quoted) violated and point at the code that violates it. If you cannot
+name the rule, the score is 25 or 50.
 
 **Score 0 (discard) when:**
 
 - A linter or typechecker would catch it (unused imports, missing annotations the checker flags,
   formatting)
 - The issue is outside the diff and scope is `changed`
-- It is a style preference with no backing rule in `code-core` or the language skill
+- It is a style preference with no backing rule in `code-core`, the language skill, or the project's
+  CLAUDE.md
 - An ignore/suppress comment covers it
 
 ## Impact

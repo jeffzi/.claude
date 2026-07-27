@@ -139,6 +139,15 @@ Full list: [testdesiderata.com](https://testdesiderata.com/).
 | **Clear**        | Name describes behavior             | `test('test1')`                                     |
 | **Shows intent** | Demonstrates desired API            | Obscures what code should do                        |
 
+### 9. Project Conventions Bind Like These Principles
+
+The project's CLAUDE.md (and files it imports, such as AGENTS.md) may state its own testing
+conventions — fixture layout, naming patterns, forbidden helpers, required markers. Where present,
+they join these principles with equal force: writing tests, follow them; reviewing tests, cite them
+exactly like a skill rule (`CLAUDE.md: "<quoted convention>"`). A stated project convention is never
+a "style preference" — the project already made that decision. Only imperative rules about test
+content qualify: command references and build instructions are documentation, not conventions.
+
 ## When Adding Coverage
 
 Adding tests to an existing feature (coverage gap-filling, not new behavior) has its own rules:
