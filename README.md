@@ -84,7 +84,7 @@ finds. Dispatch the agent directly when you want findings without edits.
 | [`build`](skills/build/SKILL.md)                                 | End-to-end feature pipeline: brainstorm → plan → TDD with quality gates        |
 | [`fix`](skills/fix/SKILL.md)                                     | Root cause investigation then TDD-driven fix                                   |
 | [`harden`](skills/harden/SKILL.md)                               | Bug-hunting audit + Don't Repeat Yourself (DRY) pass with diff-gated execution |
-| [`preflight`](skills/preflight/SKILL.md)                         | Pre-commit review pipeline: vet, scan, auto-fix, iterate                       |
+| [`preflight`](skills/preflight/SKILL.md)                         | Gated pre-commit pipeline: review, auto-fix, verify, restore on red            |
 | [`receiving-code-review`](skills/receiving-code-review/SKILL.md) | Decide what to implement from review feedback (PR comments, agent findings)    |
 | [`plan-commit`](skills/plan-commit/SKILL.md)                     | Analyze uncommitted changes and suggest granular commits                       |
 | [`investigate`](skills/investigate/SKILL.md)                     | Systematic root cause investigation — diagnosis only, no fix                   |
@@ -112,6 +112,7 @@ finds. Dispatch the agent directly when you want findings without edits.
 | ------------------------------------------------------------ | ------------------------------------------------------- |
 | [`bug-scanner`](agents/bug-scanner.md)                       | Runtime correctness audit at specific locations         |
 | [`simplification-scanner`](agents/simplification-scanner.md) | Dead code, single-use abstractions, stdlib replacements |
+| [`distill-scanner`](agents/distill-scanner.md)               | Read-only distillation review: nesting, duplication     |
 | [`vet-code`](agents/vet-code.md)                             | Review code against idiom, type, and structure rules    |
 | [`vet-test`](agents/vet-test.md)                             | Review tests for redundancy, AAA, and drift             |
 | [`vet-doc`](agents/vet-doc.md)                               | Review docs for structure, prose, accessibility         |
