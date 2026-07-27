@@ -1,19 +1,45 @@
 ---
 name: preflight
 description: >
-  Use when about to commit changes, before code review,
-  or when preparing a PR for submission
+  Use when about to commit or push changes, running a pre-commit or pre-push check ("is this
+  ready to commit", "check my changes"), or preparing a PR for submission. Not for reviewing a
+  GitHub PR by number (use /review) or a security-only pass (use /security-review).
 argument-hint: Optional path or commit ref (defaults to changes since last push)
 disable-model-invocation: true
-model: sonnet
-effort: high
+# Slash-only (disable-model-invocation), so both declarations are live:
+model: opus # orchestrates a multi-agent pipeline with snapshot/restore decisions
+effort: high # gate verdicts and restore decisions must not be shortcut
 ---
 
 # Preflight
 
-Automated pre-commit review with iterative fix loop.
+Automated pre-commit review: a gated pipeline with one verified fix pass. Not a loop — there are no
+iterations, no ledger, no cross-round dedup.
 
-**Core principle:** High precision over high recall. Only auto-fix verified issues (score ≥75).
+**Core principle:** High precision over high recall. Of the findings the review agents return, only
+those scored ≥ 75 are auto-fixed; the rest are reported, not applied.
+
+**Invariant:** Never leave the tree worse than it was found. Every edit round is preceded by a
+snapshot and followed by a gate. On a red gate the snapshot guarantees recovery — and its scope is
+the user's choice (full, partial, or none; steps 4–5), never a silent loss of good fixes. The
+snapshot is recovery, the gate is detection — neither substitutes for the other.
+
+**Scripts:** the mechanical steps run through two helpers in this skill's `scripts/` directory,
+invoked with plain `node` (v22.18+); `<scripts>` below means this skill's `scripts` path. `gate.ts`
+runs both gate halves, auto-numbers its capture files, and prints a machine-readable verdict with a
+`FAILING:` line naming red sub-checks. Its exit codes: 0 green, 1 red (a verdict, not an error), 2
+infrastructure failure — exit 2 is never a gate verdict; surface it and stop. `snapshot.ts` saves
+and restores manifest-aware tar snapshots; a full restore deletes mender-created files, a `--only`
+restore touches nothing beyond the files it names. Both snapshot commands run from the repo root —
+restore included.
+
+**Gate** = the project's checkers **and** tests. Not one or the other.
+
+**The orchestrator routes; it never reads target files.** Step 1 needs filenames, step 3's prompts
+carry paths and diffs, and every lens reads its own files in its own fresh context. The only file
+contents you ever load: the build-config files consulted to resolve the gate commands (step 1) and
+the gate capture files. Reading a target file "to understand the code" or "before dispatching" is
+context stolen from triage and the report — the steps only you can do.
 
 ## Context
 
@@ -27,34 +53,42 @@ Automated pre-commit review with iterative fix loop.
 
 **Announce at start:** "✈️ Preflight check initiated for [files/path]..."
 
-**Silent until Summary:** After the start announcement, output NOTHING until Step 5's Summary
-Report. No progress updates, no tool results, no "verification passed", no "no issues found". The
-spinner shows progress. If you're about to output text, that's a signal to keep working
-silently—user should never need to say "continue".
+**Status budget:** After the start announcement, at most ONE short status line per step transition —
+fixed shape, `Step 3/7: review lenses dispatched.` — and nothing else until Step 7's Summary Report.
+Never findings, issue counts, gate verdicts, or any results content: those exist only in the report
+— and the transition lines themselves carry none of it: `Step 4/7: menders
+dispatched.` is complete;
+never append what was found, promoted, scored, or adjudicated. A task notification or wakeup is NOT
+a demand for output — on a wakeup with nothing new to transition to, end the turn with no text at
+all; the empty turn IS the correct output, not a failure to respond. `Step N/7 in progress.` exists
+solely as the reply to the harness's literal "no visible output" auto-continuation message; emitting
+it on an ordinary wakeup is a budget violation. About to write a second sentence anywhere? That's
+the signal to keep working instead.
 
 ## Execution Sequence
 
-**Execute steps 1-5 in order. Only stop after step 5.**
+**Execute steps 1-7 in order. Only stop after step 7.**
 
 ### Task Management (MANDATORY)
 
-**At the very start**, use the **TaskCreate** tool to create ALL 5 tasks:
+**At the very start**, use the **TaskCreate** tool to create ALL 7 tasks:
 
-| # | Task subject                        | activeForm                      |
-| - | ----------------------------------- | ------------------------------- |
-| 1 | Setup: detect files and conventions | Detecting files and conventions |
-| 2 | Cleanup: simplify and review        | Running cleanup                 |
-| 3 | Review-Fix Loop                     | Scanning for issues             |
-| 4 | Final verification                  | Verifying changes               |
-| 5 | Generate summary report             | Generating summary              |
+| # | Task subject                       | activeForm                   |
+| - | ---------------------------------- | ---------------------------- |
+| 1 | Setup: files and gate commands     | Detecting files and commands |
+| 2 | Entry gate                         | Running entry gate           |
+| 3 | Review: all lenses, one pass       | Reviewing                    |
+| 4 | Triage and fix                     | Triaging and fixing          |
+| 5 | Post-fix scan and fix verification | Checking applied fixes       |
+| 6 | Exit gate: full suite              | Running exit gate            |
+| 7 | Generate summary report            | Generating summary           |
 
-**As you work**, use the **TaskUpdate** tool:
+**As you work**, use the **TaskUpdate** tool: `in_progress` when starting a step, `completed` when
+finishing it.
 
-- Set `status: in_progress` when starting a step
-- Set `status: completed` when finishing a step
-
-⚠️ **HARD RULE: You cannot stop while ANY task is incomplete.** If tasks 3, 4, or 5 show as
-pending/in_progress, you are NOT done. Keep going.
+⚠️ **HARD RULE: You cannot stop while ANY task is incomplete.** A hard stop (red gate) does not
+suspend this rule — it jumps the pipeline: mark the skipped tasks `completed` (nothing remains to do
+on them), run task 7, and report the stop status.
 
 ---
 
@@ -62,14 +96,25 @@ pending/in_progress, you are NOT done. Keep going.
 
 - [ ] Disambiguate argument (commit range vs commit ref vs path — see rules below)
 - [ ] Get target files (path arg or git diff)
-- [ ] Find CLAUDE.md conventions (3 locations below)
 - [ ] Bucket each target file using the **Language Dispatch for test-\* and code-\*** table in
       `rules/skill-loading.md` (already in session context). For each file, look up its extension:
       if the file path matches one of the test-pattern globs for that row → test files; known
       extension but not matching a test pattern → code files; `.md`, `README*`, `CHANGELOG*` → doc
       files; extension not in the table → still review: test files if the filename matches a generic
       test pattern (`test_*`, `*_test.*`, `*.test.*`, `*_spec.*`, `*Tests.*`), otherwise code files
-      (`vet-code`/`vet-test` fall back to hub-only review when no dispatch row exists).
+      (the `vet-code`/`vet-test` agents fall back to hub-only review when no dispatch row exists).
+      **Exception — data and asset files are not review targets** (doc-named files — `.md`,
+      `README*`, `CHANGELOG*` — bucket as docs first; this exception never claims them): serialized
+      data and config data (`.json`, `.jsonl`, `.yaml`, `.yml`, `.toml`, `.ini`, `.xml`, `.csv`,
+      `.tsv`, `.txt` — fixture and golden files included), lockfiles (`*.lock`,
+      `package-lock.json`), media and binaries (images, fonts, archives), generated artifacts
+      (`*.min.*`, `*.map`, anything under `dist/`/`build/`), and test snapshots (`__snapshots__/`,
+      `*.snap`). Skip them — no lens reviews them — and list them in the report's Files Checked as
+      `skipped (data/asset)`. Bucketing is filename-based throughout: no file is ever opened to
+      classify it. Collection stays extension-blind — never pre-filter by extension at the
+      `find`/git stage (no `find -name '*.ts'`); every file under the target must reach bucketing,
+      or the skipped-files listing silently loses its rows.
+- [ ] Resolve the gate commands (below)
 
 **Argument disambiguation:** if an argument is given:
 
@@ -87,165 +132,278 @@ pending/in_progress, you are NOT done. Keep going.
 
 **No-argument file collection** — always run all four, combine and deduplicate:
 
-1. `git diff --name-only @{push}` — committed but not yet pushed (skip if `@{push}` fails — no
-   upstream)
-2. `git diff --name-only` — unstaged working-tree changes
-3. `git diff --cached --name-only` — staged changes
+1. `git diff --name-only --diff-filter=d @{push}` — committed but not yet pushed (skip if `@{push}`
+   fails — no upstream)
+2. `git diff --name-only --diff-filter=d` — unstaged working-tree changes
+3. `git diff --cached --name-only --diff-filter=d` — staged changes
 4. `git ls-files --others --exclude-standard` — untracked, non-gitignored files
+
+`--diff-filter=d` excludes deleted files everywhere: a deleted file has no content to review and
+would abort the snapshot. Commit-ref and range modes take the same flag.
 
 If no target files are found (empty diff and no path argument), report "No changes detected" and
 stop.
 
-**CLAUDE.md Locations** (check only these, do NOT search subdirectories):
+**Gate commands** — resolve both halves and record them for steps 2, 4, 5, and 6:
 
-- `./CLAUDE.md` (current directory)
-- `<repo-root>/CLAUDE.md`
-- `~/.claude/CLAUDE.md`
+- **Checkers** (linter + typechecker): look in `package.json` scripts (`lint`, `typecheck`,
+  `check`), `lefthook.yml` (TypeScript projects), `.pre-commit-config.yaml` →
+  `prek run --files
+  <targets>` (never assume the `pre-commit` command exists),
+  `Makefile`/`justfile` targets, `pyproject.toml` tool config (ruff, mypy).
+- **Tests**: the project's test runner (`package.json` test script, pytest, busted, `swift test`,
+  …). Intermediate gates (steps 2, 4, 5) may scope the test run to the target files where the runner
+  supports file arguments; the exit gate (step 6) never scopes. Scope is decided here, once, before
+  any gate runs — a red gate is never answered by re-running narrower.
+- A project with no test suite gates on checkers alone; a project with no checkers gates on tests
+  alone. Either absence is stated in the report — never silently treated as green-by-default on both
+  halves. Neither half existing → skip gates, report "no gate commands found", review-only run.
+- Resolve `<scratchpad>`: the session's scratchpad directory when the harness provides one,
+  otherwise `$(mktemp -d)`. Record the path alongside the gate commands — every gate capture and
+  snapshot below writes into it.
 
 → **TaskUpdate** task 1 to `completed`. **TaskUpdate** task 2 to `in_progress`.
 
 ---
 
-### Step 2: Cleanup
+### Step 2: Entry Gate
 
-- [ ] Split target files into source files, test files, and documentation files (`.md`, `README*`,
-      `CHANGELOG*`)
-- [ ] Dispatch agents in parallel (single message, one **Agent** tool call per non-empty bucket):
-  - **Agent A (implementation):** `model: sonnet` — "Distill then review these implementation files:
-    [list]. First load `Skill(distill-code)` and apply it to these files. Then load
-    `Skill(vet-code)` and review them."
-  - **Agent B (tests):** `model: sonnet` — "Distill then review these test files: [list]. First load
-    `Skill(distill-code)` and apply it to these files. Then load `Skill(vet-test)` and review them."
-  - **Agent C (docs):** `model: sonnet` — "Review these documentation files: [list]. Load
-    `Skill(vet-doc)` and review them (it routes CHANGELOG.md to `write-changelog` rules
-    automatically)."
+Run the gate script — it runs both halves, captures everything, and prints the verdict. Never re-run
+to re-filter; the captures hold the full output:
 
-→ Wait for all step 2 agents to return, THEN **TaskUpdate** task 2 to `completed`. **TaskUpdate**
-task 3 to `in_progress`.
+```bash
+node <scripts>/gate.ts <scratchpad> entry "<checker command>" "<test command>"
+```
+
+Pass `""` for an absent half — the script reports it as SKIPPED and gates on the other alone.
+
+- **Red (either half fails):** report status 🚫 **BLOCKED** with the failing output, jump to step 7.
+  No review happens on a broken tree — reviewing it wastes the fan-out; editing it makes it worse.
+  No severity judgment: a failure that looks trivial, stale, or obviously caused by the user's own
+  diff is still red — that judgment belongs to the user, after BLOCKED is reported. And no
+  re-scoping: the test scope was fixed in step 1; a red run is never answered by re-running
+  narrower.
+- **Green:** proceed. Pass NOTHING from the gate to the reviewers — a green gate can only say
+  "everything passed"; there is no payload worth forwarding.
+
+→ **TaskUpdate** task 2 to `completed`. **TaskUpdate** task 3 to `in_progress`.
 
 ---
 
-### Step 3: Review-Fix Loop (max 3 iterations)
+### Step 3: Review — all lenses in parallel, one pass
 
-**This is the core of preflight.** Cleanup was just preparation.
+Capture the review diff now (re-run the step 1 collection commands; in commit-ref/range mode use the
+ref diff). Nothing edits between here and triage, so this diff stays current for every lens.
+**Path-argument mode has no diff** — scope is `full`, so skip capture entirely; prompts carry the
+file list and scope only. Capturing a diff means `git diff` output, never reading files.
 
-**Review scope baseline:** Step 2 agents fix files, so re-capture the diff now — re-run the step 1
-collection commands; in commit-ref/range mode also include `git diff -- <target files>` to pick up
-step 2's working-tree edits. Review agents get current line numbers, and cleanup edits are in scope
-like any other unreviewed change.
+**Launch all applicable lenses in a single message** — one **Agent** tool call per lens. Every lens
+is a typed agent: **never set a model on any dispatch — each agent defines its own.**
 
-Each iteration:
+Project CLAUDE.md conventions need no lens of their own: the harness injects the project's CLAUDE.md
+into every subagent, and the reviewers' hub skills make its imperative conventions citeable rules. A
+convention violation arrives as an ordinary `vet-*` finding.
 
-1. **Launch review agents in parallel** using **Agent** tool (single message, one call per
-   applicable agent):
+**Checklist reviewers** — one per non-empty bucket from step 1:
 
-   **Bug Scanner** (when code files exist)
-   - `subagent_type: bug-scanner` — do NOT set model, the agent defines its own
-   - Prompt:
-     `"Review these files for runtime correctness bugs.\n\nFiles: [code file
-     list]\n\nDiff:\n[diff from step 1]\n\nScope: [full if path-argument mode,
-     changed otherwise]"`
+- `subagent_type: vet-code` on the code files
+- `subagent_type: vet-test` on the test files
+- `subagent_type: vet-doc` on the doc files
+- Prompt each:
+  `"Review these files.\n\nFiles: [bucket file list]\n\nDiff:\n[review diff]\n\nScope: [full if
+  path-argument mode, changed otherwise]"`
+- Each loads its own hub and language leaves and returns `### Finding N` blocks. Do not name a skill
+  in the prompt. `vet-doc` routes CHANGELOG.md to `write-changelog` rules on its own.
+- `vet-comments` and `vet-skill` are not part of preflight — no bucket feeds them.
 
-   **CLAUDE.md Compliance** (when conventions found in step 1)
-   - `model: sonnet` — no subagent_type
-   - Prompt:
-     `"Check whether the changed code follows the project conventions below. For each
-     violation, output a ### Finding N block with fields: Issue, Location, Score (0–100), Reasoning.
-     Return 'No findings.' if clean. Do NOT run tests, linters, or any shell commands — this is a
-     read-only review.\n\nConventions:\n[CLAUDE.md contents]\n\nFiles: [target file
-     list]\n\nDiff:\n[diff from step 1]"`
+**Bug Scanner** (when code files exist)
 
-   **Review scope by input mode:**
-   - **Path argument**: scope = `full` — review entire file(s)
-   - **Commit ref / range / no-argument**: scope = `changed` — use diff from step 1, flag only
-     issues in changed lines
+- `subagent_type: bug-scanner` — do NOT set model, the agent defines its own
+- Prompt:
+  `"Review these files for runtime correctness bugs.\n\nFiles: [code file list]\n\nDiff:\n[review
+  diff]\n\nScope: [full if path-argument mode, changed otherwise]"`
 
-2. **Consolidate findings** — no agent dispatch needed:
+**Distill lens** (when code or test files exist) — read-only; it emits findings, it does not edit.
+Silent unrecorded edits become countable, scoreable, gated findings instead.
 
-   - Collect all `### Finding N` blocks from both agents
-   - Discard findings with score 0 (false positives — see list below)
-   - Partition: score ≥ 75 → fix queue; score < 75 → report-only queue
+- `subagent_type: distill-scanner` — do NOT set model, the agent defines its own. Its tool set has
+  no Edit, so read-only is structural, not a prompt promise.
+- Prompt:
+  `"Review these files for distillation opportunities.\n\nFiles: [code + test file
+  list]\n\nDiff:\n[review diff]\n\nScope: [full if path-argument mode, changed otherwise]"`
+- The agent loads `distill-code` itself and carries its own scoring rubric and impact enum. Do not
+  name a skill in the prompt.
 
-   **False Positives (score = 0, discard):**
+**Review scope by input mode:**
 
-   - Pre-existing issues not in your diff (no-argument mode only)
-   - Linter/typechecker would catch (unused imports, missing type hints, style violations)
-   - General quality without CLAUDE.md backing
-   - Silenced by ignore comments
-   - Stylistic prose preferences without `write-doc` rule backing
-
-3. **Fix issues with score ≥ 75** — for each finding in the fix queue, dispatch one **Agent** call
-   with `subagent_type: code-mender` (send all dispatches in a single parallel message — one call
-   per finding). Do NOT set model. Reformat the finding into code-mender's input format:
-
-   ```text
-   Issue: [description from finding]
-   Location: [file_path:line_number from finding]
-   Severity: [high if score ≥ 90, medium if score ≥ 75]
-   Suggested fix: [reasoning from finding]
-   ```
-
-4. **Decision point:**
-   - If fixes applied AND iterations < 3 → repeat from step 3.1
-   - If no fixes OR iterations = 3 → proceed to Step 4
-
-⚠️ **CHECKPOINT: Only exit loop when no fixes needed OR 3 iterations done.**
+- **Path argument**: scope = `full` — review entire file(s)
+- **Commit ref / range / no-argument**: scope = `changed` — flag only issues in changed lines
 
 → **TaskUpdate** task 3 to `completed`. **TaskUpdate** task 4 to `in_progress`.
 
 ---
 
-### Step 4: Final Verification
+### Step 4: Triage and Fix
 
-**Skip this step only if preflight applied no fixes AND the review-fix loop produced no report-only
-findings (score < 75)** — proceed directly to Step 5. Otherwise there are claims to verify.
+**Triage** — one orchestrator pass over every lens's output. Read `references/triage.md` now and
+follow it exactly: discard score-0 false positives (its list), partition on score (≥ 75 → fix queue,
+else report-only), rank Impact tags against its per-lens enum table, adjudicate qualifying 50s
+through one `claim-reviewer` dispatch, and keep the per-agent tally it defines.
 
-Two kinds of claim feed this step, and both go to `claim-reviewer`:
+**Empty fix queue — checked after adjudication → mark tasks 4 and 5 `completed`, skip to step 6.**
 
-- **Fix claims** — every fix applied in steps 2-3 asserts an issue was resolved. Verify it held
-  rather than trusting the fix report.
-- **Unfixed-finding claims** — every report-only finding (score < 75) asserts an issue _exists_ but
-  was too uncertain to auto-fix. Let the reviewer adjudicate whether it is real.
+**Snapshot** — before any edit, from the repo root (a manifest-aware file copy — never `git stash`;
+`stash create` cannot include untracked files and untracked files are in scope):
 
-Dispatch a single **Agent** tool call with `subagent_type: claim-reviewer` (do NOT set model — the
-agent defines its own). Pass one claim per fix and one per report-only finding:
-
-```text
-Claim N: [issue from the finding] is now resolved at [file:line], and the surrounding code is intact
-Location: [file:line of the fix]
-Stated evidence: [what code-mender reported changing]
-
-Claim M: [issue from the finding] exists at [file:line]
-Location: [file:line of the finding]
+```bash
+node <scripts>/snapshot.ts save <scratchpad>/preflight-snap-1 <target files>
 ```
 
-The agent re-reads each location in its own context and returns a `### Claim N` block per claim
-(`Verdict: Verified | Refuted | Unsubstantiated`, `Score`, `Evidence`, `Reasoning`). Do NOT pass
-diffs or prior state beyond the claim text — the agent re-derives evidence from the files.
+**Fix** — group the fix queue into **file groups** and dispatch **one `code-mender` per group**,
+never per finding — concurrent menders sharing a file race each other, and `code-mender` takes a
+list by contract. A finding's edit targets are the files its Location line and fix text name.
 
-**Consolidate the verdicts** — report-only, no automated re-fix:
+**Group together** (one mender): findings sharing any edit-target file, merged transitively — a
+shared-helper extraction naming three files welds all three, plus every other finding on any of
+them, into one group. **Keep separate** (parallel menders): findings whose file sets are disjoint.
+**Rule of thumb** (mirrors `tdd`'s batching rule): if two fixes touch any common file, one mender
+owns both; split across parallel menders, a cross-file fix cannot land — each mender sees only its
+own file, and the gate goes red on the seam. When in doubt, group: over-grouping only costs
+parallelism; under-grouping ships a half-applied fix.
 
-- _Fix claim_ `Refuted` (≥ 75) → the fix did not hold; record as a verification finding.
-- _Fix claim_ `Unsubstantiated` (≥ 75) → the fix could not be confirmed; record as a verification
-  finding.
-- _Unfixed-finding claim_ `Verified` (≥ 75) → the uncertain finding is real after all; escalate it
-  to a verification finding so the user sees it.
-- _Unfixed-finding claim_ `Refuted` → confirmed false positive; drop it.
-- Anything else (verdict below score 75, or a `Verified` fix claim) → nothing to report.
+Most findings name one file, so most groups are one file. A mender carrying many findings is not
+lower quality than many menders carrying one each; the group is the race-safe unit. Send all group
+dispatches in a single parallel message. Do NOT set model — the agent defines its own. Per group,
+pass every finding for its files:
+
+```text
+Issue: [description from finding]
+Location: [file_path:line_number from finding]
+Severity: [high if the Impact tag ranks 1 or 2 in the enum table in references/triage.md, medium if it ranks 3 or 4]
+Suggested fix: [reasoning from finding]
+
+Issue: [next finding for this file]
+...
+```
+
+Record the set of edited files for step 5.
+
+**Gate** — `node <scripts>/gate.ts <scratchpad> fix "<checker command>" "<test command>"`.
+
+Classification is the script's `FAILING:` line — it names the red sub-checks; the captures hold the
+detail. The line parses npm-run-s output; on `FAILING: (unparsed — see captures)`, classify by
+grepping the captures instead — same evidence, one extra step. Never re-run checks with different
+flags to diagnose, never run the tools directly, and never read target files — grep the captures
+when the summary needs support, nothing more. The only decision here is which branch below applies.
+
+- **Red on formatting alone** (`FAILING:` names only the project's format check): run the project's
+  own formatter — the exact tool the failing check invokes, never a substitute (no reaching for
+  biome in an oxfmt project) — once, scoped to the files preflight edited, then re-run the gate
+  script, both halves (the script numbers the new captures itself). The entry gate was green, so any
+  new format failure lives in those files; formatting untouched files is outside the snapshot and
+  the restore guarantee. Record the Gates row as `🔴→✅ (formatter re-run)`, never a plain ✅. A
+  second red, or any non-format red, takes the choice below.
+- **Red otherwise — the restore decision belongs to the user.** Extract the implicated files (the
+  files the failing sub-checks name in the captures), then widen each to its whole mender group: a
+  group is the atomic unit for reverting exactly as it was for fixing, and it includes any file the
+  group's mender created — restoring half an atomic fix leaves orphans. Then use **AskUserQuestion**
+  with exactly these three options and wait:
+  1. **Restore everything** →
+     `node <scripts>/snapshot.ts restore <scratchpad>/preflight-snap-1 --edited <edited files>`,
+     then report status 🔄 **REVERTED** with the failing output and the fixes attempted, jump to
+     step 7.
+  2. **Restore only the implicated files** →
+     `node <scripts>/snapshot.ts restore <scratchpad>/preflight-snap-1 --only <implicated files>
+     --edited <edited files>`,
+     then re-run the gate script. Green → move the reverted files' findings to Issues Reported
+     ("reverted at red gate — user choice"), adjust the tally, and continue the pipeline with the
+     surviving fixes. Still red → ask again with options 1 and 3 only.
+  3. **Leave the tree as it is** (user takes over) → stop, report status 🚫 **HANDED OFF** — gate
+     red, fixes left in the tree at user request — including the failing output, the files preflight
+     changed, and the exact restore command with the snapshot path (noting it runs from the repo
+     root) so recovery is one paste. Jump to step 7.
+- **Green:** proceed.
 
 → **TaskUpdate** task 4 to `completed`. **TaskUpdate** task 5 to `in_progress`.
 
 ---
 
-### Step 5: Summary Report
+### Step 5: Post-Fix Scan and Verification
+
+The step 3 bug scan only ever saw pre-fix code. Menders can introduce bugs — this is the pass that
+sees the post-fix code. Style re-violations from a mender are not worth re-running four lenses for,
+so this is `bug-scanner` only.
+
+- `subagent_type: bug-scanner`, scoped to the files step 4 edited, with a fresh diff:
+  `git diff -- <edited files>`. An untracked edited file has no diff — pass its name and let the
+  scanner read it in full; never `cat` it into your own context.
+- Prompt as in step 3, scope `changed`.
+
+**If it returns findings ≥ 75:** one corrective round, then stop fixing regardless.
+
+1. Snapshot the edited files:
+   `node <scripts>/snapshot.ts save <scratchpad>/preflight-snap-2 <edited files>`
+2. One `code-mender` per file group (step 4's grouping rule), in parallel, same format as step 4
+3. Gate: `node <scripts>/gate.ts <scratchpad> corrective "<checker command>" "<test command>"` —
+   same red-gate flow as step 4 (formatting-alone branch, then the three-option restore decision),
+   with `preflight-snap-2` as the snapshot.
+4. **Scan the corrective edits** — dispatch `bug-scanner` once more, scoped to the files the
+   corrective menders touched, with a fresh diff. Its findings — at any score — are report-only by
+   the round cap: they join the Post-Fix Bugs (unresolved) table, never a fix queue. No snapshot or
+   gate follows; a scan that cannot trigger edits needs neither. This is not a third round — the cap
+   counts edit rounds, and a read-only scan edits nothing. Without it, the corrective menders' code
+   would be the only code in the pipeline no reviewer ever reads.
+
+Anything found after the corrective round is a report, not another iteration — including bugs you
+notice yourself while reading a mender's report. The cap counts edit rounds, not who spotted the
+issue, and a round done "properly" with snapshot and gate is still a third round. Findings < 75 join
+the report-only queue.
+
+**Verify the fix claims** — every mender report asserts issues were resolved; the gates only proved
+nothing broke, and the scans only hunted new bugs. Read `references/verification.md` now and follow
+it exactly: one `claim-reviewer` dispatch covering every qualifying applied fix from both rounds,
+verdict routing into Verification Findings and Issues Reported, and the tally adjustment.
+Verification is report-only — it never triggers a re-fix.
+
+→ **TaskUpdate** task 5 to `completed`. **TaskUpdate** task 6 to `in_progress`.
+
+---
+
+### Step 6: Exit Gate
+
+Run the **full suite, whole project** — checkers and tests, never scoped to the target files. This
+catches breakage in callers outside the diff.
+
+```bash
+node <scripts>/gate.ts <scratchpad> exit "<checker command>" "<full test command>"
+```
+
+- **Red:** report status 🚫 **GROUNDED** with the failing output and the list of files preflight
+  changed (the fixes remain in the tree — say so explicitly), jump to step 7. A failure that looks
+  environmental, pre-existing, or unrelated to the diff is still red — never downgrade GROUNDED
+  based on your own read of relatedness, and never substitute a scoped re-run as the gate result.
+- **Green:** proceed.
+
+→ **TaskUpdate** task 6 to `completed`. **TaskUpdate** task 7 to `in_progress`.
+
+---
+
+### Step 7: Summary Report
 
 Generate the final report. **This is your FIRST text output since the start announcement.**
 
 **Report status:**
 
-- All clear: "✅ All systems go! Cleared for commit."
-- Issues fixed: "🔧 Fixed [N] issues. Ready for takeoff!"
-- Issues remain: "⚠️ [N] issues need attention before departure."
+- ✅ "All systems go! Cleared for commit." — exit gate ran and passed, nothing report-only. Never
+  claim this unless step 6 actually ran and passed.
+- 🔧 "Fixed [N] issues. Ready for takeoff!" — exit gate passed, fixes applied, nothing report-only
+- ⚠️ "[N] issues need attention before departure." — exit gate passed, report-only findings remain
+- 🚫 **BLOCKED** — entry gate red; no review performed
+- 🔄 **REVERTED** — fixes failed a gate; the user chose full restore, tree is back to its entry-gate
+  state
+- 🚫 **HANDED OFF** — a gate is red and the user chose to keep the fixes in the tree; the report
+  carries the snapshot path and the one-paste restore command
+- 🚫 **GROUNDED** — exit gate red; preflight's fixes remain in the tree
 
 **Omit empty sections.**
 
@@ -254,45 +412,78 @@ Generate the final report. **This is your FIRST text output since the start anno
 
 ## Files Checked
 
-- [files]
+- [files, with data/asset files listed as `skipped (data/asset)`]
 
-## Iterations
+## Gates
 
-- Total: [count]
-- Exit reason: [no changes / max iterations]
+| Gate       | Checkers | Tests | Result |
+| ---------- | -------- | ----- | ------ |
+| Entry      | [cmd]    | [cmd] | ✅/🔴  |
+| Fix        | …        | …     | …      |
+| Corrective | …        | …     | …      |
+| Exit       | [cmd]    | [cmd] | ✅/🔴  |
+
+(one row per gate actually run, named after its capture files — `gate-entry-*`, `gate-fix-*`,
+`gate-corrective-*`, `gate-exit-*`; note here if a half was absent — "no test suite: gates ran
+checkers only")
+
+## Review Agents
+
+| Agent | Found | Fixed | Report-only |
+| ----- | ----- | ----- | ----------- |
+
+(one row per lens dispatched in step 3 — vet-code, vet-test, vet-doc, bug-scanner, distill-scanner —
+including lenses that returned "No findings."; plus a `claim-reviewer` row when adjudication or fix
+verification ran, mapped as Found = claims sent, Fixed = `Verified`, Report-only = `Refuted` +
+`Unsubstantiated`)
 
 ## Issues Fixed (score ≥ 75)
 
-| Issue | Location | Score | Agent |
-| ----- | -------- | ----- | ----- |
+Rows ordered by impact rank, worst first.
 
-## Issues Reported (score < 75)
+| Issue | Location | Impact | Score | Agent |
+| ----- | -------- | ------ | ----- | ----- |
 
-| Issue | Location | Score | Reason Not Fixed |
-| ----- | -------- | ----- | ---------------- |
+## Issues Reported (not auto-fixed)
+
+| Issue | Location | Impact | Score | Reason Not Fixed |
+| ----- | -------- | ------ | ----- | ---------------- |
+
+## Post-Fix Bugs (unresolved)
+
+| Issue | Location | Impact | Score |
+| ----- | -------- | ------ | ----- |
+
+(Only bugs still in the delivered tree: post-corrective findings, and any post-fix finding that went
+unfixed. A bug a mender introduced and the corrective round removed is internal churn — the
+Corrective gate row is its only trace; the report describes the delivered tree, never the pipeline's
+self-repairs.)
 
 ## Verification Findings
 
 | Claim | Location | Verdict | Score |
 | ----- | -------- | ------- | ----- |
 
+(Failures only: `Refuted` and `Unsubstantiated` rows. A `Verified` claim never appears here — its
+only trace is the claim-reviewer tally. Verification findings always escalate: while one exists the
+status is never ✅ or 🔧 — ⚠️ at best, 🚫 if the exit gate is also red.)
+
 ## Status
 
-✅ Cleared for commit / ⚠️ Needs manual review / 🚫 Grounded — issues remain
-
-(Verification findings always escalate to ⚠️ or 🚫)
+✅ Cleared for commit / ⚠️ Needs manual review / 🚫 Blocked / 🔄 Reverted / 🚫 Handed off / 🚫
+Grounded
 ```
 
-→ **TaskUpdate** task 5 to `completed`. **All tasks must now show as completed.**
+→ **TaskUpdate** task 7 to `completed`. **All tasks must now show as completed.**
 
 ---
 
 ## Common Mistakes
 
-- ❌ Sequential agent dispatch → use parallel (single message, multiple **Agent** tool calls)
-- ❌ Single code-mender call for all findings → one **Agent** call per finding, all dispatched in
-  parallel
-- ❌ Auto-fixing linter issues → run the project's configured linter/formatter instead (e.g.,
-  `ruff --fix`, `eslint --fix`)
-- ❌ Skipping "test files", "doc files", or "examples" → treat all files uniformly
-- ❌ Fixing pre-existing issues → only fix what's in your diff (no-argument mode only)
+Each step states its own counters inline; triage and verification mistakes live in their reference
+files. Only rules not stated elsewhere appear here:
+
+- ❌ Auto-fixing linter issues → the gates run the project's configured tools; linter-catchable
+  findings score 0
+- ❌ Skipping the post-corrective scan because its findings can't be fixed → the report is the
+  point; unscanned mender code is how bugs ship silently under a green gate
