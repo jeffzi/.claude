@@ -37,7 +37,8 @@
       "Bash(cargo *)",
       "Bash(swift *)",
       "Bash(swiftformat *)",
-      "Bash(swiftlint *)"
+      "Bash(swiftlint *)",
+      "Bash(~/.claude/scripts/fix-ci-push.sh *)"
     ],
     "deny": [
       "Bash(git push)",
