@@ -80,9 +80,11 @@ finds. Dispatch the agent directly when you want findings without edits.
 
 | Skill                                                            | Description                                                                    |
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [`autocommit`](skills/autocommit/SKILL.md)                       | Standing commit approval — auto-commit verified work, no pushes                |
 | [`brainstorming`](skills/brainstorming/SKILL.md)                 | Explore intent and design space before implementing features                   |
 | [`build`](skills/build/SKILL.md)                                 | End-to-end feature pipeline: brainstorm → plan → TDD with quality gates        |
 | [`fix`](skills/fix/SKILL.md)                                     | Root cause investigation then TDD-driven fix                                   |
+| [`fix-ci`](skills/fix-ci/SKILL.md)                               | Diagnose and fix failing GitHub Actions CI                                     |
 | [`harden`](skills/harden/SKILL.md)                               | Bug-hunting audit + Don't Repeat Yourself (DRY) pass with diff-gated execution |
 | [`preflight`](skills/preflight/SKILL.md)                         | Gated pre-commit pipeline: review, auto-fix, verify, restore on red            |
 | [`receiving-code-review`](skills/receiving-code-review/SKILL.md) | Decide what to implement from review feedback (PR comments, agent findings)    |
@@ -105,6 +107,12 @@ finds. Dispatch the agent directly when you want findings without edits.
 | [`statsmodels`](skills/statsmodels/SKILL.md)                   | Regression, generalized linear models (GLM), time series, mixed models, inference tables    |
 | [`scikit-learn`](skills/scikit-learn/SKILL.md)                 | Classification, regression, clustering, preprocessing, pipelines                            |
 | [`scikit-survival`](skills/scikit-survival/SKILL.md)           | Survival analysis: Cox, random survival forest (RSF), Brier score, censored data            |
+
+#### Utility
+
+| Skill                          | Description                         |
+| ------------------------------ | ----------------------------------- |
+| [`opus`](skills/opus/SKILL.md) | Switch the active model to Opus 4.6 |
 
 ### Agents
 
@@ -168,6 +176,16 @@ Pace emoji (🔥 / 🐢) appear above 50% usage when the burn rate diverges from
 .claude │ Opus 4.6 ▓▓▓▓▓▓▓▓▓░░░░░░░░░░░ 45% │ 5h:72% (🔥 ⏳2h) │ 7d:89% (🐢 ⏳Jul13 09:00)
 ```
 
+### Scripts
+
+| Script                                               | Description                                                      |
+| ---------------------------------------------------- | ---------------------------------------------------------------- |
+| [`cleanup-sessions.sh`](scripts/cleanup-sessions.sh) | Remove stale session data older than a configurable age          |
+| [`fix-ci-policy.sh`](scripts/fix-ci-policy.sh)       | Push-gate policy shared by `fix-ci` loop and `git-guard` hook    |
+| [`fix-ci-push.sh`](scripts/fix-ci-push.sh)           | Sanctioned push wrapper for the `fix-ci` loop                    |
+| [`statusline.sh`](scripts/statusline.sh)             | Custom status line: model, context bar, rate limit pacing        |
+| [`sync-skills.sh`](scripts/sync-skills.sh)           | Sync selected skills from external repositories via `npx skills` |
+
 ### Hooks
 
 | Hook                                               | Description                                                                     |
@@ -192,10 +210,10 @@ Skills and agents resolve these two fields differently, and the difference decid
 declaration is worth writing at all.
 
 **Skill frontmatter is slash-path only.** `model` and `effort` apply when the user types
-`/skill-name`. Loaded through the `Skill()` tool, or reached inside a subagent, both are inert — the
-surrounding turn governs. So the hubs and language leaves (`code-core`, `test-core`, `code-py`, …)
-declare neither: they are only ever loaded, never invoked. A live declaration overrides the user's
-`/model` choice for the whole turn, so it needs a stated reason.
+`/skill-name`. When loaded through the `Skill()` tool or reached inside a subagent, `model` and
+`effort` are inert — the surrounding turn governs. So the hubs and language leaves (`code-core`,
+`test-core`, `code-py`, …) declare neither: they are only ever loaded, never invoked. A live
+declaration overrides the user's `/model` choice for the whole turn, so it needs a stated reason.
 
 The upstream docs describe both fields as applying "when this skill is active", with no
 invocation-path qualifier. That is why this is written down here.
