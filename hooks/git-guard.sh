@@ -12,6 +12,12 @@ command -v jq >/dev/null || {
 	exit 1
 }
 
+# fix-ci policy, shared with the wrapper that fronts the loop's pushes. The hook
+# runs with cwd set to the repo it is guarding, so this is sourced by absolute
+# path — never relative to cwd.
+# shellcheck source=SCRIPTDIR/../scripts/fix-ci-policy.sh
+. "$HOME/.claude/scripts/fix-ci-policy.sh"
+
 input=$(cat)
 full_command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 
@@ -111,6 +117,193 @@ check_tdd_cycle_marker() {
 }
 
 # ╭────────────────────────────────────────────────────────────╮
+# │                  fix-ci Marker Relaxation                  │
+# ╰────────────────────────────────────────────────────────────╯
+
+# While `$GIT_DIR/fix-ci-active` exists, a CI-fix loop is running on throwaway
+# `fix-ci/*` branches whose plain commits get squash-merged back. Two relaxations
+# follow from that shape:
+#
+#   - The loop only ever appends commits, so a plain push is allowed on any
+#     branch. Which branch HEAD points at (or whether it points at one at all)
+#     is irrelevant. Append-only is enforced here, not assumed: force in every
+#     form, `--mirror`, and any deletion outside `fix-ci/*` stay blocked.
+#   - A squash-merged branch has no ancestry in its target, so `git branch -d`
+#     refuses it and `-D` is the only way to clean up the loop's own branches.
+#
+# Both relaxations are scoped to the repo that raised the marker: the effective
+# git dir comes from the command's own `-C` / `--git-dir`, so a marker in one
+# repo never relaxes a command aimed at another.
+#
+# The loop never rewrites history: force-push in every form (including
+# --force-with-lease), `git commit --amend`, and --no-verify stay blocked.
+#
+# The marker expires so an interrupted session cannot leave a repo relaxed
+# forever. Outside the freshness window the marker counts as absent and gets
+# swept; the window itself is defined in scripts/fix-ci-policy.sh, alongside the
+# `fix-ci/*` namespace rule, and shared with the wrapper that fronts the loop's
+# pushes.
+
+# Git dir the command actually targets, honouring its global `-C` / `--git-dir`
+# options. Falls back to the hook's cwd when the command names no repo.
+# Uses global $command (set per sub-command in the main loop).
+git_target_dir() {
+	local -a repo_args=()
+	local word in_git=false capture_next=false skip_next=false
+
+	for word in $command; do
+		if $capture_next; then
+			repo_args+=("$word")
+			capture_next=false
+			continue
+		fi
+		if $skip_next; then
+			skip_next=false
+			continue
+		fi
+
+		# Wait for 'git'
+		if ! $in_git; then
+			[[ "$word" == "git" ]] && in_git=true
+			continue
+		fi
+
+		case "$word" in
+		-C | --git-dir)
+			repo_args+=("$word")
+			capture_next=true
+			;;
+		-C* | --git-dir=*)
+			# Value attached, as in -Cpath or --git-dir=path
+			repo_args+=("$word")
+			;;
+		-c | --work-tree | --namespace)
+			skip_next=true
+			;;
+		--*=* | -*) ;;
+		*)
+			# First non-option word is the subcommand: no repo options left
+			break
+			;;
+		esac
+	done
+
+	git --no-optional-locks ${repo_args[@]+"${repo_args[@]}"} rev-parse --absolute-git-dir 2>/dev/null
+}
+
+# Uses global $command (set per sub-command in the main loop).
+fix_ci_active() {
+	local git_dir marker
+	git_dir=$(git_target_dir) || return 1
+	[[ -n "$git_dir" ]] || return 1
+	marker="$git_dir/fix-ci-active"
+	[[ -f "$marker" ]] || return 1
+
+	if fix_ci_marker_fresh "$marker"; then
+		return 0
+	fi
+	rm -f "$marker" 2>/dev/null || true
+	return 1
+}
+
+# True when the push deletes nothing, or deletes only `fix-ci/*` refs — the
+# same namespace rule local branch deletion follows. `--delete` / `-d` deletes
+# every refspec it is given; without it, a leading-colon refspec such as
+# ':main' deletes on its own.
+# Uses global $command (set per sub-command in the main loop).
+fix_ci_push_deletes_only_own() {
+	local -a refs=()
+	local word ref seen_push=false seen_remote=false delete_mode=false
+
+	for word in $command; do
+		if ! $seen_push; then
+			[[ "$word" == "push" ]] && seen_push=true
+			continue
+		fi
+		case "$word" in
+		--delete | -d)
+			delete_mode=true
+			continue
+			;;
+		-*) continue ;;
+		esac
+		# The first bare word is the remote; the rest are refspecs.
+		if ! $seen_remote; then
+			seen_remote=true
+			continue
+		fi
+		refs+=("$word")
+	done
+
+	if $delete_mode; then
+		# Deleting without naming a ref: nothing proves it stays in namespace.
+		[[ ${#refs[@]} -gt 0 ]] || return 1
+	fi
+
+	while IFS= read -r ref; do
+		fix_ci_ref_in_namespace "$ref" || return 1
+	done < <(fix_ci_deleted_refs "$delete_mode" ${refs[@]+"${refs[@]}"})
+	return 0
+}
+
+# Set by fix_ci_allows_push when the marker is up but the push form is banned.
+fix_ci_push_denial_op=""
+fix_ci_push_denial_reason=""
+
+# Uses global $command (set per sub-command in the main loop).
+fix_ci_allows_push() {
+	fix_ci_push_denial_op=""
+	fix_ci_push_denial_reason=""
+	fix_ci_active || return 1
+
+	# Force in any long form: --force, --force-with-lease, --force-if-includes.
+	# Short-option cluster containing f: -f, -fu, -uf. The [[:alnum:]]* run
+	# never crosses a second dash, so long options and words such as
+	# 'feature/fix-flaky' cannot match.
+	# Force refspec: a token starting with '+', as in 'origin +main:main'.
+	if [[ "$command" =~ [[:space:]]--force ]] ||
+		[[ "$command" =~ [[:space:]]-[[:alnum:]]*f ]] ||
+		[[ "$command" =~ [[:space:]][+][^[:space:]] ]]; then
+		fix_ci_push_denial_op="git push --force"
+		fix_ci_push_denial_reason="The fix-ci loop squash-merges; it never rewrites history."
+		return 1
+	fi
+
+	# --mirror deletes every remote ref that has no local counterpart, so it is
+	# never in namespace no matter what the refspecs say.
+	if [[ "$command" =~ [[:space:]]--mirror([[:space:]]|$) ]] || ! fix_ci_push_deletes_only_own; then
+		fix_ci_push_denial_op="git push (delete)"
+		fix_ci_push_denial_reason="The fix-ci loop deletes only its own fix-ci/* branches, never other history."
+		return 1
+	fi
+
+	return 0
+}
+
+# Uses global $command (set per sub-command in the main loop). True only when
+# every branch named for deletion belongs to the loop's own `fix-ci/*` namespace.
+fix_ci_allows_branch_delete() {
+	fix_ci_active || return 1
+
+	local -a names=()
+	local word seen_branch=false
+	for word in $command; do
+		if ! $seen_branch; then
+			[[ "$word" == "branch" ]] && seen_branch=true
+			continue
+		fi
+		[[ "$word" == -* ]] && continue
+		names+=("$word")
+	done
+
+	[[ ${#names[@]} -gt 0 ]] || return 1
+	for word in "${names[@]}"; do
+		fix_ci_ref_in_namespace "$word" || return 1
+	done
+	return 0
+}
+
+# ╭────────────────────────────────────────────────────────────╮
 # │           Destructive Operations Protection                │
 # ╰────────────────────────────────────────────────────────────╯
 
@@ -151,7 +344,7 @@ check_destructive_operations() {
 
 	# ── Branch ───────────────────────────────────────────────────
 	# git branch -D
-	is_git_subcmd "branch" && [[ "$command" =~ [[:space:]]-D ]] &&
+	is_git_subcmd "branch" && [[ "$command" =~ [[:space:]]-D ]] && ! fix_ci_allows_branch_delete &&
 		block_destructive "git branch -D" "Force-deletes branch, may lose unmerged commits."
 
 	# ── Restore ──────────────────────────────────────────────────
@@ -203,7 +396,9 @@ check_single_command() {
 	fi
 
 	# Block push operations
-	if is_git_subcmd "push"; then
+	if is_git_subcmd "push" && ! fix_ci_allows_push; then
+		[[ -n "$fix_ci_push_denial_reason" ]] &&
+			block_destructive "$fix_ci_push_denial_op" "$fix_ci_push_denial_reason"
 		printf "Error: Automatic git push is not allowed. Review and push manually.\n" >&2
 		exit 2
 	fi

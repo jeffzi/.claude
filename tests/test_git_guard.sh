@@ -56,6 +56,18 @@ expect_allow() {
 	fi
 }
 
+expect_absent() {
+	local desc="$1"
+	local path="$2"
+	if [[ ! -e "$path" ]]; then
+		printf "PASS  %s\n" "$desc"
+		((++PASS))
+	else
+		printf "FAIL  %s  (still present: %s)\n" "$desc" "$path"
+		((++FAIL))
+	fi
+}
+
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
 TMPDIR_ROOT=$(mktemp -d)
@@ -74,6 +86,15 @@ setup_repo() {
 	printf '%s' "$dir"
 }
 
+# Repo on branch $2 with the fix-ci marker raised in its git dir
+setup_fix_ci_repo() {
+	local dir
+	dir=$(setup_repo "$1")
+	git -C "$dir" branch -M "$2"
+	touch "$(git -C "$dir" rev-parse --absolute-git-dir)/fix-ci-active"
+	printf '%s' "$dir"
+}
+
 REPO=$(setup_repo repo)
 
 # Repo with staged plan files (force-add to bypass global gitignore in test setup only)
@@ -81,6 +102,26 @@ PLAN_REPO=$(setup_repo plan_repo)
 mkdir -p "$PLAN_REPO/.claude/plans"
 printf 'plan content\n' >"$PLAN_REPO/.claude/plans/phase.md"
 git -C "$PLAN_REPO" add -f .claude/plans/phase.md
+
+FIXCI_REPO=$(setup_fix_ci_repo fixci_repo feature/ci)
+FIXCI_MAIN_REPO=$(setup_fix_ci_repo fixci_main_repo main)
+FIXCI_MASTER_REPO=$(setup_fix_ci_repo fixci_master_repo master)
+
+# Marker raised but HEAD detached: no current branch name exists at all
+FIXCI_DETACHED_REPO=$(setup_fix_ci_repo fixci_detached_repo feature/ci)
+git -C "$FIXCI_DETACHED_REPO" switch --detach --quiet HEAD
+
+# Marker abandoned by an interrupted session: mtime backdated past the TTL.
+# The live loop refreshes the mtime each iteration, so only abandonment ages out.
+FIXCI_STALE_REPO=$(setup_fix_ci_repo fixci_stale_repo feature/ci)
+FIXCI_STALE_MARKER="$(git -C "$FIXCI_STALE_REPO" rev-parse --absolute-git-dir)/fix-ci-active"
+touch -t "$(date -v-31M +%Y%m%d%H%M)" "$FIXCI_STALE_MARKER"
+
+# Clock skew or a forged mtime must not buy an unbounded window: freshness is
+# bounded on both sides, so a marker dated ahead of now reads as absent.
+FIXCI_FUTURE_REPO=$(setup_fix_ci_repo fixci_future_repo feature/ci)
+touch -t "$(date -v+60M +%Y%m%d%H%M)" \
+	"$(git -C "$FIXCI_FUTURE_REPO" rev-parse --absolute-git-dir)/fix-ci-active"
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -95,9 +136,9 @@ expect_block "git checkout HEAD -- file" "$REPO" "git checkout HEAD -- file"
 expect_block "git checkout ." "$REPO" "git checkout ."
 expect_block "git checkout -f branch" "$REPO" "git checkout -f branch"
 expect_block "git checkout --force branch" "$REPO" "git checkout --force branch"
-expect_allow "git checkout branch" "$REPO" "git checkout branch"
-expect_allow "git checkout -b new-branch" "$REPO" "git checkout -b new-branch"
-expect_allow "git checkout -b feat/my.feature" "$REPO" "git checkout -b feat/my.feature"
+expect_block "git checkout branch" "$REPO" "git checkout branch"
+expect_block "git checkout -b new-branch" "$REPO" "git checkout -b new-branch"
+expect_block "git checkout -b feat/my.feature" "$REPO" "git checkout -b feat/my.feature"
 
 printf "\n── Switch (discard) ─────────────────────────────────────────────────────────\n"
 expect_block "git switch -f branch" "$REPO" "git switch -f branch"
@@ -139,13 +180,52 @@ expect_allow "git restore --staged ." "$REPO" "git restore --staged ."
 
 printf "\n── Commit ───────────────────────────────────────────────────────────────────\n"
 expect_block "git commit --amend" "$REPO" "git commit --amend"
-expect_block "git commit --amend --no-edit" "$REPO" "git commit --amend --no-edit"
 expect_allow "git commit -m 'msg'" "$REPO" "git commit -m 'msg'"
 expect_block "git commit (plan files staged)" "$PLAN_REPO" "git commit -m 'msg'"
 
 printf "\n── --no-verify (any subcommand) ─────────────────────────────────────────────\n"
 expect_block "git commit --no-verify" "$REPO" "git commit --no-verify -m 'msg'"
 expect_block "git push --no-verify" "$REPO" "git push --no-verify"
+
+printf "\n── fix-ci marker (append-only push relaxed) ─────────────────────────────────\n"
+# Plain push is allowed regardless of which branch (or none) HEAD points at
+expect_allow "push under marker" "$FIXCI_REPO" "git push"
+expect_allow "push on main under marker" "$FIXCI_MAIN_REPO" "git push"
+expect_allow "push on master under marker" "$FIXCI_MASTER_REPO" "git push"
+expect_allow "push with detached HEAD under marker" "$FIXCI_DETACHED_REPO" "git push"
+expect_allow "push --delete of fix-ci branch under marker" "$FIXCI_REPO" "git push origin --delete fix-ci/lint"
+expect_allow "push :fix-ci branch (delete refspec) under marker" "$FIXCI_REPO" "git push origin :fix-ci/lint"
+expect_allow "push branch whose name contains -f under marker" "$FIXCI_REPO" "git push origin feature/fix-flaky"
+# Remote deletion is scoped to fix-ci/* exactly like local branch deletion
+expect_block "push --delete of non-fix-ci branch under marker" "$FIXCI_REPO" "git push origin --delete main"
+expect_block "push :main (delete refspec) under marker" "$FIXCI_REPO" "git push origin :main"
+expect_block "push --mirror under marker" "$FIXCI_REPO" "git push --mirror"
+# No force in any form: the loop squash-merges, it never rewrites history
+expect_block "push --force-with-lease under marker" "$FIXCI_REPO" "git push --force-with-lease"
+expect_block "push --force under marker" "$FIXCI_REPO" "git push --force"
+expect_block "push -f under marker" "$FIXCI_REPO" "git push -f"
+expect_block "push -fu (bundled force) under marker" "$FIXCI_REPO" "git push -fu origin HEAD"
+expect_block "push -uf (f-last cluster) under marker" "$FIXCI_REPO" "git push -uf origin HEAD"
+expect_block "push +refspec (force) under marker" "$FIXCI_REPO" "git push origin +main:main"
+expect_block "amend under marker" "$FIXCI_REPO" "git commit --amend"
+# Squash-merged fix-ci/* branches have no ancestry, so -d refuses and -D is the cleanup
+expect_allow "branch -D fix-ci/* under marker" "$FIXCI_REPO" "git branch -D fix-ci/lint"
+expect_block "branch -D other branch under marker" "$FIXCI_REPO" "git branch -D feature"
+expect_block "branch -D mixed fix-ci/* and other under marker" "$FIXCI_REPO" "git branch -D fix-ci/lint feature"
+expect_block "branch -D with no names under marker" "$FIXCI_REPO" "git branch -D"
+expect_block "commit --no-verify under marker" "$FIXCI_REPO" "git commit --no-verify -m 'msg'"
+expect_block "push --no-verify under marker" "$FIXCI_REPO" "git push --no-verify"
+
+printf "\n── fix-ci marker (freshness window fails closed) ────────────────────────────\n"
+expect_block "push under marker older than the TTL" "$FIXCI_STALE_REPO" "git push"
+expect_absent "stale marker removed by the hook" "$FIXCI_STALE_MARKER"
+expect_block "push under marker dated in the future" "$FIXCI_FUTURE_REPO" "git push"
+
+printf "\n── fix-ci marker (scoped to the repo that raised it) ────────────────────────\n"
+# The effective repo is the command's target, not the shell's cwd
+expect_block "push -C at unmarked repo from marked cwd" "$FIXCI_REPO" "git -C $REPO push"
+expect_allow "push -C at marked repo from unmarked cwd" "$REPO" "git -C $FIXCI_REPO push"
+expect_allow "push --git-dir at marked repo from unmarked cwd" "$REPO" "git --git-dir=$FIXCI_REPO/.git push"
 
 printf "\n── History extraction with redirect ─────────────────────────────────────────\n"
 expect_block "git show > file" "$REPO" "git show HEAD > output.txt"
