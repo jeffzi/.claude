@@ -69,8 +69,10 @@ REFACTOR (once, after last cycle):
       - Run two tracks in parallel. For each track:
         1. Dispatch code-distiller agent on the files -- do NOT set model, the agent
            defines its own
-        2. Dispatch subagent_type: vet-code (impl track) or vet-test (test track) on the
-           same files -- do NOT set model, the agent defines its own
+        2. Dispatch in parallel on the same files -- do NOT set model, the agents
+           define their own:
+             - subagent_type: vet-code (impl track) or vet-test (test track)
+             - subagent_type: vet-comments (both tracks)
         3. The reviewers are read-only; apply their findings in the main context
       - If any fixes applied, re-run FULL_SUITE_COMMAND to confirm tests still green
 ```

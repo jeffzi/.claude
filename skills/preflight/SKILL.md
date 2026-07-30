@@ -214,7 +214,17 @@ convention violation arrives as an ordinary `vet-*` finding.
   path-argument mode, changed otherwise]"`
 - Each loads its own hub and language leaves and returns `### Finding N` blocks. Do not name a skill
   in the prompt. `vet-doc` routes CHANGELOG.md to `write-changelog` rules on its own.
-- `vet-comments` and `vet-skill` are not part of preflight — no bucket feeds them.
+- `vet-skill` is not part of preflight — no bucket feeds it.
+
+**Comment lens** (when code or test files exist) — comments in both buckets, one dispatch:
+
+- `subagent_type: vet-comments` — do NOT set model, the agent defines its own
+- Prompt:
+  `"Review these files.\n\nFiles: [code + test file list]\n\nDiff:\n[review diff]\n\nScope: [full
+  if path-argument mode, changed otherwise]"`
+- It resolves its own language skills per file and emits `### Finding N` blocks with Impact tags
+  like every other lens. Its Skills/Exports preamble is its completeness proof — read past it;
+  triage collects only the finding blocks.
 
 **Bug Scanner** (when code files exist)
 
@@ -238,6 +248,19 @@ Silent unrecorded edits become countable, scoreable, gated findings instead.
 
 - **Path argument**: scope = `full` — review entire file(s)
 - **Commit ref / range / no-argument**: scope = `changed` — flag only issues in changed lines
+
+**Completion gate — every lens back, verified.** Keep a dispatch ledger from the launch results:
+lens → task-id. Step 3 ends only when every ledger row has a received task-notification whose
+task-id matches its row. Match notifications to ledger rows, never keep a running tally — "five
+results seen" is how a fabricated or twice-fired notification closes the step early. A
+task-notification is an incoming message from the harness; lens-result text you authored,
+summarized, or predicted is not one — composing a pending lens's result is fabrication, and a triage
+pass over it is corrupt. Before the TaskUpdate below, confirm the ledger with TaskList: every lens
+task `completed` with its notification received. Still running → keep waiting; an auto-continuation
+nudge is not evidence a lens finished, and elapsed time is not a signal this contract recognizes.
+Errored, or `completed` with empty or unusable output → stop and surface it
+(`rules/skill-loading.md`) — never triage a partial lens set. Notification lost but TaskList shows
+`completed` → read that task's output file; never re-dispatch, never reconstruct.
 
 → **TaskUpdate** task 3 to `completed`. **TaskUpdate** task 4 to `in_progress`.
 
@@ -302,12 +325,24 @@ when the summary needs support, nothing more. The only decision here is which br
   script, both halves (the script numbers the new captures itself). The entry gate was green, so any
   new format failure lives in those files; formatting untouched files is outside the snapshot and
   the restore guarantee. Record the Gates row as `🔴→✅ (formatter re-run)`, never a plain ✅. A
-  second red, or any non-format red, takes the choice below.
-- **Red otherwise — the restore decision belongs to the user.** Extract the implicated files (the
-  files the failing sub-checks name in the captures), then widen each to its whole mender group: a
-  group is the atomic unit for reverting exactly as it was for fixing, and it includes any file the
-  group's mender created — restoring half an atomic fix leaves orphans. Then use **AskUserQuestion**
-  with exactly these three options and wait:
+  second red, or any non-format red, takes the repair branch below.
+- **Red otherwise — one repair attempt before anyone is asked.** A regression a mender introduced is
+  something a mender can remove; the user question is the fallback, never the first response.
+  Extract the implicated files (the files the failing sub-checks name in the captures) and widen
+  each to its whole mender group — a group is the atomic unit for repairing exactly as it is for
+  fixing, and it includes any file the group's mender created. Dispatch one `code-mender` per
+  implicated group, in parallel, whose finding is the gate evidence itself: the failing sub-check
+  names, the relevant capture excerpt, and the group's files — "these checks went red after this
+  group's edits; repair the regression." The mender diagnoses in its own context; the no-diagnosis
+  rule above still binds you. Add the repair menders' edits to the edited-files set, then re-run the
+  gate script, both halves. Green → record the Gates row as `🔴→✅ (gate repair)` and proceed — a
+  regression a mender introduced and the repair removed is internal churn, no report row. Still red
+  → the restore decision below. **One repair attempt per gate, ever** — a second red at the same
+  gate is never answered with another mender.
+- **Red after the repair attempt — the restore decision belongs to the user.** Re-extract the
+  implicated files from the newest captures and widen each to its whole mender group (repair edits
+  included) — restoring half an atomic fix leaves orphans. Then use **AskUserQuestion** with exactly
+  these three options and wait:
   1. **Restore everything** →
      `node <scripts>/snapshot.ts restore <scratchpad>/preflight-snap-1 --edited <edited files>`,
      then report status 🔄 **REVERTED** with the failing output and the fixes attempted, jump to
@@ -331,8 +366,8 @@ when the summary needs support, nothing more. The only decision here is which br
 ### Step 5: Post-Fix Scan and Verification
 
 The step 3 bug scan only ever saw pre-fix code. Menders can introduce bugs — this is the pass that
-sees the post-fix code. Style re-violations from a mender are not worth re-running four lenses for,
-so this is `bug-scanner` only.
+sees the post-fix code. Style re-violations from a mender are not worth re-running the full lens
+fan-out for, so this is `bug-scanner` only.
 
 - `subagent_type: bug-scanner`, scoped to the files step 4 edited, with a fresh diff:
   `git diff -- <edited files>`. An untracked edited file has no diff — pass its name and let the
@@ -345,8 +380,9 @@ so this is `bug-scanner` only.
    `node <scripts>/snapshot.ts save <scratchpad>/preflight-snap-2 <edited files>`
 2. One `code-mender` per file group (step 4's grouping rule), in parallel, same format as step 4
 3. Gate: `node <scripts>/gate.ts <scratchpad> corrective "<checker command>" "<test command>"` —
-   same red-gate flow as step 4 (formatting-alone branch, then the three-option restore decision),
-   with `preflight-snap-2` as the snapshot.
+   same red-gate flow as step 4 (formatting-alone branch, one repair attempt, then the three-option
+   restore decision), with `preflight-snap-2` as the snapshot. The gate's single repair attempt is
+   gate machinery, not a round — the round cap counts scan-driven fix rounds.
 4. **Scan the corrective edits** — dispatch `bug-scanner` once more, scoped to the files the
    corrective menders touched, with a fresh diff. Its findings — at any score — are report-only by
    the round cap: they join the Post-Fix Bugs (unresolved) table, never a fix queue. No snapshot or
@@ -424,18 +460,19 @@ Generate the final report. **This is your FIRST text output since the start anno
 | Exit       | [cmd]    | [cmd] | ✅/🔴  |
 
 (one row per gate actually run, named after its capture files — `gate-entry-*`, `gate-fix-*`,
-`gate-corrective-*`, `gate-exit-*`; note here if a half was absent — "no test suite: gates ran
-checkers only")
+`gate-corrective-*`, `gate-exit-*`; a gate that went red and self-recovered records
+`🔴→✅ (formatter re-run)` or `🔴→✅ (gate repair)`, never a plain ✅; note here if a half was
+absent — "no test suite: gates ran checkers only")
 
 ## Review Agents
 
 | Agent | Found | Fixed | Report-only |
 | ----- | ----- | ----- | ----------- |
 
-(one row per lens dispatched in step 3 — vet-code, vet-test, vet-doc, bug-scanner, distill-scanner —
-including lenses that returned "No findings."; plus a `claim-reviewer` row when adjudication or fix
-verification ran, mapped as Found = claims sent, Fixed = `Verified`, Report-only = `Refuted` +
-`Unsubstantiated`)
+(one row per lens dispatched in step 3 — vet-code, vet-test, vet-doc, vet-comments, bug-scanner,
+distill-scanner — including lenses that returned "No findings."; plus a `claim-reviewer` row when
+adjudication or fix verification ran, mapped as Found = claims sent, Fixed = `Verified`, Report-only
+= `Refuted` + `Unsubstantiated`)
 
 ## Issues Fixed (score ≥ 75)
 

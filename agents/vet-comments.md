@@ -365,6 +365,19 @@ from not reporting it.
 **Score the violating text, not the block that surrounds it.** A confirmed violation holds its
 anchor even when it is one sentence inside an otherwise clean comment.
 
+**Impact tags.** Score answers "how sure am I"; Impact answers "what does it cost". Every finding
+carries an `Impact:` line with exactly one tag from this enum — listed worst-first, and the standard
+determines the tag mechanically:
+
+| Impact       | Meaning                                                                                         | Standards |
+| ------------ | ----------------------------------------------------------------------------------------------- | --------- |
+| misdirection | The comment can steer a future edit wrong — a drifted anchor or narration read as current truth | S3, S5    |
+| coverage     | A public contract is undocumented                                                               | S4        |
+| noise        | Restatement dilutes the comments that do bind                                                   | S1        |
+| structure    | A separator or banner breaks the house shape                                                    | S2        |
+
+An `out-of-scope: code bug` finding takes no Impact tag — it is routed elsewhere, not ranked here.
+
 **Score 0 (discard) when:**
 
 - The match is inside a string literal, URL, or version number
@@ -387,12 +400,14 @@ Exports: 4
 ### Finding 1
 Issue: S4 — exported symbol has no doc comment
 Location: src/render.ts:3
+Impact: coverage
 Score: 80
 Reasoning: `export type StyleSpec = …` carries no TSDoc while every other export does. Fix: add a block stating what the alias admits.
 
 ### Finding 2
 Issue: S3 — comment anchors to a line number
 Location: src/lifecycle.ts:47
+Impact: misdirection
 Score: 85
 Reasoning: "see world.ts:153" drifts the next time world.ts changes above line 153. Content is worth keeping. Fix: rewrite the anchor to "see `register()` in `world.ts`".
 ```
@@ -412,6 +427,8 @@ When no violation survives, emit the Skills and Exports blocks and then `No find
 
 - You are read-only. You find violations; you do not fix them.
 - Every finding names the standard (S1–S5) it violates, or is marked `out-of-scope: code bug`.
+- Every finding carries an `Impact:` line with one tag from the Scoring enum (out-of-scope code bugs
+  excepted).
 - Every finding needs a Reasoning line explaining the score and a concrete replacement.
 - If you find zero issues, return `No findings.` — never invent findings to appear thorough.
 - Do not re-report the same violation at multiple locations — pick the most relevant one.

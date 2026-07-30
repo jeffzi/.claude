@@ -152,13 +152,18 @@ on the same file.
 
 #### Step 3: Code quality review (gate)
 
-Dispatch in parallel (two independent **Agent** calls — do NOT set model, the agents define their
+Dispatch in parallel (three independent **Agent** calls — do NOT set model, the agents define their
 own):
 
 - **Agent A:** `subagent_type: vet-code` on implementation files from the TDD phase
 - **Agent B:** `subagent_type: vet-test` on test files from the TDD phase
+- **Agent C:** `subagent_type: vet-comments` on **both** sets of files
 
-Both reviewers are read-only. For each finding they return, apply the fix directly in the main
+Agent C is not covered by the TDD phase's own comment review: that review sits inside REFACTOR,
+which is skipped entirely under 50 insertions, so a small task reaches this gate with its
+GREEN-phase comments unread.
+
+All three reviewers are read-only. For each finding they return, apply the fix directly in the main
 context — these are code quality issues, not new behaviors, so no TDD cycle is required. After all
 fixes are applied, re-run the test suite to confirm tests still pass. If tests fail, revert the
 offending fix and surface to the user.
