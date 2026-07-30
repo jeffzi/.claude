@@ -32,6 +32,7 @@ enums are reproduced here so no agent definition needs consulting:
 | vet-code / distill-scanner | silent-failure | type-safety  | structure  | clarity     |
 | vet-test                   | coverage       | fragility    | cost       | clarity     |
 | vet-doc                    | misinformation | access       | navigation | polish      |
+| vet-comments               | misdirection   | coverage     | noise      | structure   |
 | bug-scanner                | corruption     | wrong-result | crash      | degradation |
 
 A finding ≥ 50 with no Impact line is treated as rank 1 — never demoted for missing metadata. Ranks

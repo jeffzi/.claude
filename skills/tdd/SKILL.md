@@ -246,11 +246,14 @@ Compute total insertions across all files modified/added during this `/tdd` invo
 If **≥ 50 lines**, split changed files into impl and test files. Run two tracks in parallel:
 
 - **Impl track:** dispatch `code-distiller` on impl files; then dispatch `subagent_type: vet-code`
-  on the result
+  **and** `subagent_type: vet-comments` on the result, in parallel
 - **Test track:** dispatch `code-distiller` on test files; then dispatch `subagent_type: vet-test`
-  on the result
+  **and** `subagent_type: vet-comments` on the result, in parallel
 
-Do NOT set model on either reviewer dispatch — the agents define their own. They load `code-core` /
+`vet-comments` runs on both tracks because distillation rewrites the code its comments describe —
+restatement, stale anchors, and doc-comment gaps surface only after the shape settles.
+
+Do NOT set model on any reviewer dispatch — the agents define their own. They load `code-core` /
 `test-core` and the language leaf inside their own context, so pass no skill in the prompt.
 
 The reviewers are read-only: they return `### Finding N` blocks and change nothing. Apply their
