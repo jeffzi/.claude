@@ -86,9 +86,16 @@ type: plan
 
 **Implementation:** Use `/tdd` for implementation.
 
-**Verify before commit:** After the task is complete, dispatch a `claim-reviewer` agent with this
-task's behavioral claims before committing. Fix any `Refuted`/`Unsubstantiated` verdicts first.
+**Verify:** After the task is complete, dispatch a `claim-reviewer` agent with this task's
+behavioral claims. Fix any `Refuted`/`Unsubstantiated` verdicts first.
 ```
+
+The **Verify** block goes on every task **except the last implementation task** — the Final Task
+re-verifies that task's claims immediately after it, and no later task builds on it, so a per-task
+pass there is pure overlap. The exception covers exactly one task: the one directly before the Final
+Task. Token pressure never removes **Verify** from any earlier task — those have dependents, and a
+defect caught late costs rework in every task built on it. A single-task plan has no per-task
+**Verify** at all; the Final Task is its verification.
 
 ## Final Verification Task
 
@@ -97,7 +104,7 @@ Every plan ends with this task, verbatim except for the claims:
 ```markdown
 ### Final Task: Verify Implementation
 
-After all tasks are committed, run a final whole-plan review. Dispatch a single **Agent** call with
+After all tasks are complete, run a final whole-plan review. Dispatch a single **Agent** call with
 `subagent_type: claim-reviewer` (do NOT set model — the agent defines its own). Extract one claim
 per behavior across **all** tasks, stated as implemented fact:
 
@@ -105,9 +112,10 @@ Claim N: [behavior from Task M, e.g. "email validation rejects empty, malformed,
 emails"] Location: [file the task created/modified]
 
 This catches cross-task integration issues that per-task verification misses (e.g. Task 3 broke Task
-1's behavior). For any `Refuted` or `Unsubstantiated` verdict, fix the gap and re-verify that claim
-once; if it still fails, surface it to the user. Mechanical claims (tests pass, build green) are not
-for the reviewer — verify those by running the commands directly.
+1's behavior), and it is the sole claim verification for the last implementation task. For any
+`Refuted` or `Unsubstantiated` verdict, fix the gap and re-verify that claim once; if it still
+fails, surface it to the user. Mechanical claims (tests pass, build green) are not for the reviewer
+— verify those by running the commands directly.
 ```
 
 ## Test-Only Plans
@@ -118,11 +126,12 @@ drive from a failing test, and the tests are themselves the deliverable. `/tdd` 
 a test-only plan may omit. Adapt the task template; drop nothing else:
 
 - **Implementation:** replace `Use /tdd` with the concrete change the task makes.
-- **Verify before commit** and **Final Task:** `claim-reviewer` **still runs — no plan ever skips
-  it.** A passing suite is a mechanical claim (run it directly) and does **not** prove a test
-  asserts the right thing; a green test can check the wrong behavior. Extract claims about what each
-  test now exercises and asserts (e.g. "the bucketing test covers all three buckets") and let the
-  independent review verify them.
+- **Verify** and **Final Task:** `claim-reviewer` **still runs — no plan ever skips it** (the
+  last-task **Verify** omission applies as usual; the Final Task covers that task). A passing suite
+  is a mechanical claim (run it directly) and does **not** prove a test asserts the right thing; a
+  green test can check the wrong behavior. Extract claims about what each test now exercises and
+  asserts (e.g. "the bucketing test covers all three buckets") and let the independent review verify
+  them.
 
 No matter how thoroughly the main agent reviewed its own work, independent review is required. The
 factual claim-verification pass below also runs regardless: a test-only plan still asserts facts
