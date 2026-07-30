@@ -12,7 +12,6 @@
         ".planning/**",
         ".research/**",
         ".stryker-tmp/**",
-        "CHANGELOG.md",
         "LICENSE",
         "node_modules/**"
     ]
