@@ -225,8 +225,10 @@ _create_; it can only verify what exists now.
 
 ## Checkpoint
 
-After the plan is approved and written to disk, confirm the artifact path for handoff to downstream
-tools.
+Save the plan as `.plans/plan-<slug>.md`, where `<slug>` is a kebab-case name derived from the
+feature or task (e.g. `.plans/plan-email-validation.md`). Create the `.plans/` directory if it
+doesn't exist. After the plan is approved and written to disk, confirm the artifact path for handoff
+to downstream tools.
 
 ## Common Mistakes
 
