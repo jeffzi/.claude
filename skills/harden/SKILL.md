@@ -94,9 +94,11 @@ per-step mechanics before running a round.
 4. **Approval gate.** Enter plan mode, present via `ExitPlanMode`, and wait for the go-ahead. On
    approval, update the wip file so the executed plan matches the approved one byte-for-byte.
 
-5. **Execute.** Per-task commits, lowest → highest risk. Load skills per the harness's **Skill
-   Dispatch** table. Run the harness's per-task gate as an opaque command block after every task,
-   the **Round-Completion Gate** at the end, then delete the working plan.
+5. **Execute.** Tasks run lowest → highest risk; each task is a contiguous, fully-committed commit
+   range before the next begins — one commit for a direct-edit task, tdd's own commit sequence for a
+   `/tdd` task. Load skills per the harness's **Skill Dispatch** table. Run the harness's per-task
+   gate as an opaque command block on every task's final tree before its closing commit, the
+   **Round-Completion Gate** at the end, then delete the working plan.
 
 ## Finding Classification
 

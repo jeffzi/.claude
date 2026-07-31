@@ -64,9 +64,18 @@ byte-for-byte.
 
 ## 5. Execute
 
-Per-task commits, lowest → highest risk, so rollback is trivial. Load skills per the harness's
-**Skill Dispatch** table for each area touched. After each task, run the harness's per-task gate
-**as an opaque command block** — this skill does not know whether that block runs the test suite or
-build-plus-diff-plus-tests; it runs whatever the harness defines and requires it to pass before the
-task is committed. After the last task is committed, run the harness's **Round-Completion Gate** if
-it defines one, then delete the working plan.
+Tasks execute lowest → highest risk. Each task's work is fully committed before the next task
+begins: a direct-edit task commits once; a `/tdd` task commits per tdd's own flow (a
+tests-then-implementation pair per cycle, plus a refactor commit) — either way the task is a
+contiguous commit range, so rollback and blame stay per-task. Load skills per the harness's **Skill
+Dispatch** table for each area touched.
+
+Run the harness's per-task gate **as an opaque command block** — this skill does not know whether
+that block runs the test suite or build-plus-diff-plus-tests; it runs whatever the harness defines —
+on the task's final working tree, before the commit that closes the task. Mid-task commits from
+`/tdd` cycles follow tdd's implement → verify → commit order; when the gate block is exactly the
+cycle's own verification commands, one run per commit point serves both skills — never run the same
+suite twice on the same tree. A red gate is a failed task contract: fix it inside the task's commit
+range or revert the range (with the user's say-so) — never start the next task over a red gate.
+After the last task's gate is green and its closing commit lands, run the harness's
+**Round-Completion Gate** if it defines one, then delete the working plan.

@@ -38,11 +38,10 @@ The TDD orchestrator gives you:
 - **Task description** — the behaviors to test (single behavior or cohesive batch)
 - **Test file path(s)** — where the new tests should live
 
-You resolve the matching test and code skills yourself via the Language Dispatch table in
-`rules/skill-loading.md` (already in your session context). Load `Skill(test-core)` once at the
-start of Phase 1 — it contains universal testing principles and dispatches to the matching
-`test-{lang}` skill, which in turn auto-detects domain overlays (e.g. `import polars` →
-`Skill(test-polars)`) via its Domain Skill Detection section.
+Load `Skill(test-core)` at the start of Phase 1 and `Skill(code-core)` at the start of Phase 2. Each
+hub dispatches the matching language leaf itself (via the Language Dispatch table in
+`rules/skill-loading.md`), and the leaf's Domain Skill Detection auto-loads overlays (e.g.
+`import polars` → `Skill(test-polars)`). Do not resolve leaves manually — the hubs own dispatch.
 
 ## Phase 1: RED — Write Failing Tests
 
@@ -94,21 +93,17 @@ different spelling.
    commits. You NEVER remove `tdd-cycle-active`; it must outlive you, and the orchestrator removes
    it after you return. If the project is not a git repo, skip this step — the access rules still
    apply.
-1. **Load testing principles and language skill**:
-   - Load `Skill(test-core)` first — the universal principles hub.
-   - Read the test file extension and look it up in the **Language Dispatch for test-\* and
-     code-\*** table in `rules/skill-loading.md` (already in your session context).
-   - Load the matching `Skill(test-{lang})`. That skill's Domain Skill Detection section scans
-     imports and auto-loads any domain overlays (e.g. `import polars` → `Skill(test-polars)`).
-   - If the extension has no row in the table, note "no matching test skill" and proceed using
-     `test-core` principles plus project conventions from `package.json` / `Makefile` / etc.
-   - The test skill (or project config) specifies the test runner command (e.g., `uv run pytest`,
-     `npx vitest run`, `busted`).
+1. **Load testing principles**: load `Skill(test-core)` — the hub dispatches the matching
+   `Skill(test-{lang})` leaf itself, and the leaf's Domain Skill Detection auto-loads overlays (e.g.
+   `import polars` → `Skill(test-polars)`). If the extension has no dispatch row, note "no matching
+   test skill" and proceed using `test-core` principles plus project conventions from `package.json`
+   / `Makefile` / etc. The test skill (or project config) specifies the test runner command (e.g.,
+   `uv run pytest`, `npx vitest run`, `busted`).
 2. **Understand the API** from public interfaces, type stubs, docs (NOT implementation)
 3. **Write tests** for one behavior group (single behavior or cohesive batch):
    - Each individual test covers one thing (clear name, one assertion focus)
-   - Cohesive batch = tests that fail for the same structural reason (missing function, missing
-     branch, missing parameter) and touch the same implementation area
+   - Cohesive batch = tests for behaviors that share the same implementation area (module or file
+     set), even when they fail for different structural reasons
    - Never batch unrelated tests (no horizontal slicing)
    - Follow test skill naming conventions and structure
 4. **Run the test** and confirm it **fails for the right reason**:
@@ -143,11 +138,10 @@ Phase 1 restrictions are now lifted.
 
 0. **Lower the read guard**: run `rm -f "$(git rev-parse --git-dir)/tdd-red-phase"` (skip if you
    skipped raising it).
-1. **Load code skill** — look up the implementation file extension in the **Language Dispatch for
-   test-\* and code-\*** table in `rules/skill-loading.md` and load the matching
-   `Skill(code-{lang})`. That skill's Domain Skill Detection (if present) auto-loads any matching
-   overlays based on imports. If the extension has no row in the table, follow the project's
-   existing code conventions.
+1. **Load code principles**: load `Skill(code-core)` — the hub dispatches the matching
+   `Skill(code-{lang})` leaf itself, and the leaf's Domain Skill Detection (if present) auto-loads
+   overlays. Its comment policy, error-surfacing, and typing rules govern the implementation you
+   write. If the extension has no dispatch row, follow the project's existing code conventions.
 2. **Read the failing test** to understand what behavior is expected
 3. **Read relevant implementation files** to understand existing code
 4. **Write minimal code** to pass the failing test — no speculative features

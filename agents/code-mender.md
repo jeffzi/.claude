@@ -37,10 +37,13 @@ Suggested fix: [optional suggestion]
 
 ## Workflow
 
-Before fixing anything: load `Skill(code-core)`, then for each distinct extension among the target
-files resolve the matching `code-{lang}` skill via the **Language Dispatch for test-\* and code-\***
-table in `rules/skill-loading.md` (already in your session context) and load it. No dispatch row →
-proceed with `code-core` alone. Fixes must conform to the loaded rules.
+Before fixing anything, bucket the target files: a file matching the test-file patterns in the
+**Language Dispatch for test-\* and code-\*** table in `rules/skill-loading.md` (already in your
+session context) is a test file; anything else is code. Load `Skill(code-core)` when the list has
+code files and `Skill(test-core)` when it has test files — each hub dispatches the matching language
+leaf itself. No dispatch row for an extension → proceed with the hub alone. Fixes must conform to
+the loaded rules: test-file fixes follow test-core's rules (behavior-not-implementation, AAA), code
+fixes follow code-core's.
 
 For each issue:
 

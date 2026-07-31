@@ -23,15 +23,12 @@ When `/tdd` is invoked, determine the entry point before doing anything else:
 ```text
 LOOP (one behavior group per cycle):
 
-  LOAD PRINCIPLES (once per session, before first RED):
-    0. Load Skill(test-core). tdd-cycle will load the matching test-{lang}
-       and code-{lang} skills itself via the Language Dispatch table in
-       rules/skill-loading.md.
-
   RED-GREEN:
     1. Dispatch tdd-cycle agent (do NOT set model -- the agent defines its own) with:
        - Task description (what behaviors to test -- may be a cohesive batch)
        - Relevant test file paths
+       The agent loads test-core (RED) and code-core (GREEN) in its own context; the
+       orchestrator loads no hub or language skills and reads no target files.
     2. Capture from tdd-cycle output: TEST_FILE, TEST_NAME, TEST_COMMAND,
        FULL_SUITE_COMMAND, FAILURE_OUTPUT, IMPLEMENTATION_FILES, TEST_OUTPUT, STATUS
        Then clear the cycle commit guard the agent raised:
@@ -56,25 +53,40 @@ LOOP (one behavior group per cycle):
           - stage IMPLEMENTATION_FILES -> commit
 
   CONTINUE:
-    5. Ask user: more behaviors to implement? -> loop or exit
+    5. More behavior groups?
+       - Executing a plan task -> the task's behavior list decides: continue until every
+         group in the task is done. Never pause to ask the user mid-task -- the plan
+         approval already answered "more behaviors?".
+       - Ad hoc invocation -> ask user: more behaviors to implement? -> loop or exit
 
 END LOOP
 
-REFACTOR (once, after last cycle):
+REFACTOR (once, after last cycle -- never set model on any dispatch in this sequence):
   10. Compute total insertions across all files modified/added during this /tdd
       invocation: git diff --stat
   11. If < 50 insertions: skip REFACTOR, log "REFACTOR skipped: <N> lines"
   12. If >= 50 insertions:
-      - Split all changed files into implementation files and test files
-      - Run two tracks in parallel. For each track:
-        1. Dispatch code-distiller agent on the files -- do NOT set model, the agent
-           defines its own
-        2. Dispatch in parallel on the same files -- do NOT set model, the agents
-           define their own:
-             - subagent_type: vet-code (impl track) or vet-test (test track)
-             - subagent_type: vet-comments (both tracks)
-        3. The reviewers are read-only; apply their findings in the main context
-      - If any fixes applied, re-run FULL_SUITE_COMMAND to confirm tests still green
+      a. Split changed files into implementation files and test files; dispatch
+         code-distiller on each set, in one parallel message
+      b. After both return: dispatch subagent_type: vet-comments once over ALL
+         changed files (distillation rewrites the code its comments describe);
+         it is read-only and returns ### Finding N blocks
+      c. Triage the findings -- no skill loads, no file reads:
+         score 0 -> discard; score >= 75 -> fix queue; below 75 -> report to the
+         user at task close, never silently dropped
+      d. Fix queue non-empty -> group findings into transitive file groups
+         (findings sharing any target file share a group); dispatch one
+         code-mender per group in a single parallel message, passing per finding:
+           Issue: <description>
+           Location: <file:line>
+           Severity: <high if the Impact tag ranks in the lens's top two, else medium>
+           Suggested fix: <reasoning from the finding>
+      e. Any edits applied -> re-run FULL_SUITE_COMMAND; when an enclosing workflow
+         defines a per-task gate (e.g. a hardening round's gate block), run that gate
+         instead -- it subsumes the suite re-run, and the closing commit must sit
+         behind the full gate, never a subset
+         - green -> load Skill(write-commit), commit the refactor delta
+         - red -> surface the failing output; do not commit
 ```
 
 ## Phase Data Contracts
