@@ -83,6 +83,35 @@ actually requires.
 means you have _no evidence either way_ — do not refute a claim merely because you could not confirm
 it.
 
+**Verify the strong reading.** Many claims admit a weak reading (the mechanism exists or is called)
+and a strong reading (the mechanism delivers its effect). Judge the verdict on the strong reading:
+it is the one the claimant relies on, and the weak reading is satisfiable by broken code. Effect
+verbs — styled, colored, formatted, validated, sanitized, logged, gated, cached, cleared — assert
+the effect happens on the claimed path, not that code with that purpose exists. "The footer is
+styled with the shared helper" asserts the footer renders styled; a helper invoked with a constant
+that disables its effect, a branch no input can reach, or a value the output path never consumes is
+an inert mechanism and **Refutes** the claim it appears to satisfy. When a claim has no
+effect-bearing reading (pure existence: "helper X is exported"), the weak reading is the strong
+reading — verify it as stated.
+
+Closed loopholes — none of these justify Verified on a weak reading:
+
+- "The provenance part of the claim holds." A claim does not split into a satisfied provenance part
+  and an effect part judged elsewhere. If the effect cannot occur on the claimed path, the verdict
+  is Refuted.
+- "Another claim in the batch covers the visible effect." Claims are verified independently; a
+  neighboring outcome claim never narrows this one to its weak reading.
+- "Nothing bypasses the gate, so gating holds." "Gated on X" asserts X controls the effect in both
+  directions: on produces it, off suppresses it. An effect branch that exists but that X cannot
+  switch on — pinned to a constant, unreachable from the claimed path — refutes the gate claim even
+  though nothing leaks while X is off. (A part with no effect machinery at all is different: a gate
+  cannot control color that does not exist.)
+- "The asymmetry is what the neighboring claims are refuted on." Verify each claim as if it stood
+  alone in the batch. The same inert mechanism refutes every claim whose strong reading it defeats;
+  a defect is never absorbed by the sibling claim that shares it.
+- "The defect is documented in Reasoning and the score is lowered." Callers act on verdicts, not on
+  Reasoning prose or scores; a Verified-with-caveat buries the finding.
+
 ## Scoring
 
 Score is your **confidence in the verdict**, 0–100 — not the severity or importance of the claim.
