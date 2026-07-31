@@ -43,6 +43,23 @@ the same implementation area. Tasks describe **what** to build, not **how** to t
 **Bad task:** "Step 1: Write failing test for empty email. Step 2: Run test. Step 3: Implement
 validation. Step 4: Run test. Step 5: Commit."
 
+## Behavior Wording
+
+Write each behavior as an **observable outcome** — what renders, returns, or exits, under which
+input or mode — never as the mechanism that produces it. "The `Note:` label uses the shared styling
+helper" is satisfied by a call that styles nothing (`formatLabel(false)`); "the `Note:` label
+renders yellow-underlined when color is on, plain when off" is not. Name a mechanism only in
+addition to the outcome, never instead of it. Downstream verification checks exactly what the
+sentence says — a mechanism-worded behavior gets verified at mechanism level and passes a broken
+implementation.
+
+For a behavior gated on a flag or mode (color, output format, verbosity, TTY), state the outcome of
+**both branches** and spec test coverage for both — a fixture or assertion per branch. A behavior
+whose tests exercise only one branch is unverified on the other.
+
+Under length pressure, compress by dropping the mechanism, never the outcome. "Stay consistent with
+the plan's concise style" is not a reason to word a behavior as a helper call.
+
 ## Plan Document Header
 
 Every plan starts with:
@@ -110,6 +127,10 @@ per behavior across **all** tasks, stated as implemented fact:
 
 Claim N: [behavior from Task M, e.g. "email validation rejects empty, malformed, and duplicate
 emails"] Location: [file the task created/modified]
+
+Word every claim as the observable outcome the behavior promises (see Behavior Wording): a claim the
+reviewer can confirm by finding a call site, without tracing what it produces, is worded wrong. A
+flag-gated behavior yields a claim covering both branches.
 
 This catches cross-task integration issues that per-task verification misses (e.g. Task 3 broke Task
 1's behavior), and it is the sole claim verification for the last implementation task. For any
@@ -217,3 +238,5 @@ tools.
 | All changes in one task because they're related             | Independent subsystems → separate tasks (or separate plans)                |
 | Skipping the file structure section                         | Without file mapping, decomposition decisions are deferred and conflicting |
 | Plan documents the obvious (CRUD, standard patterns)        | Only document non-obvious constraints, gotchas, and dependencies           |
+| Behaviors or claims name a mechanism ("uses helper X")      | Word the observable outcome; mechanism wording passes broken code          |
+| Flag-gated behavior specs tests for one branch only         | Spec a fixture or assertion per branch — both modes, both outcomes         |
