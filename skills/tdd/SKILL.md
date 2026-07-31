@@ -78,10 +78,10 @@ principles, rationalizations table, and red flags checklist.
 
 Context isolation prevents the LLM from designing tests around planned implementation.
 
-| Phase     | Agent                            | Can see (Phase 1 / Phase 2)                      | Cannot see/modify                          |
-| --------- | -------------------------------- | ------------------------------------------------ | ------------------------------------------ |
-| RED-GREEN | `tdd-cycle`                      | Phase 1: tests, stubs, public API / Phase 2: all | Phase 1: impl source / Phase 2: test files |
-| REFACTOR  | 2 parallel tracks (if ≥50 lines) | Everything                                       | N/A (see REFACTOR section)                 |
+| Phase     | Agent                                            | Can see (Phase 1 / Phase 2)                      | Cannot see/modify                          |
+| --------- | ------------------------------------------------ | ------------------------------------------------ | ------------------------------------------ |
+| RED-GREEN | `tdd-cycle`                                      | Phase 1: tests, stubs, public API / Phase 2: all | Phase 1: impl source / Phase 2: test files |
+| REFACTOR  | distiller → vet-comments → mender (if ≥50 lines) | Everything                                       | N/A (see REFACTOR section)                 |
 
 ### Mandatory Entry Point
 
@@ -90,41 +90,48 @@ verification, no circuit breaker, no structured data passing.
 
 ## Language Skill Dispatch
 
-Before the **first** RED-GREEN cycle, load `Skill(test-core)`. That hub contains the universal
-testing principles (AAA, behavior-not-implementation, parametrize-over-loops, mocking anti-patterns)
-that every `tdd-cycle` invocation must respect.
+The orchestrator loads no testing or coding skills. `tdd-cycle` loads `Skill(test-core)` in its RED
+phase and `Skill(code-core)` in its GREEN phase, inside its own context; each hub dispatches the
+matching language leaf and the leaf auto-loads domain overlays. The orchestrator loads a hub only in
+the fallback case where it must edit files itself (e.g., a REFACTOR mender skipped a finding you
+then fix by hand) — `rules/skill-loading.md` applies as usual at that point.
 
-The language dispatch table lives in `rules/skill-loading.md` (already in session context) — look up
-the test file extension under **Language Dispatch for test-\* and code-\*** to find the matching
-`test-{lang}` and `code-{lang}` skills. The `tdd-cycle` agent loads them in its RED and GREEN phases
-respectively. If the extension has no row, note "no matching skill" and proceed with `test-core`
-principles alone.
+**The orchestrator routes; it never reads target files.** Dispatch prompts carry behavior
+descriptions and file paths; every agent reads its own files in its own fresh context. The only
+contents the orchestrator loads are agent reports and the output of TEST_COMMAND /
+FULL_SUITE_COMMAND. Reading a test or implementation file "to understand the API", "to batch
+better", or "before dispatching" is context stolen from the steps only the orchestrator can do —
+verification, triage, commits. Batching is decided from the plan's behavior list, never from file
+contents. If the extension has no dispatch row in `rules/skill-loading.md`, the agent notes "no
+matching skill" and proceeds on hub principles alone.
 
 `tdd-cycle` resolves TEST_COMMAND and FULL_SUITE_COMMAND during its RED phase — the orchestrator
 uses these for independent GREEN verification.
 
 ## Batching: Cohesive vs. Unrelated
 
-Each RED-GREEN cycle covers a **behavior group** — one behavior or a cohesive batch of related
-behaviors that share the same implementation area.
+Each RED-GREEN cycle covers a **behavior group** — one behavior or a batch of related behaviors that
+share the same implementation area. Isolation is a property of the **dispatch**, not the behavior:
+one RED that writes tests for three behaviors landing in the same module loses nothing, and every
+dispatch re-pays the agent's fixed startup cost (context, skill loads, file reads) — under-batching
+is the expensive failure.
 
 **Batch together** (single RED-GREEN cycle):
 
-- Edge cases of the same behavior (empty input, whitespace, too-long, special chars)
-- Closely related micro-features that touch the same function/module
+- Behaviors whose implementations land in the same module or file set — even when their tests fail
+  for different structural reasons
+- Edge cases and variants of the same behavior (empty input, whitespace, format variants)
 - Validation rules for the same field or data type
-- Format variants of the same operation (CSV, JSON, YAML output)
 
 **Keep separate** (distinct RED-GREEN cycles):
 
 - Behaviors touching different modules or subsystems
-- Features that could ship independently
-- Behaviors with different failure modes or error paths
-- Anything where a single GREEN implementation would be too large to reason about
+- Anything where a single GREEN implementation would be too large to reason about or verify as one
+  diff
 
-**Rule of thumb:** If all the tests will fail for the same structural reason (missing function,
-missing branch, missing parameter), they belong in one batch. If they'd fail for different reasons,
-they're separate cycles.
+**Rule of thumb:** group by where the implementation lands, not by why the tests fail. "Different
+failure modes" or "could ship independently" are never reasons to split behaviors that live in the
+same files.
 
 ## Orchestration Flow
 
@@ -141,7 +148,7 @@ cohesive batch (see Batching section above). Each individual test still covers o
 **Good** — Three tests, one RED-GREEN cycle (all fail because CatalogEntry doesn't exist yet):
 
 ```python
-# Cohesive batch: all test CatalogEntry validation (same model, same structural reason)
+# Cohesive batch: all test CatalogEntry validation (same model, same implementation area)
 def test_catalog_entry_parses_valid_section():
     entry = CatalogEntry(**valid_catalog)
     assert entry.name == "My App"
@@ -155,7 +162,8 @@ def test_catalog_entry_rejects_invalid_type():
         CatalogEntry(**{**valid_catalog, "type": "invalid"})
 ```
 
-**Bad** — Same model, same failure reason — splitting wastes time without improving isolation:
+**Bad** — Same model, same implementation area — splitting wastes dispatches without improving
+isolation:
 
 ```python
 # One test per RED-GREEN cycle for the same model — 3 agent dispatches for no benefit
@@ -243,21 +251,32 @@ REFACTOR runs **once** after all RED-GREEN cycles complete, not per-cycle.
 Compute total insertions across all files modified/added during this `/tdd` invocation using
 `git diff --stat`. If total insertions are **< 50 lines**, skip REFACTOR entirely.
 
-If **≥ 50 lines**, split changed files into impl and test files. Run two tracks in parallel:
+If **≥ 50 lines**, run the distill-and-mend sequence. The orchestrator dispatches and triages; it
+never loads hub skills and never edits files here:
 
-- **Impl track:** dispatch `code-distiller` on impl files; then dispatch `subagent_type: vet-code`
-  **and** `subagent_type: vet-comments` on the result, in parallel
-- **Test track:** dispatch `code-distiller` on test files; then dispatch `subagent_type: vet-test`
-  **and** `subagent_type: vet-comments` on the result, in parallel
+1. Split changed files into impl and test files. Dispatch `code-distiller` on the impl files and
+   `code-distiller` on the test files, in one parallel message. Do NOT set model on any dispatch in
+   this sequence — each agent defines its own, and each loads its skills in its own context, so pass
+   no skill in the prompt.
+2. After both return, dispatch `subagent_type: vet-comments` once over **all** changed files —
+   distillation rewrites the code its comments describe, so the comment pass runs after the shape
+   settles. It is read-only and returns `### Finding N` blocks.
+3. Triage the findings — no skill loads, no file reads: score 0 → discard (declared false positive);
+   score ≥ 75 → fix queue; below 75 → report to the user at task close, never silently dropped.
+4. Non-empty fix queue → group findings into transitive file groups (findings sharing any target
+   file share a group) and dispatch one `code-mender` per group in a single parallel message — never
+   one per finding; concurrent menders sharing a file race each other. Pass per finding: Issue /
+   Location / Severity (high for the top two ranks of the lens's Impact enum, else medium) /
+   Suggested fix.
+5. If any agent applied edits, re-run FULL_SUITE_COMMAND — or, when an enclosing workflow defines a
+   per-task gate (e.g. a hardening round's gate block), run that gate instead; it subsumes the suite
+   re-run. Green → load `Skill(write-commit)` and commit the refactor delta. Red → surface the
+   failing output; do not commit.
 
-`vet-comments` runs on both tracks because distillation rewrites the code its comments describe —
-restatement, stale anchors, and doc-comment gaps surface only after the shape settles.
-
-Do NOT set model on any reviewer dispatch — the agents define their own. They load `code-core` /
-`test-core` and the language leaf inside their own context, so pass no skill in the prompt.
-
-The reviewers are read-only: they return `### Finding N` blocks and change nothing. Apply their
-findings in the main context, then re-run FULL_SUITE_COMMAND if either track applied changes.
+The heavier review lenses (`vet-code`, `vet-test`, `bug-scanner`) are deliberately absent: they run
+in the pre-push `/preflight` pass, which owns snapshots, gates, and fix verification. REFACTOR's job
+is shape and comment hygiene on freshly written code, so later tasks don't inherit — and imitate —
+crust.
 
 ### Repeat
 
@@ -314,8 +333,8 @@ function submitForm(data: FormData) {
 PASS
 ```
 
-**REFACTOR** — Run code-distiller + vet tracks if ≥50 lines changed. Extract validation for multiple
-fields if needed.
+**REFACTOR** — Run the distill-and-mend sequence if ≥50 lines changed. Extract validation for
+multiple fields if needed.
 
 ## Verification Checklist
 
@@ -358,7 +377,10 @@ RED phase failures this skill was designed to address:
 
 - Agents writing implementation first, then retrofitting tests
 - Batching unrelated behaviors into one RED-GREEN cycle to "save time"
+- Splitting same-module behaviors into per-behavior cycles because they "fail differently" — paying
+  an extra dispatch for zero isolation gain
 - Orchestrators reading source files during Phase 1 to "understand the API"
+- Orchestrators pre-reading test files "to batch better" or "to write a better dispatch prompt"
 - Agents dispatching tdd-cycle directly, bypassing the orchestrator
 
 See `references/philosophy.md` for the full rationalization table and red flags.

@@ -115,7 +115,8 @@ This catches cross-task integration issues that per-task verification misses (e.
 1's behavior), and it is the sole claim verification for the last implementation task. For any
 `Refuted` or `Unsubstantiated` verdict, fix the gap and re-verify that claim once; if it still
 fails, surface it to the user. Mechanical claims (tests pass, build green) are not for the reviewer
-— verify those by running the commands directly.
+— verify those by running the commands directly. Close by reminding the user to run `/preflight`
+before pushing — plan execution defers the deep review lenses to it.
 ```
 
 ## Test-Only Plans
