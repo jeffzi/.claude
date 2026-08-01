@@ -41,25 +41,27 @@
       "Bash(~/.claude/scripts/fix-ci-push.sh *)"
     ],
     "deny": [
-      "Bash(git push)",
-      "Bash(git push *)",
-      "Bash(git stash)",
-      "Bash(git stash *)",
-      "Bash(git clean)",
       "Bash(git clean *)",
-      "Bash(git reset)",
+      "Bash(git clean)",
+      "Bash(git push *)",
+      "Bash(git push)",
       "Bash(git reset *)",
-      "Read(.env)",
+      "Bash(git reset)",
+      "Bash(git stash *)",
+      "Bash(git stash)",
+      "NotebookEdit",
       "Read(.env.*)",
-      "Read(**/secrets/*)",
-      "Read(**/*credential*)",
-      "Read(**/*.pem)",
+      "Read(.env)",
       "Read(**/*.key)",
-      "Read(**/*.secret)"
+      "Read(**/*.pem)",
+      "Read(**/*.secret)",
+      "Read(**/*credential*)",
+      "Read(**/secrets/*)"
     ],
     "defaultMode": "auto"
   },
   "model": "claude-opus-4-6",
+  "disableBundledSkills": true,
   "hooks": {
     "PreToolUse": [
       {
@@ -184,6 +186,7 @@
       }
     ]
   },
+  "disableWorkflows": true,
   "statusLine": {
     "type": "command",
     "command": "$HOME/.claude/scripts/statusline.sh"
@@ -202,17 +205,12 @@
         "source": "github",
         "repo": "anthropics/claude-plugins-official"
       }
-    },
-    "ponytail": {
-      "source": {
-        "source": "github",
-        "repo": "DietrichGebert/ponytail"
-      }
     }
   },
   "effortLevel": "medium",
   "promptSuggestionEnabled": false,
   "tui": "fullscreen",
+  "autoMemoryEnabled": false,
   "skipDangerousModePermissionPrompt": true,
   "autoCompactEnabled": true,
   "agentPushNotifEnabled": true,
