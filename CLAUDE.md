@@ -19,17 +19,15 @@ user first and explain why. Full operation list: `rules/no-destructive-ops.md`.
 
 ### Skill loading is mandatory — no exceptions
 
-**Before every action in the skill-loading table (`rules/skill-loading.md`), load the skill first.**
-Plan mode = `Skill(write-plan)`. Writing code = `Skill(code-core)`. Tests = `Skill(test-core)`.
-Every time, even if loaded earlier, even if already in plan mode, even after compaction. "Already in
-plan mode" does not mean the skill is loaded — plan mode is system state, the skill is the
-instructions for how to use it. Editing a plan file without the skill loaded is always wrong.
+**Before every action in the skill-loading table (`rules/skill-loading.md`), load the skill first**
+— every time, even if loaded earlier, even if already in plan mode, even after compaction. Plan mode
+is system state; the skill is the instructions for using it. Editing a plan file without
+`Skill(write-plan)` loaded is always wrong.
 
 ### Skill-prescribed agent dispatch is pre-approved
 
 **Invoking a skill or command is the request for every agent it prescribes, in the number and
-grouping it prescribes.** When a loaded skill, command, or rule prescribes launching an agent,
-dispatch it — never ask for approval, never do the work inline instead, and never present inline
+grouping it prescribes** — dispatch without asking, never do the work inline, never present inline
 work as an agent's result. Agents you invent on your own initiative still need the user's request.
 Full rule: `rules/skill-loading.md`.
 
@@ -42,9 +40,9 @@ in the project qualifies. No test suite at all → skip TDD.
   bug report alone is read-only (`rules/no-unrequested-edits.md`); `/fix` requires a fix request.
 - **New feature** (root cause irrelevant): load `Skill(tdd)` directly and start the red–green cycle.
 
-Never dispatch `tdd-cycle` directly. Exception: build's FAIL-path remediation may dispatch
-`tdd-cycle` directly when the TDD context (`TEST_COMMAND`, `TEST_FILE`, etc.) is already present
-from a prior `tdd` run.
+Never dispatch `tdd-cycle` directly. Exception: the `plan-executor` agent's FAIL-path remediation
+may dispatch `tdd-cycle` directly when the TDD context (`TEST_COMMAND`, `TEST_FILE`, etc.) is
+already present from a prior `tdd` run.
 
 ### Pre-commit hooks: `prek` or `lefthook`
 
