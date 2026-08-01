@@ -13,7 +13,7 @@ tools:
   - LSP
   - Bash
   - Skill
-model: opus
+model: claude-opus-5
 effort: high
 color: orange
 ---
@@ -28,7 +28,7 @@ You must complete Phase 1 and confirm the test fails before reading any implemen
 
 Do not dispatch this agent directly. Use `/tdd` — it is the only valid caller. Direct dispatch
 bypasses the orchestrator's batching, phase tracking, and error aggregation. One exception (per
-CLAUDE.md): `build`'s FAIL-path remediation may dispatch directly when the TDD context
+CLAUDE.md): `plan-executor`'s FAIL-path remediation may dispatch directly when the TDD context
 (`TEST_COMMAND`, `TEST_FILE`, etc.) is already present from a prior `tdd` run.
 
 ## When you are invoked
