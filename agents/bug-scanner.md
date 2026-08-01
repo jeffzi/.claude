@@ -3,7 +3,7 @@ name: bug-scanner
 description: >
   Use when reviewing code files for runtime correctness bugs —
   null access, off-by-one, resource leaks, race conditions, logic errors
-model: opus
+model: claude-opus-5
 effort: high
 tools:
   - Skill

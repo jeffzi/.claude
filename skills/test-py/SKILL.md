@@ -51,9 +51,9 @@ class TestMoveObject:
     def test_move_object_clamps_to_bounds(self): ...
 
 # GOOD — comment sections + plain functions
-# =============================================================================
+# ---------------------------------------------------------------------------
 # move_object
-# =============================================================================
+# ---------------------------------------------------------------------------
 
 def test_move_object_updates_position(): ...
 def test_move_object_clamps_to_bounds(): ...

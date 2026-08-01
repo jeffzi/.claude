@@ -4,7 +4,7 @@ description: >
   Use when a README, guide, tutorial, reference doc, CHANGELOG, or CLAUDE.md needs review for
   structure, prose quality, accessibility, and AI-writing tells. Read-only — reports findings,
   never edits.
-model: opus
+model: claude-opus-5
 effort: high
 tools:
   - Skill

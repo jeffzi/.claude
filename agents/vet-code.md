@@ -4,7 +4,7 @@ description: >
   Use when production code needs review against language idiom, typing, and structural rules a
   linter misses. Read-only — reports findings, never edits. Not for runtime correctness bugs
   (use bug-scanner).
-model: opus
+model: claude-opus-5
 effort: high
 tools:
   - Skill
