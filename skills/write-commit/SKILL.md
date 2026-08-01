@@ -15,19 +15,15 @@ The diff shows what code changed. The commit message adds what the diff can't: t
 **concrete effect**, the body explains **why** — motivation, reasoning, and context that vanish from
 memory within weeks.
 
-## Commit Granularity
+## Commit Scope
 
-Default to **one commit per task**. A "task" is whatever unit of work serves one coherent purpose —
-this includes multi-step plans when all steps contribute to the same goal. The user reviews all
-changes before committing, so splitting into atomic commits adds friction without benefit — partial
-staging (`git add -p`) is not available in this workflow.
+A commit serves one coherent purpose. When the changes to commit bundle genuinely unrelated work
+(e.g. "upgrade dependencies AND add a new feature"), split it into separate commits; otherwise
+prefer one commit with a subject that captures the overall purpose.
 
-Prefer a single commit with a clear subject line that captures the overall purpose. Only split into
-multiple commits when a plan bundles genuinely unrelated work (e.g. "upgrade dependencies AND add a
-new feature") — those are really separate tasks and deserve separate commits.
-
-**Never auto-commit during plan execution.** The user must review all changes before any commit is
-made. If a plan requires multiple commits, surface this during planning and get explicit approval.
+When and how often to commit is the caller's decision — an explicit user request, a standing grant,
+or a workflow that prescribes its own commit sequencing. This skill governs the commit's content:
+its message and what belongs in it.
 
 ## Conventional Commits (required)
 
@@ -112,7 +108,6 @@ footer, not as the message.
 | "Allow X on Y" / "Enable X for Z"        | Reads as motivation, not effect — name what concretely changed |
 | "Address review comments"                | Meaningless outside PR context                                 |
 | Body narrates diff or justifies bundling | "Also bumps X since both touch Y" — logistics, not motivation  |
-| Auto-committing during plan execution    | User loses ability to review before commit; hard to undo       |
 
 ## No internal tooling leaks
 
@@ -125,9 +120,11 @@ these, rewrite to describe the effect instead.
 
 ## Execution
 
-When the user **explicitly** asks to commit (in any phrasing — "commit", "commit changes", "commit
-this"). **Never execute this during plan execution** — the user must review all changes first. An
-explicit "commit" request during an active plan is not an exception to this rule.
+This flow covers interactive commit requests — the user explicitly asked to commit (in any phrasing
+— "commit", "commit changes", "commit this"). A workflow that prescribes its own commit sequencing
+(e.g. per-cycle TDD commits during plan execution) owns staging, approval, and timing itself: it
+loads this skill for the message rules alone, and this flow — the confirmation step included — does
+not apply there.
 
 Pre-commit verification (tests, lint, type-check) is enforced by the global rules — it must pass
 **before** this skill is loaded. This skill owns message composition and the commit workflow, not
@@ -172,7 +169,7 @@ verification.
 
 ## Red Flags — Stop Before Committing
 
-- Auto-committing without the user's explicit approval
+- Running `git commit` on an interactive request without the user approving the final message
 - Writing a body that narrates the diff ("changed X to Y", "also bumps Z")
 - Subject describes implementation steps instead of the concrete effect
 - Commit bundles unrelated changes that deserve separate commits
@@ -188,10 +185,9 @@ A commit message that technically avoids the listed anti-patterns but still obsc
 the spirit of these rules. If a future reader would need to open the diff to understand what
 changed, the message has failed.
 
-| Excuse                                                                  | Reality                                                                 |
-| ----------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| "The diff is self-explanatory"                                          | Diffs show _what_, never _why_. Add the why.                            |
-| "I'll remember the context"                                             | You won't, and your teammates never had it.                             |
-| "The ticket has all the details"                                        | Tickets get migrated, deleted, or go offline. Message must stand alone. |
-| "It's just a small fix"                                                 | Small fixes deserve clear subjects. "Fix X when Y" takes 5 seconds.     |
-| "The user asked me to commit, so auto-committing during a plan is fine" | Explicit commit request during a plan still requires user review first. |
+| Excuse                           | Reality                                                                 |
+| -------------------------------- | ----------------------------------------------------------------------- |
+| "The diff is self-explanatory"   | Diffs show _what_, never _why_. Add the why.                            |
+| "I'll remember the context"      | You won't, and your teammates never had it.                             |
+| "The ticket has all the details" | Tickets get migrated, deleted, or go offline. Message must stand alone. |
+| "It's just a small fix"          | Small fixes deserve clear subjects. "Fix X when Y" takes 5 seconds.     |
