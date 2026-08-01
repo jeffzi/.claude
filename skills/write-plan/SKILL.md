@@ -2,7 +2,8 @@
 name: write-plan
 description: >
   Use when you have a spec or requirements for a multi-step task, before touching code.
-  Also use when asked to create an implementation plan or invoked via /write-plan.
+  Also use when asked to create an implementation plan, invoked via /write-plan, or about
+  to enter plan mode — this skill replaces plan mode.
   Not for single-task changes or quick bug fixes that need no plan.
 argument-hint: "[task or spec]"
 ---
@@ -16,6 +17,43 @@ vertical slice — a behavior or cohesive group of behaviors that could ship ind
 
 Assume the implementing agent is skilled but has zero context for the codebase or problem domain.
 Document which files to touch, what behaviors to implement, and what to watch out for.
+
+## No Plan Mode
+
+This skill replaces plan mode. **Never call `EnterPlanMode`, and never steer the user into entering
+plan mode for you** — the ban is unconditional and covers the whole session, including calling it
+_before_ loading this skill: plan-mode state you created or solicited is a violation, never a
+trigger for the recovery rule below. Plan mode locks writing to a harness-assigned file outside the
+project (e.g. `~/.claude/plans/<random>.md`) and erases context on approval — the checkpoint below
+would be stranded, which is why plan mode is banned rather than patched around.
+
+Instead: write the plan directly to `.planning/plan-<slug>.md` (see Checkpoint), present it in
+conversation, and wait for the user's explicit approval before any implementation. Creating
+`.planning/` and the plan file is prescribed by this skill — it is not an unrequested edit and needs
+no separate permission. Approval happens in conversation, not via `ExitPlanMode`: ask explicitly
+("Approve this plan?") and wait — silence, a tangent, or a question is not approval.
+
+| Excuse                                             | Reality                                                              |
+| -------------------------------------------------- | -------------------------------------------------------------------- |
+| "The harness reminder suggests plan mode"          | Generic advice; this skill overrides it.                             |
+| "We always used plan mode for planning here"       | Precedent is not permission — every such plan was stranded.          |
+| "Plan mode gives me a plan file for free"          | That file lives outside the project; it's the cost, not the benefit. |
+| "I'll enter plan mode first, then load the skill"  | Pre-load entry is the same violation, not a recovery trigger.        |
+| "I can still write to `.planning/` from plan mode" | Satisfying the ban's rationale does not lift the ban.                |
+
+## Recovery: Plan Mode Already Active
+
+Applies when the session entered plan mode without your doing — the user toggled it, a launch flag
+or hook set it — never to state you created or solicited. Work within it, but the harness-assigned
+file is scratch: the plan-mode approval dialog counts as the user's approval, and the first action
+after it is saving the approved plan verbatim to `.planning/plan-<slug>.md` — slug derived from the
+feature, never from the harness filename — before any implementation step. Once the copy exists, it
+is the plan; stop referencing the scratch file.
+
+If you entered plan mode in violation of the ban, say so to the user, then route the artifact the
+same way — assigned file is scratch, plan saved to `.planning/plan-<slug>.md` immediately after
+approval. That is recovery of the artifact, not absolution: the violation is still surfaced, and
+"recovery exists" is never a reason to enter plan mode.
 
 ## Scope Check
 
@@ -225,10 +263,12 @@ _create_; it can only verify what exists now.
 
 ## Checkpoint
 
-Save the plan as `.plans/plan-<slug>.md`, where `<slug>` is a kebab-case name derived from the
-feature or task (e.g. `.plans/plan-email-validation.md`). Create the `.plans/` directory if it
-doesn't exist. After the plan is approved and written to disk, confirm the artifact path for handoff
-to downstream tools.
+Create the plan at `.planning/plan-<slug>.md` **as the working file from the first draft** —
+`<slug>` is a kebab-case name derived from the feature or task (e.g.
+`.planning/plan-email-validation.md`). Create the `.planning/` directory if it doesn't exist. Draft,
+review, and revise in this file; it is the single artifact downstream tools consume. When the plan
+is ready, present it to the user in conversation and wait for explicit approval before starting
+implementation. After approval, confirm the artifact path for handoff.
 
 ## Common Mistakes
 
@@ -242,3 +282,5 @@ to downstream tools.
 | Plan documents the obvious (CRUD, standard patterns)        | Only document non-obvious constraints, gotchas, and dependencies           |
 | Behaviors or claims name a mechanism ("uses helper X")      | Word the observable outcome; mechanism wording passes broken code          |
 | Flag-gated behavior specs tests for one branch only         | Spec a fixture or assertion per branch — both modes, both outcomes         |
+| Entering plan mode — before or after loading this skill     | The ban is unconditional; write `.planning/plan-<slug>.md` directly        |
+| Approved plan left in the harness-assigned file             | First post-approval action is saving it to `.planning/plan-<slug>.md`      |
