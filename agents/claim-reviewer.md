@@ -4,7 +4,7 @@ description: >
   Use when claims or assertions need independent verification against the codebase — a plan's
   behaviors, findings, or conclusions — to confirm, refute, or flag each as
   unsubstantiated. For claims requiring reasoning, not mechanical facts.
-model: opus
+model: claude-opus-5
 effort: high
 tools:
   - Read

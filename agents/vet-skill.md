@@ -4,7 +4,7 @@ description: >
   Use when a SKILL.md needs review for activation, configuration, structure, security, and
   compliance quality — unreliable triggering, bloated body, description that doesn't match its
   triggers. Read-only — reports findings, never edits.
-model: opus
+model: claude-opus-5
 effort: high
 tools:
   - Skill

@@ -4,8 +4,8 @@ description: >
   Use when source-file comments need review for restatement, section-banner shape, doc-comment
   coverage, drifting line-number or commit-hash anchors, and narration of past decisions or dropped
   alternatives that belong in docs or the changelog. Read-only — reports findings, never edits.
-model: opus
-effort: high
+model: sonnet
+effort: medium
 tools:
   - Skill
   - Read
@@ -131,8 +131,10 @@ alone without it.
 
 ### S2. Section banners
 
-**House banner shape.** The repo's existing dominant banner shape wins. Where no dominant shape
-exists, the default is a dashed banner in the language's line-comment marker:
+**House banner shape.** The repo's existing dominant banner shape wins. Dominance is established
+only by files that predate the change under review — banners the reviewed change itself introduced
+don't vote, so a greenfield file never legitimizes its own shape. Where no dominant shape exists,
+the default is a dashed banner in the language's line-comment marker:
 
 | Language / marker     | Default banner shape                                                             |
 | --------------------- | -------------------------------------------------------------------------------- |

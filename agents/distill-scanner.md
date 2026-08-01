@@ -4,7 +4,7 @@ description: >
   Use when code or test files need a read-only distillation review — deep nesting, duplicated
   logic, unclear names, magic values, needless indirection — reported as scored findings.
   Never edits; use code-distiller to apply cleanups.
-model: opus
+model: claude-opus-5
 effort: high
 tools:
   - Skill

@@ -4,7 +4,7 @@ description: >
   Use when you have identified code issues with file:line
   references that need surgical fixes
 model: sonnet
-effort: medium
+effort: high
 tools:
   - Skill
   - Read

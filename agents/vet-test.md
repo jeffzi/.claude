@@ -4,7 +4,7 @@ description: >
   Use when test files need review for redundancy, AAA violations, behavior-vs-implementation
   drift, weak assertions, and language test-skill rules. Read-only — reports findings, never
   edits.
-model: opus
+model: claude-opus-5
 effort: high
 tools:
   - Skill
