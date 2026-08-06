@@ -15,19 +15,21 @@ script's `add` commands are the source map.
 
 #### Code
 
-| Skill                                                  | Description                                                                      |
-| ------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| [`code-core`](skills/code-core/SKILL.md)               | Production code principles hub (types, errors, verification, comments)           |
-| [`code-py`](skills/code-py/SKILL.md)                   | Python: type hints, modern syntax (3.10+), Pythonic idioms                       |
-| [`code-lua`](skills/code-lua/SKILL.md)                 | Lua: LuaLS annotations, naming conventions, performance                          |
-| [`code-marimo`](skills/code-marimo/SKILL.md)           | Marimo: directed acyclic graph (DAG) patterns, SQL-first analysis, UI reactivity |
-| [`code-shell`](skills/code-shell/SKILL.md)             | Bash: strict mode, quoting, ShellCheck/shfmt compliance                          |
-| [`code-shiny`](skills/code-shiny/SKILL.md)             | Shiny for Python: reactive logic, Express/Core mode                              |
-| [`code-swift`](skills/code-swift/SKILL.md)             | Swift: strict concurrency, structured concurrency                                |
-| [`code-ts`](skills/code-ts/SKILL.md)                   | TypeScript: strict types, modern patterns                                        |
-| [`code-tstl`](skills/code-tstl/SKILL.md)               | TypeScript-to-Lua: TSTL targeting Lua 5.1                                        |
-| [`code-tstl-plugin`](skills/code-tstl-plugin/SKILL.md) | TSTL plugins: visitor transforms, printer overrides                              |
-| [`design-cli`](skills/design-cli/SKILL.md)             | CLI design: subcommands, flags, help text, output formatting                     |
+| Skill                                                    | Description                                                                      |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| [`code-core`](skills/code-core/SKILL.md)                 | Production code principles hub (types, errors, verification, comments)           |
+| [`code-py`](skills/code-py/SKILL.md)                     | Python: type hints, modern syntax (3.10+), Pythonic idioms                       |
+| [`code-lua`](skills/code-lua/SKILL.md)                   | Lua: LuaLS annotations, naming conventions, performance                          |
+| [`code-marimo`](skills/code-marimo/SKILL.md)             | Marimo: directed acyclic graph (DAG) patterns, SQL-first analysis, UI reactivity |
+| [`code-shell`](skills/code-shell/SKILL.md)               | Bash: strict mode, quoting, ShellCheck/shfmt compliance                          |
+| [`code-shiny`](skills/code-shiny/SKILL.md)               | Shiny for Python: reactive logic, Express/Core mode                              |
+| [`code-sql`](skills/code-sql/SKILL.md)                   | SQL: warehouse naming conventions, query structure, lowercase keywords           |
+| [`code-sql-redshift`](skills/code-sql-redshift/SKILL.md) | Redshift: pinned dialect facts (QUALIFY, lateral aliases), AUTO tuning defaults  |
+| [`code-swift`](skills/code-swift/SKILL.md)               | Swift: strict concurrency, structured concurrency                                |
+| [`code-ts`](skills/code-ts/SKILL.md)                     | TypeScript: strict types, modern patterns                                        |
+| [`code-tstl`](skills/code-tstl/SKILL.md)                 | TypeScript-to-Lua: TSTL targeting Lua 5.1                                        |
+| [`code-tstl-plugin`](skills/code-tstl-plugin/SKILL.md)   | TSTL plugins: visitor transforms, printer overrides                              |
+| [`design-cli`](skills/design-cli/SKILL.md)               | CLI design: subcommands, flags, help text, output formatting                     |
 
 #### Testing
 
