@@ -20,6 +20,7 @@ argument-hint: "[feature or behavior to implement]"
 - [Architecture: Context-Isolated Subagents](#architecture-context-isolated-subagents)
 - [Language Skill Dispatch](#language-skill-dispatch)
 - [Batching: Cohesive vs. Unrelated](#batching-cohesive-vs-unrelated)
+- [Parallel Waves: Independent Groups Run Concurrently](#parallel-waves-independent-groups-run-concurrently)
 - [Orchestration Flow](#orchestration-flow)
 - [Red-Green-Refactor](#red-green-refactor)
 - [Circuit Breaker](#circuit-breaker)
@@ -88,6 +89,23 @@ Context isolation prevents the LLM from designing tests around planned implement
 **NEVER dispatch `tdd-cycle` directly.** This skill is the orchestrator — without it, no phase
 verification, no circuit breaker, no structured data passing.
 
+### Dispatch First — No Prep Tool Calls
+
+**Within each cycle, the `tdd-cycle` dispatch is the first tool call.** Between the task's behavior
+list and the Agent call there is nothing to read, run, or check: no Read, no Bash, no Glob, no Grep.
+Every "prep" step you can name belongs elsewhere — language detection (TSTL markers, framework
+checks) is the agent's hub dispatch; a baseline suite run duplicates work the agent's RED phase
+owns; your own TEST_COMMAND runs come after the agent returns (Verify GREEN). Announcing the
+dispatch is not the dispatch — only the Agent call is. Each tool call inserted before it is a step
+out of the router role into the implementer role, and that drift ends with the orchestrator writing
+RED tests inline while still believing it is about to dispatch.
+
+| Excuse                                            | Reality                                                                          |
+| ------------------------------------------------- | -------------------------------------------------------------------------------- |
+| "Checking TSTL markers is routing, not reading"   | You pass paths, never a language. tdd-cycle's hubs route in its own context.     |
+| "A green baseline confirms the suite works first" | tdd-cycle resolves and runs the commands in RED. Your first run is Verify GREEN. |
+| "I said I'd dispatch — these reads are just prep" | The announcement is not the dispatch. Any prep before the Agent call is drift.   |
+
 ## Language Skill Dispatch
 
 The orchestrator loads no testing or coding skills. `tdd-cycle` loads `Skill(test-core)` in its RED
@@ -100,10 +118,10 @@ then fix by hand) — `rules/skill-loading.md` applies as usual at that point.
 descriptions and file paths; every agent reads its own files in its own fresh context. The only
 contents the orchestrator loads are agent reports and the output of TEST_COMMAND /
 FULL_SUITE_COMMAND. Reading a test or implementation file "to understand the API", "to batch
-better", or "before dispatching" is context stolen from the steps only the orchestrator can do —
-verification, triage, commits. Batching is decided from the plan's behavior list, never from file
-contents. If the extension has no dispatch row in `rules/skill-loading.md`, the agent notes "no
-matching skill" and proceeds on hub principles alone.
+better", "to detect the language", or "before dispatching" is context stolen from the steps only the
+orchestrator can do — verification, triage, commits. Batching is decided from the plan's behavior
+list, never from file contents. If the extension has no dispatch row in `rules/skill-loading.md`,
+the agent notes "no matching skill" and proceeds on hub principles alone.
 
 `tdd-cycle` resolves TEST_COMMAND and FULL_SUITE_COMMAND during its RED phase — the orchestrator
 uses these for independent GREEN verification.
@@ -132,6 +150,35 @@ is the expensive failure.
 **Rule of thumb:** group by where the implementation lands, not by why the tests fail. "Different
 failure modes" or "could ship independently" are never reasons to split behaviors that live in the
 same files.
+
+## Parallel Waves: Independent Groups Run Concurrently
+
+Batching decides what shares a cycle; **waves decide which cycles run at the same time.** Behavior
+groups that are independent — neither consumes anything the other introduces (no new function, type,
+or module from one used by the other) and their test files and implementation areas are disjoint —
+form one wave: one `tdd-cycle` per group, all dispatched in a **single parallel message**. A group
+that consumes another group's output runs in a later wave, after the producer's cycle is verified —
+its code is on disk; commits wait until after REFACTOR.
+
+Independence is judged from the plan's behavior list alone — never by reading files (the same rule
+that governs batching). Unsure → serialize; a wasted wave costs one dispatch round, while two agents
+editing the same file costs a corrupted cycle.
+
+Wave mechanics (full loop in `references/orchestration-flow.md`):
+
+- Multi-group wave prompts carry the PARALLEL WAVE notice: each agent stays inside its group's files
+  and skips its own full-suite run.
+- Verification: each cycle's TEST_COMMAND, then FULL_SUITE_COMMAND **once per wave**.
+- No commits mid-loop: commits stay serial and per-cycle, in TDD order, but happen only in the
+  COMMIT phase after REFACTOR — never interleave two cycles' files in one commit.
+- Guards (`tdd-cycle-active`, per-agent `tdd-red-phase.<agent_id>` read markers) are cleared only
+  after every agent in the wave has returned.
+- One STUCK or TEST_FLAWED cycle never blocks the wave's PASSED cycles — verify those first, then
+  surface the failure; the PASSED cycles commit with the rest after REFACTOR.
+
+Serializing independent groups wastes wall-clock time the same way splitting cohesive behaviors
+wastes dispatches; parallelizing dependent ones hands an agent a GREEN phase whose prerequisite code
+doesn't exist yet. Both are wave-planning failures.
 
 ## Orchestration Flow
 
@@ -184,9 +231,9 @@ isolation:
 state. `FAILURE_OUTPUT` is the evidence that substitutes for it: the failure message must be
 expected, and it must fail because the feature is missing (not typos).
 
-The agent NEVER commits — you commit after verification passes, in TDD order (test files first, then
-implementation files; see the orchestration flow). Never ask the agent for a commit or instruct it
-to make one.
+The agent NEVER commits — and neither do you until the COMMIT phase after REFACTOR, in TDD order
+(test files first, then implementation files; see the orchestration flow). Never ask the agent for a
+commit or instruct it to make one.
 
 **`STATUS: PASSED_UNEXPECTEDLY`?** Behavior already exists. Report to user and ask: skip or revise
 scope?
@@ -232,7 +279,8 @@ Don't add features, refactor other code, or "improve" beyond the test.
 ### Verify GREEN — Watch It Pass
 
 **MANDATORY. Run TEST_COMMAND and FULL_SUITE_COMMAND yourself** — do not rely solely on tdd-cycle's
-report.
+report. In a multi-group wave, run each cycle's TEST_COMMAND, then FULL_SUITE_COMMAND once for the
+wave (the agents skipped it by instruction).
 
 Confirm:
 
@@ -244,12 +292,16 @@ Confirm:
 
 **Other tests fail?** Fix regressions now.
 
-### REFACTOR — Clean Up (after the last cycle)
+### REFACTOR — Clean Up (after the last cycle, before any commit)
 
-REFACTOR runs **once** after all RED-GREEN cycles complete, not per-cycle.
+REFACTOR runs **once** after all RED-GREEN cycles complete, not per-cycle — and **before any
+commit**. Nothing is committed until REFACTOR finishes, so every commit contains the cleaned-up
+code; there is no separate refactor commit.
 
-Compute total insertions across all files modified/added during this `/tdd` invocation using
-`git diff --stat`. If total insertions are **< 50 lines**, skip REFACTOR entirely.
+Compute total insertions across all files modified/added during this `/tdd` invocation: register new
+files with `git add -N`, then run `git diff --stat -- <ALL_CHANGED_FILES>`. Scoping the diff to the
+invocation's files keeps unrelated uncommitted work out of the count. If total insertions are **< 50
+lines**, skip REFACTOR and go straight to Commit.
 
 If **≥ 50 lines**, run the distill-and-mend sequence. The orchestrator dispatches and triages; it
 never loads hub skills and never edits files here:
@@ -270,17 +322,24 @@ never loads hub skills and never edits files here:
    Suggested fix.
 5. If any agent applied edits, re-run FULL_SUITE_COMMAND — or, when an enclosing workflow defines a
    per-task gate (e.g. a hardening round's gate block), run that gate instead; it subsumes the suite
-   re-run. Green → load `Skill(write-commit)` and commit the refactor delta. Red → surface the
-   failing output; do not commit.
+   re-run. Green → proceed to Commit. Red → surface the failing output; do not commit.
 
 The heavier review lenses (`vet-code`, `vet-test`, `bug-scanner`) are deliberately absent: they run
 in the pre-push `/preflight` pass, which owns snapshots, gates, and fix verification. REFACTOR's job
 is shape and comment hygiene on freshly written code, so later tasks don't inherit — and imitate —
 crust.
 
+### Commit — Last Phase
+
+Commits come after REFACTOR, never before or during the loop. When an enclosing workflow defines a
+pre-commit verification step (e.g. a plan task's **Verify** block dispatching `claim-reviewer`), run
+it now and resolve its findings first — verification always precedes the commit. Then load
+`Skill(write-commit)` and commit cycle by cycle in TDD order (that cycle's test files first, then
+its implementation files; staging rules in `references/orchestration-flow.md`).
+
 ### Repeat
 
-Next behavior group. One vertical slice (or cohesive batch) per cycle.
+Next wave. One vertical slice (or cohesive batch) per cycle; independent cycles share a wave.
 
 ## Circuit Breaker
 
@@ -334,7 +393,7 @@ PASS
 ```
 
 **REFACTOR** — Run the distill-and-mend sequence if ≥50 lines changed. Extract validation for
-multiple fields if needed.
+multiple fields if needed. Only then commit.
 
 ## Verification Checklist
 
@@ -343,15 +402,15 @@ Before marking work complete:
 - [ ] Every new function/method has a test
 - [ ] Watched each test fail before implementing (confirmed via FAILURE_OUTPUT from tdd-cycle)
 - [ ] Each test failed for expected reason (feature missing, not typo)
-- [ ] Committed each cycle yourself in TDD order (tests first, then implementation) — the agent
-      never commits
+- [ ] Committed each cycle yourself in TDD order (tests first, then implementation), only after
+      REFACTOR finished — the agent never commits
 - [ ] Wrote minimal code to pass each test (via tdd-cycle agent)
 - [ ] All tests pass
 - [ ] Output pristine (no errors, warnings)
 - [ ] Tests use real code (mocks only if unavoidable)
 - [ ] Showed test output proving pass (not "should pass" — actual output)
 - [ ] Edge cases and errors covered
-- [ ] REFACTOR ran (if ≥50 lines changed) or skipped with reason logged
+- [ ] REFACTOR ran (if ≥50 lines changed) or skipped with reason logged — before any commit
 
 Can't check all boxes? You skipped TDD. Start over.
 
@@ -381,6 +440,12 @@ RED phase failures this skill was designed to address:
   an extra dispatch for zero isolation gain
 - Orchestrators reading source files during Phase 1 to "understand the API"
 - Orchestrators pre-reading test files "to batch better" or "to write a better dispatch prompt"
+- Orchestrators inserting "prep" tool calls after announcing a dispatch — a language-marker read, a
+  baseline suite run — then sliding into inline RED as the implementer role takes over
 - Agents dispatching tdd-cycle directly, bypassing the orchestrator
+- Orchestrators serializing independent behavior groups one dispatch at a time — or reading files
+  "to check independence" before planning a wave
+- Orchestrators putting a consumer group in the same wave as its producer because "the agent can
+  stub it"
 
 See `references/philosophy.md` for the full rationalization table and red flags.

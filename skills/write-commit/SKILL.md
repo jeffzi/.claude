@@ -19,7 +19,9 @@ memory within weeks.
 
 A commit serves one coherent purpose. When the changes to commit bundle genuinely unrelated work
 (e.g. "upgrade dependencies AND add a new feature"), split it into separate commits; otherwise
-prefer one commit with a subject that captures the overall purpose.
+prefer one commit with a subject that captures the overall purpose. Tests and implementation for the
+same change are one coherent purpose — never split them into separate commits (e.g. a `test:` commit
+followed by a `feat:` commit).
 
 When and how often to commit is the caller's decision — an explicit user request, a standing grant,
 or a workflow that prescribes its own commit sequencing. This skill governs the commit's content:
@@ -126,7 +128,8 @@ This flow covers interactive commit requests — the user explicitly asked to co
 loads this skill for the message rules alone, and this flow — the confirmation step included — does
 not apply there.
 
-Pre-commit verification (tests, lint, type-check) is enforced by the global rules — it must pass
+Pre-commit verification — tests, lint, type-check, and any verification the calling workflow
+prescribes (e.g. plan-mandated claim review) — is enforced by the global rules; it must pass
 **before** this skill is loaded. This skill owns message composition and the commit workflow, not
 verification.
 
@@ -173,6 +176,7 @@ verification.
 - Writing a body that narrates the diff ("changed X to Y", "also bumps Z")
 - Subject describes implementation steps instead of the concrete effect
 - Commit bundles unrelated changes that deserve separate commits
+- Splitting tests from implementation into separate commits for the same feature/fix
 - Referencing internal tooling (skill names, `.planning/` paths, agent names)
 - Committing without fresh verification evidence in the current conversation
 

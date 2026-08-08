@@ -141,8 +141,9 @@ type: plan
 
 **Implementation:** Use `/tdd` for implementation.
 
-**Verify:** After the task is complete, dispatch a `claim-reviewer` agent with this task's
-behavioral claims. Fix any `Refuted`/`Unsubstantiated` verdicts first.
+**Verify:** After implementation is complete and before committing, dispatch a `claim-reviewer`
+agent with this task's behavioral claims. Fix any `Refuted`/`Unsubstantiated` verdicts before
+committing.
 ```
 
 The **Verify** block goes on every task **except the last implementation task** — the Final Task
