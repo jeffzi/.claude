@@ -67,6 +67,7 @@ before counting prescribed dispatches.
 | .lua                  | test-lua              | code-lua   | `*_test.lua`, `*_spec.lua` |
 | .swift                | test-swift            | code-swift | `*Tests.swift`             |
 | .sh, .bash            | none (test-core only) | code-shell | `test_*.sh`                |
+| .sql                  | none (test-core only) | code-sql   | —                          |
 
 Overlays load automatically via base-skill Domain Skill Detection (e.g. `test-py` detects
 `import polars` → `Skill(test-polars)`; `code-py` detects `import polars` → `Skill(polars)`). The
