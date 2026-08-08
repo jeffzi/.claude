@@ -124,9 +124,9 @@ usage_color() {
 	hsl2rgb "$hue" "$sat" "$light"
 }
 
-# One rendered segment (" │ 5h:61% (↑ 2h10m)"). Only the ":61%" carries the usage
-# gradient; the label and the reset time use the terminal's default color, so the
-# gradient marks usage alone.
+# One rendered segment (" │ 5h:61% (↑ 2h10m)"). Only the "61%" carries the usage
+# gradient; the label, colon, and reset time use the terminal's default color, so
+# the gradient marks usage alone.
 # reset_fmt names the formatter function — countdown for the 5h window, absolute
 # date for the 7d window.
 fmt_limit_segment() {
@@ -142,7 +142,7 @@ fmt_limit_segment() {
 	elif [[ -n "$pace" ]]; then
 		detail=" (${pace})"
 	fi
-	printf ' │ %s%s:%s%%%s%s' "$label" "$color" "$used_int" "$RESET" "$detail"
+	printf ' │ %s:%s%s%%%s%s' "$label" "$color" "$used_int" "$RESET" "$detail"
 }
 
 # Even-pace delta: actual usage vs. linear spend rate across the window.
