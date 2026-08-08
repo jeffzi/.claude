@@ -40,8 +40,8 @@ Ignore this block when `$0` names a different PR, run, or SHA — the entry-poin
 
 ```text
 warm up signing → locate run → wait if running → read failing logs → triage
-→ check branch CI coverage → touch marker → branch fix-ci/<slug> → reproduce locally
-→ fix → verify locally → commit → push branch → watch its run
+→ check branch CI coverage → touch marker → checkout PR branch → branch fix-ci/<slug>
+→ reproduce locally → fix → verify locally → commit → push branch → watch its run
 → green? squash back : loop (max 3 pushed attempts) → rm marker (EVERY exit path)
 ```
 
@@ -86,12 +86,26 @@ git tag -s fix-ci-warmup -m warmup && git tag -d fix-ci-warmup
 
 ## The fix branch
 
-From the failing HEAD — main included, any branch works:
+**Bright line: triage is remote, reproduction is local — and local means on the failing branch.**
+Reading CI logs via `gh` is triage; running any local command that touches project files (linters,
+test runners, reading configs, checking versions) is reproduction. No local reproduction until you
+are on the PR branch. "Just checking one thing" on main is reproduction on the wrong branch.
+
+When the entry point is a PR, check out its branch immediately after triage:
 
 ```bash
-git switch -c fix-ci/<short-slug>
+gh pr checkout <pr-number>                                        # fetch + switch to PR branch
+git switch -c fix-ci/<short-slug>                                 # branch from the PR's HEAD
 ~/.claude/scripts/fix-ci-push.sh -u origin fix-ci/<short-slug>   # after the first verified fix commit
 ```
+
+If `gh pr checkout` fails (auth, SSH alias, remote resolution), fix the checkout — don't fall back
+to analyzing from main. The PR branch name is in `gh pr view <n> --json headRefName`; manual
+alternative: `git fetch origin <branch> && git switch <branch>`.
+
+When the entry point is a bare branch or commit (no PR), `git switch -c fix-ci/<short-slug>` from
+the current HEAD is fine — but never analyze or reproduce from a different branch than the one that
+failed.
 
 Attempts are plain commits; the squash erases them, so retries never amend or force. If pushing the
 branch triggers no workflow, open the PR early (`gh pr create --fill --base <original>`) to fire
@@ -186,21 +200,28 @@ squash an unproven fix into the target.
 
 ## Rationalizations
 
-| Excuse                                            | Reality                                                           |
-| ------------------------------------------------- | ----------------------------------------------------------------- |
-| "Skip/xfail the flaky test, fix it later"         | That deletes the signal. Root-cause it or hand back.              |
-| "`# type: ignore` unblocks the release"           | It suppresses every future error on that line. Fix or hand back.  |
-| "Rerun first — might be flaky"                    | Rerun before reading the log tells you nothing. Read first.       |
-| "Branching is overhead, I'll commit on main"      | Attempts on the original branch are permanent. Branch first.      |
-| "No CI on the branch — I'll just push to main"    | The target branch is never the test bed. Hard stop, report.       |
-| "Merge normally — squash loses the detail"        | The attempts are noise by design. Squash is the contract.         |
-| "I'll leave the marker, I might loop again later" | A lingering marker disarms the guard repo-wide. Remove it now.    |
-| "The file isn't mine / pre-existing failure"      | It's a CI error; the request is fixing CI errors. No origin talk. |
-| "Push #4 will surely be the one"                  | Three misses means the model of the bug is wrong. Hand back.      |
+| Excuse                                             | Reality                                                                  |
+| -------------------------------------------------- | ------------------------------------------------------------------------ |
+| "Skip/xfail the flaky test, fix it later"          | That deletes the signal. Root-cause it or hand back.                     |
+| "`# type: ignore` unblocks the release"            | It suppresses every future error on that line. Fix or hand back.         |
+| "Rerun first — might be flaky"                     | Rerun before reading the log tells you nothing. Read first.              |
+| "Branching is overhead, I'll commit on main"       | Attempts on the original branch are permanent. Branch first.             |
+| "No CI on the branch — I'll just push to main"     | The target branch is never the test bed. Hard stop, report.              |
+| "Merge normally — squash loses the detail"         | The attempts are noise by design. Squash is the contract.                |
+| "I'll leave the marker, I might loop again later"  | A lingering marker disarms the guard repo-wide. Remove it now.           |
+| "The file isn't mine / pre-existing failure"       | It's a CI error; the request is fixing CI errors. No origin talk.        |
+| "I can analyze from main / read the diff remotely" | Reproduce means run the code. Switch to the failing branch first.        |
+| "I'm still triaging, just checking one thing"      | Running a local command is reproduction, not triage. Checkout first.     |
+| "`gh pr checkout` failed, I'll work from main"     | Fix the checkout or use manual fetch+switch. Main is never the fallback. |
+| "Push #4 will surely be the one"                   | Three misses means the model of the bug is wrong. Hand back.             |
 
 ## Red flags — STOP
 
 - About to run `--log` without `--job`, or re-fetch logs you already tee'd
+- Reproducing or editing on a branch other than the one that failed (e.g. staying on main for a PR
+  fix)
+- Running any local project command (linter, test, config read) before `gh pr checkout`
+- `gh pr checkout` failed and about to proceed on main instead of fixing the checkout
 - Editing code before reproducing the failure locally
 - About to commit a fix attempt on the original branch instead of `fix-ci/*`
 - About to merge the fix branch without `--squash`, or squash a branch whose run isn't green
