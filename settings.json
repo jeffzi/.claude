@@ -189,7 +189,7 @@
   "disableWorkflows": true,
   "statusLine": {
     "type": "command",
-    "command": "$HOME/.claude/scripts/statusline.sh"
+    "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/scripts/statusline.sh"
   },
   "enabledPlugins": {
     "lua-lsp@claude-plugins-official": true,
