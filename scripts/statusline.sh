@@ -8,42 +8,72 @@ RESET=$'\033[0m'
 GAUGE_SLOTS=5
 FIVE_HOUR_SECONDS=$((5 * 3600))
 SEVEN_DAY_SECONDS=$((7 * 24 * 3600))
+# The OAuth usage endpoint answers out of the same strict rate budget as Claude
+# Code's own /usage polling, so spending it here makes /usage fail with a 429.
+# Poll it rarely, and back off further once it starts refusing.
+USAGE_POLL_SECONDS=300
+USAGE_BACKOFF_SECONDS=900
 
-# Team-plan sessions never receive the unified rate-limit headers, so stdin lacks
-# .rate_limits entirely even though the data exists server-side
-# (anthropics/claude-code#63659). Fetch it from the OAuth usage endpoint instead,
-# throttled to one attempt per minute via a per-account cache file keyed on
-# CLAUDE_CONFIG_DIR — the same key Claude Code uses to suffix its Keychain entry.
-# Any failure leaves the cache empty, blanking the segment until a later render
-# retries. Emits JSON in the stdin .rate_limits shape (resets_at as epoch seconds).
-fetch_usage_fallback() {
-	local now="$1"
-	local suffix="default" cache service token response
-	[[ -n "${CLAUDE_CONFIG_DIR:-}" ]] && suffix=$(printf '%s' "$CLAUDE_CONFIG_DIR" | shasum -a 256 | cut -c1-8)
-	cache="${TMPDIR:-/tmp}/claude-statusline-usage-${suffix}.json"
-	local mtime
-	mtime=$(stat -f %m "$cache" 2>/dev/null) || mtime=0
-	if [[ -f "$cache" ]] && ((now - mtime < 60)); then
-		cat "$cache"
-		return
-	fi
-	: >"$cache" # claim the attempt window up front; a failed fetch stays blank
-	trap 'rm -f "${cache}.tmp"' RETURN
-	service="Claude Code-credentials"
+# Reads the OAuth usage endpoint for the account keyed by $1 and emits the stdin
+# .rate_limits shape on stdout (resets_at as epoch seconds).
+#
+# Emits nothing and returns non-zero when the account has no token, the request
+# fails, or the body carries no .five_hour.utilization — the last is what the
+# endpoint answers with when it rate-limits, and mapping it would produce a
+# well-formed payload with null percentages in it.
+fetch_usage_payload() {
+	local suffix="$1" service="Claude Code-credentials" token response
 	[[ "$suffix" != "default" ]] && service="${service}-${suffix}"
 	token=$(security find-generic-password -s "$service" -w 2>/dev/null | jq -r '.claudeAiOauth.accessToken // empty') || return
-	[[ -z "$token" ]] && return
+	[[ -n "$token" ]] || return 1
 	response=$(curl -sS --max-time 2 \
 		-H "Authorization: Bearer $token" \
 		-H "anthropic-beta: oauth-2025-04-20" \
 		https://api.anthropic.com/api/oauth/usage 2>/dev/null) || return
 	printf '%s' "$response" | jq -c '
 		def epoch: if . == null then null else (sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601) end;
-		{
+		if .five_hour.utilization == null then empty else {
 			five_hour: {used_percentage: .five_hour.utilization, resets_at: (.five_hour.resets_at | epoch)},
 			seven_day: {used_percentage: .seven_day.utilization, resets_at: (.seven_day.resets_at | epoch)}
-		}' >"${cache}.tmp" 2>/dev/null || return
-	mv "${cache}.tmp" "$cache"
+		} end' 2>/dev/null
+}
+
+# Team-plan sessions never receive the unified rate-limit headers, so stdin lacks
+# .rate_limits entirely even though the data exists server-side
+# (anthropics/claude-code#63659). Fetch it from the OAuth usage endpoint instead,
+# cached per account in a file keyed on CLAUDE_CONFIG_DIR — the same key Claude
+# Code uses to suffix its Keychain entry.
+#
+# The cache holds good payloads only, and is the sole data source between
+# attempts: a failed fetch must serve it unchanged rather than blank the segment.
+# The attempt clock therefore lives in a sibling marker file — its mtime dates the
+# last attempt and its contents record the verdict — so claiming the next window
+# never touches the data.
+fetch_usage_fallback() {
+	local now="$1"
+	local suffix="default" cache marker last_attempt verdict throttle payload
+	[[ -n "${CLAUDE_CONFIG_DIR:-}" ]] && suffix=$(printf '%s' "$CLAUDE_CONFIG_DIR" | shasum -a 256 | cut -c1-8)
+	cache="${TMPDIR:-/tmp}/claude-statusline-usage-${suffix}.json"
+	marker="${cache}.attempt"
+	last_attempt=$(stat -f %m "$marker" 2>/dev/null) || last_attempt=0
+	verdict=$(cat "$marker" 2>/dev/null) || verdict=""
+	throttle=$USAGE_POLL_SECONDS
+	[[ "$verdict" == failed ]] && throttle=$USAGE_BACKOFF_SECONDS
+	if ((now - last_attempt >= throttle)); then
+		local tmp="${cache}.tmp"
+		# Claim the window pessimistically: a fetch that dies mid-flight must not
+		# invite the next render, a second later, to try again.
+		printf 'failed' >"$marker"
+		trap 'rm -f "$tmp"' RETURN
+		payload=$(fetch_usage_payload "$suffix") || payload=""
+		# The ok verdict is earned only when the payload actually reached the
+		# cache — a failed write must leave the failed claim (and its longer
+		# backoff) in place rather than republish stale data as fresh.
+		if [[ -n "$payload" ]] && printf '%s' "$payload" >"$tmp" && mv "$tmp" "$cache"; then
+			printf 'ok' >"$marker"
+		fi
+	fi
+	[[ -f "$cache" ]] || return 1
 	cat "$cache"
 }
 
@@ -197,8 +227,28 @@ fmt_context_bar() {
 	printf '%s%s%s%%%s' "$out" "$color" "$pct" "$RESET"
 }
 
+# Fail fast with the culprit named instead of letting a missing tool surface
+# as a misleading downstream error: absent jq reads as a stdin parse failure,
+# and a stat without -f (GNU coreutils) would defeat the fallback throttle and
+# poll the usage endpoint on every render. stat gets a functional probe because
+# `command -v` cannot tell the BSD and GNU variants apart.
+check_deps() {
+	local tool
+	for tool in jq curl security shasum date; do
+		command -v "$tool" >/dev/null || {
+			printf 'statusline: %s is required\n' "$tool" >&2
+			return 1
+		}
+	done
+	stat -f %m . >/dev/null 2>&1 || {
+		printf 'statusline: BSD stat (-f) is required\n' >&2
+		return 1
+	}
+}
+
 main() {
 	local input model effort dir pct api_ms rate_limits_json now
+	check_deps || return 1
 	input=$(cat)
 	now=$(date +%s)
 
