@@ -194,6 +194,7 @@ rules/skill-loading.md → Code skill column
   .lua             →  Skill(code-lua)
   .swift           →  Skill(code-swift)
   .sh, .bash       →  Skill(code-shell)
+  .sql             →  Skill(code-sql)
 ```
 
 If the extension is not listed, check whether a `code-{lang}` skill exists under `skills/` with a
