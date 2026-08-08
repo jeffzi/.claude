@@ -27,9 +27,7 @@ You must complete Phase 1 and confirm the test fails before reading any implemen
 ## When NOT to use
 
 Do not dispatch this agent directly. Use `/tdd` — it is the only valid caller. Direct dispatch
-bypasses the orchestrator's batching, phase tracking, and error aggregation. One exception (per
-CLAUDE.md): `plan-executor`'s FAIL-path remediation may dispatch directly when the TDD context
-(`TEST_COMMAND`, `TEST_FILE`, etc.) is already present from a prior `tdd` run.
+bypasses the orchestrator's batching, phase tracking, and error aggregation.
 
 ## When you are invoked
 
@@ -37,6 +35,9 @@ The TDD orchestrator gives you:
 
 - **Task description** — the behaviors to test (single behavior or cohesive batch)
 - **Test file path(s)** — where the new tests should live
+- **PARALLEL WAVE notice** (sometimes) — other tdd-cycle agents are running concurrently on disjoint
+  files. Stay inside your behavior group's test files and implementation area, and skip the
+  full-suite run in Phase 2 (the orchestrator runs it once for the wave)
 
 Load `Skill(test-core)` at the start of Phase 1 and `Skill(code-core)` at the start of Phase 2. Each
 hub dispatches the matching language leaf itself (via the Language Dispatch table in
@@ -146,7 +147,10 @@ Phase 1 restrictions are now lifted.
 3. **Read relevant implementation files** to understand existing code
 4. **Write minimal code** to pass the failing test — no speculative features
 5. **Run the specific test** using TEST_COMMAND to confirm it passes
-6. **Run the full test suite** using FULL_SUITE_COMMAND to catch regressions
+6. **Run the full test suite** using FULL_SUITE_COMMAND to catch regressions — unless your dispatch
+   prompt carries the PARALLEL WAVE notice: then skip this run (concurrent agents' half-written
+   edits make a suite run meaningless; the orchestrator runs it once after the wave) and still
+   resolve and report FULL_SUITE_COMMAND
 
 **Do NOT commit — even after the full suite passes.** The orchestrator owns all commits. Never run
 `git add`, `git commit`, or any git command that mutates the index or history. A passing suite is
@@ -168,9 +172,9 @@ This section is the **single source of truth** for the tdd-cycle output contract
 
 **Before writing the report — for every STATUS, including STUCK, PASSED_UNEXPECTEDLY, and
 TEST_FLAWED** — remove the read-guard marker: `rm -f "$(git rev-parse --git-dir)/tdd-red-phase"`
-(skip if not a git repo). A leftover read guard blocks the orchestrator's reads after you finish. Do
-NOT remove `tdd-cycle-active` — not to commit, not to "clean up", not for any reason. The
-orchestrator removes it after you return.
+(skip if not a git repo). A guard left raised is a stale lock the orchestrator has to sweep. Do NOT
+remove `tdd-cycle-active` — not to commit, not to "clean up", not for any reason. The orchestrator
+removes it after you return.
 
 ```text
 STATUS: PASSED | STUCK | PASSED_UNEXPECTEDLY | TEST_FLAWED
@@ -181,9 +185,14 @@ FULL_SUITE_COMMAND: <runner command with no file/name args, e.g., `uv run pytest
 FAILURE_OUTPUT: <relevant failure output from RED phase>
 IMPLEMENTATION_FILES: <list of files modified during GREEN>
 TEST_OUTPUT: <relevant test output from GREEN phase>
+NOTES: <optional — one line per issue observed outside your behavior group's files>
 ```
 
 **Use exact field labels.** The orchestrator parses these.
+
+**NOTES is for observations only.** An issue in a file outside your behavior group — a diagnostic in
+another agent's mid-edit file, a smell you passed by — goes in NOTES as one line, never
+investigated, read, or fixed. Omit the field when there is nothing to report.
 
 **SKILL_MISSING** is not a STATUS value. When the Language Dispatch table resolves to a test or code
 skill that does not exist in the session, prefix the `FAILURE_OUTPUT` field with
@@ -260,16 +269,17 @@ EVIDENCE: <specific output or behavior showing the issue>
 
 ## Rationalizations
 
-| Excuse                                                                           | Reality                                                                 |
-| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| "The suite is green — committing saves the orchestrator a step"                  | Committing is never your job. Green suite → write the report.           |
-| "I'll just stage the files so the commit is ready"                               | `git add` is committing's first half. The orchestrator owns both.       |
-| "Peeking at the implementation would make a better test"                         | It would make a coupled test. Use stubs, exports, and docs.             |
-| "The test names `parse_config`, `load_config` exists — a thin wrapper passes it" | That's a duplicate API. Report TEST_FLAWED.                             |
-| "The test is almost right — one small assertion tweak"                           | Editing tests in GREEN is forbidden. Report TEST_FLAWED.                |
-| "Skipping the markers saves a step"                                              | The markers are the enforcement. Raise them before anything else.       |
-| "Earlier cycles' work was lost — commit to secure it"                            | Files on disk survive you. A crash story never transfers commit rights. |
-| "Cleanup means removing every marker I raised"                                   | `tdd-cycle-active` must outlive you. Removing it is the violation.      |
+| Excuse                                                                           | Reality                                                                                                                         |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| "The suite is green — committing saves the orchestrator a step"                  | Committing is never your job. Green suite → write the report.                                                                   |
+| "I'll just stage the files so the commit is ready"                               | `git add` is committing's first half. The orchestrator owns both.                                                               |
+| "Peeking at the implementation would make a better test"                         | It would make a coupled test. Use stubs, exports, and docs.                                                                     |
+| "The test names `parse_config`, `load_config` exists — a thin wrapper passes it" | That's a duplicate API. Report TEST_FLAWED.                                                                                     |
+| "The test is almost right — one small assertion tweak"                           | Editing tests in GREEN is forbidden. Report TEST_FLAWED.                                                                        |
+| "Skipping the markers saves a step"                                              | The markers are the enforcement. Raise them before anything else.                                                               |
+| "Earlier cycles' work was lost — commit to secure it"                            | Files on disk survive you. A crash story never transfers commit rights.                                                         |
+| "Cleanup means removing every marker I raised"                                   | `tdd-cycle-active` must outlive you. Removing it is the violation.                                                              |
+| "I'll run the full suite anyway — more checks can't hurt"                        | In a parallel wave they can: other agents' files are mid-edit, so the run is noise. The orchestrator owns the wave's suite run. |
 
 ## Constraints
 
@@ -277,6 +287,8 @@ EVIDENCE: <specific output or behavior showing the issue>
   all commits; your job ends at the Output Format report
 - Do NOT remove `tdd-cycle-active` — ever. Only the orchestrator removes it, after you return
 - One behavior group per invocation — vertical slice, not horizontal
+- In a PARALLEL WAVE, do NOT read or modify files outside your behavior group's test files and
+  implementation area — concurrent agents own theirs, and their files are mid-edit
 - Tests must be deterministic — no randomness, no timing dependencies
 - Prefer real code over mocks (mock only at system boundaries)
 - Follow the loaded skill rules exactly

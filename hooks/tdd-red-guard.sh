@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Fires on Read|Bash. While a tdd-cycle agent is in its RED phase (marker file
-# `$GIT_DIR/tdd-red-phase` exists, created/removed by the agent per agents/tdd-cycle.md),
-# block reads of implementation source files — mechanical enforcement of the Phase 1
-# access rules that were previously honor-system.
+# Fires on Read|Bash. While a tdd-cycle agent is in its RED phase, block its reads of
+# implementation source files — mechanical enforcement of the Phase 1 access rules in
+# agents/tdd-cycle.md.
 #
-# Only the tdd-cycle agent is blocked: hook stdin carries `agent_type` for subagent
-# calls, so the orchestrator (and anything else in the repo) reads freely during RED.
+# Per-instance markers: the agent touches/removes `$GIT_DIR/tdd-red-phase` by that
+# name, and this hook mirrors those touch/rm commands onto `tdd-red-phase.<agent_id>`
+# (hook stdin carries a unique agent_id per subagent instance). The guard checks only
+# the per-instance marker, so concurrent tdd-cycle agents in one repo gate themselves —
+# one agent's RED never blocks another's GREEN reads. The un-suffixed file the agent's
+# own command creates is inert here; the orchestrator sweeps all marker files after
+# each wave. Without an agent_id the un-suffixed marker is the guard.
 #
-# ponytail: marker is per-repo, not per-session — two tdd-cycle agents in the same repo
-# would share the guard (one's RED gates the other's GREEN reads). Per-session markers
-# if that ever bites.
+# Only tdd-cycle agents are affected: hook stdin carries agent_type for subagent calls,
+# so the orchestrator (and anything else in the repo) reads freely during RED.
 
 command -v jq >/dev/null || {
 	printf "Error: jq is required\n" >&2
@@ -24,7 +27,9 @@ agent_type=$(printf '%s' "$input" | jq -r '.agent_type // empty')
 [[ "$agent_type" == "tdd-cycle" ]] || exit 0
 
 git_dir=$(git --no-optional-locks rev-parse --git-dir 2>/dev/null) || exit 0
-[[ -f "$git_dir/tdd-red-phase" ]] || exit 0
+
+agent_id=$(printf '%s' "$input" | jq -r '.agent_id // empty')
+marker="$git_dir/tdd-red-phase${agent_id:+.$agent_id}"
 
 # Allowed during RED: test files, stubs, interfaces, public API surface, anything
 # under a test directory. Everything else with a source extension is impl source.
@@ -56,24 +61,39 @@ block() {
 tool_name=$(printf '%s' "$input" | jq -r '.tool_name // empty')
 
 if [[ "$tool_name" == "Read" ]]; then
+	[[ -f "$marker" ]] || exit 0
 	file_path=$(printf '%s' "$input" | jq -r '.tool_input.file_path // empty')
 	[[ -n "$file_path" ]] && is_impl_source "$file_path" && block "$file_path"
 	exit 0
 fi
 
-# Bash: scan read-type commands for impl-source file arguments.
-# ponytail: word-scan, not a shell parser — catches `cat src/foo.py`, not exotic
-# quoting/globs. The docs remain the rule; this catches the casual violations.
+[[ "$tool_name" == "Bash" ]] || exit 0
 full_command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 [[ -z "$full_command" ]] && exit 0
 
+# Word-scan, not a shell parser — catches `cat src/foo.py`, not exotic quoting/globs.
+# The docs remain the rule; this catches the casual violations. The same pass mirrors
+# the agent's marker touch/rm onto the per-instance marker before any read check.
 read_cmds="cat|head|tail|less|more|sed|awk|grep|rg|bat|nl|tac|cut|strings|python|python3|node"
 
 while IFS= read -r subcmd; do
 	subcmd="${subcmd#"${subcmd%%[![:space:]]*}"}"
 	[[ -z "$subcmd" ]] && continue
-	first_word="${subcmd%% *}"
-	[[ "$(basename "$first_word")" =~ ^(${read_cmds})$ ]] || continue
+	first_word=$(basename "${subcmd%% *}")
+	if [[ "$subcmd" == *tdd-red-phase* ]]; then
+		case "$first_word" in
+		touch)
+			touch "$marker"
+			continue
+			;;
+		rm)
+			rm -f "$marker"
+			continue
+			;;
+		esac
+	fi
+	[[ -f "$marker" ]] || continue
+	[[ "$first_word" =~ ^(${read_cmds})$ ]] || continue
 	for word in $subcmd; do
 		word="${word%\"}" word="${word#\"}" word="${word%\'}" word="${word#\'}"
 		if is_impl_source "$word" && [[ -f "$word" ]]; then
