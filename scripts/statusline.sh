@@ -5,7 +5,7 @@ AMBER=$'\033[38;5;208m'
 RED=$'\033[31m'
 GREEN=$'\033[32m'
 RESET=$'\033[0m'
-BAR_WIDTH=5
+GAUGE_SLOTS=5
 FIVE_HOUR_SECONDS=$((5 * 3600))
 SEVEN_DAY_SECONDS=$((7 * 24 * 3600))
 
@@ -165,7 +165,7 @@ fmt_pace() {
 	fi
 }
 
-# Context gauge plus its percentage ("● ◎ ○ ○ ○ 30%"). Each of BAR_WIDTH slots is
+# Context gauge plus its percentage ("● ◎ ○ ○ ○ 30%"). Each of GAUGE_SLOTS slots is
 # ● full, ◎ half, or ○ empty; a slot's fractional fill snaps to the nearest of the
 # three at the quarter marks.
 #
@@ -178,24 +178,17 @@ fmt_pace() {
 # slots stay uncolored, matching the default foreground of the model name beside them.
 fmt_context_bar() {
 	local pct="$1"
-	local color units full frac slot out=""
+	local color slot out=""
 	color=$(usage_color "$pct")
-	# Hundredths of a slot, so the fill stays integral: pct * BAR_WIDTH / 100 slots.
-	units=$((pct * BAR_WIDTH))
-	# used_percentage can exceed 100 (context overflow) — cap the gauge, not the % text
-	if ((units > 100 * BAR_WIDTH)); then
-		units=$((100 * BAR_WIDTH))
-	fi
-	full=$((units / 100))
-	frac=$((units % 100))
-	if ((frac >= 75)); then
-		full=$((full + 1))
-		frac=0
-	fi
-	for ((slot = 0; slot < BAR_WIDTH; slot++)); do
-		if ((slot < full)); then
+	# Quarter-slots filled across the gauge; capped so the bar saturates at 100%
+	# while the percentage text can still show overflow.
+	local quarters=$((pct * GAUGE_SLOTS * 4 / 100))
+	((quarters > 4 * GAUGE_SLOTS)) && quarters=$((4 * GAUGE_SLOTS))
+	for ((slot = 0; slot < GAUGE_SLOTS; slot++)); do
+		local q=$((quarters - slot * 4))
+		if ((q >= 3)); then
 			out+="${color}●${RESET} "
-		elif ((slot == full && frac >= 25)); then
+		elif ((q >= 1)); then
 			out+="${color}◎${RESET} "
 		else
 			out+="○ "
