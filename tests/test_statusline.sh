@@ -528,6 +528,141 @@ printf "\n── Pace detail parenthetical (no hourglass prefix) ─────
 expect_detail_text "over pace: reset time follows the arrow directly" "5h" 88 "(↑ RESET)"
 expect_detail_text "on pace: reset time alone, no arrow prefix" "5h" 82 "(RESET)"
 
+# ── Usage fallback fetch ─────────────────────────────────────────────────────
+#
+# fetch_usage_fallback polls the OAuth usage endpoint when Claude Code's stdin
+# carries no .rate_limits. That endpoint enforces a strict shared rate budget, so
+# the function throttles itself: one attempt per 300s after a success, and a
+# longer 900s backoff after a failure, giving the endpoint room to recover.
+#
+# Between attempts the last successful payload is the statusline's only data, so
+# no failure may discard it — not a curl error, not a non-JSON body, and not a
+# JSON body without .five_hour.utilization, which is the shape the endpoint
+# returns once it starts rate-limiting.
+#
+# curl and security are stubbed with shims on PATH; TMPDIR and CLAUDE_CONFIG_DIR
+# point at a per-case directory, so each scenario owns its cache. Elapsed time is
+# driven by the `now` argument, offset from the real clock that the cache files
+# themselves carry. The offsets stay well clear of the 300s and 900s boundaries
+# so that a second of wall-clock drift during the run cannot flip a verdict.
+
+if ! declare -F fetch_usage_fallback >/dev/null; then
+	printf "\nFAIL  fetch_usage_fallback is not defined after sourcing %s\n" "$SCRIPT"
+	exit 1
+fi
+
+FALLBACK_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/statusline-fallback.XXXXXX")
+trap 'rm -rf "$FALLBACK_ROOT"' EXIT
+
+# The endpoint's own shape: utilization percentages and ISO-8601 reset stamps.
+USAGE_BODY='{"five_hour":{"utilization":42,"resets_at":"2023-11-14T22:13:20Z"},"seven_day":{"utilization":13,"resets_at":"2023-11-20T22:13:20Z"}}'
+FIVE_HOUR_RESET_EPOCH=1700000000
+# What the endpoint answers with once the shared budget is spent: no utilization.
+RATE_LIMITED_BODY='{"error":{"type":"rate_limit_error","message":"rate limit exceeded"}}'
+NOT_JSON_BODY='<html>429 Too Many Requests</html>'
+
+# Creates an isolated case directory holding the curl/security shims, the attempt
+# log, and its own TMPDIR for the cache.
+fallback_case() {
+	local dir="$FALLBACK_ROOT/$1"
+	mkdir -p "$dir/bin" "$dir/tmp"
+	: >"$dir/attempts"
+	cat >"$dir/bin/curl" <<-'SHIM'
+		#!/usr/bin/env bash
+		printf 'attempt\n' >>"$STUB_ATTEMPTS"
+		code=$(cat "$STUB_CURL_EXIT")
+		((code == 0)) || exit "$code"
+		cat "$STUB_CURL_BODY"
+	SHIM
+	cat >"$dir/bin/security" <<-'SHIM'
+		#!/usr/bin/env bash
+		printf '%s\n' '{"claudeAiOauth":{"accessToken":"stub-token"}}'
+	SHIM
+	chmod +x "$dir/bin/curl" "$dir/bin/security"
+}
+
+# Calls the function against a case's stubs and prints whatever it emits. A
+# curl_exit of 0 serves `body`; any other value makes the curl stub fail with
+# that status without emitting anything, as a transport error would.
+fallback_fetch() {
+	local dir="$FALLBACK_ROOT/$1" curl_exit="$2" body="$3" now="$4"
+	printf '%s' "$body" >"$dir/body"
+	printf '%s' "$curl_exit" >"$dir/curl-exit"
+	(
+		export PATH="$dir/bin:$PATH" TMPDIR="$dir/tmp" CLAUDE_CONFIG_DIR="$dir"
+		export STUB_ATTEMPTS="$dir/attempts" STUB_CURL_BODY="$dir/body" STUB_CURL_EXIT="$dir/curl-exit"
+		fetch_usage_fallback "$now"
+	) || true
+}
+
+expect_fallback_json() {
+	local desc="$1" payload="$2" filter="$3" want="$4" got ok=no
+	got=$(printf '%s' "$payload" | jq -r "$filter" 2>/dev/null) || got="<not JSON>"
+	[[ "$got" == "$want" ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'expected %s = %q, got %q\n      payload: %q' "$filter" "$want" "$got" "$payload")"
+}
+
+expect_attempts() {
+	local desc="$1" case_name="$2" want="$3" got ok=no
+	got=$(awk 'END {print NR}' <"$FALLBACK_ROOT/$case_name/attempts")
+	[[ "$got" == "$want" ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'expected %s endpoint attempt(s), got %s' "$want" "$got")"
+}
+
+# Creates a case and seeds it with one successful fetch at FB_BASE, establishing
+# the "last good payload" a subsequent failure in that case must not discard.
+seed_good_cache() {
+	local case_name="$1"
+	fallback_case "$case_name"
+	fallback_fetch "$case_name" 0 "$USAGE_BODY" "$FB_BASE" >/dev/null
+}
+
+FB_BASE=$(date +%s)
+
+printf "\n── Usage fallback: 300s throttle between attempts ────────────────────────────\n"
+fallback_case throttle
+fb_out=$(fallback_fetch throttle 0 "$USAGE_BODY" "$FB_BASE")
+expect_attempts "first call reaches the endpoint" throttle 1
+expect_fallback_json "first call maps utilization onto used_percentage" "$fb_out" '.five_hour.used_percentage' 42
+expect_fallback_json "first call converts resets_at to epoch seconds" "$fb_out" '.five_hour.resets_at' "$FIVE_HOUR_RESET_EPOCH"
+expect_fallback_json "first call maps the 7d window too" "$fb_out" '.seven_day.used_percentage' 13
+
+fb_out=$(fallback_fetch throttle 0 "$USAGE_BODY" $((FB_BASE + 250)))
+expect_attempts "250s after a success: no request, the window is 300s not 60s" throttle 1
+expect_fallback_json "250s after a success: the cached payload is served" "$fb_out" '.five_hour.used_percentage' 42
+
+fallback_fetch throttle 0 "$USAGE_BODY" $((FB_BASE + 400)) >/dev/null
+expect_attempts "400s after a success: the 300s window expired, request sent" throttle 2
+
+printf "\n── Usage fallback: failures keep the last good payload ───────────────────────\n"
+seed_good_cache curl-failure
+
+fb_out=$(fallback_fetch curl-failure 7 "" $((FB_BASE + 400)))
+expect_attempts "curl error: the request was attempted" curl-failure 2
+expect_fallback_json "curl error: the last good payload is still served" "$fb_out" '.five_hour.used_percentage' 42
+
+fb_out=$(fallback_fetch curl-failure 7 "" $((FB_BASE + 800)))
+expect_attempts "800s after a failure: still backing off, no request" curl-failure 2
+expect_fallback_json "800s after a failure: the cache still holds the good payload" "$fb_out" '.five_hour.used_percentage' 42
+
+fallback_fetch curl-failure 7 "" $((FB_BASE + 1000)) >/dev/null
+expect_attempts "1000s after a failure: the 900s backoff expired, request sent" curl-failure 3
+
+printf "\n── Usage fallback: error bodies are failures, not data ───────────────────────\n"
+seed_good_cache rate-limited
+
+fb_out=$(fallback_fetch rate-limited 0 "$RATE_LIMITED_BODY" $((FB_BASE + 400)))
+expect_fallback_json "body without .five_hour.utilization: good payload served, not null" "$fb_out" '.five_hour.used_percentage' 42
+
+fb_out=$(fallback_fetch rate-limited 0 "$USAGE_BODY" $((FB_BASE + 800)))
+expect_attempts "error body counts as a failed attempt: backing off 800s later" rate-limited 2
+expect_fallback_json "error body never reaches the cache" "$fb_out" '.five_hour.used_percentage' 42
+
+seed_good_cache not-json
+
+fb_out=$(fallback_fetch not-json 0 "$NOT_JSON_BODY" $((FB_BASE + 400)))
+expect_fallback_json "non-JSON body: the last good payload is still served" "$fb_out" '.five_hour.used_percentage' 42
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 
 printf "\n─────────────────────────────────────────────────────────────────────────────\n"
