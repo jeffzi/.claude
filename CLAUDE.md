@@ -40,9 +40,7 @@ in the project qualifies. No test suite at all → skip TDD.
   bug report alone is read-only (`rules/no-unrequested-edits.md`); `/fix` requires a fix request.
 - **New feature** (root cause irrelevant): load `Skill(tdd)` directly and start the red–green cycle.
 
-Never dispatch `tdd-cycle` directly. Exception: the `plan-executor` agent's FAIL-path remediation
-may dispatch `tdd-cycle` directly when the TDD context (`TEST_COMMAND`, `TEST_FILE`, etc.) is
-already present from a prior `tdd` run.
+Never dispatch `tdd-cycle` directly.
 
 ### Pre-commit hooks: `prek` or `lefthook`
 
