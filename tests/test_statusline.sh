@@ -375,13 +375,13 @@ NOW=1700000000
 PACE_WINDOW=18000
 PACE_RESET=$((NOW + 3600))
 
-# The gradient starts at the colon: the label prefix stays uncolored, so only ":PCT%" is
-# wrapped in the escape.
+# The gradient starts after the colon: the "label:" prefix stays uncolored, so only
+# "PCT%" is wrapped in the escape.
 expect_segment_gradient() {
 	local desc="$1" label="$2" pct="$3" color out want ok=no
 	color=$(usage_color "$pct")
 	out=$(fmt_limit_segment "$label" "$pct" "$PACE_RESET" "$PACE_WINDOW" fmt_reset_countdown "$NOW")
-	want="${label}${color}:${pct}%${C_RESET}"
+	want="${label}:${color}${pct}%${C_RESET}"
 	[[ "$out" == *"$want"* ]] && ok=yes
 	report "$desc" "$ok" "$(printf 'expected to contain %q\n    actual: %q' "$want" "$out")"
 }
@@ -393,7 +393,7 @@ expect_label_uncolored() {
 	color=$(usage_color "$pct")
 	out=$(fmt_limit_segment "$label" "$pct" "$PACE_RESET" "$PACE_WINDOW" fmt_reset_countdown "$NOW")
 	head=${out%%"$color"*}
-	[[ "$head" != *$'\033'* && "$head" == *"$label" ]] && ok=yes
+	[[ "$head" != *$'\033'* && "$head" == *"$label:" ]] && ok=yes
 	report "$desc" "$ok" "$(printf 'text before the gradient escape: %q' "$head")"
 }
 
@@ -410,7 +410,7 @@ expect_reset_not_gradient() {
 	local color out tail ok=no
 	color=$(usage_color "$pct")
 	out=$(fmt_limit_segment "$label" "$pct" "$reset_ts" "$window" "$formatter" "$NOW")
-	tail=${out#*"${label}${color}:${pct}%${C_RESET}"}
+	tail=${out#*"${label}:${color}${pct}%${C_RESET}"}
 	[[ "$tail" != *"$color"* ]] && ok=yes
 	report "$desc" "$ok" "$(printf 'reset text after the label: %q' "$tail")"
 }
@@ -457,11 +457,11 @@ expect_red_direction "red channel climbs from 50% to 100%" 50 100 rises
 # ── Limit segment coloring ───────────────────────────────────────────────────
 
 printf "\n── Limit segment coloring ───────────────────────────────────────────────────\n"
-expect_segment_gradient "61%: only :61% wears the gradient, the 5h label does not" "5h" 61
-expect_segment_gradient "10%: only :10% wears the gradient, the 5h label does not" "5h" 10
-expect_segment_gradient "95%: only :95% wears the gradient, the 5h label does not" "5h" 95
-expect_label_uncolored "5h label renders with no color escape" "5h" 61
-expect_label_uncolored "7d label renders with no color escape" "7d" 20
+expect_segment_gradient "61%: only 61% wears the gradient, the 5h: label does not" "5h" 61
+expect_segment_gradient "10%: only 10% wears the gradient, the 5h: label does not" "5h" 10
+expect_segment_gradient "95%: only 95% wears the gradient, the 5h: label does not" "5h" 95
+expect_label_uncolored "5h label and colon render with no color escape" "5h" 61
+expect_label_uncolored "7d label and colon render with no color escape" "7d" 20
 expect_gradient_used_once "61%: gradient escape is emitted once per segment" "5h" 61
 expect_reset_not_gradient "countdown reset text not gradient-colored" "5h" 61 fmt_reset_countdown "$PACE_RESET" "$PACE_WINDOW"
 expect_reset_not_gradient "absolute reset text not gradient-colored" "7d" 20 fmt_reset_absolute "$((NOW + 200000))" 604800
