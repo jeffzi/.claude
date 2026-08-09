@@ -169,17 +169,39 @@ See the [Process](#process) skills table for additional workflows (`/harden`, `/
 
 ### Status Line
 
-[`scripts/statusline.sh`](scripts/statusline.sh) renders a custom status line showing model name,
-project directory, a context gauge, and rate limit pacing. The context gauge is five circles
-(`● ◎ ○`) whose fill and color carry the level — no percentage text. Each rate-limit window shows
-its usage percentage and reset countdown at all times; a continuous gray→gold→red gradient colors
-each segment by how hot it runs, so a quiet session reads as gray. Pace arrows (`↑` / `↑↑` / `↓`)
-appear above 50% usage when the burn rate diverges from an even linear spend — the over-pace arrows
-wear the segment's gradient color, the under-pace `↓` stays uncolored.
+[`scripts/statusline.sh`](scripts/statusline.sh) renders a custom status line: directory, model, a
+context gauge, and rate-limit pacing. The design surfaces detail only when it matters — quiet
+sessions read as gray, and extra segments appear only when they carry information.
 
 ```text
-.claude │ Opus 4.6 ● ● ◎ ○ ○ │ 5h 72%↑↑ · 2h10m │ 7d 89% · 4d13h
+.claude ⎇ feature-x │ Fable (high) ● ● ◎ ○ ○ │ 5h 72%↑↑ · 2h10m │ 7d 89% · 4d13h
+│         │           │     │      │           │  │   │    │       │
+│         │           │     │      │           │  │   │    │       └─ 7-day window, same anatomy
+│         │           │     │      │           │  │   │    └─ reset countdown (shown at ≥ 75%)
+│         │           │     │      │           │  │   └─ pace arrows: ↑ over · ↑↑ hot · ↓ under
+│         │           │     │      │           │  └─ usage %, gray→gold→red gradient
+│         │           │     │      │           └─ 5-hour rate-limit window
+│         │           │     │      └─ context gauge (◆ ◈ ◇ once past 200k tokens)
+│         │           │     └─ reasoning effort
+│         │           └─ model name
+│         └─ worktree name, or the git branch outside one
+└─ project directory
 ```
+
+The context gauge is five slots (`● ◎ ○`) whose fill and color carry the level — no percentage text.
+Rate-limit segments color their usage percentage with a continuous gray→gold→red gradient; over-pace
+arrows wear the gradient, the under-pace `↓` stays uncolored.
+
+Conditional elements and when they appear:
+
+| Element               | Appears                                                           |
+| --------------------- | ----------------------------------------------------------------- |
+| `⎇ name`              | Worktree name inside one, branch name in a regular checkout       |
+| `(effort)`            | Only when the model reports a reasoning effort level              |
+| Diamond gauge `◆ ◈ ◇` | Once the session's context grows past 200k tokens                 |
+| Pace arrows `↑ ↑↑ ↓`  | At ≥ 50% usage, when burn rate diverges from an even linear spend |
+| Reset countdown       | At ≥ 75% usage, when the window's reset starts to matter          |
+| Rate-limit segments   | When usage data exists (stdin rate limits, or the OAuth fallback) |
 
 ### Scripts
 
