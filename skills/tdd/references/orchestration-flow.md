@@ -15,8 +15,8 @@ When `/tdd` is invoked, determine the entry point before doing anything else:
 
 - **Plan mode is active** -- Write plan tasks describing behaviors. Each task ends with "Use `/tdd`
   for implementation." Do NOT dispatch agents from plan mode.
-- **Multiple behaviors, no plan yet** -- Load `/write-plan` and create a plan first. Do NOT dispatch
-  agents until the plan is approved and you're executing a specific task.
+- **Multiple behaviors, no plan yet** -- Load `Skill(write-plan)` and create a plan first. Do NOT
+  dispatch agents until the plan is approved and you're executing a specific task.
 - **Single behavior or executing a plan task** -- Proceed to the RED-GREEN-REFACTOR loop below.
 
 ## Wave Planning
@@ -136,7 +136,18 @@ contains the cleaned-up code; there is no separate refactor commit):
   13. When an enclosing workflow defines a pre-commit verification step (e.g. a
       plan task's Verify block dispatching claim-reviewer), run it NOW and resolve
       its findings -- verification always precedes the commit, never follows it.
-  14. Load Skill(write-commit), then commit cycle by cycle (the agents NEVER
+  14. Approval gate -- the skill prescribes WHEN to commit; the user's approval
+      authorizes THAT it happens. A PLAN TASK is a numbered task from a plan
+      the user approved this session; everything else is AD HOC:
+      - Plan task or autocommit active -> commit proceeds without pausing
+        (approval already granted).
+      - Ad hoc -> list each cycle's test files and implementation files in
+        commit order. STOP -- no git commit in this turn. Wait for the user's
+        next message with explicit approval. "Present and proceed" in a single
+        turn is committing without approval.
+      This gate is the TDD orchestrator's own rule, not delegated to
+      write-commit. Loading write-commit does not absorb or replace it.
+  15. Load Skill(write-commit), then commit cycle by cycle (the agents NEVER
       commit -- you own this), in TDD order:
       - stage that cycle's TEST_FILE(s) only -> commit (tests first)
       - stage that cycle's IMPLEMENTATION_FILES -> commit

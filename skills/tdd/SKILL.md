@@ -3,7 +3,8 @@ name: tdd
 description: >
   Use when implementing any feature, behavior change, or bug fix in a project with a test suite.
   Also use when asked to follow TDD or invoked via /tdd. Use when you think "I'll add tests later"
-  — that's rationalization. Not for projects without a test suite.
+  — that's rationalization. Not for projects without a test suite. Not for bugs with unknown root
+  cause — use /fix first (it investigates, then drives TDD).
 argument-hint: "[feature or behavior to implement]"
 ---
 
@@ -298,44 +299,31 @@ REFACTOR runs **once** after all RED-GREEN cycles complete, not per-cycle — an
 commit**. Nothing is committed until REFACTOR finishes, so every commit contains the cleaned-up
 code; there is no separate refactor commit.
 
-Compute total insertions across all files modified/added during this `/tdd` invocation: register new
-files with `git add -N`, then run `git diff --stat -- <ALL_CHANGED_FILES>`. Scoping the diff to the
-invocation's files keeps unrelated uncommitted work out of the count. If total insertions are **< 50
-lines**, skip REFACTOR and go straight to Commit.
-
-If **≥ 50 lines**, run the distill-and-mend sequence. The orchestrator dispatches and triages; it
-never loads hub skills and never edits files here:
-
-1. Split changed files into impl and test files. Dispatch `code-distiller` on the impl files and
-   `code-distiller` on the test files, in one parallel message. Do NOT set model on any dispatch in
-   this sequence — each agent defines its own, and each loads its skills in its own context, so pass
-   no skill in the prompt.
-2. After both return, dispatch `subagent_type: vet-comments` once over **all** changed files —
-   distillation rewrites the code its comments describe, so the comment pass runs after the shape
-   settles. It is read-only and returns `### Finding N` blocks.
-3. Triage the findings — no skill loads, no file reads: score 0 → discard (declared false positive);
-   score ≥ 75 → fix queue; below 75 → report to the user at task close, never silently dropped.
-4. Non-empty fix queue → group findings into transitive file groups (findings sharing any target
-   file share a group) and dispatch one `code-mender` per group in a single parallel message — never
-   one per finding; concurrent menders sharing a file race each other. Pass per finding: Issue /
-   Location / Severity (high for the top two ranks of the lens's Impact enum, else medium) /
-   Suggested fix.
-5. If any agent applied edits, re-run FULL_SUITE_COMMAND — or, when an enclosing workflow defines a
-   per-task gate (e.g. a hardening round's gate block), run that gate instead; it subsumes the suite
-   re-run. Green → proceed to Commit. Red → surface the failing output; do not commit.
+- **< 50 insertions** across this invocation's files → skip REFACTOR, go to Commit.
+- **≥ 50 insertions** → run the distill-and-mend sequence (`references/orchestration-flow.md` steps
+  10–12).
 
 The heavier review lenses (`vet-code`, `vet-test`, `bug-scanner`) are deliberately absent: they run
-in the pre-push `/preflight` pass, which owns snapshots, gates, and fix verification. REFACTOR's job
-is shape and comment hygiene on freshly written code, so later tasks don't inherit — and imitate —
-crust.
+in the pre-push `/preflight` pass. REFACTOR's job is shape and comment hygiene on freshly written
+code, so later tasks don't inherit — and imitate — crust.
 
 ### Commit — Last Phase
 
 Commits come after REFACTOR, never before or during the loop. When an enclosing workflow defines a
 pre-commit verification step (e.g. a plan task's **Verify** block dispatching `claim-reviewer`), run
-it now and resolve its findings first — verification always precedes the commit. Then load
-`Skill(write-commit)` and commit cycle by cycle in TDD order (that cycle's test files first, then
-its implementation files; staging rules in `references/orchestration-flow.md`).
+it now and resolve its findings first — verification always precedes the commit.
+
+**Approval gate** — the skill prescribes _when_ to commit; the user's approval authorizes _that_ it
+happens. A **plan task** is a numbered task from a plan the user approved this session; everything
+else is **ad hoc**:
+
+- **Plan task or autocommit active** — commit proceeds without pausing (approval already granted).
+- **Ad hoc** — list each cycle's test files and implementation files in commit order. **Stop — no
+  `git commit` in this turn.** Wait for the user's next message with explicit approval. "Present and
+  proceed" in a single turn is committing without approval.
+
+Then load `Skill(write-commit)` and commit cycle by cycle in TDD order (that cycle's test files
+first, then its implementation files; staging rules in `references/orchestration-flow.md`).
 
 ### Repeat
 
@@ -404,6 +392,8 @@ Before marking work complete:
 - [ ] Each test failed for expected reason (feature missing, not typo)
 - [ ] Committed each cycle yourself in TDD order (tests first, then implementation), only after
       REFACTOR finished — the agent never commits
+- [ ] Ad hoc: presented commit plan to user and waited for approval before committing (plan task or
+      autocommit: approval already granted)
 - [ ] Wrote minimal code to pass each test (via tdd-cycle agent)
 - [ ] All tests pass
 - [ ] Output pristine (no errors, warnings)
