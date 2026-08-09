@@ -29,6 +29,9 @@ tests. Don't commit and "fix forward." Delete and start over with a failing test
 | "Let me read the source first" / "I'll write test inline"     | RED agent reads what it needs. Context isolation exists for a reason.                    |
 | "Just one quick cycle, no plan needed"                        | Multi-behavior tasks need a plan. Plans describe behaviors; agents figure out how.       |
 | "I'll dispatch `tdd-cycle` directly, skip the orchestrator"   | No phase verification, no circuit breaker, no data contracts. Always go through `/tdd`.  |
+| "The workflow prescribes committing, so it's pre-approved"    | The skill prescribes _when_; the user authorizes _that_. Ad hoc → ask first.             |
+| "I'll present the message and commit in the same turn"        | Present-and-proceed is committing without approval. Stop the turn; wait for the user.    |
+| "write-commit handles approval, so the TDD gate is redundant" | The TDD gate is the orchestrator's own rule. Loading write-commit does not replace it.   |
 
 ## Red Flags — STOP and Start Over
 
