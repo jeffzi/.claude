@@ -9,9 +9,13 @@
         "MD060": false
     },
     "ignores": [
+        ".agents/**",
+        ".claude/**",
         ".planning/**",
         ".research/**",
         ".stryker-tmp/**",
+        "AGENTS.md",
+        "CLAUDE.md",
         "LICENSE",
         "node_modules/**"
     ]
