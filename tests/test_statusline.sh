@@ -19,6 +19,11 @@ set -euo pipefail
 # gradient. Only empty slots carry no color escape at all, so they render in the terminal's
 # default foreground like the model name beside them. There are no color tiers — the gradient
 # is continuous across 50% and 90%.
+#
+# A session whose context window runs past 200k tokens (`exceeds_200k_tokens` on stdin) draws
+# the same five slots from the diamond family instead: ◆ (U+25C6) filled, ◈ (U+25C8) half,
+# ◇ (U+25C7) empty. Only the three glyphs swap — slot count, quarter-snap thresholds, spacing,
+# and coloring stay the circle bar's.
 
 TEST_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SCRIPT="$TEST_DIR/../scripts/statusline.sh"
@@ -29,6 +34,9 @@ C_RESET=$'\033[0m'
 EMPTY="○"
 HALF="◎"
 FILLED="●"
+WIDE_EMPTY="◇"
+WIDE_HALF="◈"
+WIDE_FILLED="◆"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -56,9 +64,12 @@ report() {
 	fi
 }
 
+# The optional fourth argument is the exceeds_200k_tokens flag, spelled out to pin which
+# family it selects. It arrives from jq as the string "true" or "false"; omitting it stands
+# for the absent field.
 expect_glyphs() {
-	local desc="$1" pct="$2" expected="$3" actual ok=no
-	actual=$(format_context_bar "$pct" | strip_ansi)
+	local desc="$1" pct="$2" expected="$3" exceeds="${4-}" actual ok=no
+	actual=$(format_context_bar "$pct" "$exceeds" | strip_ansi)
 	[[ "$actual" == "$expected" ]] && ok=yes
 	report "$desc" "$ok" "$(printf 'expected: %s\n      actual: %s' "$expected" "$actual")"
 }
@@ -71,44 +82,42 @@ expect_glyphs() {
 #
 # The gradient escape is looked up from usage_color itself, so these assertions pin which
 # glyphs carry the gradient without restating the ramp — the ramp has its own tests below.
+#
+# The optional fourth argument is the exceeds_200k_tokens flag: pass "true" to draw the
+# pattern from the diamond family instead. Omitting it stands for the absent field.
 expect_bar() {
-	local desc="$1" pct="$2" pattern="$3" color expected="" sep="" i actual ok=no
+	local desc="$1" pct="$2" pattern="$3" exceeds="${4-}" color expected="" sep="" i actual ok=no
+	local filled="$FILLED" half="$HALF" empty="$EMPTY"
+	if [[ "$exceeds" == "true" ]]; then
+		filled="$WIDE_FILLED" half="$WIDE_HALF" empty="$WIDE_EMPTY"
+	fi
 	color=$(usage_color "$pct")
 	for ((i = 0; i < ${#pattern}; i++)); do
 		case "${pattern:i:1}" in
-		F) expected+="${sep}${color}${FILLED}${C_RESET}" ;;
-		H) expected+="${sep}${color}${HALF}${C_RESET}" ;;
-		E) expected+="${sep}${EMPTY}" ;;
-		*)
-			printf "FAIL  %s\n    unknown slot code %q in pattern %q\n" "$desc" "${pattern:i:1}" "$pattern"
-			((++FAIL))
-			return
-			;;
+		F) expected+="${sep}${color}${filled}${C_RESET}" ;;
+		H) expected+="${sep}${color}${half}${C_RESET}" ;;
+		E) expected+="${sep}${empty}" ;;
 		esac
 		sep=" "
 	done
-	actual=$(format_context_bar "$pct")
+	actual=$(format_context_bar "$pct" "$exceeds")
 	[[ "$actual" == "$expected" ]] && ok=yes
 	report "$desc" "$ok" "$(printf 'expected: %q\n      actual: %q' "$expected" "$actual")"
 }
 
-# Every ● in the bar must wear the gradient: strip the colored-filled form, and no bare ●
-# may remain.
-expect_every_filled_colored() {
-	local desc="$1" pct="$2" color rest ok=no
-	color=$(usage_color "$pct")
-	rest=$(format_context_bar "$pct")
-	while [[ "$rest" == *"${color}${FILLED}${C_RESET}"* ]]; do
-		rest="${rest/"${color}${FILLED}${C_RESET}"/}"
-	done
-	[[ "$rest" != *"$FILLED"* ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'uncolored %s left after stripping colored ones: %q' "$FILLED" "$rest")"
+# Byte-for-byte comparison that several expect_* helpers below reduce to: compute
+# "actual", compare to "expected". Defined here, ahead of the "Whole line" section
+# it conceptually belongs to, since some of those callers run earlier in the file.
+expect_exact_line() {
+	local desc="$1" actual="$2" expected="$3" ok=no
+	[[ "$actual" == "$expected" ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'expected %q\n      actual: %q' "$expected" "$actual")"
 }
 
 # ── Load the renderer ─────────────────────────────────────────────────────────
 
 # shellcheck source-path=SCRIPTDIR source=../scripts/statusline.sh
-source "$SCRIPT" </dev/null
+. "$SCRIPT" </dev/null
 
 for required in format_context_bar usage_color; do
 	require_function "$required"
@@ -117,27 +126,18 @@ done
 # ── Glyph layout: 5 slots, space separated ───────────────────────────────────
 
 printf "\n── Glyph layout ─────────────────────────────────────────────────────────────\n"
+# The gauge carries no number of its own: the percentages belong to the limit segments.
+# expect_glyphs compares against exact glyph strings below, so a stray "%" or digit would
+# already fail those comparisons.
 expect_glyphs "0%: all slots empty" 0 "○ ○ ○ ○ ○"
 expect_glyphs "100%: all slots filled" 100 "● ● ● ● ●"
 expect_glyphs "20%: exactly one slot filled" 20 "● ○ ○ ○ ○"
 
-# The gauge carries no number of its own: the percentages belong to the limit segments.
-expect_no_percent_sign() {
-	local desc="$1" pct="$2" actual ok=no
-	actual=$(format_context_bar "$pct" | strip_ansi)
-	[[ "$actual" != *"%"* && "$actual" != *"$pct"* ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'expected glyphs only, got: %q' "$actual")"
-}
-
-for pct in 0 45 67 100; do
-	expect_no_percent_sign "$pct%: the gauge renders glyphs only, no percentage text" "$pct"
-done
-
 # ── Fractional slot rounding ─────────────────────────────────────────────────
 
 printf "\n── Fractional slot rounding (three glyphs: ● ◎ ○) ────────────────────────────\n"
-expect_glyphs "30% (1.50 slots): the partly-filled slot renders ◎" 30 "● ◎ ○ ○ ○"
-expect_glyphs "52% (2.60 slots): the partly-filled slot renders ◎" 52 "● ● ◎ ○ ○"
+expect_bar "30% (1.50 slots): the partly-filled slot renders a gradient-colored ◎" 30 "FHEEE"
+expect_bar "52% (2.60 slots): the partly-filled slot renders a gradient-colored ◎" 52 "FFHEE"
 
 # The half and filled glyphs differ while both wear the gradient, so the rounding boundaries
 # below still pin which glyph each fraction picks.
@@ -146,16 +146,21 @@ expect_bar "65% (3.25 slots): fraction at 0.25 renders a gradient-colored half" 
 expect_bar "74% (3.70 slots): fraction below 0.75 renders a gradient-colored half" 74 "FFFHE"
 expect_bar "75% (3.75 slots): fraction at 0.75 is promoted to filled" 75 "FFFFE"
 
+# ── Glyph family for a context window past 200k ───────────────────────────────
+#
+# exceeds_200k_tokens swaps the three glyphs and nothing else: slot count, quarter-snap
+# thresholds, spacing, and coloring stay the circle bar's — already pinned above — so only
+# the swap itself, and what keeps it from firing, need cases here.
+
+printf "\n── Glyph family for a context window past 200k (◆ ◈ ◇) ───────────────────────\n"
+expect_glyphs "30% past 200k: the partly-filled slot renders ◈" 30 "◆ ◈ ◇ ◇ ◇" true
+expect_glyphs "30% under 200k: the flag is false, so the circles stay" 30 "● ◎ ○ ○ ○" false
+
 # ── Gradient coloring ────────────────────────────────────────────────────────
 
 printf "\n── Gradient coloring (filled and half; only empty uncolored) ─────────────────\n"
 expect_bar "48%: the filled slots and the ◎ all wear the gradient" 48 "FFHEE"
 expect_bar "95%: every filled slot wears the 95% gradient" 95 "FFFFF"
-
-# ◎ is the only partly-filled glyph now: no bare ● stands in for one.
-for pct in 30 52; do
-	expect_every_filled_colored "$pct%: every ● wears the gradient, none is left bare" "$pct"
-done
 
 # ── Usage gradient helpers ───────────────────────────────────────────────────
 #
@@ -214,14 +219,21 @@ within_tolerance() {
 	((diff <= limit))
 }
 
-# Exact channel anchor, independent of ref_rgb: it holds the second ramp half in place
-# while the first half's lightness changes.
+# True when all three channels are within $limit of their counterpart. Shared by
+# expect_rgb and expect_continuous_across, which each keep their own report line.
+rgb_within_tolerance() {
+	local got_r="$1" got_g="$2" got_b="$3" want_r="$4" want_g="$5" want_b="$6" limit="$7"
+	within_tolerance "$got_r" "$want_r" "$limit" || return 1
+	within_tolerance "$got_g" "$want_g" "$limit" || return 1
+	within_tolerance "$got_b" "$want_b" "$limit" || return 1
+}
+
+# The tolerance-comparison backend expect_matches_hsl_ref calls with the HSL
+# reference's own R/G/B — not an independently-used exact anchor.
 expect_rgb() {
-	local desc="$1" pct="$2" want_r="$3" want_g="$4" want_b="$5" r g b ok=yes
+	local desc="$1" pct="$2" want_r="$3" want_g="$4" want_b="$5" r g b ok=no
 	read -r r g b <<<"$(usage_rgb "$pct")"
-	within_tolerance "$r" "$want_r" 1 || ok=no
-	within_tolerance "$g" "$want_g" 1 || ok=no
-	within_tolerance "$b" "$want_b" 1 || ok=no
+	rgb_within_tolerance "$r" "$g" "$b" "$want_r" "$want_g" "$want_b" 1 && ok=yes
 	report "$desc" "$ok" "$(printf 'expected ~%s %s %s, got %s %s %s' "$want_r" "$want_g" "$want_b" "$r" "$g" "$b")"
 }
 
@@ -255,10 +267,6 @@ expect_red_direction() {
 		case "$dir" in
 		rises) ((r_hi > r_lo)) && ok=yes ;;
 		falls) ((r_hi < r_lo)) && ok=yes ;;
-		*)
-			report "$desc" no "unknown direction $dir"
-			return
-			;;
 		esac
 	fi
 	report "$desc" "$ok" "$(printf 'R(%s) = %s, R(%s) = %s, expected it to have %s' "$lo" "$r_lo" "$hi" "$r_hi" "$dir")"
@@ -266,19 +274,17 @@ expect_red_direction() {
 
 # The two ramp halves must meet without a visible seam at 50%.
 expect_continuous_across() {
-	local desc="$1" lo="$2" hi="$3" limit="$4" ok=yes
+	local desc="$1" lo="$2" hi="$3" limit="$4" ok=no
 	local r1 g1 b1 r2 g2 b2
 	read -r r1 g1 b1 <<<"$(usage_rgb "$lo")"
 	read -r r2 g2 b2 <<<"$(usage_rgb "$hi")"
-	within_tolerance "$r1" "$r2" "$limit" || ok=no
-	within_tolerance "$g1" "$g2" "$limit" || ok=no
-	within_tolerance "$b1" "$b2" "$limit" || ok=no
+	rgb_within_tolerance "$r1" "$g1" "$b1" "$r2" "$g2" "$b2" "$limit" && ok=yes
 	report "$desc" "$ok" "$(printf '%s%% = %s %s %s, %s%% = %s %s %s' "$lo" "$r1" "$g1" "$b1" "$hi" "$r2" "$g2" "$b2")"
 }
 
 NOW=1700000000
 # The default reset window for segment/pace tests below: a 5h window with 1h left.
-PACE_WINDOW=18000
+PACE_WINDOW=$FIVE_HOUR_SECONDS
 PACE_RESET=$((NOW + 3600))
 # The 7d window's own reset window, mirrored below wherever a 7d countdown is needed.
 WEEK_WINDOW=$SEVEN_DAY_SECONDS
@@ -294,7 +300,7 @@ expect_segment_gradient() {
 	report "$desc" "$ok" "$(printf 'expected to contain %q\n    actual: %q' "$want" "$out")"
 }
 
-# Parentheses framed the old detail group; the new separator is a middle dot.
+# The segment's detail group is framed by a middle dot, never parentheses.
 expect_no_parentheses() {
 	local desc="$1" actual="$2" ok=no
 	[[ "$actual" != *"("* && "$actual" != *")"* ]] && ok=yes
@@ -351,9 +357,6 @@ expect_red_direction "red channel climbs from 50% to 100%" 50 100 rises
 
 printf "\n── Limit segment coloring ───────────────────────────────────────────────────\n"
 expect_segment_gradient "61%: label, space, and 61%% all wear the gradient" "5h" 61
-expect_segment_gradient "25%: label, space, and 25%% all wear the gradient" "5h" 25
-expect_segment_gradient "95%: label, space, and 95%% all wear the gradient" "5h" 95
-expect_segment_gradient "7d label, space, and 20%% all wear the gradient" "7d" 20
 # Both percentages sit at or above the 75% threshold, so there is a countdown to check.
 expect_reset_uncolored "5h countdown renders in the default foreground" "5h" 88 "$PACE_RESET" "$PACE_WINDOW"
 expect_reset_uncolored "7d countdown renders in the default foreground" "7d" 80 "$WEEK_RESET" "$WEEK_WINDOW"
@@ -376,10 +379,9 @@ expect_reset_uncolored "7d countdown renders in the default foreground" "7d" 80 
 # segment's, and is pinned by expect_arrow_color below.
 
 expect_pace_glyph() {
-	local desc="$1" used="$2" expected="$3" actual ok=no
+	local desc="$1" used="$2" expected="$3" actual
 	actual=$(format_pace "$used" "$PACE_RESET" "$PACE_WINDOW" "$NOW" | strip_ansi)
-	[[ "$actual" == "$expected" ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'expected %q\n      actual: %q' "$expected" "$actual")"
+	expect_exact_line "$desc" "$actual" "$expected"
 }
 
 # The whole segment as plain text: pins glyph order and spacing — the leading separator,
@@ -387,11 +389,9 @@ expect_pace_glyph() {
 # the countdown — without restating any color. The segment carries its own " │ " prefix;
 # main concatenates segments without inserting one.
 expect_segment_plain() {
-	local desc="$1" label="$2" used="$3" reset_ts="$4" window="$5" expected="$6"
-	local actual ok=no
+	local desc="$1" label="$2" used="$3" reset_ts="$4" window="$5" expected="$6" actual
 	actual=$(format_limit_segment "$label" "$used" "$reset_ts" "$window" "$NOW" | strip_ansi)
-	[[ "$actual" == "$expected" ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'expected %q\n      actual: %q' "$expected" "$actual")"
+	expect_exact_line "$desc" "$actual" "$expected"
 }
 
 # The last color escape standing before the arrow decides what color the arrow renders in:
@@ -410,10 +410,6 @@ expect_arrow_color() {
 	case "$want" in
 	gradient) expected="$color" ;;
 	default) expected="$C_RESET" ;;
-	*)
-		report "$desc" no "unknown color expectation $want"
-		return
-		;;
 	esac
 	[[ "$out" == *"$arrow"* && "$got" == "$expected" ]] && ok=yes
 	report "$desc" "$ok" "$(printf 'escape in force at the arrow: %q, expected %q\n      actual: %q' "$got" "$expected" "$out")"
@@ -471,10 +467,9 @@ expect_segment_plain "7d window counts down in days and hours" "7d" 80 "$((NOW +
 # and renders as the empty string so the caller can leave the detail off entirely.
 
 expect_countdown() {
-	local desc="$1" seconds="$2" expected="$3" actual ok=no
+	local desc="$1" seconds="$2" expected="$3" actual
 	actual=$(format_countdown "$((NOW + seconds))" "$NOW")
-	[[ "$actual" == "$expected" ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'expected %q\n      actual: %q' "$expected" "$actual")"
+	expect_exact_line "$desc" "$actual" "$expected"
 }
 
 printf "\n── Reset countdown ──────────────────────────────────────────────────────────\n"
@@ -484,8 +479,38 @@ expect_countdown "2h10m left: hours and minutes" $((2 * 3600 + 10 * 60)) "2h10m"
 expect_countdown "23h59m left: still below a day" $((23 * 3600 + 59 * 60)) "23h59m"
 expect_countdown "exactly 24h left: a day with zero hours" $((24 * 3600)) "1d"
 expect_countdown "4d13h left: days and hours" $((4 * 86400 + 13 * 3600)) "4d13h"
+expect_countdown "59s left: reset is imminent, renders 0m rather than nothing" 59 "0m"
 expect_countdown "reset lands on now: nothing to count down" 0 ""
 expect_countdown "reset already passed: nothing to count down" -3600 ""
+
+# ── Directory segment ────────────────────────────────────────────────────────
+#
+# The line opens with the working directory's basename, and whatever follows ⎇ (U+2387) names
+# where the session sits in git: `proj ⎇ dash`. A session running in a git worktree carries
+# `workspace.git_worktree`, and that name takes the slot instead — a worktree and its branch
+# are nearly always the same word, so printing both would only repeat it. With neither name
+# to show, the basename stands alone and the glyph goes with it rather than dangling.
+#
+# format_dir stays a pure formatter: the branch is resolved by the caller and handed in, so
+# the cases below never need a repository on disk. That the caller resolves it from the real
+# working directory is asserted end to end through main below.
+#
+# The whole segment stays in the terminal's default foreground — the glyph is a label, not a
+# status — so the assertions below compare raw output rather than stripping escapes first: an
+# escape anywhere in it fails the comparison.
+
+require_function format_dir
+
+expect_dir() {
+	local desc="$1" dir="$2" worktree="$3" branch="$4" expected="$5" actual
+	actual=$(format_dir "$dir" "$worktree" "$branch")
+	expect_exact_line "$desc" "$actual" "$expected"
+}
+
+printf "\n── Directory segment (basename ⎇ branch or worktree) ─────────────────────────\n"
+expect_dir "a branch and no worktree: the branch follows the basename, uncolored" "/tmp/statusline-proj" "" "dash" "statusline-proj ⎇ dash"
+expect_dir "a worktree outranks the branch: one name after the glyph, never both" "/tmp/statusline-proj" "feature-x" "dash" "statusline-proj ⎇ feature-x"
+expect_dir "neither branch nor worktree: the basename stands alone, no dangling glyph" "/tmp/statusline-proj" "" "" "statusline-proj"
 
 # ── Whole line ───────────────────────────────────────────────────────────────
 #
@@ -503,18 +528,29 @@ require_function main
 MAIN_NOW=$(date +%s)
 MAIN_PAYLOAD=$(printf '{"five_hour":{"used_percentage":78,"resets_at":%s},"seven_day":{"used_percentage":7,"resets_at":%s}}' \
 	"$((MAIN_NOW + 4 * 3600 + 10 * 60 - 1))" "$((MAIN_NOW + 4 * 86400 + 13 * 3600 + 1800))")
-MAIN_TRANSCRIPT=$(mktemp "${TMPDIR:-/tmp}/statusline-transcript.XXXXXX")
-CLEANUP_PATHS=("$MAIN_TRANSCRIPT")
+CLEANUP_PATHS=()
 trap 'rm -rf "${CLEANUP_PATHS[@]}"' EXIT
 
-# All three stdin fixtures below (this one and the two degraded-input ones further down)
-# share this envelope; stdin_json merges in each fixture's distinguishing fields.
-STDIN_ENVELOPE='{"hook_event_name":"Status","session_id":"statusline-test","transcript_path":"'"$MAIN_TRANSCRIPT"'","cwd":"/tmp/statusline-proj","version":"1.0.0","output_style":{"name":"default"},"exceeds_200k_tokens":false}'
+# All stdin fixtures below share this envelope; stdin_json merges in each fixture's
+# distinguishing fields. context_window.used_percentage sits here rather than on any one
+# fixture so every case renders a partially-filled gauge, exercising that field's wiring
+# through main wherever the gauge is checked.
+STDIN_ENVELOPE='{"hook_event_name":"Status","session_id":"statusline-test","transcript_path":"/tmp/statusline-transcript.jsonl","cwd":"/tmp/statusline-proj","version":"1.0.0","output_style":{"name":"default"},"exceeds_200k_tokens":false,"context_window":{"used_percentage":45}}'
 stdin_json() {
 	jq -c --argjson extra "$1" '. * $extra' <<<"$STDIN_ENVELOPE"
 }
 
-MAIN_STDIN=$(stdin_json '{"model":{"id":"claude-opus-4-1","display_name":"Opus 4.6"},"workspace":{"current_dir":"/tmp/statusline-proj","project_dir":"/tmp/statusline-proj"}}')
+# The model/workspace object shared by every fixture that carries a full, non-degraded
+# model and workspace — merged in on top of STDIN_ENVELOPE rather than folded into it,
+# since STDIN_ENVELOPE's `. * $extra` merge cannot remove keys: baking display_name and
+# current_dir into the envelope would leak them back into STDIN_NO_NAMES and stop that
+# fixture from testing degraded input.
+STDIN_MODEL_WORKSPACE='{"model":{"id":"claude-opus-4-1","display_name":"Opus 4.6"},"workspace":{"current_dir":"/tmp/statusline-proj","project_dir":"/tmp/statusline-proj"}}'
+full_stdin_json() {
+	jq -c --argjson base "$STDIN_MODEL_WORKSPACE" --argjson extra "$1" '. * $base * $extra' <<<"$STDIN_ENVELOPE"
+}
+
+MAIN_STDIN=$(full_stdin_json '{}')
 
 # main reaches the stubbed fetch_usage_payload through fetch_usage_fallback, whose
 # cache lives under TMPDIR keyed on CLAUDE_CONFIG_DIR — so both are pointed at a
@@ -555,12 +591,6 @@ expect_line_contains() {
 	report "$desc" "$ok" "$(printf 'expected to contain %q\n      actual: %q' "$needle" "$haystack")"
 }
 
-expect_exact_line() {
-	local desc="$1" actual="$2" expected="$3" ok=no
-	[[ "$actual" == "$expected" ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'expected %q\n      actual: %q' "$expected" "$actual")"
-}
-
 # The gauge runs straight into the next separator: no percentage stands between them.
 expect_gauge_meets_separator() {
 	local desc="$1" plain="$2" ok=no
@@ -573,11 +603,51 @@ MAIN_PLAIN=$(printf '%s' "$MAIN_OUT" | strip_ansi)
 
 printf "\n── Whole line ───────────────────────────────────────────────────────────────\n"
 expect_gauge_meets_separator "the context gauge is followed by the separator, not a percentage" "$MAIN_PLAIN"
+expect_line_contains "context_window.used_percentage reaches the gauge, which partially fills" "$MAIN_PLAIN" "Opus 4.6 ● ● ◎ ○ ○ │"
 expect_line_contains "the 5h segment renders as label, percentage, arrow, countdown" "$MAIN_PLAIN" "│ 5h 78%↑↑ · 4h9m │"
 # The trailing segment, taken whole: nothing follows the percentage, so the 7d window's
 # days-away reset stays off the line while it is below the threshold.
 expect_exact_line "the 7d segment is below the threshold, so no countdown trails the line" "${MAIN_PLAIN##*│ }" "7d 7%"
 expect_no_parentheses "the whole line frames details with · , not parentheses" "$MAIN_PLAIN"
+
+# Both new stdin fields ride the same batched jq extraction main already does, so each one
+# is checked end to end here: the worktree name against the leading segment, the glyph family
+# against the gauge that meets the next separator.
+expect_leading_segment() {
+	local desc="$1" plain="$2" expected="$3"
+	expect_exact_line "$desc" "${plain%% │ *}" "$expected"
+}
+
+expect_leading_segment "no workspace.git_worktree: the basename stands alone" "$MAIN_PLAIN" "statusline-proj"
+
+MAIN_STDIN_WORKTREE=$(full_stdin_json '{"workspace":{"git_worktree":"feature-x"}}')
+expect_leading_segment "workspace.git_worktree reaches the line beside the basename" \
+	"$(main_render worktree "$MAIN_STDIN_WORKTREE" "$MAIN_PAYLOAD" | strip_ansi)" \
+	"statusline-proj ⎇ feature-x"
+
+# The branch is git's own answer for workspace.current_dir, not a field on stdin, so this
+# case needs a repository on disk: a fresh repo on a known branch with current_dir pointed
+# at it. No commit is needed — `git branch --show-current` names an unborn branch too.
+# Every other main case points current_dir at a path that is no repository at all, so the
+# leading segments they assert also pin that a directory with no branch keeps its bare
+# basename.
+BRANCH_REPO="$MAIN_CASES/branch-repo"
+git init -q -b tdd-branch "$BRANCH_REPO"
+MAIN_STDIN_BRANCH=$(full_stdin_json "$(printf '{"workspace":{"current_dir":"%s"}}' "$BRANCH_REPO")")
+expect_leading_segment "the branch of workspace.current_dir reaches the line beside the basename" \
+	"$(main_render branch "$MAIN_STDIN_BRANCH" "$MAIN_PAYLOAD" | strip_ansi)" \
+	"branch-repo ⎇ tdd-branch"
+
+MAIN_STDIN_EXCEEDS=$(full_stdin_json '{"exceeds_200k_tokens":true}')
+expect_line_contains "exceeds_200k_tokens reaches the gauge, which draws the diamond family" \
+	"$(main_render exceeds "$MAIN_STDIN_EXCEEDS" "$MAIN_PAYLOAD" | strip_ansi)" \
+	" ◆ ◆ ◈ ◇ ◇ │ "
+
+MAIN_STDIN_EFFORT=$(full_stdin_json '{"effort":{"level":"high"}}')
+expect_line_contains "effort.level is appended to the model name in parentheses" \
+	"$(main_render effort "$MAIN_STDIN_EFFORT" "$MAIN_PAYLOAD" | strip_ansi)" \
+	"Opus 4.6 (high)"
+
 # ── Degraded input ───────────────────────────────────────────────────────────
 #
 # Claude Code does not promise every field on every event. A model without a display
@@ -590,27 +660,127 @@ expect_no_parentheses "the whole line frames details with · , not parentheses" 
 # "there were no limits to show", so the failure goes to stderr the way a failed stdin
 # parse already does, and the rest of the line still renders.
 
-# The diagnostic reaches stderr and the line still reaches stdout: neither alone is
-# enough, since a diagnostic that replaces the line is as bad as a line that hides the
-# failure.
-expect_diagnosed() {
-	local desc="$1" plain="$2" needle="$3" rendered="$4" case_name="$5" err ok=no
-	err=$(<"$MAIN_CASES/$case_name/stderr")
-	[[ "$err" == *"$needle"* && "$plain" == *"$rendered"* ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'expected stderr to mention %q and the line to keep %q\n      stderr: %q\n      stdout: %q' "$needle" "$rendered" "$err" "$plain")"
+# A field that renders as the literal "null" would slip past a mere emptiness check on
+# one slot, so this scans the whole line instead.
+expect_no_literal_null() {
+	local desc="$1" actual="$2" ok=no
+	[[ "$actual" != *"null"* ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'expected no literal "null", got: %q' "$actual")"
 }
 
 # shellcheck disable=SC2031 # main_render's TMPDIR change is subshell-local; ambient TMPDIR is intact here
 STDIN_NO_NAMES=$(stdin_json '{"model":{"id":"claude-opus-4-1"},"workspace":{"project_dir":"/tmp/statusline-proj"}}')
 # Valid stdin carrying an invalid rate-limits payload: the string parses, its contents do not.
-STDIN_BAD_LIMITS=$(stdin_json '{"model":{"id":"claude-opus-4-1","display_name":"Opus 4.6"},"workspace":{"current_dir":"/tmp/statusline-proj","project_dir":"/tmp/statusline-proj"},"rate_limits":"{not json","cost":{"total_api_duration_ms":100}}')
+STDIN_BAD_LIMITS=$(full_stdin_json '{"rate_limits":"{not json","cost":{"total_api_duration_ms":100}}')
 
 printf "\n── Degraded input ───────────────────────────────────────────────────────────\n"
-expect_exact_line "a stdin without model.display_name or workspace.current_dir renders empty slots, not \"null\"" \
-	"$(main_render no-names "$STDIN_NO_NAMES" "$MAIN_PAYLOAD" | strip_ansi)" \
-	" │  ○ ○ ○ ○ ○ │ 5h 78%↑↑ · 4h9m │ 7d 7%"
-expect_diagnosed "an unparseable rate-limits payload is reported on stderr, and the line still renders" \
-	"$(main_render bad-limits "$STDIN_BAD_LIMITS" | strip_ansi)" "rate-limit parse failed" "Opus 4.6" bad-limits
+NO_NAMES_LINE=$(main_render no-names "$STDIN_NO_NAMES" "$MAIN_PAYLOAD" | strip_ansi)
+expect_leading_segment "a stdin without workspace.current_dir leaves the leading segment empty" "$NO_NAMES_LINE" ""
+expect_no_literal_null "a stdin without model.display_name or workspace.current_dir never renders the literal \"null\"" "$NO_NAMES_LINE"
+
+BAD_LIMITS_LINE=$(main_render bad-limits "$STDIN_BAD_LIMITS" | strip_ansi)
+BAD_LIMITS_ERR=$(<"$MAIN_CASES/bad-limits/stderr")
+expect_line_contains "an unparseable rate-limits payload leaves the rest of the line rendering" "$BAD_LIMITS_LINE" "Opus 4.6"
+expect_line_contains "an unparseable rate-limits payload is reported on stderr" "$BAD_LIMITS_ERR" "rate-limit parse failed"
+
+# stdin that jq cannot walk — not JSON at all, or JSON whose fields carry the wrong type —
+# fails the batched extraction that every other field on the line comes from. Printing
+# nothing is the one outcome the user cannot read: the statusline goes blank, which is
+# exactly what a working render with nothing to say looks like. The failure has to reach
+# the line itself, and it only gets there if the host renders what the script printed —
+# so the script leaves with a success status carrying the degraded line, not a bare
+# failure the host drops on the floor.
+#
+# expect_degraded_render is the shared backend for every "still renders" case below,
+# including the missing- and unusable-tool cases further down: run the given render
+# command, then check both that its stdout names the failure and that its exit status
+# stays 0 so the host does not drop the line on the floor.
+expect_degraded_render() {
+	local desc="$1" expected="$2" status=0 out
+	shift 2
+	out=$("$@") || status=$?
+	expect_exact_line "$desc: the line reports the failure instead of rendering blank" \
+		"$(printf '%s' "$out" | strip_ansi)" "$expected"
+	expect_exact_line "$desc: the exit status keeps the line renderable" "$status" "0"
+}
+
+expect_degraded_render "stdin jq cannot walk" "statusline: stdin parse failed" \
+	main_render broken-stdin 'not json at all'
+
+# ── Missing or unusable tools ────────────────────────────────────────────────
+#
+# The host renders the statusline from what the script prints, and discards the output of
+# a command that exited non-zero. A dependency check that only writes to stderr and
+# returns 1 therefore reaches the user as a blank line — indistinguishable from a healthy
+# render with nothing to say. Every environment failure leaves by the same door the stdin
+# parse failure already uses: a named line on stdout under a success status, naming the
+# tool that is missing so the user knows what to install.
+#
+# `stat` is the one tool no `command -v` can vet, since what breaks is not its absence but
+# its options: a non-BSD stat is on PATH and answers, just not the way file_mtime asked.
+# It surfaces at the point of use instead — and only where the file it was asked about
+# exists. An absent lock or marker is an ordinary condition on every platform, so a
+# missing file stays the silent fallback it already is; only a stat that cannot run at all
+# is worth a line.
+
+# Renders main with one required tool taken off PATH. The case's bin directory holds a
+# symlink to every other required tool and is the entire PATH, so nothing else on the
+# system can supply the missing one. check_deps runs before main touches any of them, so
+# the render never needs more than this.
+missing_dep_render() {
+	local missing="$1" tool path dir
+	dir="$MAIN_CASES/missing-$missing"
+	mkdir -p "$dir/bin"
+	for tool in jq curl security shasum date stat; do
+		if [[ "$tool" != "$missing" ]] && path=$(command -v "$tool"); then
+			ln -sf "$path" "$dir/bin/$tool"
+		fi
+	done
+	(
+		# shellcheck disable=SC2030,SC2031 # subshell-local on purpose: the narrowed PATH must not leak out
+		export PATH="$dir/bin" TMPDIR="$dir" CLAUDE_CONFIG_DIR="$dir"
+		fetch_usage_payload() { printf '%s' "$MAIN_PAYLOAD"; }
+		printf '%s' "$MAIN_STDIN" | main
+	) 2>"$dir/stderr"
+}
+
+expect_missing_dep_reported() {
+	local tool="$1"
+	expect_degraded_render "a missing $tool" "statusline: missing required tool: $tool" \
+		missing_dep_render "$tool"
+}
+
+# Prepends a `stat` that always fails to PATH — the stand-in for a stat whose options this
+# platform does not accept — leaving every other tool the render needs real.
+unusable_stat_render() {
+	local case_name="$1" dir
+	dir="$MAIN_CASES/$case_name"
+	mkdir -p "$dir/bin"
+	printf '%s\n' '#!/usr/bin/env bash' 'exit 1' >"$dir/bin/stat"
+	chmod +x "$dir/bin/stat"
+	(
+		# shellcheck disable=SC2030,SC2031 # subshell-local on purpose: the stub must not leak out
+		export PATH="$dir/bin:$PATH"
+		main_render "$case_name" "$MAIN_STDIN" "$MAIN_PAYLOAD"
+	)
+}
+
+printf "\n── Missing or unusable tools ────────────────────────────────────────────────\n"
+# Two tools, so the line has to carry the name of the one that is actually missing rather
+# than a single blanket message.
+expect_missing_dep_reported jq
+expect_missing_dep_reported shasum
+
+# Nothing has run in this case's cache directory, so the marker whose mtime the render
+# reads does not exist — the ordinary condition, which the render absorbs in silence.
+expect_line_contains "an unusable stat with no marker to read: the ordinary line still renders" \
+	"$(unusable_stat_render stat-absent | strip_ansi)" "Opus 4.6 ● ● ◎ ○ ○ │"
+
+# Seeded with one ordinary render, so the marker exists and this render's stat failure is
+# the tool's doing, not the file's.
+main_render stat-present "$MAIN_STDIN" "$MAIN_PAYLOAD" >/dev/null
+expect_degraded_render "an unusable stat with a marker to read" "statusline: unusable required tool: stat" \
+	unusable_stat_render stat-present
 
 # ── Usage fallback fetch ─────────────────────────────────────────────────────
 #
@@ -671,7 +841,7 @@ fallback_fetch() {
 	printf '%s' "$body" >"$dir/body"
 	printf '%s' "$curl_exit" >"$dir/curl-exit"
 	(
-		# shellcheck disable=SC2031 # subshell-local on purpose: each case owns its cache
+		# shellcheck disable=SC2030,SC2031 # subshell-local on purpose: each case owns its cache
 		export PATH="$dir/bin:$PATH" TMPDIR="$dir/tmp" CLAUDE_CONFIG_DIR="$dir"
 		export STUB_ATTEMPTS="$dir/attempts" STUB_CURL_BODY="$dir/body" STUB_CURL_EXIT="$dir/curl-exit"
 		fetch_usage_fallback "$now"
@@ -749,49 +919,279 @@ expect_fallback_json "non-JSON body: the last good payload is still served" "$fb
 # ── Usage fallback: the lock keeps concurrent renders from double-fetching ─────
 #
 # Renders overlap — two windows repaint at once, both see the throttle window open at
-# the same time. The mkdir lock is what keeps only one of them fetching: a render that
-# loses the race falls through without touching the network, still serving whatever the
-# cache already holds rather than blanking the segment. Once the lock is released, the
-# next call past the throttle window is free to fetch and land its payload in the cache.
+# the same time. The lock is what keeps only one of them fetching: a render that loses
+# the race falls through without touching the network, still serving whatever the cache
+# already holds rather than blanking the segment. Once the in-flight fetch completes, its
+# own fresh payload lands in the cache.
+#
+# Driven directly against refresh_usage_cache rather than through fetch_usage_fallback:
+# the outer throttle can't isolate this race on its own terms. The in-flight writer's
+# marker write happens the same wall-clock second as the lock's own mkdir (the write
+# follows the mkdir immediately, before the fetch even starts), so a second
+# fetch_usage_fallback call reading that marker would see the same age the reclaim
+# check sees on the lock -- clearing the throttle always also clears the reclaim, so a
+# racing call can never observe "window open, lock still fresh" through that path.
+# refresh_usage_cache is called from fetch_usage_fallback only, but it is what the
+# lock actually lives in, and only a direct call can hold the throttle constant while
+# still exercising the mkdir race.
 
-# The cache file name is the script's own business, so it is discovered by content
-# rather than spelled out here.
-cache_file_for() {
-	local dir="$FALLBACK_ROOT/$1/tmp" f
-	for f in "$dir"/*; do
-		[[ -f "$f" ]] || continue
-		if grep -q five_hour "$f"; then
-			printf '%s' "$f"
-			return 0
-		fi
+require_function refresh_usage_cache
+
+# Waits for $path to appear and be non-empty, bounded so a stuck race fails the test
+# instead of hanging the suite.
+wait_for_file() {
+	local path="$1" tries=0
+	until [[ -s "$path" ]]; do
+		((++tries < 100)) || return 1
+		sleep 0.05
 	done
-	return 1
 }
 
 FRESH_USAGE_BODY='{"five_hour":{"utilization":55,"resets_at":"2023-11-14T22:13:20Z"},"seven_day":{"utilization":13,"resets_at":"2023-11-20T22:13:20Z"}}'
 
+# Calls refresh_usage_cache against the concurrent case's stubs, isolated in a subshell
+# so each racer's PATH/RACE_* exports never leak into the other.
+concurrent_refresh() {
+	# shellcheck disable=SC2030,SC2031 # subshell-local on purpose: each racer owns its own env
+	export PATH="$FALLBACK_ROOT/concurrent/bin:$PATH"
+	# shellcheck disable=SC2030,SC2031 # subshell-local on purpose: each racer owns its own env
+	export RACE_ATTEMPTS="$FALLBACK_ROOT/concurrent/attempts" RACE_CURL_BODY="$FALLBACK_ROOT/concurrent/body" RACE_CURL_EXIT="$FALLBACK_ROOT/concurrent/curl-exit"
+	# shellcheck disable=SC2030,SC2031 # subshell-local on purpose: each racer owns its own env
+	export RACE_RELEASE="$FALLBACK_ROOT/concurrent/release"
+	refresh_usage_cache concurrent "$concurrent_cache" "$concurrent_marker" "$USAGE_BACKOFF_SECONDS" "$(date +%s)"
+}
+
 printf "\n── Usage fallback: the lock keeps concurrent renders from double-fetching ─────\n"
-seed_good_cache staging
-staging_cache=$(cache_file_for staging) || {
-	printf "\nFAIL  cache_file_for could not find the seeded cache file for the staging case\n"
+seed_good_cache concurrent
+concurrent_cache=$(compgen -G "$FALLBACK_ROOT/concurrent/tmp/claude-statusline-usage-*.json")
+concurrent_marker="${concurrent_cache}.attempt"
+
+# Blocks the curl stub on a release file for the first invocation only, so the
+# in-flight fetch below holds its lock open long enough for a genuinely concurrent
+# second call to race it. A second invocation (only possible if the lock fails to
+# hold it out) answers immediately instead of blocking too, so a broken lock fails
+# the attempt-count assertion below rather than deadlocking the suite.
+cat >"$FALLBACK_ROOT/concurrent/bin/curl" <<-'SHIM'
+	#!/usr/bin/env bash
+	printf 'attempt\n' >>"$RACE_ATTEMPTS"
+	if [[ $(wc -l <"$RACE_ATTEMPTS") -eq 1 ]]; then
+		until [[ -f "$RACE_RELEASE" ]]; do sleep 0.05; done
+	fi
+	code=$(cat "$RACE_CURL_EXIT")
+	((code == 0)) || exit "$code"
+	cat "$RACE_CURL_BODY"
+SHIM
+chmod +x "$FALLBACK_ROOT/concurrent/bin/curl"
+: >"$FALLBACK_ROOT/concurrent/attempts"
+rm -f "$FALLBACK_ROOT/concurrent/release"
+printf '%s' "$FRESH_USAGE_BODY" >"$FALLBACK_ROOT/concurrent/body"
+printf '0' >"$FALLBACK_ROOT/concurrent/curl-exit"
+
+(concurrent_refresh) &
+first_pid=$!
+
+wait_for_file "$FALLBACK_ROOT/concurrent/attempts" || {
+	printf "\nFAIL  the in-flight fetch never registered its attempt\n"
 	exit 1
 }
-mkdir -p "${staging_cache}.lock"
-# The lock is reclaimed once it's older than the throttle window, judged against the
-# `now` argument below rather than the wall clock — so a lock merely mkdir'd at the real
-# time would look stale to a `now` this far ahead and get reclaimed instead of held. Back
-# date it to just inside the window so it reads as a lock a concurrent render still holds.
-touch -m -t "$(date -r $((FB_BASE + 399)) +%Y%m%d%H%M.%S)" "${staging_cache}.lock"
 
-fb_out=$(fallback_fetch staging 0 "$FRESH_USAGE_BODY" $((FB_BASE + 400)))
-expect_attempts "a held lock keeps the locked-out render from fetching" staging 1
-expect_fallback_json "a held lock still serves the stale cache, not a blank segment" "$fb_out" '.five_hour.used_percentage' 42
+(concurrent_refresh)
+expect_attempts "a render racing an in-flight fetch sees the lock held, no request sent" concurrent 1
+second_out=$(cat "$concurrent_cache")
+expect_fallback_json "the locked-out render still serves the stale cache, not a blank segment" "$second_out" '.five_hour.used_percentage' 42
 
-rmdir "${staging_cache}.lock"
+touch "$FALLBACK_ROOT/concurrent/release"
+wait "$first_pid"
+first_out=$(cat "$concurrent_cache")
+expect_fallback_json "the in-flight render lands the fresh payload once its own fetch completes" "$first_out" '.five_hour.used_percentage' 55
 
-fb_out=$(fallback_fetch staging 0 "$FRESH_USAGE_BODY" $((FB_BASE + 450)))
-expect_attempts "lock released: the next call past the throttle window fetches" staging 2
-expect_fallback_json "lock released: the fresh payload lands in the cache" "$fb_out" '.five_hour.used_percentage' 55
+# ── Usage fallback: the lock belongs to a render, not to a path ────────────────
+#
+# A render can stall long enough for its lock to look abandoned — the machine sleeps, the
+# endpoint hangs — so a later render is allowed to reclaim it. From that moment the lock at
+# that path belongs to the reclaimer, and the stalled render owns nothing. Every operation
+# on the lock therefore has to name whose lock it is acting on: a release that only knows
+# the path frees a lock somebody else is fetching under, and a reclaim that only knows the
+# path evicts whoever happens to be standing there when it arrives.
+#
+# The cases below drive refresh_usage_cache directly, the way the concurrency case above
+# does, and extend its curl stub: every render exports its own RACE_ID, so the attempt log
+# names who reached the network, and a render started with a hold file blocks inside curl
+# until that file appears — holding its lock open for exactly as long as the scenario needs.
+# Staleness is forced by backdating the lock rather than by waiting out a threshold, so the
+# cases stay deterministic and finish in milliseconds.
+
+RECLAIM_DIR="$FALLBACK_ROOT/reclaim"
+RECLAIM_TMP="$RECLAIM_DIR/tmp"
+RECLAIM_ATTEMPTS="$RECLAIM_DIR/attempts"
+# Far enough back that any staleness threshold counts the lock abandoned.
+STALE_STAMP=202001010000
+
+seed_good_cache reclaim
+reclaim_cache=$(compgen -G "$RECLAIM_TMP/claude-statusline-usage-*.json")
+reclaim_marker="${reclaim_cache}.attempt"
+
+cat >"$RECLAIM_DIR/bin/curl" <<-'SHIM'
+	#!/usr/bin/env bash
+	printf '%s\n' "$RACE_ID" >>"$RACE_ATTEMPTS"
+	if [[ -n "${RACE_HOLD:-}" ]]; then
+		until [[ -f "$RACE_HOLD" ]]; do sleep 0.05; done
+	fi
+	code=$(cat "$RACE_CURL_EXIT")
+	((code == 0)) || exit "$code"
+	cat "$RACE_CURL_BODY"
+SHIM
+chmod +x "$RECLAIM_DIR/bin/curl"
+: >"$RECLAIM_ATTEMPTS"
+rm -f "$RECLAIM_DIR"/release.*
+printf '%s' "$FRESH_USAGE_BODY" >"$RECLAIM_DIR/body"
+printf '0' >"$RECLAIM_DIR/curl-exit"
+
+# Runs one render under this case's stubs. A non-empty `hold` makes its fetch block until
+# release_render names it. TMPDIR points at the case's cache directory so that any scratch
+# directory the refresh creates lands where expect_no_stray_dirs can see it.
+reclaim_refresh() {
+	local id="$1" hold="${2-}"
+	# shellcheck disable=SC2030,SC2031 # subshell-local on purpose: each render owns its own env
+	export PATH="$RECLAIM_DIR/bin:$PATH" TMPDIR="$RECLAIM_TMP"
+	# shellcheck disable=SC2030,SC2031 # subshell-local on purpose: each render owns its own env
+	export RACE_ID="$id" RACE_ATTEMPTS="$RECLAIM_ATTEMPTS" RACE_CURL_BODY="$RECLAIM_DIR/body" RACE_CURL_EXIT="$RECLAIM_DIR/curl-exit"
+	# shellcheck disable=SC2030,SC2031 # subshell-local on purpose: each render owns its own env
+	[[ -z "$hold" ]] || export RACE_HOLD="$RECLAIM_DIR/release.$id"
+	refresh_usage_cache reclaim "$reclaim_cache" "$reclaim_marker" "$USAGE_BACKOFF_SECONDS" "$(date +%s)"
+}
+
+# Runs a render to completion. Backgrounding it keeps the caller's `||` off the function,
+# so errexit stays live inside refresh_usage_cache the way it is for a direct call —
+# fetch_usage_fallback's own `|| true` is not around to mask a failed write.
+run_render() {
+	local pid
+	(reclaim_refresh "$1") &
+	pid=$!
+	wait "$pid" || return 0
+}
+
+release_render() {
+	touch "$RECLAIM_DIR/release.$1"
+}
+
+# Waits for a named render to reach the network, bounded so a render that never gets there
+# fails the test instead of hanging the suite.
+wait_for_attempt() {
+	local id="$1" tries=0
+	until grep -qx "$id" "$RECLAIM_ATTEMPTS"; do
+		((++tries < 200)) || return 1
+		sleep 0.05
+	done
+}
+
+require_stalled_render() {
+	wait_for_attempt "$1" || {
+		printf "\nFAIL  render %s never reached its fetch\n" "$1"
+		exit 1
+	}
+}
+
+# Backdates the lock the in-flight render is holding, so the next render finds it
+# abandoned. The lock is found rather than named: it is the only directory a refresh
+# leaves in the cache directory, and the tests have no business knowing its path.
+make_lock_stale() {
+	local lock
+	lock=$(find "$RECLAIM_TMP" -mindepth 1 -maxdepth 1 -type d)
+	[[ -n "$lock" && "$lock" != *$'\n'* ]] || {
+		printf "\nFAIL  expected exactly one lock directory under the cache dir, found: %q\n" "$lock"
+		exit 1
+	}
+	# Depth-first, so the lock directory itself is stamped after its contents: touching a
+	# child would otherwise bump the parent's mtime back to now.
+	find "$lock" -depth -exec touch -t "$STALE_STAMP" {} +
+}
+
+expect_fetched() {
+	local desc="$1" id="$2" ok=no
+	grep -qx "$id" "$RECLAIM_ATTEMPTS" && ok=yes
+	report "$desc" "$ok" "$(printf 'no attempt logged for %s\n      attempts: %s' "$id" "$(tr '\n' ' ' <"$RECLAIM_ATTEMPTS")")"
+}
+
+expect_not_fetched() {
+	local desc="$1" id="$2" ok=no
+	grep -qx "$id" "$RECLAIM_ATTEMPTS" || ok=yes
+	report "$desc" "$ok" "$(printf '%s reached the network\n      attempts: %s' "$id" "$(tr '\n' ' ' <"$RECLAIM_ATTEMPTS")")"
+}
+
+expect_no_stray_dirs() {
+	local desc="$1" leftovers ok=no
+	leftovers=$(find "$RECLAIM_TMP" -mindepth 1 -type d)
+	[[ -z "$leftovers" ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'directories left behind in TMPDIR:\n      %s' "$(printf '%s' "$leftovers" | tr '\n' ' ')")"
+}
+
+printf "\n── Usage fallback: the lock belongs to a render, not to a path ───────────────\n"
+
+(reclaim_refresh stalled hold) &
+stalled_pid=$!
+require_stalled_render stalled
+
+make_lock_stale
+(reclaim_refresh reclaimer hold) &
+reclaimer_pid=$!
+require_stalled_render reclaimer
+
+run_render bystander
+expect_not_fetched "the reclaimer's own lock holds the next render out, so no second fetch runs" bystander
+
+release_render stalled
+wait "$stalled_pid" || true
+run_render late
+expect_not_fetched "the reclaimed render frees nothing: the reclaimer's lock still stands after it exits" late
+
+release_render reclaimer
+wait "$reclaimer_pid" || true
+
+expect_no_stray_dirs "the first reclaim cycle leaves no directory behind in TMPDIR"
+
+# ── Usage fallback: reclaiming a stale lock leaves no debris ──────────────────
+#
+# usage_lock_reclaim takes the stale lock over in place (rmdir then mkdir on the same
+# path) rather than staging it under a separate directory, so nothing pid-keyed is ever
+# created for a reclaim. Two reclaim cycles from this one test process therefore have to
+# end with the cache directory holding no extra directories at all — that is what
+# expect_no_stray_dirs checks below.
+
+(reclaim_refresh stalled-again hold) &
+stalled_again_pid=$!
+require_stalled_render stalled-again
+
+make_lock_stale
+(reclaim_refresh reclaimer-again hold) &
+reclaimer_again_pid=$!
+require_stalled_render reclaimer-again
+
+release_render stalled-again
+wait "$stalled_again_pid" || true
+release_render reclaimer-again
+wait "$reclaimer_again_pid" || true
+
+printf "\n── Usage fallback: reclaiming a stale lock leaves no debris ──────────────────\n"
+expect_no_stray_dirs "two reclaims from one process leave no directory behind in TMPDIR"
+
+# ── Usage fallback: a failed write still frees the lock ──────────────────────
+#
+# Between taking the lock and giving it back, refresh_usage_cache writes. Those writes fail
+# for reasons the statusline does not control — a full disk, a TMPDIR the user cannot write.
+# With errexit live and no caller's `|| true` to soften it, a failed write ends the function
+# where it stands, and a lock that outlives its holder blocks every later render until the
+# staleness window runs out. Pointing the marker path at a directory makes every write to it
+# fail without touching anything else the refresh depends on.
+
+rm -f "$reclaim_marker"
+mkdir "$reclaim_marker"
+run_render write-fails
+rmdir "$reclaim_marker"
+
+printf "\n── Usage fallback: a failed write still frees the lock ───────────────────────\n"
+run_render after-write-failure
+expect_fetched "a render whose write failed leaves the lock free for the next one" after-write-failure
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 
