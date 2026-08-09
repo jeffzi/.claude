@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-AMBER=$'\033[38;5;208m'
-RED=$'\033[31m'
-GREEN=$'\033[32m'
 RESET=$'\033[0m'
 GAUGE_SLOTS=5
 FIVE_HOUR_SECONDS=$((5 * 3600))
@@ -17,16 +14,17 @@ USAGE_BACKOFF_SECONDS=900
 # Reads the OAuth usage endpoint for the account keyed by $1 and emits the stdin
 # .rate_limits shape on stdout (resets_at as epoch seconds).
 #
-# Emits nothing and returns non-zero when the account has no token, the request
-# fails, or the body carries no .five_hour.utilization — the last is what the
-# endpoint answers with when it rate-limits, and mapping it would produce a
-# well-formed payload with null percentages in it.
+# Emits nothing when the account has no token, the request fails, or the body
+# carries no .five_hour.utilization — the last is what the endpoint answers
+# with when it rate-limits, and mapping it would produce a well-formed payload
+# with null percentages in it. That last case exits zero (jq's `empty`), so
+# callers must check for empty output rather than a non-zero exit.
 fetch_usage_payload() {
 	local suffix="$1" service="Claude Code-credentials" token response
 	[[ "$suffix" != "default" ]] && service="${service}-${suffix}"
 	token=$(security find-generic-password -s "$service" -w 2>/dev/null | jq -r '.claudeAiOauth.accessToken // empty') || return
 	[[ -n "$token" ]] || return 1
-	response=$(curl -sS --max-time 2 \
+	response=$(curl -s --max-time 2 \
 		-H "Authorization: Bearer $token" \
 		-H "anthropic-beta: oauth-2025-04-20" \
 		https://api.anthropic.com/api/oauth/usage 2>/dev/null) || return
@@ -56,50 +54,76 @@ fetch_usage_fallback() {
 	cache="${TMPDIR:-/tmp}/claude-statusline-usage-${suffix}.json"
 	marker="${cache}.attempt"
 	last_attempt=$(stat -f %m "$marker" 2>/dev/null) || last_attempt=0
-	verdict=$(cat "$marker" 2>/dev/null) || verdict=""
+	{ verdict=$(<"$marker"); } 2>/dev/null || verdict=""
 	throttle=$USAGE_POLL_SECONDS
-	[[ "$verdict" == failed ]] && throttle=$USAGE_BACKOFF_SECONDS
+	[[ "$verdict" == "failed" ]] && throttle=$USAGE_BACKOFF_SECONDS
 	if ((now - last_attempt >= throttle)); then
-		local tmp="${cache}.tmp"
-		# Claim the window pessimistically: a fetch that dies mid-flight must not
-		# invite the next render, a second later, to try again.
-		printf 'failed' >"$marker"
-		trap 'rm -f "$tmp"' RETURN
-		payload=$(fetch_usage_payload "$suffix") || payload=""
-		# The ok verdict is earned only when the payload actually reached the
-		# cache — a failed write must leave the failed claim (and its longer
-		# backoff) in place rather than republish stale data as fresh.
-		if [[ -n "$payload" ]] && printf '%s' "$payload" >"$tmp" && mv "$tmp" "$cache"; then
-			printf 'ok' >"$marker"
+		# The throttle check above is a plain read, not a claim: two renders that
+		# overlap can both see the window open. mkdir is atomic on POSIX, so only
+		# one of them can create this directory — the other falls through without
+		# fetching, leaving the winner as the sole writer for the window.
+		local lock="${cache}.lock"
+		if [[ -d "$lock" ]]; then
+			# A render killed by SIGTERM/SIGKILL never fires the RETURN trap below,
+			# so the lock outlives the process that made it. Reclaim it once it's
+			# older than the throttle window itself — by then no legitimate holder
+			# could still be running one, since a live fetch finishes (or is
+			# reclaimed) well inside that window.
+			local lock_age
+			lock_age=$(stat -f %m "$lock" 2>/dev/null) || lock_age=0
+			((now - lock_age >= throttle)) && rmdir "$lock" 2>/dev/null
+		fi
+		if mkdir "$lock" 2>/dev/null; then
+			trap 'rmdir "$lock" 2>/dev/null' RETURN
+			# Claim the window pessimistically: a fetch that dies mid-flight must not
+			# invite the next render, a second later, to try again.
+			printf 'failed' >"$marker"
+			# A predictable staging path — rather than a per-render mktemp name —
+			# means at most one orphan can ever accumulate if the process is killed
+			# before the mv below runs (mktemp names would each be an orphan of
+			# their own, since a RETURN trap never fires on SIGTERM/SIGKILL). The
+			# mkdir lock above already guarantees no other render is writing this
+			# same path concurrently.
+			local staging="${cache}.staging"
+			payload=$(fetch_usage_payload "$suffix") || payload=""
+			# The ok verdict is earned only when the payload actually reached the
+			# cache — a failed write must leave the failed claim (and its longer
+			# backoff) in place rather than republish stale data as fresh.
+			if [[ -n "$payload" ]] && printf '%s' "$payload" >"$staging" && mv "$staging" "$cache"; then
+				printf 'ok' >"$marker"
+			fi
 		fi
 	fi
 	[[ -f "$cache" ]] || return 1
 	cat "$cache"
 }
 
-# 5h window: countdown ("2h10m"). 7d window: absolute date ("Jul12 09:00").
-fmt_reset_countdown() {
+# Time left before a window resets, for both the 5h and the 7d one: "4d13h" once a day
+# is on the clock, "2h10m" below that, "45m" below an hour. Zero units are dropped ("5d",
+# "2h"), and minutes stop carrying information beside days, so they are left out there.
+#
+# A reset that has already passed has nothing to count down and renders empty, which is
+# the caller's signal to leave the detail off the segment entirely.
+format_countdown() {
 	local reset_epoch="$1" now="$2"
 	[[ -z "$reset_epoch" ]] && return
-	local secs h m
+	local secs d h m
 	secs=$((reset_epoch - now))
 	((secs <= 0)) && return
-	h=$((secs / 3600))
+	d=$((secs / 86400))
+	h=$(((secs % 86400) / 3600))
 	m=$(((secs % 3600) / 60))
-	if ((h > 0 && m > 0)); then
-		printf '%dh%dm' "$h" "$m"
+	local out
+	if ((d > 0)); then
+		out="${d}d"
+		((h > 0)) && out+="${h}h"
 	elif ((h > 0)); then
-		printf '%dh' "$h"
+		out="${h}h"
+		((m > 0)) && out+="${m}m"
 	else
-		printf '%dm' "$m"
+		out="${m}m"
 	fi
-}
-
-fmt_reset_absolute() {
-	local reset_epoch="$1" now="$2"
-	[[ -z "$reset_epoch" ]] && return
-	((reset_epoch <= now)) && return # stale/past reset — don't render a bygone date
-	date -r "$reset_epoch" '+%b%d %H:%M'
+	printf '%s' "$out"
 }
 
 # Converts HSL (hue in degrees, saturation/lightness in permille) to a
@@ -154,30 +178,34 @@ usage_color() {
 	hsl2rgb "$hue" "$sat" "$light"
 }
 
-# One rendered segment (" │ 5h:61% (↑ 2h10m)"). Only the "61%" carries the usage
-# gradient; the label, colon, and reset time use the terminal's default color, so
-# the gradient marks usage alone.
-# reset_fmt names the formatter function — countdown for the 5h window, absolute
-# date for the 7d window.
-fmt_limit_segment() {
-	local label="$1" used="$2" reset_epoch="$3" window_sec="$4" reset_fmt="$5" now="$6"
+# One rendered segment (" │ 5h 61%↑ · 2h10m"). The label, the space, and the percentage
+# form a single span in the usage gradient; the countdown that follows the middle dot
+# stays in the terminal's default foreground so it never competes for attention.
+format_limit_segment() {
+	local label="$1" used="$2" reset_epoch="$3" window_sec="$4" now="$5"
 	local used_int color pace reset detail=""
 	used_int=$(printf '%.0f' "$used")
 	color=$(usage_color "$used_int")
-	pace=$(fmt_pace "$used_int" "$reset_epoch" "$window_sec" "$now")
-	reset=$("$reset_fmt" "$reset_epoch" "$now")
-	if [[ -n "$reset" ]]; then
-		[[ -n "$pace" ]] && pace+=" "
-		detail=" (${pace}${reset})"
-	elif [[ -n "$pace" ]]; then
-		detail=" (${pace})"
+	pace=$(format_pace "$used_int" "$reset_epoch" "$window_sec" "$now")
+	reset=$(format_countdown "$reset_epoch" "$now")
+	# Below 75% the window has room to spare, so when it resets is noise: the countdown
+	# earns its place on the line only once usage is close enough to matter.
+	((used_int >= 75)) && [[ -n "$reset" ]] && detail=" · ${reset}"
+	# Over-pace is the warning, so its arrow joins the gradient span and reddens with the
+	# rest of it; the under-pace ↓ is good news and stays in the default foreground.
+	local span="${label} ${used_int}%" uncolored=""
+	if [[ "$pace" == "↓" ]]; then
+		uncolored="$pace"
+	else
+		span+="$pace"
 	fi
-	printf ' │ %s:%s%s%%%s%s' "$label" "$color" "$used_int" "$RESET" "$detail"
+	printf ' │ %s%s%s%s%s' "$color" "$span" "$RESET" "$uncolored" "$detail"
 }
 
-# Even-pace delta: actual usage vs. linear spend rate across the window.
-# Only shown above 50% — below that, pace is noise regardless of delta.
-fmt_pace() {
+# Even-pace delta: actual usage vs. linear spend rate across the window. Only shown above
+# 50% — below that, pace is noise regardless of delta. The glyph carries no color of its
+# own; format_limit_segment decides what the arrow wears.
+format_pace() {
 	local used_int="$1" reset_epoch="$2" window_sec="$3" now="$4"
 	[[ -z "$reset_epoch" ]] && return
 	local remaining expected delta
@@ -187,44 +215,47 @@ fmt_pace() {
 	expected=$(((window_sec - remaining) * 100 / window_sec))
 	delta=$((used_int - expected))
 	if ((delta >= 15)); then
-		printf '%s↑↑%s' "$RED" "$RESET"
+		printf '↑↑'
 	elif ((delta >= 5)); then
-		printf '%s↑%s' "$AMBER" "$RESET"
+		printf '↑'
 	elif ((delta <= -5)); then
-		printf '%s↓%s' "$GREEN" "$RESET"
+		printf '↓'
 	fi
 }
 
-# Context gauge plus its percentage ("● ◎ ○ ○ ○ 30%"). Each of GAUGE_SLOTS slots is
-# ● full, ◎ half, or ○ empty; a slot's fractional fill snaps to the nearest of the
-# three at the quarter marks.
+# Context gauge ("● ◎ ○ ○ ○"). Each of GAUGE_SLOTS slots is ● full, ◎ half, or ○ empty;
+# a slot's fractional fill snaps to the nearest of the three at the quarter marks. The
+# gauge carries no number of its own — the percentages belong to the limit segments, and
+# repeating one here would only crowd the line.
 #
 # The three glyphs are concentric circles (U+25CF, U+25CE, U+25CB), all of
 # unambiguous East Asian width, so each occupies exactly one cell. Do not reach for
 # the half-circle family (◐ ◑ ◒ ◓) for the half state: those are ambiguous-width and
 # terminals render them double-width, dwarfing ● and ○.
 #
-# Full slots, the half slot, and the percentage text wear the usage gradient. Only empty
-# slots stay uncolored, matching the default foreground of the model name beside them.
-fmt_context_bar() {
+# Full slots and the half slot wear the usage gradient. Only empty slots stay uncolored,
+# matching the default foreground of the model name beside them.
+format_context_bar() {
 	local pct="$1"
-	local color slot out=""
+	local color slot sep="" out=""
 	color=$(usage_color "$pct")
-	# Quarter-slots filled across the gauge; capped so the bar saturates at 100%
-	# while the percentage text can still show overflow.
+	# Quarter-slots filled across the gauge, capped so a used_percentage that
+	# overflows past 100 still saturates the bar rather than overrunning it.
 	local quarters=$((pct * GAUGE_SLOTS * 4 / 100))
-	((quarters > 4 * GAUGE_SLOTS)) && quarters=$((4 * GAUGE_SLOTS))
+	local max_quarters=$((4 * GAUGE_SLOTS))
+	((quarters > max_quarters)) && quarters=$max_quarters
 	for ((slot = 0; slot < GAUGE_SLOTS; slot++)); do
 		local q=$((quarters - slot * 4))
 		if ((q >= 3)); then
-			out+="${color}●${RESET} "
+			out+="${sep}${color}●${RESET}"
 		elif ((q >= 1)); then
-			out+="${color}◎${RESET} "
+			out+="${sep}${color}◎${RESET}"
 		else
-			out+="○ "
+			out+="${sep}○"
 		fi
+		sep=" "
 	done
-	printf '%s%s%s%%%s' "$out" "$color" "$pct" "$RESET"
+	printf '%s' "$out"
 }
 
 # Fail fast with the culprit named instead of letting a missing tool surface
@@ -256,12 +287,13 @@ main() {
 	# (~300ms during activity), so per-field jq calls multiply into real latency.
 	# \u001f (unit separator) not @tsv: read collapses runs of tabs — they are IFS
 	# whitespace — so empty fields like a missing effort level would shift every
-	# field after them.
+	# field after them. Every field needs its own `// ""`: tostring renders an
+	# absent one as the literal string "null".
 	local jq_out
 	jq_out=$(printf '%s' "$input" | jq -r '[
-		.model.display_name,
+		(.model.display_name // ""),
 		(.effort.level // ""),
-		.workspace.current_dir,
+		(.workspace.current_dir // ""),
 		(.context_window.used_percentage // 0 | floor),
 		(.cost.total_api_duration_ms // 0)
 	] | map(tostring) | join("\u001f")') || {
@@ -280,20 +312,29 @@ main() {
 	((api_ms > 0)) && rate_limits_json=$(printf '%s' "$input" | jq -c '.rate_limits // empty') || true
 	[[ -z "$rate_limits_json" ]] && rate_limits_json=$(fetch_usage_fallback "$now" || true)
 
-	local five_h="" five_h_reset="" week="" week_reset=""
-	[[ -n "$rate_limits_json" ]] && IFS=$'\037' read -r five_h five_h_reset week week_reset < <(printf '%s' "$rate_limits_json" | jq -r '[
-		(.five_hour.used_percentage // ""),
-		(.five_hour.resets_at // ""),
-		(.seven_day.used_percentage // ""),
-		(.seven_day.resets_at // "")
-	] | map(tostring) | join("\u001f")') || true
+	local five_h="" five_h_reset="" week="" week_reset="" limits_out=""
+	# Capture jq's output before reading it: a process substitution feeding `read`
+	# hides jq's exit status, so a payload that will not parse would blank the
+	# segments with no word about why.
+	if [[ -n "$rate_limits_json" ]]; then
+		limits_out=$(printf '%s' "$rate_limits_json" | jq -r '[
+			(.five_hour.used_percentage // ""),
+			(.five_hour.resets_at // ""),
+			(.seven_day.used_percentage // ""),
+			(.seven_day.resets_at // "")
+		] | map(tostring) | join("\u001f")') || {
+			printf 'statusline: rate-limit parse failed\n' >&2
+			limits_out=""
+		}
+		IFS=$'\037' read -r five_h five_h_reset week week_reset <<<"$limits_out"
+	fi
 
 	# Rate limits — absent for non-subscribers or when both sources came up empty
 	local limits=""
-	[[ -n "$five_h" ]] && limits+=$(fmt_limit_segment "5h" "$five_h" "$five_h_reset" "$FIVE_HOUR_SECONDS" fmt_reset_countdown "$now")
-	[[ -n "$week" ]] && limits+=$(fmt_limit_segment "7d" "$week" "$week_reset" "$SEVEN_DAY_SECONDS" fmt_reset_absolute "$now")
+	[[ -n "$five_h" ]] && limits+=$(format_limit_segment "5h" "$five_h" "$five_h_reset" "$FIVE_HOUR_SECONDS" "$now")
+	[[ -n "$week" ]] && limits+=$(format_limit_segment "7d" "$week" "$week_reset" "$SEVEN_DAY_SECONDS" "$now")
 
-	printf '%s\n' "${dir##*/} │ ${model} $(fmt_context_bar "$pct")${limits}"
+	printf '%s\n' "${dir##*/} │ ${model} $(format_context_bar "$pct")${limits}"
 }
 
 # Guarded so tests can source the formatters without rendering a status line.
