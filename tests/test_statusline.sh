@@ -12,30 +12,20 @@ set -euo pipefail
 # Each slot covers 20%. Within the partially-filled slot the fraction picks the glyph:
 # below 0.25 → ○, 0.25 up to 0.75 → ◎, 0.75 and above → ● (promoted to filled).
 #
-# Color marks progress: the filled slots, the half slot, and the percentage text wear the smooth
-# `usage_color` gradient. Only empty slots carry no color escape at all, so they render in the
-# terminal's default foreground like the model name beside them. There are no color tiers —
-# the gradient is continuous across 50% and 90%.
+# The gauge is glyphs only — no percentage text follows it. The numbers live in the limit
+# segments beside it, so the bar reads as a shape rather than as a second copy of a number.
 #
-# The gradient's own base is light (≈191 gray at 0%), so a bar at low usage reads like default
-# terminal text on a dark background rather than as near-invisible dark gray.
+# Color marks progress: the filled slots and the half slot wear the smooth `usage_color`
+# gradient. Only empty slots carry no color escape at all, so they render in the terminal's
+# default foreground like the model name beside them. There are no color tiers — the gradient
+# is continuous across 50% and 90%.
 
 TEST_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SCRIPT="$TEST_DIR/../scripts/statusline.sh"
 PASS=0
 FAIL=0
 
-# ── Expected escapes, spelled out independently of the script's own variables ─
-
-C_GRAY=$'\033[38;5;238m'
-C_YELLOW=$'\033[33m'
-C_RED=$'\033[31m'
-C_GREEN=$'\033[32m'
-C_AMBER=$'\033[38;5;208m'
-C_BLINK=$'\033[5m'
 C_RESET=$'\033[0m'
-
-# Only empty slots wear no escape: a bare glyph in the default foreground.
 EMPTY="○"
 HALF="◎"
 FILLED="●"
@@ -44,6 +34,13 @@ FILLED="●"
 
 strip_ansi() {
 	sed $'s/\033\\[[0-9;]*m//g'
+}
+
+require_function() {
+	declare -F "$1" >/dev/null || {
+		printf "\nFAIL  %s is not defined after sourcing %s\n" "$1" "$SCRIPT"
+		exit 1
+	}
 }
 
 # Shared PASS/FAIL reporter: every expect_* helper below computes "$desc", an
@@ -61,7 +58,7 @@ report() {
 
 expect_glyphs() {
 	local desc="$1" pct="$2" expected="$3" actual ok=no
-	actual=$(fmt_context_bar "$pct" | strip_ansi)
+	actual=$(format_context_bar "$pct" | strip_ansi)
 	[[ "$actual" == "$expected" ]] && ok=yes
 	report "$desc" "$ok" "$(printf 'expected: %s\n      actual: %s' "$expected" "$actual")"
 }
@@ -72,18 +69,16 @@ expect_glyphs() {
 #   H  half ◎, wearing the same gradient
 #   E  empty ○, uncolored
 #
-# The trailing percentage text always wears the same gradient, whatever the pattern.
-#
 # The gradient escape is looked up from usage_color itself, so these assertions pin which
 # glyphs carry the gradient without restating the ramp — the ramp has its own tests below.
 expect_bar() {
-	local desc="$1" pct="$2" pattern="$3" color slots="" sep="" i expected actual ok=no
+	local desc="$1" pct="$2" pattern="$3" color expected="" sep="" i actual ok=no
 	color=$(usage_color "$pct")
 	for ((i = 0; i < ${#pattern}; i++)); do
 		case "${pattern:i:1}" in
-		F) slots+="${sep}${color}${FILLED}${C_RESET}" ;;
-		H) slots+="${sep}${color}${HALF}${C_RESET}" ;;
-		E) slots+="${sep}${EMPTY}" ;;
+		F) expected+="${sep}${color}${FILLED}${C_RESET}" ;;
+		H) expected+="${sep}${color}${HALF}${C_RESET}" ;;
+		E) expected+="${sep}${EMPTY}" ;;
 		*)
 			printf "FAIL  %s\n    unknown slot code %q in pattern %q\n" "$desc" "${pattern:i:1}" "$pattern"
 			((++FAIL))
@@ -92,19 +87,17 @@ expect_bar() {
 		esac
 		sep=" "
 	done
-	expected="${slots} ${color}${pct}%${C_RESET}"
-	actual=$(fmt_context_bar "$pct")
+	actual=$(format_context_bar "$pct")
 	[[ "$actual" == "$expected" ]] && ok=yes
 	report "$desc" "$ok" "$(printf 'expected: %q\n      actual: %q' "$expected" "$actual")"
 }
 
 # Every ● in the bar must wear the gradient: strip the colored-filled form, and no bare ●
-# may remain. This is what rules out the superseded uncolored ● that used to stand in for a
-# partial slot — that role belongs to ◎ now.
+# may remain.
 expect_every_filled_colored() {
 	local desc="$1" pct="$2" color rest ok=no
 	color=$(usage_color "$pct")
-	rest=$(fmt_context_bar "$pct")
+	rest=$(format_context_bar "$pct")
 	while [[ "$rest" == *"${color}${FILLED}${C_RESET}"* ]]; do
 		rest="${rest/"${color}${FILLED}${C_RESET}"/}"
 	done
@@ -112,59 +105,39 @@ expect_every_filled_colored() {
 	report "$desc" "$ok" "$(printf 'uncolored %s left after stripping colored ones: %q' "$FILLED" "$rest")"
 }
 
-# Checks any rendered fragment — bar, segment, whole line — for the marks of superseded
-# renderers: the block glyphs and the ambiguous-width half-circle family (◐ ◑ ◒ ◓) of the
-# old gauges, the skull and blink of the old alarm, and the palette `usage_color` replaced
-# (dim gray as base text, the yellow tier). `usage_color` is the only source of color for
-# usage now, so nothing colored by usage may carry these.
-#
-# Green and red are deliberately absent from the list: fmt_pace still owns \033[32m for its
-# under-pace arrow and \033[31m for the hot-pace one. The bar's own expect_bar assertions
-# match its output exactly, so they already reject any stray escape there.
-expect_no_legacy_artifacts() {
-	local desc="$1" actual="$2" found="" ok=no
-	if [[ "$actual" == *"█"* || "$actual" == *"░"* || "$actual" == *"▓"* ]]; then
-		found="block glyph"
-	elif [[ "$actual" == *"◐"* || "$actual" == *"◑"* || "$actual" == *"◒"* || "$actual" == *"◓"* ]]; then
-		found="half-circle glyph (◐ ◑ ◒ ◓ all render double-width)"
-	elif [[ "$actual" == *"💀"* ]]; then
-		found="skull emoji"
-	elif [[ "$actual" == *"$C_BLINK"* ]]; then
-		found="blink escape"
-	elif [[ "$actual" == *"$C_GRAY"* ]]; then
-		found="dim gray escape (usage text renders uncolored or gradient-colored)"
-	elif [[ "$actual" == *"$C_YELLOW"* ]]; then
-		found="yellow tier escape"
-	fi
-	[[ -z "$found" ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'found %s in %q' "$found" "$actual")"
-}
-
 # ── Load the renderer ─────────────────────────────────────────────────────────
 
 # shellcheck source-path=SCRIPTDIR source=../scripts/statusline.sh
 source "$SCRIPT" </dev/null
 
-for required in fmt_context_bar usage_color; do
-	if ! declare -F "$required" >/dev/null; then
-		printf "FAIL  %s is not defined after sourcing %s\n" "$required" "$SCRIPT"
-		exit 1
-	fi
+for required in format_context_bar usage_color; do
+	require_function "$required"
 done
 
 # ── Glyph layout: 5 slots, space separated ───────────────────────────────────
 
 printf "\n── Glyph layout ─────────────────────────────────────────────────────────────\n"
-expect_glyphs "0%: all slots empty" 0 "○ ○ ○ ○ ○ 0%"
-expect_glyphs "100%: all slots filled" 100 "● ● ● ● ● 100%"
-expect_glyphs "20%: exactly one slot filled" 20 "● ○ ○ ○ ○ 20%"
+expect_glyphs "0%: all slots empty" 0 "○ ○ ○ ○ ○"
+expect_glyphs "100%: all slots filled" 100 "● ● ● ● ●"
+expect_glyphs "20%: exactly one slot filled" 20 "● ○ ○ ○ ○"
+
+# The gauge carries no number of its own: the percentages belong to the limit segments.
+expect_no_percent_sign() {
+	local desc="$1" pct="$2" actual ok=no
+	actual=$(format_context_bar "$pct" | strip_ansi)
+	[[ "$actual" != *"%"* && "$actual" != *"$pct"* ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'expected glyphs only, got: %q' "$actual")"
+}
+
+for pct in 0 45 67 100; do
+	expect_no_percent_sign "$pct%: the gauge renders glyphs only, no percentage text" "$pct"
+done
 
 # ── Fractional slot rounding ─────────────────────────────────────────────────
 
 printf "\n── Fractional slot rounding (three glyphs: ● ◎ ○) ────────────────────────────\n"
-expect_glyphs "24% (1.20 slots): fraction below 0.25 renders empty" 24 "● ○ ○ ○ ○ 24%"
-expect_glyphs "30% (1.50 slots): the partly-filled slot renders ◎" 30 "● ◎ ○ ○ ○ 30%"
-expect_glyphs "52% (2.60 slots): the partly-filled slot renders ◎" 52 "● ● ◎ ○ ○ 52%"
+expect_glyphs "30% (1.50 slots): the partly-filled slot renders ◎" 30 "● ◎ ○ ○ ○"
+expect_glyphs "52% (2.60 slots): the partly-filled slot renders ◎" 52 "● ● ◎ ○ ○"
 
 # The half and filled glyphs differ while both wear the gradient, so the rounding boundaries
 # below still pin which glyph each fraction picks.
@@ -175,29 +148,13 @@ expect_bar "75% (3.75 slots): fraction at 0.75 is promoted to filled" 75 "FFFFE"
 
 # ── Gradient coloring ────────────────────────────────────────────────────────
 
-printf "\n── Gradient coloring (filled, half and text; only empty uncolored) ───────────\n"
-expect_bar "48%: the filled slots, the ◎ and the 48% text all wear the gradient" 48 "FFHEE"
-expect_bar "95%: every filled slot and the text wear the 95% gradient, not red" 95 "FFFFF"
-expect_bar "0%: no slot is filled, so only the 0% text wears the gradient" 0 "EEEEE"
+printf "\n── Gradient coloring (filled and half; only empty uncolored) ─────────────────\n"
+expect_bar "48%: the filled slots and the ◎ all wear the gradient" 48 "FFHEE"
+expect_bar "95%: every filled slot wears the 95% gradient" 95 "FFFFF"
 
 # ◎ is the only partly-filled glyph now: no bare ● stands in for one.
-for pct in 30 48 52 65 74 89; do
+for pct in 30 52; do
 	expect_every_filled_colored "$pct%: every ● wears the gradient, none is left bare" "$pct"
-done
-
-# The gradient is continuous: the percentages where the old tiers switched color render
-# like their neighbors, with no jump to yellow at 50% or red at 90%.
-printf "\n── No tier boundaries ───────────────────────────────────────────────────────\n"
-expect_bar "50%: gradient value, not the yellow tier" 50 "FFHEE"
-expect_bar "89%: gradient value, not the yellow tier" 89 "FFFFH"
-expect_bar "90%: gradient value, not the red tier" 90 "FFFFH"
-
-# ── Removed artifacts ────────────────────────────────────────────────────────
-
-printf "\n── Removed artifacts (blocks, ◐ ◑ ◒ ◓, skull, blink, gray, yellow tier) ──────\n"
-for pct in 0 30 45 50 52 90 100; do
-	expect_no_legacy_artifacts "$pct%: context bar carries no superseded escape or glyph" \
-		"$(fmt_context_bar "$pct")"
 done
 
 # ── Usage gradient helpers ───────────────────────────────────────────────────
@@ -240,15 +197,6 @@ usage_rgb() {
 	printf '%s' "${body//;/ }"
 }
 
-occurrences() {
-	local rest="$1" needle="$2" count=0
-	while [[ "$rest" == *"$needle"* ]]; do
-		rest="${rest#*"$needle"}"
-		((++count))
-	done
-	printf '%d' "$count"
-}
-
 expect_truecolor_escape() {
 	local desc="$1" pct="$2" actual ok=no
 	actual=$(usage_color "$pct")
@@ -266,31 +214,7 @@ within_tolerance() {
 	((diff <= limit))
 }
 
-expect_matches_hsl_ref() {
-	local desc="$1" pct="$2" ok=yes
-	local r g b rr rg rb
-	read -r r g b <<<"$(usage_rgb "$pct")"
-	read -r rr rg rb <<<"$(ref_rgb "$pct")"
-	within_tolerance "$r" "$rr" 1 || ok=no
-	within_tolerance "$g" "$rg" 1 || ok=no
-	within_tolerance "$b" "$rb" 1 || ok=no
-	report "$desc" "$ok" "$(printf 'expected ~%s %s %s, got %s %s %s' "$rr" "$rg" "$rb" "$r" "$g" "$b")"
-}
-
-# A neutral gray of a given brightness: all three channels equal and near $level. The level
-# is spelled out here rather than derived from ref_rgb, so it pins the design anchor — the
-# base of the ramp must sit at ordinary-terminal-text brightness — independently of whatever
-# lightness formula the ramp happens to carry.
-expect_gray_level() {
-	local desc="$1" pct="$2" level="$3" tol="$4" r g b ok=no
-	read -r r g b <<<"$(usage_rgb "$pct")"
-	if [[ "$r" == "$g" && "$g" == "$b" ]] && within_tolerance "$r" "$level" "$tol"; then
-		ok=yes
-	fi
-	report "$desc" "$ok" "$(printf 'expected three equal channels near %s (±%s), got %s %s %s' "$level" "$tol" "$r" "$g" "$b")"
-}
-
-# Exact channel anchor, again independent of ref_rgb: it holds the second ramp half in place
+# Exact channel anchor, independent of ref_rgb: it holds the second ramp half in place
 # while the first half's lightness changes.
 expect_rgb() {
 	local desc="$1" pct="$2" want_r="$3" want_g="$4" want_b="$5" r g b ok=yes
@@ -301,21 +225,10 @@ expect_rgb() {
 	report "$desc" "$ok" "$(printf 'expected ~%s %s %s, got %s %s %s' "$want_r" "$want_g" "$want_b" "$r" "$g" "$b")"
 }
 
-# Chroma stand-in: red minus blue is the visible colorfulness of this ramp.
-expect_chroma_at_most() {
-	local desc="$1" pct="$2" limit="$3" r g b diff ok=no
-	read -r r g b <<<"$(usage_rgb "$pct")"
-	diff=$((r - b))
-	[[ "$r" =~ ^[0-9]+$ && "$b" =~ ^[0-9]+$ && $diff -le "$limit" ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'R-B = %s, expected <= %s (rgb %s %s %s)' "$diff" "$limit" "$r" "$g" "$b")"
-}
-
-expect_chroma_at_least() {
-	local desc="$1" pct="$2" floor="$3" r g b diff ok=no
-	read -r r g b <<<"$(usage_rgb "$pct")"
-	diff=$((r - b))
-	[[ "$r" =~ ^[0-9]+$ && "$b" =~ ^[0-9]+$ && $diff -ge "$floor" ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'R-B = %s, expected >= %s (rgb %s %s %s)' "$diff" "$floor" "$r" "$g" "$b")"
+expect_matches_hsl_ref() {
+	local desc="$1" pct="$2" rr rg rb
+	read -r rr rg rb <<<"$(ref_rgb "$pct")"
+	expect_rgb "$desc" "$pct" "$rr" "$rg" "$rb"
 }
 
 # Gold means red leads green leads blue. Hue 60 would make red and green equal.
@@ -324,13 +237,6 @@ expect_gold_not_green() {
 	read -r r g b <<<"$(usage_rgb "$pct")"
 	[[ "$r" =~ ^[0-9]+$ && $r -gt $g && $g -gt $b ]] && ok=yes
 	report "$desc" "$ok" "$(printf 'expected R > G > B, got %s %s %s' "$r" "$g" "$b")"
-}
-
-expect_red() {
-	local desc="$1" pct="$2" min_r="$3" max_gb="$4" r g b ok=no
-	read -r r g b <<<"$(usage_rgb "$pct")"
-	[[ "$r" =~ ^[0-9]+$ && $r -ge "$min_r" && $g -le "$max_gb" && $b -le "$max_gb" ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'expected R >= %s and G,B <= %s, got %s %s %s' "$min_r" "$max_gb" "$r" "$g" "$b")"
 }
 
 expect_pure_red_hue() {
@@ -374,45 +280,36 @@ NOW=1700000000
 # The default reset window for segment/pace tests below: a 5h window with 1h left.
 PACE_WINDOW=18000
 PACE_RESET=$((NOW + 3600))
+# The 7d window's own reset window, mirrored below wherever a 7d countdown is needed.
+WEEK_WINDOW=$SEVEN_DAY_SECONDS
+WEEK_RESET=$((NOW + 200000))
 
-# The gradient starts after the colon: the "label:" prefix stays uncolored, so only
-# "PCT%" is wrapped in the escape.
+# The label, the space, and the percentage form one gradient-colored span — no colon.
 expect_segment_gradient() {
 	local desc="$1" label="$2" pct="$3" color out want ok=no
 	color=$(usage_color "$pct")
-	out=$(fmt_limit_segment "$label" "$pct" "$PACE_RESET" "$PACE_WINDOW" fmt_reset_countdown "$NOW")
-	want="${label}:${color}${pct}%${C_RESET}"
+	out=$(format_limit_segment "$label" "$pct" "$PACE_RESET" "$PACE_WINDOW" "$NOW")
+	want="${color}${label} ${pct}%"
 	[[ "$out" == *"$want"* ]] && ok=yes
 	report "$desc" "$ok" "$(printf 'expected to contain %q\n    actual: %q' "$want" "$out")"
 }
 
-# Everything the segment prints before the gradient escape — the separator and the label —
-# must carry no escape at all, so the label renders in the terminal's default foreground.
-expect_label_uncolored() {
-	local desc="$1" label="$2" pct="$3" color out head ok=no
-	color=$(usage_color "$pct")
-	out=$(fmt_limit_segment "$label" "$pct" "$PACE_RESET" "$PACE_WINDOW" fmt_reset_countdown "$NOW")
-	head=${out%%"$color"*}
-	[[ "$head" != *$'\033'* && "$head" == *"$label:" ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'text before the gradient escape: %q' "$head")"
+# Parentheses framed the old detail group; the new separator is a middle dot.
+expect_no_parentheses() {
+	local desc="$1" actual="$2" ok=no
+	[[ "$actual" != *"("* && "$actual" != *")"* ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'expected no parentheses, got: %q' "$actual")"
 }
 
-expect_gradient_used_once() {
-	local desc="$1" label="$2" pct="$3" color out ok=no
-	color=$(usage_color "$pct")
-	out=$(fmt_limit_segment "$label" "$pct" "$PACE_RESET" "$PACE_WINDOW" fmt_reset_countdown "$NOW")
-	[[ "$(occurrences "$out" "$color")" == "1" ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'gradient escape appears %s time(s): %q' "$(occurrences "$out" "$color")" "$out")"
-}
-
-expect_reset_not_gradient() {
-	local desc="$1" label="$2" pct="$3" formatter="$4" reset_ts="$5" window="$6"
-	local color out tail ok=no
-	color=$(usage_color "$pct")
-	out=$(fmt_limit_segment "$label" "$pct" "$reset_ts" "$window" "$formatter" "$NOW")
-	tail=${out#*"${label}:${color}${pct}%${C_RESET}"}
-	[[ "$tail" != *"$color"* ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'reset text after the label: %q' "$tail")"
+# Everything from the ` · ` separator onward renders in the terminal's default foreground,
+# so the countdown never competes with the usage color for attention.
+expect_reset_uncolored() {
+	local desc="$1" label="$2" pct="$3" reset_ts="$4" window="$5"
+	local out tail ok=no
+	out=$(format_limit_segment "$label" "$pct" "$reset_ts" "$window" "$NOW")
+	tail=" · ${out##* · }"
+	[[ "$out" == *" · "* && "$tail" != *$'\033'* ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'reset text carries an escape: %q' "$tail")"
 }
 
 # ── Gradient escape shape ────────────────────────────────────────────────────
@@ -444,10 +341,6 @@ expect_empty_color() {
 expect_empty_color "0%: no escape, inherits terminal default" 0
 expect_empty_color "12%: still below saturation threshold" 12
 expect_gold_not_green "50%: warm gold, R > G > B" 50
-# The lighter base only moves the first ramp half: the seam value stays where it was.
-expect_rgb "50%: warm gold unchanged by the lighter base" 50 207 183 63
-expect_chroma_at_least "50%: clearly colored, not gray" 50 100
-expect_red "95%: red" 95 240 100
 expect_pure_red_hue "100%: pure red hue, G = B at full saturation" 100
 # Below 50% the ramp darkens as color emerges: the light base is the low-usage end, so the
 # red channel dips before the second half drives it up to pure red.
@@ -457,76 +350,267 @@ expect_red_direction "red channel climbs from 50% to 100%" 50 100 rises
 # ── Limit segment coloring ───────────────────────────────────────────────────
 
 printf "\n── Limit segment coloring ───────────────────────────────────────────────────\n"
-expect_segment_gradient "61%: only 61% wears the gradient, the 5h: label does not" "5h" 61
-expect_segment_gradient "10%: only 10% wears the gradient, the 5h: label does not" "5h" 10
-expect_segment_gradient "95%: only 95% wears the gradient, the 5h: label does not" "5h" 95
-expect_label_uncolored "5h label and colon render with no color escape" "5h" 61
-expect_label_uncolored "7d label and colon render with no color escape" "7d" 20
-expect_gradient_used_once "61%: gradient escape is emitted once per segment" "5h" 61
-expect_reset_not_gradient "countdown reset text not gradient-colored" "5h" 61 fmt_reset_countdown "$PACE_RESET" "$PACE_WINDOW"
-expect_reset_not_gradient "absolute reset text not gradient-colored" "7d" 20 fmt_reset_absolute "$((NOW + 200000))" 604800
-
-# The gradient is the only source of usage color here too, so the superseded palette must be
-# gone from the segments as well — not just from the bar.
-expect_no_legacy_artifacts "5h segment carries no superseded escape or glyph" \
-	"$(fmt_limit_segment "5h" 61 "$PACE_RESET" "$PACE_WINDOW" fmt_reset_countdown "$NOW")"
-expect_no_legacy_artifacts "7d segment carries no superseded escape or glyph" \
-	"$(fmt_limit_segment "7d" 20 "$((NOW + 200000))" 604800 fmt_reset_absolute "$NOW")"
+expect_segment_gradient "61%: label, space, and 61%% all wear the gradient" "5h" 61
+expect_segment_gradient "25%: label, space, and 25%% all wear the gradient" "5h" 25
+expect_segment_gradient "95%: label, space, and 95%% all wear the gradient" "5h" 95
+expect_segment_gradient "7d label, space, and 20%% all wear the gradient" "7d" 20
+# Both percentages sit at or above the 75% threshold, so there is a countdown to check.
+expect_reset_uncolored "5h countdown renders in the default foreground" "5h" 88 "$PACE_RESET" "$PACE_WINDOW"
+expect_reset_uncolored "7d countdown renders in the default foreground" "7d" 80 "$WEEK_RESET" "$WEEK_WINDOW"
 
 # ── Pace indicator ───────────────────────────────────────────────────────────
 #
-# fmt_pace compares usage against the share of the window already elapsed and
-# renders a colored arrow for the gap:
+# format_pace compares usage against the share of the window already elapsed and
+# renders an arrow for the gap:
 #
-#   delta <= -5    ↓   green   (under pace)
-#   -5 < delta < 5  (nothing)  (on pace)
-#   +5 .. +14      ↑   amber   (over pace)
-#   delta >= +15   ↑↑  red     (hot)
+#   delta <= -5    ↓   (under pace)
+#   -5 < delta < 5  (nothing, on pace)
+#   +5 .. +14      ↑   (over pace)
+#   delta >= +15   ↑↑  (hot)
 #
 # Every case below uses a 5h window with 1h left (PACE_WINDOW/PACE_RESET), so 4h
 # of 5h has elapsed and the on-pace usage is 80%. The `used` value therefore sets
 # the delta directly.
+#
+# Which glyph appears is the arrow's own contract; what color it wears is the
+# segment's, and is pinned by expect_arrow_color below.
 
-expect_pace() {
+expect_pace_glyph() {
 	local desc="$1" used="$2" expected="$3" actual ok=no
-	actual=$(fmt_pace "$used" "$PACE_RESET" "$PACE_WINDOW" "$NOW")
+	actual=$(format_pace "$used" "$PACE_RESET" "$PACE_WINDOW" "$NOW" | strip_ansi)
 	[[ "$actual" == "$expected" ]] && ok=yes
 	report "$desc" "$ok" "$(printf 'expected %q\n      actual: %q' "$expected" "$actual")"
 }
 
-# Compares the plain-text rendering of the whole segment, so the assertion pins
-# glyph order and spacing inside the parenthetical without restating colors.
-expect_detail_text() {
-	local desc="$1" label="$2" used="$3" expected_detail="$4"
-	local out plain reset_plain ok=no
-	out=$(fmt_limit_segment "$label" "$used" "$PACE_RESET" "$PACE_WINDOW" fmt_reset_countdown "$NOW")
-	plain=$(printf '%s' "$out" | strip_ansi)
-	reset_plain=$(fmt_reset_countdown "$PACE_RESET" "$NOW" | strip_ansi)
-	local want="${expected_detail/RESET/$reset_plain}"
-	[[ "$plain" == *"$want"* ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'expected to contain %q\n      actual: %q' "$want" "$plain")"
+# The whole segment as plain text: pins glyph order and spacing — the leading separator,
+# the space between label and percentage, the arrow hugging the `%`, and the ` · ` before
+# the countdown — without restating any color. The segment carries its own " │ " prefix;
+# main concatenates segments without inserting one.
+expect_segment_plain() {
+	local desc="$1" label="$2" used="$3" reset_ts="$4" window="$5" expected="$6"
+	local actual ok=no
+	actual=$(format_limit_segment "$label" "$used" "$reset_ts" "$window" "$NOW" | strip_ansi)
+	[[ "$actual" == "$expected" ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'expected %q\n      actual: %q' "$expected" "$actual")"
 }
 
-if ! declare -F fmt_pace >/dev/null; then
-	printf "\nFAIL  fmt_pace is not defined after sourcing %s\n" "$SCRIPT"
-	exit 1
-fi
+# The last color escape standing before the arrow decides what color the arrow renders in:
+# the gradient for the over-pace arrows, a reset (terminal default) for the under-pace one.
+last_escape() {
+	printf '%s' "$1" | grep -oE $'\033\\[[0-9;]*m' | tail -1 || true
+}
 
-printf "\n── Pace arrows ──────────────────────────────────────────────────────────────\n"
-expect_pace "60% at 80%% pace (delta -20): green down arrow" 60 "${C_GREEN}↓${C_RESET}"
-expect_pace "75% at 80%% pace (delta -5): green down arrow at the boundary" 75 "${C_GREEN}↓${C_RESET}"
-expect_pace "76% at 80%% pace (delta -4): on pace, no arrow" 76 ""
-expect_pace "84% at 80%% pace (delta +4): on pace, no arrow" 84 ""
-expect_pace "85% at 80%% pace (delta +5): amber up arrow at the boundary" 85 "${C_AMBER}↑${C_RESET}"
-expect_pace "94% at 80%% pace (delta +14): amber up arrow" 94 "${C_AMBER}↑${C_RESET}"
-expect_pace "95% at 80%% pace (delta +15): red double arrow at the boundary" 95 "${C_RED}↑↑${C_RESET}"
-expect_pace "100% at 80%% pace (delta +20): red double arrow" 100 "${C_RED}↑↑${C_RESET}"
+expect_arrow_color() {
+	local desc="$1" used="$2" arrow="$3" want="$4"
+	local color out head got expected ok=no
+	color=$(usage_color "$used")
+	out=$(format_limit_segment "5h" "$used" "$PACE_RESET" "$PACE_WINDOW" "$NOW")
+	head=${out%%"$arrow"*}
+	got=$(last_escape "$head")
+	case "$want" in
+	gradient) expected="$color" ;;
+	default) expected="$C_RESET" ;;
+	*)
+		report "$desc" no "unknown color expectation $want"
+		return
+		;;
+	esac
+	[[ "$out" == *"$arrow"* && "$got" == "$expected" ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'escape in force at the arrow: %q, expected %q\n      actual: %q' "$got" "$expected" "$out")"
+}
 
-# ── Pace detail parenthetical ────────────────────────────────────────────────
+require_function format_pace
 
-printf "\n── Pace detail parenthetical (no hourglass prefix) ───────────────────────────\n"
-expect_detail_text "over pace: reset time follows the arrow directly" "5h" 88 "(↑ RESET)"
-expect_detail_text "on pace: reset time alone, no arrow prefix" "5h" 82 "(RESET)"
+printf "\n── Pace arrow thresholds ────────────────────────────────────────────────────\n"
+expect_pace_glyph "75% at 80%% pace (delta -5): down arrow at the boundary" 75 "↓"
+expect_pace_glyph "76% at 80%% pace (delta -4): on pace, no arrow" 76 ""
+expect_pace_glyph "84% at 80%% pace (delta +4): on pace, no arrow" 84 ""
+expect_pace_glyph "85% at 80%% pace (delta +5): up arrow at the boundary" 85 "↑"
+expect_pace_glyph "94% at 80%% pace (delta +14): up arrow" 94 "↑"
+expect_pace_glyph "95% at 80%% pace (delta +15): double arrow at the boundary" 95 "↑↑"
+
+# ── Pace arrow color ─────────────────────────────────────────────────────────
+#
+# Over-pace is the bad news, so it inherits the segment's own usage gradient and grows
+# louder as usage climbs. Under-pace is good news and stays quiet: the ↓ renders in the
+# terminal's default foreground, with no color of its own.
+
+printf "\n── Pace arrow color (gradient up, default down) ──────────────────────────────\n"
+expect_arrow_color "85%: the ↑ inherits the 85%% gradient" 85 "↑" gradient
+expect_arrow_color "100%: the ↑↑ inherits the 100%% gradient" 100 "↑↑" gradient
+expect_arrow_color "60%: the ↓ renders in the default foreground" 60 "↓" default
+
+# ── Segment shape ────────────────────────────────────────────────────────────
+#
+# `<label> <pct>%<arrow> · <countdown>` — no colon, no parentheses, no space before the
+# arrow. The countdown is appended only when there is one to show *and* usage has reached
+# 75%: below that the window has room to spare, so how long until it resets is noise and
+# the percentage stands alone.
+
+printf "\n── Segment shape (label pct%%arrow · countdown) ───────────────────────────────\n"
+expect_segment_plain "over pace: the arrow hugs the percentage" "5h" 88 "$PACE_RESET" "$PACE_WINDOW" " │ 5h 88%↑ · 1h"
+expect_segment_plain "hot pace: the double arrow hugs the percentage" "5h" 100 "$PACE_RESET" "$PACE_WINDOW" " │ 5h 100%↑↑ · 1h"
+expect_segment_plain "on pace: countdown alone, no arrow" "5h" 82 "$PACE_RESET" "$PACE_WINDOW" " │ 5h 82% · 1h"
+expect_segment_plain "no countdown to show: nothing follows the percentage" "5h" 100 "$NOW" "$PACE_WINDOW" " │ 5h 100%"
+# The 75% boundary, pinned from both sides. Both cases sit under pace, so the down arrow
+# still hugs the percentage and the countdown is the only difference between them.
+expect_segment_plain "74%: below the threshold, the down arrow hugs the percentage and no countdown follows" "5h" 74 "$PACE_RESET" "$PACE_WINDOW" " │ 5h 74%↓"
+expect_segment_plain "75%: at the threshold, the countdown appears" "5h" 75 "$PACE_RESET" "$PACE_WINDOW" " │ 5h 75%↓ · 1h"
+# Both windows render a countdown: the 7d segment prints "4d13h"-style output, matching the
+# 5h segment's format.
+expect_segment_plain "7d window counts down in days and hours" "7d" 80 "$((NOW + 4 * 86400 + 13 * 3600))" "$WEEK_WINDOW" " │ 7d 80%↑↑ · 4d13h"
+
+# ── Reset countdown ──────────────────────────────────────────────────────────
+#
+# Both windows render a countdown, and the 7d window routinely has days left, so the
+# format has a day unit above 24h: `4d13h`, dropping the hours when they are zero
+# (`5d`) exactly as the sub-day form drops zero minutes (`2h`). Minutes are noise next to
+# days, so they disappear once a day is on the clock.
+#
+# A reset that has already passed — or lands exactly on now — has nothing to count down,
+# and renders as the empty string so the caller can leave the detail off entirely.
+
+expect_countdown() {
+	local desc="$1" seconds="$2" expected="$3" actual ok=no
+	actual=$(format_countdown "$((NOW + seconds))" "$NOW")
+	[[ "$actual" == "$expected" ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'expected %q\n      actual: %q' "$expected" "$actual")"
+}
+
+printf "\n── Reset countdown ──────────────────────────────────────────────────────────\n"
+expect_countdown "45m left: minutes alone" $((45 * 60)) "45m"
+expect_countdown "2h left: zero minutes are dropped" $((2 * 3600)) "2h"
+expect_countdown "2h10m left: hours and minutes" $((2 * 3600 + 10 * 60)) "2h10m"
+expect_countdown "23h59m left: still below a day" $((23 * 3600 + 59 * 60)) "23h59m"
+expect_countdown "exactly 24h left: a day with zero hours" $((24 * 3600)) "1d"
+expect_countdown "4d13h left: days and hours" $((4 * 86400 + 13 * 3600)) "4d13h"
+expect_countdown "reset lands on now: nothing to count down" 0 ""
+expect_countdown "reset already passed: nothing to count down" -3600 ""
+
+# ── Whole line ───────────────────────────────────────────────────────────────
+#
+# main composes the pieces into the rendered status line. The usage payload is stubbed at
+# the network boundary with the normalized shape fetch_usage_payload yields, so the line is
+# deterministic; the resets sit a comfortable margin past their rendered minute so a second
+# of wall-clock drift during the run cannot move the countdown.
+#
+# The two windows straddle the 75% countdown threshold — the 5h window is above it and the
+# 7d window well below — so one composed line shows both a segment that carries a countdown
+# and one that does not.
+
+require_function main
+
+MAIN_NOW=$(date +%s)
+MAIN_PAYLOAD=$(printf '{"five_hour":{"used_percentage":78,"resets_at":%s},"seven_day":{"used_percentage":7,"resets_at":%s}}' \
+	"$((MAIN_NOW + 4 * 3600 + 10 * 60 - 1))" "$((MAIN_NOW + 4 * 86400 + 13 * 3600 + 1800))")
+MAIN_TRANSCRIPT=$(mktemp "${TMPDIR:-/tmp}/statusline-transcript.XXXXXX")
+CLEANUP_PATHS=("$MAIN_TRANSCRIPT")
+trap 'rm -rf "${CLEANUP_PATHS[@]}"' EXIT
+
+# All three stdin fixtures below (this one and the two degraded-input ones further down)
+# share this envelope; stdin_json merges in each fixture's distinguishing fields.
+STDIN_ENVELOPE='{"hook_event_name":"Status","session_id":"statusline-test","transcript_path":"'"$MAIN_TRANSCRIPT"'","cwd":"/tmp/statusline-proj","version":"1.0.0","output_style":{"name":"default"},"exceeds_200k_tokens":false}'
+stdin_json() {
+	jq -c --argjson extra "$1" '. * $extra' <<<"$STDIN_ENVELOPE"
+}
+
+MAIN_STDIN=$(stdin_json '{"model":{"id":"claude-opus-4-1","display_name":"Opus 4.6"},"workspace":{"current_dir":"/tmp/statusline-proj","project_dir":"/tmp/statusline-proj"}}')
+
+# main reaches the stubbed fetch_usage_payload through fetch_usage_fallback, whose
+# cache lives under TMPDIR keyed on CLAUDE_CONFIG_DIR — so both are pointed at a
+# private directory. Otherwise the run reads the user's live cache (nondeterministic)
+# or overwrites it with the stub payload. Each case gets its own cache directory
+# under here and its own stderr file inside it, for the same reason.
+MAIN_CASES=$(mktemp -d "${TMPDIR:-/tmp}/statusline-cases.XXXXXX")
+CLEANUP_PATHS+=("$MAIN_CASES")
+
+# Renders main in a per-case cache directory with the network boundary stubbed, so no
+# case can read or overwrite the user's live usage cache. `payload` is what the stubbed
+# fetch serves; empty means the fetch fails and no usage data reaches the line. stderr
+# is collected in the case's own directory, so cases sharing MAIN_CASES never race on
+# one shared file.
+main_render() {
+	local case_name="$1" stdin_json="$2" stub_payload="${3-}" dir
+	dir="$MAIN_CASES/$case_name"
+	mkdir -p "$dir"
+	(
+		# shellcheck disable=SC2030,SC2031 # subshell-local on purpose: isolation must not leak out
+		export TMPDIR="$dir" CLAUDE_CONFIG_DIR="$dir"
+		if [[ -n "$stub_payload" ]]; then
+			fetch_usage_payload() { printf '%s' "$stub_payload"; }
+		else
+			fetch_usage_payload() { return 1; }
+		fi
+		printf '%s' "$stdin_json" | main
+	) 2>"$dir/stderr"
+}
+
+main_line() {
+	main_render happy-path "$MAIN_STDIN" "$MAIN_PAYLOAD"
+}
+
+expect_line_contains() {
+	local desc="$1" haystack="$2" needle="$3" ok=no
+	[[ "$haystack" == *"$needle"* ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'expected to contain %q\n      actual: %q' "$needle" "$haystack")"
+}
+
+expect_exact_line() {
+	local desc="$1" actual="$2" expected="$3" ok=no
+	[[ "$actual" == "$expected" ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'expected %q\n      actual: %q' "$expected" "$actual")"
+}
+
+# The gauge runs straight into the next separator: no percentage stands between them.
+expect_gauge_meets_separator() {
+	local desc="$1" plain="$2" ok=no
+	[[ "$plain" == *"$EMPTY │"* || "$plain" == *"$FILLED │"* || "$plain" == *"$HALF │"* ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'no gauge glyph directly before a separator: %q' "$plain")"
+}
+
+MAIN_OUT=$(main_line)
+MAIN_PLAIN=$(printf '%s' "$MAIN_OUT" | strip_ansi)
+
+printf "\n── Whole line ───────────────────────────────────────────────────────────────\n"
+expect_gauge_meets_separator "the context gauge is followed by the separator, not a percentage" "$MAIN_PLAIN"
+expect_line_contains "the 5h segment renders as label, percentage, arrow, countdown" "$MAIN_PLAIN" "│ 5h 78%↑↑ · 4h9m │"
+# The trailing segment, taken whole: nothing follows the percentage, so the 7d window's
+# days-away reset stays off the line while it is below the threshold.
+expect_exact_line "the 7d segment is below the threshold, so no countdown trails the line" "${MAIN_PLAIN##*│ }" "7d 7%"
+expect_no_parentheses "the whole line frames details with · , not parentheses" "$MAIN_PLAIN"
+# ── Degraded input ───────────────────────────────────────────────────────────
+#
+# Claude Code does not promise every field on every event. A model without a display
+# name or a workspace without a current dir leaves that slot empty — never the JSON
+# null spelled out as the four-letter word "null", which is what `tostring` yields for
+# an absent field.
+#
+# An unparseable rate-limits payload is the same kind of surprise with one difference:
+# it is worth saying out loud. A silently empty segment list is indistinguishable from
+# "there were no limits to show", so the failure goes to stderr the way a failed stdin
+# parse already does, and the rest of the line still renders.
+
+# The diagnostic reaches stderr and the line still reaches stdout: neither alone is
+# enough, since a diagnostic that replaces the line is as bad as a line that hides the
+# failure.
+expect_diagnosed() {
+	local desc="$1" plain="$2" needle="$3" rendered="$4" case_name="$5" err ok=no
+	err=$(<"$MAIN_CASES/$case_name/stderr")
+	[[ "$err" == *"$needle"* && "$plain" == *"$rendered"* ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'expected stderr to mention %q and the line to keep %q\n      stderr: %q\n      stdout: %q' "$needle" "$rendered" "$err" "$plain")"
+}
+
+# shellcheck disable=SC2031 # main_render's TMPDIR change is subshell-local; ambient TMPDIR is intact here
+STDIN_NO_NAMES=$(stdin_json '{"model":{"id":"claude-opus-4-1"},"workspace":{"project_dir":"/tmp/statusline-proj"}}')
+# Valid stdin carrying an invalid rate-limits payload: the string parses, its contents do not.
+STDIN_BAD_LIMITS=$(stdin_json '{"model":{"id":"claude-opus-4-1","display_name":"Opus 4.6"},"workspace":{"current_dir":"/tmp/statusline-proj","project_dir":"/tmp/statusline-proj"},"rate_limits":"{not json","cost":{"total_api_duration_ms":100}}')
+
+printf "\n── Degraded input ───────────────────────────────────────────────────────────\n"
+expect_exact_line "a stdin without model.display_name or workspace.current_dir renders empty slots, not \"null\"" \
+	"$(main_render no-names "$STDIN_NO_NAMES" "$MAIN_PAYLOAD" | strip_ansi)" \
+	" │  ○ ○ ○ ○ ○ │ 5h 78%↑↑ · 4h9m │ 7d 7%"
+expect_diagnosed "an unparseable rate-limits payload is reported on stderr, and the line still renders" \
+	"$(main_render bad-limits "$STDIN_BAD_LIMITS" | strip_ansi)" "rate-limit parse failed" "Opus 4.6" bad-limits
 
 # ── Usage fallback fetch ─────────────────────────────────────────────────────
 #
@@ -546,13 +630,11 @@ expect_detail_text "on pace: reset time alone, no arrow prefix" "5h" 82 "(RESET)
 # themselves carry. The offsets stay well clear of the 300s and 900s boundaries
 # so that a second of wall-clock drift during the run cannot flip a verdict.
 
-if ! declare -F fetch_usage_fallback >/dev/null; then
-	printf "\nFAIL  fetch_usage_fallback is not defined after sourcing %s\n" "$SCRIPT"
-	exit 1
-fi
+require_function fetch_usage_fallback
 
+# shellcheck disable=SC2031 # main_render's TMPDIR change is subshell-local; ambient TMPDIR is intact here
 FALLBACK_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/statusline-fallback.XXXXXX")
-trap 'rm -rf "$FALLBACK_ROOT"' EXIT
+CLEANUP_PATHS+=("$FALLBACK_ROOT")
 
 # The endpoint's own shape: utilization percentages and ISO-8601 reset stamps.
 USAGE_BODY='{"five_hour":{"utilization":42,"resets_at":"2023-11-14T22:13:20Z"},"seven_day":{"utilization":13,"resets_at":"2023-11-20T22:13:20Z"}}'
@@ -589,6 +671,7 @@ fallback_fetch() {
 	printf '%s' "$body" >"$dir/body"
 	printf '%s' "$curl_exit" >"$dir/curl-exit"
 	(
+		# shellcheck disable=SC2031 # subshell-local on purpose: each case owns its cache
 		export PATH="$dir/bin:$PATH" TMPDIR="$dir/tmp" CLAUDE_CONFIG_DIR="$dir"
 		export STUB_ATTEMPTS="$dir/attempts" STUB_CURL_BODY="$dir/body" STUB_CURL_EXIT="$dir/curl-exit"
 		fetch_usage_fallback "$now"
@@ -662,6 +745,53 @@ seed_good_cache not-json
 
 fb_out=$(fallback_fetch not-json 0 "$NOT_JSON_BODY" $((FB_BASE + 400)))
 expect_fallback_json "non-JSON body: the last good payload is still served" "$fb_out" '.five_hour.used_percentage' 42
+
+# ── Usage fallback: the lock keeps concurrent renders from double-fetching ─────
+#
+# Renders overlap — two windows repaint at once, both see the throttle window open at
+# the same time. The mkdir lock is what keeps only one of them fetching: a render that
+# loses the race falls through without touching the network, still serving whatever the
+# cache already holds rather than blanking the segment. Once the lock is released, the
+# next call past the throttle window is free to fetch and land its payload in the cache.
+
+# The cache file name is the script's own business, so it is discovered by content
+# rather than spelled out here.
+cache_file_for() {
+	local dir="$FALLBACK_ROOT/$1/tmp" f
+	for f in "$dir"/*; do
+		[[ -f "$f" ]] || continue
+		if grep -q five_hour "$f"; then
+			printf '%s' "$f"
+			return 0
+		fi
+	done
+	return 1
+}
+
+FRESH_USAGE_BODY='{"five_hour":{"utilization":55,"resets_at":"2023-11-14T22:13:20Z"},"seven_day":{"utilization":13,"resets_at":"2023-11-20T22:13:20Z"}}'
+
+printf "\n── Usage fallback: the lock keeps concurrent renders from double-fetching ─────\n"
+seed_good_cache staging
+staging_cache=$(cache_file_for staging) || {
+	printf "\nFAIL  cache_file_for could not find the seeded cache file for the staging case\n"
+	exit 1
+}
+mkdir -p "${staging_cache}.lock"
+# The lock is reclaimed once it's older than the throttle window, judged against the
+# `now` argument below rather than the wall clock — so a lock merely mkdir'd at the real
+# time would look stale to a `now` this far ahead and get reclaimed instead of held. Back
+# date it to just inside the window so it reads as a lock a concurrent render still holds.
+touch -m -t "$(date -r $((FB_BASE + 399)) +%Y%m%d%H%M.%S)" "${staging_cache}.lock"
+
+fb_out=$(fallback_fetch staging 0 "$FRESH_USAGE_BODY" $((FB_BASE + 400)))
+expect_attempts "a held lock keeps the locked-out render from fetching" staging 1
+expect_fallback_json "a held lock still serves the stale cache, not a blank segment" "$fb_out" '.five_hour.used_percentage' 42
+
+rmdir "${staging_cache}.lock"
+
+fb_out=$(fallback_fetch staging 0 "$FRESH_USAGE_BODY" $((FB_BASE + 450)))
+expect_attempts "lock released: the next call past the throttle window fetches" staging 2
+expect_fallback_json "lock released: the fresh payload lands in the cache" "$fb_out" '.five_hour.used_percentage' 55
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 

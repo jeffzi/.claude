@@ -170,12 +170,15 @@ See the [Process](#process) skills table for additional workflows (`/harden`, `/
 ### Status Line
 
 [`scripts/statusline.sh`](scripts/statusline.sh) renders a custom status line showing model name,
-project directory, context window usage bar, and rate limit pacing. Rate limits display the 5-hour
-window as a countdown (`⏳2h`) and the 7-day window as an absolute reset date (`⏳Jul12 09:00`).
-Pace emoji (🔥 / 🐢) appear above 50% usage when the burn rate diverges from an even linear spend.
+project directory, a context gauge, and rate limit pacing. The context gauge is five circles
+(`● ◎ ○`) whose fill and color carry the level — no percentage text. Each rate-limit window shows
+its usage percentage and reset countdown at all times; a continuous gray→gold→red gradient colors
+each segment by how hot it runs, so a quiet session reads as gray. Pace arrows (`↑` / `↑↑` / `↓`)
+appear above 50% usage when the burn rate diverges from an even linear spend — the over-pace arrows
+wear the segment's gradient color, the under-pace `↓` stays uncolored.
 
 ```text
-.claude │ Opus 4.6 ▓▓▓▓▓▓▓▓▓░░░░░░░░░░░ 45% │ 5h:72% (🔥 ⏳2h) │ 7d:89% (🐢 ⏳Jul13 09:00)
+.claude │ Opus 4.6 ● ● ◎ ○ ○ │ 5h 72%↑↑ · 2h10m │ 7d 89% · 4d13h
 ```
 
 ### Scripts
@@ -185,7 +188,7 @@ Pace emoji (🔥 / 🐢) appear above 50% usage when the burn rate diverges from
 | [`cleanup-sessions.sh`](scripts/cleanup-sessions.sh) | Remove stale session data older than a configurable age          |
 | [`fix-ci-policy.sh`](scripts/fix-ci-policy.sh)       | Push-gate policy shared by `fix-ci` loop and `git-guard` hook    |
 | [`fix-ci-push.sh`](scripts/fix-ci-push.sh)           | Sanctioned push wrapper for the `fix-ci` loop                    |
-| [`statusline.sh`](scripts/statusline.sh)             | Custom status line: model, context bar, rate limit pacing        |
+| [`statusline.sh`](scripts/statusline.sh)             | Custom status line: model, context gauge, rate limit pacing      |
 | [`sync-skills.sh`](scripts/sync-skills.sh)           | Sync selected skills from external repositories via `npx skills` |
 
 ### Hooks
