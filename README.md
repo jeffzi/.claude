@@ -153,6 +153,12 @@ frontmatter activate only when matching files are in context.
 | [`no-unilateral-action`](rules/no-unilateral-action.md) | Questions route through the user                               |
 | [`no-unrequested-edits`](rules/no-unrequested-edits.md) | Report first, edit only on explicit request                    |
 
+### Output Styles
+
+| Style                             | Description                                                                   |
+| --------------------------------- | ----------------------------------------------------------------------------- |
+| [`terse`](output-styles/terse.md) | Ranks output by what changes the user's next action; evidence on request only |
+
 ## Development Workflow
 
 The two most common entry points for single-session work:

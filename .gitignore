@@ -44,6 +44,10 @@ skills/fallow-review/
 !rules/
 !rules/**
 
+# Allow output styles
+!output-styles/
+!output-styles/**
+
 # Allow hooks
 !hooks/
 !hooks/**
