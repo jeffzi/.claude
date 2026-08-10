@@ -4,5 +4,5 @@
     "MD013": { "line_length": 100, "tables": false, "code_blocks": false },
     "MD029": { "style": "one_or_ordered" }
   },
-  "ignores": ["skills/humanizer/**"]
+  "ignores": ["skills/humanizer/**", "output-styles/**"]
 }

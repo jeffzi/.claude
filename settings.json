@@ -207,6 +207,7 @@
       }
     }
   },
+  "outputStyle": "Terse",
   "effortLevel": "medium",
   "promptSuggestionEnabled": false,
   "tui": "fullscreen",
