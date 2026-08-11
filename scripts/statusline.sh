@@ -359,18 +359,10 @@ format_pace() {
 #
 # Full slots and the half slot wear the usage gradient. Only empty slots stay uncolored,
 # matching the default foreground of the model name beside them.
-#
-# A session whose context window runs past 200k tokens draws the same gauge from the
-# diamond family (U+25C6, U+25C8, U+25C7) instead, so the two window sizes are never
-# mistaken for each other at a glance. Only the glyphs swap — the slot arithmetic,
-# the quarter marks, and the coloring below are shared.
 format_context_bar() {
-	local pct="$1" exceeds="${2:-}"
+	local pct="$1"
 	local color slot sep="" out=""
 	local full="●" half="◎" empty="○"
-	if [[ "$exceeds" == "true" ]]; then
-		full="◆" half="◈" empty="◇"
-	fi
 	color=$(usage_color "$pct")
 	# Quarter-slots filled across the gauge, capped so a used_percentage that
 	# overflows past 100 still saturates the bar rather than overrunning it.
@@ -456,7 +448,7 @@ render_failure() {
 }
 
 main() {
-	local input model effort dir worktree branch pct exceeds api_ms rate_limits_json now
+	local input model effort dir worktree branch pct api_ms rate_limits_json now
 	# check_deps has already named the culprit on stdout; the zero exit is what makes the
 	# host render that line instead of discarding it.
 	check_deps || return 0
@@ -470,13 +462,12 @@ main() {
 		(.workspace.current_dir // ""),
 		(.workspace.git_worktree // ""),
 		(.context_window.used_percentage // 0 | floor),
-		(.exceeds_200k_tokens // false),
 		(.cost.total_api_duration_ms // 0)
 	]') || {
 		render_failure "stdin parse failed"
 		return 0
 	}
-	IFS=$'\037' read -r model effort dir worktree pct exceeds api_ms <<<"$jq_out"
+	IFS=$'\037' read -r model effort dir worktree pct api_ms <<<"$jq_out"
 	[[ -n "$effort" ]] && model="$model ($effort)"
 
 	# Asking git costs a fork on every render, so skip it when the worktree name already
@@ -526,7 +517,7 @@ main() {
 	[[ -n "$five_h" ]] && limits+=$(format_limit_segment "5h" "$five_h" "$five_h_reset" "$FIVE_HOUR_SECONDS" "$now")
 	[[ -n "$week" ]] && limits+=$(format_limit_segment "7d" "$week" "$week_reset" "$SEVEN_DAY_SECONDS" "$now")
 
-	printf '%s │ %s %s%s\n' "$(format_dir "$dir" "$worktree" "$branch")" "$model" "$(format_context_bar "$pct" "$exceeds")" "$limits"
+	printf '%s │ %s %s%s\n' "$(format_dir "$dir" "$worktree" "$branch")" "$model" "$(format_context_bar "$pct")" "$limits"
 }
 
 # Guarded so tests can source the formatters without rendering a status line.

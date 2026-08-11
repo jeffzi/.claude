@@ -19,11 +19,6 @@ set -euo pipefail
 # gradient. Only empty slots carry no color escape at all, so they render in the terminal's
 # default foreground like the model name beside them. There are no color tiers — the gradient
 # is continuous across 50% and 90%.
-#
-# A session whose context window runs past 200k tokens (`exceeds_200k_tokens` on stdin) draws
-# the same five slots from the diamond family instead: ◆ (U+25C6) filled, ◈ (U+25C8) half,
-# ◇ (U+25C7) empty. Only the three glyphs swap — slot count, quarter-snap thresholds, spacing,
-# and coloring stay the circle bar's.
 
 TEST_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SCRIPT="$TEST_DIR/../scripts/statusline.sh"
@@ -34,9 +29,6 @@ C_RESET=$'\033[0m'
 EMPTY="○"
 HALF="◎"
 FILLED="●"
-WIDE_EMPTY="◇"
-WIDE_HALF="◈"
-WIDE_FILLED="◆"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -64,12 +56,9 @@ report() {
 	fi
 }
 
-# The optional fourth argument is the exceeds_200k_tokens flag, spelled out to pin which
-# family it selects. It arrives from jq as the string "true" or "false"; omitting it stands
-# for the absent field.
 expect_glyphs() {
-	local desc="$1" pct="$2" expected="$3" exceeds="${4-}" actual ok=no
-	actual=$(format_context_bar "$pct" "$exceeds" | strip_ansi)
+	local desc="$1" pct="$2" expected="$3" actual ok=no
+	actual=$(format_context_bar "$pct" | strip_ansi)
 	[[ "$actual" == "$expected" ]] && ok=yes
 	report "$desc" "$ok" "$(printf 'expected: %s\n      actual: %s' "$expected" "$actual")"
 }
@@ -82,15 +71,9 @@ expect_glyphs() {
 #
 # The gradient escape is looked up from usage_color itself, so these assertions pin which
 # glyphs carry the gradient without restating the ramp — the ramp has its own tests below.
-#
-# The optional fourth argument is the exceeds_200k_tokens flag: pass "true" to draw the
-# pattern from the diamond family instead. Omitting it stands for the absent field.
 expect_bar() {
-	local desc="$1" pct="$2" pattern="$3" exceeds="${4-}" color expected="" sep="" i actual ok=no
+	local desc="$1" pct="$2" pattern="$3" color expected="" sep="" i actual ok=no
 	local filled="$FILLED" half="$HALF" empty="$EMPTY"
-	if [[ "$exceeds" == "true" ]]; then
-		filled="$WIDE_FILLED" half="$WIDE_HALF" empty="$WIDE_EMPTY"
-	fi
 	color=$(usage_color "$pct")
 	for ((i = 0; i < ${#pattern}; i++)); do
 		case "${pattern:i:1}" in
@@ -100,7 +83,7 @@ expect_bar() {
 		esac
 		sep=" "
 	done
-	actual=$(format_context_bar "$pct" "$exceeds")
+	actual=$(format_context_bar "$pct")
 	[[ "$actual" == "$expected" ]] && ok=yes
 	report "$desc" "$ok" "$(printf 'expected: %q\n      actual: %q' "$expected" "$actual")"
 }
@@ -145,16 +128,6 @@ expect_bar "64% (3.20 slots): fraction below 0.25 renders empty" 64 "FFFEE"
 expect_bar "65% (3.25 slots): fraction at 0.25 renders a gradient-colored half" 65 "FFFHE"
 expect_bar "74% (3.70 slots): fraction below 0.75 renders a gradient-colored half" 74 "FFFHE"
 expect_bar "75% (3.75 slots): fraction at 0.75 is promoted to filled" 75 "FFFFE"
-
-# ── Glyph family for a context window past 200k ───────────────────────────────
-#
-# exceeds_200k_tokens swaps the three glyphs and nothing else: slot count, quarter-snap
-# thresholds, spacing, and coloring stay the circle bar's — already pinned above — so only
-# the swap itself, and what keeps it from firing, need cases here.
-
-printf "\n── Glyph family for a context window past 200k (◆ ◈ ◇) ───────────────────────\n"
-expect_glyphs "30% past 200k: the partly-filled slot renders ◈" 30 "◆ ◈ ◇ ◇ ◇" true
-expect_glyphs "30% under 200k: the flag is false, so the circles stay" 30 "● ◎ ○ ○ ○" false
 
 # ── Gradient coloring ────────────────────────────────────────────────────────
 
@@ -535,7 +508,7 @@ trap 'rm -rf "${CLEANUP_PATHS[@]}"' EXIT
 # distinguishing fields. context_window.used_percentage sits here rather than on any one
 # fixture so every case renders a partially-filled gauge, exercising that field's wiring
 # through main wherever the gauge is checked.
-STDIN_ENVELOPE='{"hook_event_name":"Status","session_id":"statusline-test","transcript_path":"/tmp/statusline-transcript.jsonl","cwd":"/tmp/statusline-proj","version":"1.0.0","output_style":{"name":"default"},"exceeds_200k_tokens":false,"context_window":{"used_percentage":45}}'
+STDIN_ENVELOPE='{"hook_event_name":"Status","session_id":"statusline-test","transcript_path":"/tmp/statusline-transcript.jsonl","cwd":"/tmp/statusline-proj","version":"1.0.0","output_style":{"name":"default"},"context_window":{"used_percentage":45}}'
 stdin_json() {
 	jq -c --argjson extra "$1" '. * $extra' <<<"$STDIN_ENVELOPE"
 }
@@ -610,9 +583,6 @@ expect_line_contains "the 5h segment renders as label, percentage, arrow, countd
 expect_exact_line "the 7d segment is below the threshold, so no countdown trails the line" "${MAIN_PLAIN##*│ }" "7d 7%"
 expect_no_parentheses "the whole line frames details with · , not parentheses" "$MAIN_PLAIN"
 
-# Both new stdin fields ride the same batched jq extraction main already does, so each one
-# is checked end to end here: the worktree name against the leading segment, the glyph family
-# against the gauge that meets the next separator.
 expect_leading_segment() {
 	local desc="$1" plain="$2" expected="$3"
 	expect_exact_line "$desc" "${plain%% │ *}" "$expected"
@@ -637,11 +607,6 @@ MAIN_STDIN_BRANCH=$(full_stdin_json "$(printf '{"workspace":{"current_dir":"%s"}
 expect_leading_segment "the branch of workspace.current_dir reaches the line beside the basename" \
 	"$(main_render branch "$MAIN_STDIN_BRANCH" "$MAIN_PAYLOAD" | strip_ansi)" \
 	"branch-repo ⎇ tdd-branch"
-
-MAIN_STDIN_EXCEEDS=$(full_stdin_json '{"exceeds_200k_tokens":true}')
-expect_line_contains "exceeds_200k_tokens reaches the gauge, which draws the diamond family" \
-	"$(main_render exceeds "$MAIN_STDIN_EXCEEDS" "$MAIN_PAYLOAD" | strip_ansi)" \
-	" ◆ ◆ ◈ ◇ ◇ │ "
 
 MAIN_STDIN_EFFORT=$(full_stdin_json '{"effort":{"level":"high"}}')
 expect_line_contains "effort.level is appended to the model name in parentheses" \
