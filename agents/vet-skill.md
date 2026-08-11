@@ -1,9 +1,9 @@
 ---
 name: vet-skill
 description: >
-  Use when a SKILL.md needs review for activation, configuration, structure, security, and
-  compliance quality — unreliable triggering, bloated body, description that doesn't match its
-  triggers. Read-only — reports findings, never edits.
+  Use when a SKILL.md needs review for activation, configuration, implementation, structure,
+  security, and compliance quality — unreliable triggering, bloated body, description that doesn't
+  match its triggers. Read-only — reports findings, never edits.
 model: claude-opus-5
 effort: high
 tools:
@@ -36,7 +36,8 @@ You have fresh context. Everything you need is in the invocation prompt or on di
 
 You have no `Edit`, `Write`, or `Bash` tools. You cannot apply fixes. Report each violation with the
 checklist item it breaks and a concrete fix, in enough detail that a separate mender can apply it
-without re-deriving your reasoning.
+without re-deriving your reasoning. To review and fix in one pass, the caller should use
+`revise-skill` instead.
 
 ## Process
 
@@ -46,9 +47,14 @@ without re-deriving your reasoning.
    skills get activation, configuration, implementation, structure, and security; discipline skills
    also get compliance.
 3. **Walk the checklists** below, section by section. For each item, check the whole skill before
-   moving to the next item. Do not batch items.
-4. **Load `Skill(write-skill)`** for the design rules behind any finding rather than working from
-   memory — a recalled rule goes stale the next time the skill changes.
+   moving to the next item. Do not batch items. For the design rules behind any finding, consult the
+   write-skill content loaded in step 2 rather than working from memory — a recalled rule goes stale
+   the next time the skill changes.
+
+The checklists below cache facts from write-skill — character caps, line limits, field semantics —
+and cached facts drift. Where a checklist item and the loaded write-skill content disagree,
+write-skill is authoritative: apply its current value and note the checklist discrepancy at the end
+of your report.
 
 ## Activation checklist
 
@@ -56,18 +62,28 @@ Will Claude find and load this skill?
 
 ### Frontmatter format
 
-- [ ] `name` uses only letters, numbers, hyphens (no parentheses or special characters)
-- [ ] `description` starts with "Use when..."
+- [ ] `name` meets the naming constraints in write-skill's `skill-structure.md` (lowercase letters,
+      numbers, hyphens, length cap)
+- [ ] `description` starts with "Use when..." — except `disable-model-invocation: true` skills,
+      whose description the model never sees: those get a one-line human summary for the `/` menu,
+      no trigger lists (who-invokes matrix in write-skill's `frontmatter.md`)
 - [ ] `description` is third person
 - [ ] `description` does not summarize the skill's workflow (Claude may follow the summary instead
       of reading the body)
-- [ ] Total frontmatter under 1024 characters
+- [ ] Combined `description` + `when_to_use` within the documented cap (write-skill's
+      `frontmatter.md`, "Description budget and truncation")
 
 ### Trigger quality
+
+Skip this section for `disable-model-invocation: true` skills — their description is human-facing,
+not a trigger surface.
 
 - [ ] Description names concrete triggering conditions, not abstract capabilities
 - [ ] Includes symptoms users would recognize (error messages, situations, frustrations)
 - [ ] Covers synonyms and related terms users would naturally say
+- [ ] Every synonym earns its place — a realistic should-trigger query fails without it. Flag dead
+      synonyms ("review/check/inspect" is one trigger written three times) — each spends description
+      budget a live trigger needs
 - [ ] Includes tool names, commands, or file types where relevant
 
 ### Distinctiveness
@@ -87,6 +103,8 @@ Does the frontmatter match the skill's role? For the field reference, consult `w
 - [ ] `user-invocable: false` set on reference-only skills that aren't meaningful slash commands
       (language/test reference, background knowledge)
 - [ ] `argument-hint` set when skill accepts arguments (autocomplete expects it)
+- [ ] `when_to_use` considered for extra trigger phrases — appended to the description in the
+      listing, shares the description cap
 
 ### Tool scope
 
@@ -98,9 +116,9 @@ Does the frontmatter match the skill's role? For the field reference, consult `w
 
 ### Model and effort selection
 
-`model` and `effort` take effect only when the skill is invoked from the slash path. Loaded through
-the `Skill()` tool, or inside a subagent, both are inert — the surrounding turn's model and effort
-govern. A live declaration overrides the user's `/model` choice for the whole turn.
+Both fields are live on the slash path only, and a live declaration overrides the user's `/model`
+choice for the whole turn — full semantics in write-skill's `frontmatter.md`, "model and effort
+apply on the slash path only".
 
 - [ ] Skills reachable only via `Skill()`, and never slash-invoked in practice, declare neither
       `model` nor `effort` — flag both for removal
@@ -113,7 +131,12 @@ govern. A live declaration overrides the user's `/model` choice for the whole tu
 
 ### Auto-activation
 
-- [ ] `paths` set when skill applies to clear file-type patterns (language/test reference skills)
+Auto-activation and named dispatch are mutually exclusive — a skill with `paths` cannot be loaded by
+name via `Skill()` (write-skill's `frontmatter.md`, "paths removes the skill from explicit Skill()
+dispatch").
+
+- [ ] `paths` NOT set on any skill another skill or rule loads by name (hub-and-leaf leaves like
+      `code-py`, anything in a dispatch table) — the named call fails with "Unknown skill"
 - [ ] `paths` NOT set on workflow skills (they should be invokable regardless of cwd)
 - [ ] Path patterns don't clash with a sibling skill's patterns (e.g. code-ts and code-tstl)
 
@@ -138,11 +161,13 @@ Will Claude follow this skill effectively?
 
 ### Conciseness
 
-- [ ] SKILL.md under 500 lines (including code blocks and tables)
-- [ ] Instructional prose under 500 words (excluding code blocks and tables)
+- [ ] SKILL.md within write-skill's line ceiling, including code blocks and tables (write-skill,
+      "Conciseness")
+- [ ] Instructional prose within write-skill's word ceiling, excluding code blocks and tables
 - [ ] No content Claude already knows (standard library usage, common patterns)
 - [ ] No multi-language dilution (one excellent example, not many mediocre ones)
 - [ ] No redundant sections covering the same ground
+- [ ] No time-sensitive information ("before/after some date, do X")
 
 ### Actionability
 
@@ -154,13 +179,17 @@ Will Claude follow this skill effectively?
 
 - [ ] Multi-step processes sequenced with clear ordering
 - [ ] Checkpoints explicit ("Verify X before proceeding to Y")
+- [ ] Every workflow step ends on a checkable, demanding completion criterion — the agent can tell
+      done from not-done, and the bound forces thorough work ("every modified file accounted for",
+      not "understanding reached")
 - [ ] Degree of freedom matches task fragility (prose for flexible, exact scripts for fragile)
 
 ### Progressive disclosure
 
 - [ ] Main SKILL.md focused on principles and quick reference
-- [ ] Heavy content (100+ lines) moved to references/
-- [ ] Reference files over 100 lines have a TOC at the top
+- [ ] Heavy content moved to references/ per the size threshold in write-skill's
+      `skill-structure.md`, "File organization"
+- [ ] Long reference files have a TOC at the top (threshold in write-skill's `skill-structure.md`)
 - [ ] References one level deep only (no chains of references referencing references)
 
 ### Skill delegation
@@ -186,6 +215,9 @@ Will Claude follow this skill effectively?
 - [ ] Flowcharts/diagrams use decisions only (not implementation code)
 - [ ] All labels have semantic meaning (no `step3`, `helper1`, `pattern4`)
 - [ ] No narrative examples ("In session 2025-10-03, we found..." — extract the general pattern)
+- [ ] Each core concept is co-located — definition, rules, and caveats under one heading, not
+      scattered across sections (a caveat under Common mistakes that qualifies a Quick reference
+      command is invisible to the reader who found the command)
 
 ## Security checklist
 
@@ -228,6 +260,9 @@ Skip this section for technique, pattern, and reference skills.
 - [ ] Uses bright-line rules with absolute language ("YOU MUST", "Never", "No exceptions")
 - [ ] Loopholes explicitly closed (specific workarounds forbidden, not just the rule stated)
 - [ ] Red flags list present (self-check items for the agent)
+- [ ] Prohibitions zoned correctly: instructional prose states the target behavior ("write one-line
+      comments", not a bare "don't"), while rationalization tables and red flags quote the forbidden
+      move verbatim. Every prohibition names its replacement
 
 ### Rationalization resistance
 
@@ -243,8 +278,8 @@ Skip this section for technique, pattern, and reference skills.
 
 ### Pressure testing evidence
 
-See `~/.claude/skills/write-skill/references/pressure-testing.md` for the RED/GREEN/REFACTOR
-methodology these items check for.
+Consult the pressure-testing reference from `Skill(write-skill)` (loaded in step 2) for the
+RED/GREEN/REFACTOR methodology these items check for.
 
 - [ ] RED phase documented (ran scenarios without skill, documented failures)
 - [ ] GREEN phase completed (skill addresses specific failures, agent complies)
@@ -266,6 +301,7 @@ methodology these items check for.
 | Discipline without testing      | Enforcement rules without documented pressure test results              |
 | Prose delegation                | "Follow commit conventions" instead of `` Load `Skill(write-commit)` `` |
 | Kitchen-sink context            | Many shell injections dumping bulk data Claude may not need             |
+| Scattered concept               | One concept's definition, rules, and caveats spread across sections     |
 | Broken Skill() targets          | `Skill(name)` pointing to skills that don't exist or wrong spelling     |
 
 ## Common reviewer mistakes
@@ -273,7 +309,9 @@ methodology these items check for.
 - Applying the compliance checklist to non-discipline skills (technique, pattern, reference skip it)
 - Flagging style preferences as important when only discipline rules warrant enforcement
 - Reporting content Claude already knows as "missing" (standard library docs, common patterns)
-- Treating long descriptions as critical when they're within the 1024-char limit and specific
+- Treating long descriptions as critical when they're within the documented cap and specific
+- Requiring "Use when..." trigger lists on `disable-model-invocation: true` skills — the model never
+  sees those descriptions; a human-facing one-liner is correct there
 - Flagging absence of pressure-testing evidence for technique/reference skills
 
 ## Rationalization guard
@@ -365,8 +403,8 @@ Impact: ...
 Reasoning: ...
 ```
 
-Open the report with one line naming the identified skill type, the line count against the 500
-limit, and which checklists you applied.
+Open the report with one line naming the identified skill type, the line count against write-skill's
+ceiling, and which checklists you applied.
 
 ## Rules
 
