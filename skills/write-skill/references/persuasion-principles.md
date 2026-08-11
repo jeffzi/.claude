@@ -5,9 +5,8 @@
 - [The seven principles](#the-seven-principles) — Authority, Commitment, Scarcity, Social proof,
   Unity, Reciprocity, Liking
 - [Principle combinations by skill type](#principle-combinations-by-skill-type)
-- [Why this works](#why-this-works)
-- [Ethical use](#ethical-use)
-- [Research citations](#research-citations)
+- [Writing compliance-resistant rules](#writing-compliance-resistant-rules) — foundational
+  principle, bright lines, loopholes, rationalization tables, red flags, prohibition zoning
 
 ---
 
@@ -149,17 +148,8 @@ discipline skill — it cuts off the entire class of "I'm following the spirit" 
 
 ### Bright-line rules
 
-Absolute language removes decision fatigue. "YOU MUST" is more effective than "consider doing."
-
-```markdown
-# Weak — agent will rationalize exceptions
-
-Consider writing tests first when feasible.
-
-# Strong — no decision to make
-
-Write code before test? Delete it. Start over. No exceptions.
-```
+Absolute language removes decision fatigue. "YOU MUST" is more effective than "consider doing"
+(example under Authority above).
 
 ### Close every loophole explicitly
 
@@ -198,37 +188,20 @@ Make it easy for agents to self-check:
 - "This is different because..."
 ```
 
-## Why this works
+### Steer positive, adjudicate negative
 
-**Bright-line rules reduce rationalization:** "YOU MUST" removes decision fatigue. Absolute language
-eliminates "is this an exception?" questions.
+Prohibitions do two different jobs; zone them accordingly.
 
-**Implementation intentions create automatic behavior:** "When X, do Y" is more effective than
-"generally do Y." Clear triggers plus required actions reduce cognitive load on compliance.
+**Instructional prose steers positive.** When guiding what the agent does next, a bare prohibition
+activates the banned concept without supplying an alternative — "don't think of an elephant" makes
+the elephant more available, not less. State the target behavior ("write one-line comments") so the
+banned one is never spoken. A "don't" where a "do" carries the same information is a smell.
 
-**LLMs mirror human responses:** trained on human text containing these patterns. Authority language
-precedes compliance in training data. Commitment sequences (statement then action) are frequently
-modeled. Social proof patterns establish norms.
+**Adjudication structures stay negative — that is their mechanism.** Rationalization tables, red
+flags, and loophole closures quote the forbidden move verbatim because their job is recognition, not
+steering: the agent mid-rationalization matches its own excuse against the named one. You cannot
+pattern-match an excuse you refuse to name.
 
-## Ethical use
-
-**Legitimate:** ensuring critical practices are followed, creating effective documentation,
-preventing predictable failures.
-
-**Illegitimate:** manipulating for personal gain, creating false urgency, guilt-based compliance.
-
-**The test:** would this technique serve the user's genuine interests if they fully understood it?
-
-## Research citations
-
-- **Cialdini, R. B. (2021).** _Influence: The Psychology of Persuasion (New and Expanded)._ Harper
-  Business. Seven principles of persuasion; empirical foundation for influence research.
-- **Meincke, L., Shapiro, D., Duckworth, A. L., Mollick, E., Mollick, L., & Cialdini, R. (2025).**
-  Call Me A Jerk: Persuading AI to Comply with Objectionable Requests. University of Pennsylvania.
-  Tested 7 principles with N=28,000 LLM conversations; compliance increased 33% to 72%.
-
-## Attribution
-
-Adapted from
-[obra/superpowers/writing-skills](https://github.com/obra/superpowers/tree/main/skills/writing-skills)
-by Jesse Vincent.
+**Every prohibition names its replacement.** "Write code before test? Delete it. Start over." —
+prohibition and positive action in the same breath. A bare "don't X" with no adjacent "do Y" is
+incomplete in either zone.
