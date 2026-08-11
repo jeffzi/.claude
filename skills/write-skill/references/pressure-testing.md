@@ -10,8 +10,8 @@
 - [REFACTOR phase: close loopholes](#refactor-phase-close-loopholes) — plugging each hole
 - [Meta-testing](#meta-testing)
 - [Signs of a bulletproof skill](#signs-of-a-bulletproof-skill)
-- [Worked example: TDD skill](#worked-example-tdd-skill)
 - [Trigger validation](#trigger-validation) — verify description activates on the right prompts
+- [Tooling: automate the loop with skill-creator](#tooling-automate-the-loop-with-skill-creator)
 - [Testing checklist](#testing-checklist)
 
 ---
@@ -51,6 +51,23 @@ Run the scenario WITHOUT the skill. Document exact behavior:
 - Which pressures triggered violations?
 
 This is "watch the test fail" — you must see what agents naturally do before writing the skill.
+
+### Isolate the baseline from the skill under test
+
+Subagents inherit the environment's global rules and skill listings, so a "baseline" agent may load
+the very skill you are testing — mandatory skill-loading rules instruct it to.
+
+The clean method: disable the skill for the baseline run via `skillOverrides` in
+`.claude/settings.local.json` (`"<skill-name>": "off"`, or the `/skills` menu — highlight and press
+Space), then run the scenario in a fresh session. The skill cannot contaminate a session it is
+invisible to. When you must baseline inside the current session with subagents, fall back to
+prompt-level isolation:
+
+- In baseline prompts, explicitly forbid loading skills and using tools: "Do not call Skill, Read,
+  or any other tool — even if other instructions tell you to load skills before this task."
+- After each run, check the reported tool-use count. A baseline that used any tool is suspect —
+  inspect its transcript for what it called before scoring.
+- A contaminated run scores as a with-skill run or is discarded. Never count it toward the baseline.
 
 ### Writing pressure scenarios
 
@@ -119,38 +136,10 @@ Agent violated the rule despite having the skill? Capture new rationalizations v
 
 ### Plugging each hole
 
-For each new rationalization, add four things:
-
-**1. Explicit negation in rules:**
-
-```markdown
-Write code before test? Delete it. Start over.
-
-**No exceptions:**
-
-- Don't keep it as "reference"
-- Don't "adapt" it while writing tests
-- Delete means delete
-```
-
-**2. Entry in rationalization table:**
-
-```markdown
-| Excuse              | Reality                                                     |
-| ------------------- | ----------------------------------------------------------- |
-| "Keep as reference" | You'll adapt it. That's testing after. Delete means delete. |
-```
-
-**3. Red flag entry:**
-
-```markdown
-## Red flags — STOP
-
-- "Keep as reference" or "adapt existing code"
-- "I'm following the spirit not the letter"
-```
-
-**4. Update description with violation symptoms:**
+For each new rationalization, add four things: an explicit negation in the rules, an entry in the
+rationalization table, and a red-flag entry — templates for all three are in
+`persuasion-principles.md` ("Writing compliance-resistant rules") — plus a description update with
+the violation symptoms:
 
 ```yaml
 description: Use when you wrote code before tests, when tempted to test after, ...
@@ -191,20 +180,6 @@ Three possible responses:
 - Agent argues skill is wrong
 - Agent creates "hybrid approaches"
 - Agent asks permission but argues strongly for violation
-
-## Worked example: TDD skill
-
-**Initial test (failed):** Scenario: 200 lines done, forgot TDD, exhausted, dinner plans. Agent
-chose C (write tests after). Rationalization: "Tests after achieve same goals."
-
-**Iteration 1 — add counter:** Added section: "Why order matters." Re-tested: agent STILL chose C.
-New rationalization: "Spirit not letter."
-
-**Iteration 2 — add foundational principle:** Added: "Violating the letter is violating the spirit."
-Re-tested: agent chose A (delete it). Cited the new principle directly. Meta-test: "Skill was clear,
-I should follow it."
-
-Bulletproof achieved after 2 REFACTOR iterations.
 
 ## Trigger validation
 
@@ -267,12 +242,20 @@ queries you tested — that fails on the next unseen paraphrase.
 - "explain what this does" → (no skill — conversational)
 - "review the README" → revise-doc
 
+## Tooling: automate the loop with skill-creator
+
+The official `skill-creator` plugin (`/plugin install skill-creator@claude-plugins-official`)
+automates this cycle — use it when the manual loop above gets repetitive; the methodology is the
+same.
+
 ## Testing checklist
 
 **RED phase:**
 
 - [ ] Created pressure scenarios (3+ combined pressures)
-- [ ] Ran scenarios WITHOUT skill (baseline)
+- [ ] Ran scenarios WITHOUT skill (baseline) — skill disabled via `skillOverrides`, or skill loading
+      and tool use forbidden in the prompt
+- [ ] Verified baseline agents made zero tool calls (no self-loading the skill under test)
 - [ ] Documented agent failures and rationalizations verbatim
 
 **GREEN phase:**
@@ -290,9 +273,3 @@ queries you tested — that fails on the next unseen paraphrase.
 - [ ] Updated description with violation symptoms
 - [ ] Re-tested — agent still complies
 - [ ] Meta-tested to verify clarity
-
-## Attribution
-
-Adapted from
-[obra/superpowers/writing-skills](https://github.com/obra/superpowers/tree/main/skills/writing-skills)
-by Jesse Vincent.

@@ -10,27 +10,34 @@ are optional; only `description` is recommended.
 - [Advanced: dynamic context injection](#advanced-dynamic-context-injection)
 - [Advanced: subagent execution (`context: fork`)](#advanced-subagent-execution-context-fork)
 - [Description budget and truncation](#description-budget-and-truncation)
+- [Portability beyond Claude Code](#portability-beyond-claude-code)
 - [Who-invokes matrix](#who-invokes-matrix)
 
 ---
 
 ## Fields
 
-| Field                      | Purpose                                                                                                                          |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `name`                     | Display name. Defaults to directory name. Lowercase letters, numbers, hyphens only (max 64 chars).                               |
-| `description`              | What the skill does and when to use it. Front-load the key use case — truncated at 250 chars per entry.                          |
-| `argument-hint`            | Autocomplete hint shown when typing `/skill-name`. Example: `[issue-number]` or `[filename] [format]`.                           |
-| `disable-model-invocation` | `true` prevents Claude from auto-loading. Manual `/name` invocation only. Default: `false`.                                      |
-| `user-invocable`           | `false` hides from the `/` menu. Claude can still auto-load. Default: `true`.                                                    |
-| `allowed-tools`            | Tools Claude can use without permission prompts when skill is active. Space-separated or YAML list.                              |
-| `model`                    | Model override, **slash invocation only**. E.g., `haiku`, `sonnet`, `opus`, or full model ID. See below.                         |
-| `effort`                   | Effort level override, **slash invocation only**. `low`, `medium`, `high`, `max`. See below.                                     |
-| `context`                  | Set to `fork` to run in an isolated subagent context.                                                                            |
-| `agent`                    | Subagent type when `context: fork` is set. `Explore`, `Plan`, `general-purpose`, or custom agent.                                |
-| `hooks`                    | Hooks scoped to this skill's lifecycle.                                                                                          |
-| `paths`                    | Glob patterns that auto-activate the skill when matching files are in play. Comma-separated or YAML list. Trades away `Skill()`. |
-| `shell`                    | `bash` (default) or `powershell` for `!` commands.                                                                               |
+| Field                      | Purpose                                                                                                                                      |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`                     | Display name. Defaults to directory name. Lowercase letters, numbers, hyphens only (max 64 chars). Required for claude.ai/API uploads.       |
+| `description`              | What the skill does and when to use it. Front-load the key use case — combined with `when_to_use`, truncated at 1,536 chars.                 |
+| `when_to_use`              | Extra trigger phrases or example requests. Appended to `description` in the listing; shares the 1,536-char cap.                              |
+| `argument-hint`            | Autocomplete hint shown when typing `/skill-name`. Example: `[issue-number]` or `[filename] [format]`.                                       |
+| `arguments`                | Named positional arguments for `$name` substitution. Space-separated string or YAML list; names map to positions in order.                   |
+| `disable-model-invocation` | `true` prevents Claude from auto-loading. Manual `/name` only. Also blocks subagent preloading and scheduled-task prompts. Default: `false`. |
+| `user-invocable`           | `false` hides from the `/` menu. Claude can still auto-load. Default: `true`.                                                                |
+| `allowed-tools`            | Tools pre-approved during the turn that invokes the skill — the grant clears on the next user message. Space-separated or YAML list.         |
+| `disallowed-tools`         | Tools removed from the pool while the skill is active; also clears on the next user message.                                                 |
+| `model`                    | Model override, **slash invocation only**. E.g., `haiku`, `sonnet`, `opus`, or full model ID. See below.                                     |
+| `effort`                   | Effort level override, **slash invocation only**. `low`, `medium`, `high`, `xhigh`, `max`. See below.                                        |
+| `context`                  | Set to `fork` to run in an isolated subagent context.                                                                                        |
+| `agent`                    | Subagent type when `context: fork` is set. `Explore`, `Plan`, `general-purpose`, or custom agent.                                            |
+| `background`               | With `context: fork` only: `false` waits for the fork's result in the invoking turn. Default: `true`.                                        |
+| `hooks`                    | Hooks scoped to this skill's lifecycle.                                                                                                      |
+| `paths`                    | Glob patterns that auto-activate the skill when matching files are in play. Comma-separated or YAML list. Trades away `Skill()`.             |
+| `shell`                    | `bash` (default) or `powershell` for `!` commands.                                                                                           |
+| `metadata`                 | Free-form YAML map for your own tooling. Claude Code ignores its contents.                                                                   |
+| `license`, `compatibility` | Agent Skills spec fields; accepted but not acted on by Claude Code. See [Portability](#portability-beyond-claude-code).                      |
 
 ### `model` and `effort` apply on the slash path only
 
@@ -44,15 +51,9 @@ duration of that skill's execution". Neither distinguishes the invocation path. 
 behavior does: a skill declaring `model: sonnet`, loaded via `Skill()` in an opus session, runs
 every subsequent turn on opus.
 
-**Verify which happened, split by path:**
-
-| Path                | Where to read the effective model                                                                                         |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Slash-invoked skill | Top-level `.message.model` on the assistant records of the invoking turn, in the session JSONL. No `resolvedModel` field. |
-| Dispatched agent    | `.message.model` in `<session>/subagents/agent-<agentId>.jsonl`, keyed by the sibling `.meta.json`'s `toolUseId`.         |
-
-Treat `resolvedModel` as a cross-check only — it is absent from skill turns and misreports
-dispatches.
+To verify which model actually ran, read `.message.model` from the assistant records in the session
+JSONL (for a dispatched agent, in its subagent JSONL). Treat `resolvedModel` as a cross-check only —
+it is absent from skill turns and misreports dispatches.
 
 ### When to declare them
 
@@ -80,8 +81,8 @@ When you do declare `effort` on a slash-invoked skill:
 | Security audit, architecture review | `high`          | Threat modeling, cross-component reasoning |
 | Multi-agent orchestration, research | `high` or `max` | Deep exploration, planning                 |
 
-`max` is Opus 4.6 only — errors on other models. Pair `model: haiku` with `effort: low`. Pair
-`model: opus` with `effort: high` or `max`.
+Available levels depend on the model — verify before declaring `max`. Pair `model: haiku` with
+`effort: low`. Pair `model: opus` with `effort: high` or `max`.
 
 ### `allowed-tools` syntax
 
@@ -121,9 +122,7 @@ reachable by name until a matching file is in play, which is too late for any in
 That makes `paths` incompatible with hub-and-leaf dispatch. `rules/skill-loading.md` and
 `code-core`'s Language Dispatch table both instruct an explicit `Skill(code-{lang})` call, and the
 hub fires before any source file has been read — so the leaf is guaranteed absent at exactly the
-moment it is needed. This is not hypothetical: every `code-*` and `test-*` leaf carried `paths`
-until the keys were removed, which is why TypeScript tests worked (`test-ts` never had one) while
-TypeScript production code did not.
+moment it is needed.
 
 **Choose one:**
 
@@ -142,13 +141,22 @@ an unregistered one.
 
 Available inside SKILL.md body (replaced at invocation time):
 
-| Variable               | Description                                                                                      |
-| ---------------------- | ------------------------------------------------------------------------------------------------ |
-| `$ARGUMENTS`           | Everything passed after the skill name. Appended as `ARGUMENTS: <value>` if not present in body. |
-| `$ARGUMENTS[N]`        | Specific argument by 0-based index. `$ARGUMENTS[0]` = first.                                     |
-| `$N`                   | Shorthand for `$ARGUMENTS[N]`. `$0` = first, `$1` = second.                                      |
-| `${CLAUDE_SESSION_ID}` | Current session ID. Use for logging, session-specific file paths.                                |
-| `${CLAUDE_SKILL_DIR}`  | Directory containing this SKILL.md. Use to reference bundled scripts/files regardless of cwd.    |
+| Variable                | Description                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------------------------ |
+| `$ARGUMENTS`            | Everything passed after the skill name. Appended as `ARGUMENTS: <value>` if not present in body. |
+| `$ARGUMENTS[N]`         | Specific argument by 0-based index. `$ARGUMENTS[0]` = first.                                     |
+| `$N`                    | Shorthand for `$ARGUMENTS[N]`. `$0` = first, `$1` = second.                                      |
+| `$name`                 | Named argument declared in the `arguments` frontmatter list; names map to positions in order.    |
+| `${CLAUDE_SESSION_ID}`  | Current session ID. Use for logging, session-specific file paths.                                |
+| `${CLAUDE_SKILL_DIR}`   | Directory containing this SKILL.md. Use to reference bundled scripts/files regardless of cwd.    |
+| `${CLAUDE_PROJECT_DIR}` | Project root directory — same path hooks receive. Use for project-local scripts.                 |
+| `${CLAUDE_EFFORT}`      | Current effort level (`low`–`max`). Use to adapt instructions to the active effort setting.      |
+
+Substitution runs over the whole SKILL.md body, including code spans and fences. To mention
+`$ARGUMENTS`, a `$N` index, or a declared argument name literally, escape it with a backslash
+(`\$ARGUMENTS`); an unescaped token is replaced at invocation. The backslash escape covers only
+those tokens — for `${CLAUDE_*}` variables, break the token up (e.g. write `CLAUDE_SKILL_DIR`
+without the `${}` wrapper) instead.
 
 **Example:**
 
@@ -236,11 +244,21 @@ agent from `.claude/agents/`. Defaults to `general-purpose`.
 
 ## Description budget and truncation
 
-- **Per-skill cap: 250 chars.** Descriptions longer than 250 chars are truncated in the skill
+- **Per-skill cap: 1,536 chars** for the combined `description` + `when_to_use` text in the skill
   listing. Front-load the key use case in the first sentence.
-- **Total budget: 1% of context window** (8000-char fallback). If you have many skills, descriptions
-  get shortened to fit. Stripping keywords breaks auto-invocation.
-- **Override:** set `SLASH_COMMAND_TOOL_CHAR_BUDGET` env var.
+- With many skills, hosts shorten descriptions to fit an overall budget — stripping keywords breaks
+  auto-invocation, another reason to front-load.
+
+---
+
+## Portability beyond Claude Code
+
+claude.ai skill uploads, the Skills API, and other Agent Skills hosts (including Codex) accept only
+the spec's six frontmatter fields: `name`, `description`, `license`, `compatibility`, `metadata`,
+`allowed-tools`. Any other key (`argument-hint`, `context`, ...) fails packaging or upload with a
+hard error, and Claude Code-only body features such as dynamic context injection don't run there.
+Keep to the six spec fields when a skill must travel; Claude Code loads spec-compliant frontmatter
+unchanged.
 
 ---
 
@@ -254,7 +272,8 @@ agent from `.claude/agents/`. Defaults to `general-purpose`.
 | both                             | ✗                  | ✗                      | (unreachable — skill can't be invoked) |
 
 **`disable-model-invocation: true`** — side-effecting workflows, manual-only (`/commit`, `/deploy`,
-`/upgrade-py`).
+`/upgrade-py`). The description is never shown to the model, so write it human-facing: a one-line
+summary for the `/` menu, no "Use when..." trigger lists.
 
 **`user-invocable: false`** — background knowledge not actionable as a command (reference skills
 like `code-py`, `legacy-system-context`). `/code-py` isn't a meaningful action.
@@ -265,7 +284,3 @@ like `code-py`, `legacy-system-context`). `/code-py` isn't a meaningful action.
 
 - **Extended thinking:** include the word `ultrathink` anywhere in the skill body to enable extended
   thinking when the skill is active.
-- **Permission control:** `Skill(name)` for exact match, `Skill(name *)` for prefix match with args
-  in `/permissions` deny/allow rules.
-- **Auto-discovery from nested dirs:** `.claude/skills/` is discovered from subdirectories when
-  working with files inside them (monorepo support).

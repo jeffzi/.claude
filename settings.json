@@ -197,7 +197,8 @@
     "typescript-lsp@claude-plugins-official": false,
     "swift-lsp@claude-plugins-official": true,
     "pyright-lsp@claude-plugins-official": true,
-    "clangd-lsp@claude-plugins-official": true
+    "clangd-lsp@claude-plugins-official": true,
+    "skill-creator@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "claude-plugins-official": {

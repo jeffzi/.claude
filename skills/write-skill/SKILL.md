@@ -47,14 +47,15 @@ failures.
 - Standard practices Claude already knows
 - Project-specific conventions — put those in CLAUDE.md
 - Mechanical constraints — automate with regex, linting, or CI instead
+- Facts the environment already answers — `package.json` scripts, `--help` output, directory layout.
+  A skill restating them is a cache that goes stale; document only what no lookup reveals (unwritten
+  conventions, rationale, gotchas)
 
 ## The Iron Law
 
 ```text
 NO SKILL WITHOUT A FAILING TEST FIRST
 ```
-
-This applies to NEW skills AND EDITS to existing skills.
 
 Write skill before testing? Delete it. Start over. Edit skill without testing? Same violation.
 
@@ -77,67 +78,52 @@ Discipline skills need persuasion techniques to resist rationalization — read
 
 ## SKILL.md structure
 
-Two required frontmatter fields: `name` (letters, numbers, hyphens only) and `description` (starts
-with "Use when...", third person, triggering conditions only — never summarize the workflow).
+Read `references/skill-structure.md` for the frontmatter naming and description rules, the structure
+template, file organization, and description optimization (CSO).
 
-**Body:** Adapt sections to your content — overview, when to use, core pattern, quick reference,
-implementation, common mistakes. Not every section applies to every skill type.
+## Steps and completion criteria
 
-**Files:** SKILL.md under 500 lines. Heavy content (100+ lines) in `references/`. One level deep
-only — no chains of references referencing references.
+For workflow and task skills, every step ends on a **completion criterion** — the condition that
+tells the agent the step is done. Two properties make it a lever:
 
-Read `references/skill-structure.md` for the full structure template, file organization rules, and
-description optimization (CSO).
+- **Clarity** — the agent can tell done from not-done. A vague bound ("understanding reached")
+  invites premature completion: the agent rushes to the visible next step. Sharpen the bound before
+  restructuring anything.
+- **Demand** — how much the bound requires. "Every modified file accounted for" forces thorough
+  digging where "produce a change list" does not. Demand also binds flat reference: "every rule
+  applied" sets an exhaustiveness bar for a checklist the same way "every step done" does for a
+  sequence.
+
+The strongest criteria are both checkable and exhaustive.
 
 ## Frontmatter beyond name/description
 
-11 additional optional fields control invocation, tool access, model selection, subagent execution,
-and dynamic context injection. Match each to the skill's role:
+Additional optional fields control invocation, tool access, model selection, subagent execution, and
+dynamic context injection. Match each to the skill's role:
 
-| Field                            | Use for                                                              |
-| -------------------------------- | -------------------------------------------------------------------- |
-| `argument-hint`                  | Any skill that takes arguments (autocomplete hint)                   |
-| `disable-model-invocation: true` | Side-effecting workflows (`/deploy`, `/upgrade-*`)                   |
-| `user-invocable: false`          | Reference-only knowledge (`/code-py` isn't an action)                |
-| `allowed-tools`                  | Read-only skills, tool-scoped skills (`Bash(git *)`)                 |
-| `model`                          | Slash-invoked skills only, and only with a stated reason — see below |
-| `effort`                         | Slash-invoked skills only, and only with a stated reason — see below |
-| `paths`                          | Auto-activate when editing matching file types                       |
-| `context: fork` + `agent`        | Long-running research/exploration tasks                              |
-| Shell injection (body syntax)    | Pre-inject git status, diffs, outdated lists, etc.                   |
+| Field                            | Use for                                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------------------------ |
+| `argument-hint`                  | Any skill that takes arguments (autocomplete hint)                                         |
+| `when_to_use`                    | Extra trigger phrases appended to the description in the listing                           |
+| `disable-model-invocation: true` | Side-effecting workflows (`/deploy`, `/upgrade-*`)                                         |
+| `user-invocable: false`          | Reference-only knowledge (`/code-py` isn't an action)                                      |
+| `allowed-tools`                  | Read-only skills, tool-scoped skills (`Bash(git *)`)                                       |
+| `model`                          | Slash-invoked skills only, and only with a stated reason — see `references/frontmatter.md` |
+| `effort`                         | Slash-invoked skills only, and only with a stated reason — see `references/frontmatter.md` |
+| `paths`                          | Auto-activate when editing matching file types                                             |
+| `context: fork` + `agent`        | Long-running research/exploration tasks                                                    |
+| Shell injection (body syntax)    | Pre-inject git status, diffs, outdated lists, etc.                                         |
 
 Read `references/frontmatter.md` for the complete reference, `allowed-tools` syntax, string
-substitutions (`$ARGUMENTS`, `${CLAUDE_SKILL_DIR}`), subagent execution details, and the description
-truncation/budget rules.
-
-### `model` and `effort` are slash-path only
-
-Both fields take effect only when the user types `/skill-name`. Loaded through the `Skill()` tool,
-or reached inside a subagent, both are **inert** — the surrounding turn's model and effort govern.
-
-This matters twice over:
-
-- **A load-only skill should declare neither.** `code-core`, `test-core`, and the language leaves
-  are reached through `Skill()`, so a `model:` line there changes nothing and tells the next reader
-  something false.
-- **A live declaration overrides the user's `/model` choice for the whole turn.** That needs a
-  stated reason — a genuine quality floor for the workflow, not "this skill feels important".
-  Liveness alone is not a reason.
-
-`disable-model-invocation: true` settles the question in one direction: slash is the only path, so
-the declaration is always live and always needs its reason.
-
-The upstream docs say both fields apply "when this skill is active", with no invocation-path
-qualifier — do not take that as license to declare them on load-only skills.
-`references/frontmatter.md` has the criterion table and the per-path verification method.
+substitutions (`\$ARGUMENTS`, `CLAUDE_SKILL_DIR` — literal mentions in a SKILL.md body substitute at
+invocation; escape `\$ARGUMENTS` with a backslash), subagent execution details, portability limits
+outside Claude Code, and the description truncation/budget rules.
 
 ## Writing for compliance
 
-**Foundational principle:** Violating the letter of the rules is violating the spirit of the rules.
-Add this early in any discipline skill. Read `references/persuasion-principles.md` (section "Writing
-compliance-resistant rules") for bright-line rules, loophole closing, and rationalization tables.
-
-See `references/persuasion-principles.md` for persuasion alignment by skill type.
+Read `references/persuasion-principles.md` (section "Writing compliance-resistant rules") for
+bright-line rules, loophole closing, rationalization tables, and the
+steer-positive/adjudicate-negative zoning rule for prohibitions.
 
 ## Pressure-testing skills
 
@@ -163,16 +149,26 @@ content to reference files, cross-reference instead of repeating, compress examp
 beats three mediocre). Match freedom to fragility: prose for flexible tasks, exact scripts for
 fragile operations.
 
+Once invoked, skill content stays in context for the rest of the session — every line is a recurring
+token cost. Write standing instructions that apply throughout a task, not one-time steps; the file
+is not re-read on later turns.
+
+Hunt no-ops sentence by sentence: an instruction the model already obeys by default pays tokens to
+say nothing. The test — does this sentence change behavior versus the default? — is settled by
+running the skill, not by debate. When a sentence fails, delete the whole sentence rather than
+trimming words from it.
+
 ## Anti-patterns
 
-| Anti-pattern                    | What to look for                                                  |
-| ------------------------------- | ----------------------------------------------------------------- |
-| Workflow summary in description | Claude follows summary as shortcut, skips body                    |
-| Narrative example               | Session-specific stories instead of general patterns              |
-| Multi-language dilution         | Same example in 5+ languages — mediocre quality, maintenance cost |
-| Code in flowcharts              | Implementation code in diagrams — can't copy-paste                |
-| Generic labels                  | `helper1`, `step3` — labels without semantic meaning              |
-| Over-documenting known things   | Standard library usage Claude already knows                       |
+| Anti-pattern                    | What to look for                                                    |
+| ------------------------------- | ------------------------------------------------------------------- |
+| Workflow summary in description | Claude follows summary as shortcut, skips body                      |
+| Narrative example               | Session-specific stories instead of general patterns                |
+| Multi-language dilution         | Same example in 5+ languages — mediocre quality, maintenance cost   |
+| Code in flowcharts              | Implementation code in diagrams — can't copy-paste                  |
+| Generic labels                  | `helper1`, `step3` — labels without semantic meaning                |
+| Over-documenting known things   | Standard library usage Claude already knows                         |
+| Scattered concept               | One concept's definition, rules, and caveats spread across sections |
 
 ## Red flags — STOP and reassess
 
@@ -187,25 +183,23 @@ If any of these are true, you are violating the Iron Law:
 
 ## Deployment checklist
 
-After writing ANY skill, STOP and complete this checklist before moving to the next.
-
-### RED phase — baseline
-
-- [ ] Created test scenarios (pressure for discipline; application for technique; recognition for
-      pattern; retrieval for reference)
-- [ ] Ran scenarios WITHOUT skill, documented failures and rationalizations verbatim
+Test items (RED/GREEN/REFACTOR runs): use the testing checklist in `references/pressure-testing.md`.
 
 ### GREEN phase — write skill
 
-- [ ] `name` uses only letters, numbers, hyphens
+- [ ] `name` uses only lowercase letters, numbers, hyphens (max 64 chars)
 - [ ] `description` starts with "Use when...", third person, no workflow summary
+- [ ] Description states what the skill is NOT for when sibling skills could match
 - [ ] SKILL.md under 500 lines; heavy content in reference files
-- [ ] Keywords cover errors, symptoms, synonyms, tool names
+- [ ] Keywords cover errors, symptoms, synonyms, tool names — each synonym earns its place (a
+      realistic should-trigger query fails without it)
+- [ ] Workflow steps end on checkable, demanding completion criteria
 - [ ] One excellent code example (not multi-language)
 - [ ] Common mistakes section included
+- [ ] Consistent terminology throughout (one term per concept)
+- [ ] No time-sensitive information ("before/after some date, do X")
 - [ ] `model`/`effort` declared only if the skill is slash-invoked, and each has a stated reason;
       otherwise both omitted (see `references/frontmatter.md`)
-- [ ] Ran scenarios WITH skill, agent now complies
 
 ### For discipline skills (additional)
 
@@ -214,16 +208,3 @@ After writing ANY skill, STOP and complete this checklist before moving to the n
 - [ ] Red flags list
 - [ ] Loopholes explicitly closed
 - [ ] Persuasion principles matched to skill type
-
-### REFACTOR phase — close loopholes
-
-- [ ] Identified new rationalizations from testing
-- [ ] Added explicit counters for each
-- [ ] Re-tested — agent still complies
-- [ ] Meta-tested to verify clarity
-
-## Attribution
-
-Core principles adapted from
-[obra/superpowers/writing-skills](https://github.com/obra/superpowers/tree/main/skills/writing-skills)
-by Jesse Vincent, which applies TDD methodology and persuasion research to skill authoring.
