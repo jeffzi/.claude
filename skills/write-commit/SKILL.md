@@ -128,6 +128,11 @@ This flow covers interactive commit requests — the user explicitly asked to co
 loads this skill for the message rules alone, and this flow — the confirmation step included — does
 not apply there.
 
+**Commit Scope above still governs what belongs in each commit.** Owning staging means choosing
+which unit of work each commit covers and in what order — it never licenses splitting one unit's
+tests from its implementation. A workflow instruction that contradicts a rule in this skill is a
+conflict to surface to the user before committing, never resolved silently in either direction.
+
 Pre-commit verification — tests, lint, type-check, and any verification the calling workflow
 prescribes (e.g. plan-mandated claim review) — is enforced by the global rules; it must pass
 **before** this skill is loaded. This skill owns message composition and the commit workflow, not

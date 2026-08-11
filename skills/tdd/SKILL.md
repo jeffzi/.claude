@@ -170,8 +170,9 @@ Wave mechanics (full loop in `references/orchestration-flow.md`):
 - Multi-group wave prompts carry the PARALLEL WAVE notice: each agent stays inside its group's files
   and skips its own full-suite run.
 - Verification: each cycle's TEST_COMMAND, then FULL_SUITE_COMMAND **once per wave**.
-- No commits mid-loop: commits stay serial and per-cycle, in TDD order, but happen only in the
-  COMMIT phase after REFACTOR — never interleave two cycles' files in one commit.
+- No commits mid-loop: commits stay serial and per-cycle — one commit per cycle, tests and
+  implementation together — but happen only in the COMMIT phase after REFACTOR; never interleave two
+  cycles' files in one commit.
 - Guards (`tdd-cycle-active`, per-agent `tdd-red-phase.<agent_id>` read markers) are cleared only
   after every agent in the wave has returned.
 - One STUCK or TEST_FLAWED cycle never blocks the wave's PASSED cycles — verify those first, then
@@ -232,9 +233,9 @@ isolation:
 state. `FAILURE_OUTPUT` is the evidence that substitutes for it: the failure message must be
 expected, and it must fail because the feature is missing (not typos).
 
-The agent NEVER commits — and neither do you until the COMMIT phase after REFACTOR, in TDD order
-(test files first, then implementation files; see the orchestration flow). Never ask the agent for a
-commit or instruct it to make one.
+The agent NEVER commits — and neither do you until the COMMIT phase after REFACTOR, one commit per
+cycle holding that cycle's test files and implementation files together (see the orchestration
+flow). Never ask the agent for a commit or instruct it to make one.
 
 **`STATUS: PASSED_UNEXPECTEDLY`?** Behavior already exists. Report to user and ask: skip or revise
 scope?
@@ -322,8 +323,9 @@ else is **ad hoc**:
   `git commit` in this turn.** Wait for the user's next message with explicit approval. "Present and
   proceed" in a single turn is committing without approval.
 
-Then load `Skill(write-commit)` and commit cycle by cycle in TDD order (that cycle's test files
-first, then its implementation files; staging rules in `references/orchestration-flow.md`).
+Then load `Skill(write-commit)` and commit cycle by cycle — one commit per cycle holding that
+cycle's test files and implementation files together. Never split a cycle's tests from its
+implementation into separate commits (staging rules in `references/orchestration-flow.md`).
 
 ### Repeat
 
@@ -390,7 +392,7 @@ Before marking work complete:
 - [ ] Every new function/method has a test
 - [ ] Watched each test fail before implementing (confirmed via FAILURE_OUTPUT from tdd-cycle)
 - [ ] Each test failed for expected reason (feature missing, not typo)
-- [ ] Committed each cycle yourself in TDD order (tests first, then implementation), only after
+- [ ] Committed each cycle yourself as one commit (tests and implementation together), only after
       REFACTOR finished — the agent never commits
 - [ ] Ad hoc: presented commit plan to user and waited for approval before committing (plan task or
       autocommit: approval already granted)
