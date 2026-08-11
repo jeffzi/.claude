@@ -12,6 +12,8 @@ readonly PACE_MIN_PCT=50
 readonly PACE_HOT_DELTA=15
 readonly PACE_OVER_DELTA=5
 readonly PACE_UNDER_DELTA=-5
+# Show countdown regardless of usage when less than this many seconds remain.
+readonly COUNTDOWN_URGENT_SECONDS=3600
 # The OAuth usage endpoint answers out of the same strict rate budget as Claude
 # Code's own /usage polling, so spending it here makes /usage fail with a 429.
 # Poll it rarely, and back off further once it starts refusing.
@@ -178,10 +180,16 @@ refresh_usage_cache() {
 	# a recycled pid from producing the name a killed render's claim already carries.
 	local owner="owner.${BASHPID}.${RANDOM}"
 	usage_lock_acquire "$lock" "$owner" "$throttle" "$now" || return 0
+	# A killed render (SIGTERM/SIGINT) must not strand the lock for the full throttle
+	# window; EXIT/INT/TERM traps are safe here, unlike RETURN, because $lock and $owner
+	# stay in scope for the duration of this function.
+	trap 'usage_lock_release "$lock" "$owner"' EXIT
+	trap 'usage_lock_release "$lock" "$owner"; exit' INT TERM
 	# The failed verdict in the marker is the record of a fetch that did not land; the
 	# lock has to come back either way.
 	publish_usage_payload "$suffix" "$cache" "$marker" || true
 	usage_lock_release "$lock" "$owner"
+	trap - EXIT INT TERM
 }
 
 # Team-plan sessions never receive the unified rate-limit headers, so stdin lacks
@@ -296,9 +304,9 @@ usage_color() {
 	hsl2rgb "$hue" "$sat" "$light"
 }
 
-# One rendered segment (" │ 5h 61%↑ · 2h10m"). The label, the space, and the percentage
-# form a single span in the usage gradient; the countdown that follows the middle dot
-# stays in the terminal's default foreground so it never competes for attention.
+# One rendered segment (" │ 5h 61%↑ · 2h10m"). The label, the space, the percentage, and
+# any pace arrow form a single span in the usage gradient; the countdown that follows the
+# middle dot stays in the terminal's default foreground so it never competes for attention.
 format_limit_segment() {
 	local label="$1" used="$2" reset_epoch="$3" window_sec="$4" now="$5"
 	local used_int color pace reset detail=""
@@ -306,23 +314,21 @@ format_limit_segment() {
 	color=$(usage_color "$used_int")
 	pace=$(format_pace "$used_int" "$reset_epoch" "$window_sec" "$now")
 	reset=$(format_countdown "$reset_epoch" "$now")
-	# Below 75% the window has room to spare, so when it resets is noise: the countdown
-	# earns its place on the line only once usage is close enough to matter.
-	((used_int >= COUNTDOWN_MIN_PCT)) && [[ -n "$reset" ]] && detail=" · ${reset}"
-	# Over-pace is the warning, so its arrow joins the gradient span and reddens with the
-	# rest of it; the under-pace ↓ is good news and stays in the default foreground.
-	local span="${label} ${used_int}%" uncolored=""
-	if [[ "$pace" == "↓" ]]; then
-		uncolored="$pace"
-	else
-		span+="$pace"
+	# The countdown earns its place once usage is high enough to matter, or once the
+	# window is about to close — a sub-hour reset is worth knowing regardless of usage.
+	if [[ -n "$reset" ]]; then
+		local remaining=$((reset_epoch - now))
+		if ((used_int >= COUNTDOWN_MIN_PCT || (remaining > 0 && remaining < COUNTDOWN_URGENT_SECONDS))); then
+			detail=" · ${reset}"
+		fi
 	fi
-	printf ' │ %s%s%s%s%s' "$color" "$span" "$RESET" "$uncolored" "$detail"
+	local span="${label} ${used_int}%${pace}"
+	printf ' │ %s%s%s%s' "$color" "$span" "$RESET" "$detail"
 }
 
 # Even-pace delta: actual usage vs. linear spend rate across the window. Only shown above
-# 50% — below that, pace is noise regardless of delta. The glyph carries no color of its
-# own; format_limit_segment decides what the arrow wears.
+# 50% — below that, pace is noise regardless of delta. All arrows inherit the segment's
+# usage gradient.
 format_pace() {
 	local used_int="$1" reset_epoch="$2" window_sec="$3" now="$4"
 	[[ -z "$reset_epoch" ]] && return
