@@ -375,8 +375,8 @@ expect_reset_uncolored "7d countdown renders in the default foreground" "7d" 80 
 # of 5h has elapsed and the on-pace usage is 80%. The `used` value therefore sets
 # the delta directly.
 #
-# Which glyph appears is the arrow's own contract; what color it wears is the
-# segment's, and is pinned by expect_arrow_color below.
+# Which glyph appears is the arrow's own contract; all arrows inherit the segment's
+# usage gradient, pinned by expect_arrow_color below.
 
 expect_pace_glyph() {
 	local desc="$1" used="$2" expected="$3" actual
@@ -395,24 +395,20 @@ expect_segment_plain() {
 }
 
 # The last color escape standing before the arrow decides what color the arrow renders in:
-# the gradient for the over-pace arrows, a reset (terminal default) for the under-pace one.
+# all pace arrows inherit the segment's usage gradient.
 last_escape() {
 	printf '%s' "$1" | grep -oE $'\033\\[[0-9;]*m' | tail -1 || true
 }
 
 expect_arrow_color() {
-	local desc="$1" used="$2" arrow="$3" want="$4"
-	local color out head got expected ok=no
+	local desc="$1" used="$2" arrow="$3"
+	local color out head got ok=no
 	color=$(usage_color "$used")
 	out=$(format_limit_segment "5h" "$used" "$PACE_RESET" "$PACE_WINDOW" "$NOW")
 	head=${out%%"$arrow"*}
 	got=$(last_escape "$head")
-	case "$want" in
-	gradient) expected="$color" ;;
-	default) expected="$C_RESET" ;;
-	esac
-	[[ "$out" == *"$arrow"* && "$got" == "$expected" ]] && ok=yes
-	report "$desc" "$ok" "$(printf 'escape in force at the arrow: %q, expected %q\n      actual: %q' "$got" "$expected" "$out")"
+	[[ "$out" == *"$arrow"* && "$got" == "$color" ]] && ok=yes
+	report "$desc" "$ok" "$(printf 'escape in force at the arrow: %q, expected %q\n      actual: %q' "$got" "$color" "$out")"
 }
 
 require_function format_pace
@@ -427,21 +423,20 @@ expect_pace_glyph "95% at 80%% pace (delta +15): double arrow at the boundary" 9
 
 # ── Pace arrow color ─────────────────────────────────────────────────────────
 #
-# Over-pace is the bad news, so it inherits the segment's own usage gradient and grows
-# louder as usage climbs. Under-pace is good news and stays quiet: the ↓ renders in the
-# terminal's default foreground, with no color of its own.
+# All pace arrows inherit the segment's usage gradient.
 
-printf "\n── Pace arrow color (gradient up, default down) ──────────────────────────────\n"
-expect_arrow_color "85%: the ↑ inherits the 85%% gradient" 85 "↑" gradient
-expect_arrow_color "100%: the ↑↑ inherits the 100%% gradient" 100 "↑↑" gradient
-expect_arrow_color "60%: the ↓ renders in the default foreground" 60 "↓" default
+printf "\n── Pace arrow color (all arrows inherit the gradient) ─────────────────────────\n"
+expect_arrow_color "85%: the ↑ inherits the 85%% gradient" 85 "↑"
+expect_arrow_color "100%: the ↑↑ inherits the 100%% gradient" 100 "↑↑"
+expect_arrow_color "60%: the ↓ inherits the 60%% gradient" 60 "↓"
 
 # ── Segment shape ────────────────────────────────────────────────────────────
 #
 # `<label> <pct>%<arrow> · <countdown>` — no colon, no parentheses, no space before the
-# arrow. The countdown is appended only when there is one to show *and* usage has reached
-# 75%: below that the window has room to spare, so how long until it resets is noise and
-# the percentage stands alone.
+# arrow. The countdown is appended when there is one to show *and* the window is worth
+# watching: either usage has reached 75%, or the reset is under an hour away. Outside those
+# two, the window has room to spare, so how long until it resets is noise and the
+# percentage stands alone.
 
 printf "\n── Segment shape (label pct%%arrow · countdown) ───────────────────────────────\n"
 expect_segment_plain "over pace: the arrow hugs the percentage" "5h" 88 "$PACE_RESET" "$PACE_WINDOW" " │ 5h 88%↑ · 1h"
@@ -449,9 +444,14 @@ expect_segment_plain "hot pace: the double arrow hugs the percentage" "5h" 100 "
 expect_segment_plain "on pace: countdown alone, no arrow" "5h" 82 "$PACE_RESET" "$PACE_WINDOW" " │ 5h 82% · 1h"
 expect_segment_plain "no countdown to show: nothing follows the percentage" "5h" 100 "$NOW" "$PACE_WINDOW" " │ 5h 100%"
 # The 75% boundary, pinned from both sides. Both cases sit under pace, so the down arrow
-# still hugs the percentage and the countdown is the only difference between them.
+# still hugs the percentage and the countdown is the only difference between them. Both
+# resets are exactly an hour out — the far edge of the urgency window below — so the 74%
+# case doubles as that window's closed side: an hour left is not yet imminent.
 expect_segment_plain "74%: below the threshold, the down arrow hugs the percentage and no countdown follows" "5h" 74 "$PACE_RESET" "$PACE_WINDOW" " │ 5h 74%↓"
 expect_segment_plain "75%: at the threshold, the countdown appears" "5h" 75 "$PACE_RESET" "$PACE_WINDOW" " │ 5h 75%↓ · 1h"
+# Under an hour to go, the imminent reset is the news rather than the percentage, so the
+# countdown comes back however far below 75% usage sits.
+expect_segment_plain "60% with 45m left: an imminent reset brings the countdown back below the threshold" "5h" 60 "$((NOW + 45 * 60))" "$PACE_WINDOW" " │ 5h 60%↓ · 45m"
 # Both windows render a countdown: the 7d segment prints "4d13h"-style output, matching the
 # 5h segment's format.
 expect_segment_plain "7d window counts down in days and hours" "7d" 80 "$((NOW + 4 * 86400 + 13 * 3600))" "$WEEK_WINDOW" " │ 7d 80%↑↑ · 4d13h"
