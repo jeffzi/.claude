@@ -1,10 +1,12 @@
 ---
 name: revise-skill
 description: >
-  Use when a SKILL.md needs review for activation, configuration, structure, security, and
-  compliance quality — unreliable triggering, bloated body, description that doesn't match its
+  Use when a SKILL.md needs review for activation, configuration, implementation, structure,
+  security, and compliance quality — unreliable triggering, bloated body, description that doesn't match its
   triggers — and the issues fixed in place. Not for writing skills from scratch — use write-skill.
 argument-hint: "[skill dir or SKILL.md path]"
+# Quality floor for the slash path: adjudicating checklist findings and rewriting frontmatter is
+# where cheaper tiers misread field semantics.
 model: opus
 effort: high
 ---
@@ -19,13 +21,15 @@ Review a SKILL.md with the `vet-skill` agent, then apply the fixes here. The age
 
 1. **Resolve targets and scope.**
    - Path argument → that skill directory or SKILL.md, scope `full`.
-   - No argument → SKILL.md files in the current diff, scope `changed`.
+   - No argument → SKILL.md files appearing in `git diff --name-only`,
+     `git diff --cached
+     --name-only`, or `git ls-files --others --exclude-standard`, scope
+     `changed`.
 
 2. **Dispatch the reviewer.** One **Agent** call, `subagent_type: vet-skill`. **Do NOT set model —
    the agent defines its own.** Pass the target, the review scope, and the diff when scope is
-   `changed`. The agent identifies the skill type, walks the activation, configuration,
-   implementation, structure, security, and — for discipline skills — compliance checklists, and
-   returns `### Finding N` blocks.
+   `changed`. The agent returns `### Finding N` blocks; which checklists it walks is its own
+   business.
 
 3. **Triage the findings** on both axes the agent emits — score gates, impact orders:
    - Score 0 → discard, it is a declared false positive.
@@ -46,9 +50,14 @@ Review a SKILL.md with the `vet-skill` agent, then apply the fixes here. The age
    A description rewrite changes when the skill triggers. After rewriting one, re-read it against
    the skill's actual body and confirm it still describes what the skill does.
 
+   Done when the fix queue is empty — every ≥ 75 finding applied, the last no less carefully than
+   the first.
+
 5. **Verify.**
-   - Frontmatter parses and stays under 1024 characters.
-   - SKILL.md is under 500 lines.
+   - The fix queue is empty, and each applied fix named its checklist item.
+   - Frontmatter parses; `description` + `when_to_use` stay within the documented cap (write-skill's
+     `references/frontmatter.md`, "Description budget and truncation").
+   - SKILL.md stays within write-skill's line ceiling.
    - Every `Skill(name)` the body references resolves to a real skill.
    - Every `references/` file the body links exists, and no reference file is orphaned.
 
@@ -81,7 +90,8 @@ Rows in fix order — impact tier first (`security` → `activation` → `compli
 
 ### Verification
 
-[frontmatter chars, line count, Skill() targets resolved, reference links resolved]
+[fix queue empty, description chars vs cap, line count vs ceiling, Skill() targets resolved,
+reference links resolved]
 ```
 
 Omit empty sections. When the agent returned `No findings.`, say so in one line and stop.
@@ -96,4 +106,4 @@ Omit empty sections. When the agent returned `No findings.`, say so in one line 
   backwards
 - ❌ Silently dropping sub-75 findings → they belong in the report
 - ❌ Treating `polish` or `compliance` as skippable → impact orders the queue; only the score gates
-  it. Every ≥ 75 finding gets fixed, last no less than first
+  it
