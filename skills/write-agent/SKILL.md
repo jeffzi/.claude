@@ -39,8 +39,9 @@ authoring scenario without this skill, watch the baseline fail, then draft.
 | Fork an isolated runner from inside a skill                         | **`context: fork`** in the skill  |
 | Run a long-running task without blocking parent                     | **Subagent** (`background: true`) |
 
-**Agents cannot spawn agents.** If the work needs nested delegation, do it from the main
-conversation or use a skill instead.
+**Agents can spawn agents** — up to three layers below the main conversation by default. Set
+`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1` to disable nesting, and note an agent whose `tools:`
+allowlist omits `Agent` still cannot dispatch.
 
 ## The four contracts
 
@@ -62,8 +63,9 @@ summary. Two style conventions are valid:
 - **"Use when ..."** — neutral, inherits skill-description conventions
 - **"Use PROACTIVELY ..."** — signals auto-delegation intent, common in Claude Code examples
 
-Pick one. Keep the description under 250 characters — it gets truncated in the agent listing parent
-Claude sees, and the part after the cutoff is invisible during delegation decisions.
+Pick one. No documented length cap or truncation applies to agent descriptions, but every character
+is injected into the parent's agent listing on every session — front-load the primary trigger and
+keep it lean.
 
 ### Workflow summary leak — the most common failure
 
@@ -92,7 +94,20 @@ tools: Read, Grep, Glob # read-only investigator
 tools: Read, Edit, Bash, Grep, Glob # code modifier
 ```
 
-Use `disallowedTools` only when you want to inherit the full tool set minus a few items (rare).
+Use `disallowedTools` only when you want to inherit the full tool set minus a few items (rare). When
+both are set, `disallowedTools` is removed first and `tools` resolves against the remainder. Both
+accept MCP server patterns (`mcp__<server>`). A `tools` list where no entry resolves to a real tool
+refuses to launch, with an error naming the bad entries.
+
+### Background runs shrink the tool pool
+
+Subagents run in the background by default (v2.1.198+) — Claude keeps one in the foreground only
+when it needs the result before continuing. A background subagent keeps every MCP tool but only
+these built-in tools: Read, Grep, Glob, Bash, PowerShell, Edit, Write, NotebookEdit, WebFetch,
+WebSearch, TodoWrite, Skill, ToolSearch, EnterWorktree, ExitWorktree, Monitor, TaskStop,
+SendMessage, Artifact. Anything else in `tools:` — LSP, for example — is silently removed, so the
+same definition resolves to different tools in foreground and background. Design the system prompt
+to work with the background-filtered set, or the agent breaks on the default dispatch path.
 
 ### Instruction/tool consistency — verify before shipping
 
@@ -118,9 +133,11 @@ either add the tool or change the instruction.
 
 - Default tool-usage guidance (Bash vs dedicated tools, commit conventions)
 - Default style and verbosity rules
-- Any global CLAUDE.md persona shaping (project CLAUDE.md is still loaded)
+- The parent's output style and auto memory
 
-If the agent needs those behaviors, restate them. Do not assume inheritance.
+Still loaded for custom agents: the full CLAUDE.md hierarchy (user, project, local, managed) and a
+git-status snapshot from the parent session's start — only the built-in Explore and Plan skip them.
+Don't restate CLAUDE.md rules in the body; restate only the lost defaults the agent needs.
 
 **Fresh context.** The agent does not see the parent conversation — only the invocation prompt
 parent Claude writes. Never reference "the user's earlier request" or "the file you just edited."
@@ -177,16 +194,21 @@ STATUS: FAILED_CORRECTLY
 
 Required: `name`, `description`. Quick decisions for the common optional fields:
 
-| Field           | Default       | Pick differently when                                                                                     |
-| --------------- | ------------- | --------------------------------------------------------------------------------------------------------- |
-| `model`         | inherits      | Reasoning-heavy → `opus`; judgment on bounded input → `sonnet`; mechanical lookup → `haiku`               |
-| `tools`         | all inherited | ALWAYS restrict — set an explicit allowlist                                                               |
-| `memory`        | none          | Agent benefits from persistent learning across runs                                                       |
-| `isolation`     | none          | Modifies files + parallel runs could conflict → `worktree`                                                |
-| `background`    | `false`       | Long-running task, parent should continue other work                                                      |
-| `effort`        | inherits      | **Always pin.** Unset inherits session effort, silently degrades. `high` for reasoning, `low` for lookups |
-| `color`         | none          | Visual identification in multi-agent sessions                                                             |
-| `initialPrompt` | none          | First message the agent should self-submit at startup                                                     |
+| Field            | Default       | Pick differently when                                                                                     |
+| ---------------- | ------------- | --------------------------------------------------------------------------------------------------------- |
+| `model`          | inherits      | Reasoning-heavy → `opus`; judgment on bounded input → `sonnet`; mechanical lookup → `haiku`               |
+| `tools`          | all inherited | ALWAYS restrict — set an explicit allowlist                                                               |
+| `memory`         | none          | Agent benefits from persistent learning across runs (`user`, `project`, or `local` scope)                 |
+| `isolation`      | none          | Modifies files + parallel runs could conflict → `worktree` (branches from default branch, not HEAD)       |
+| `background`     | Claude picks  | Default is background (v2.1.198+); `true` forces it even when parent wants the result now                 |
+| `skills`         | none          | Preload full skill content at startup; can't preload `disable-model-invocation` skills                    |
+| `permissionMode` | inherits      | Needs `plan`, `acceptEdits`, `dontAsk`… Parent `bypassPermissions`/`acceptEdits`/auto override it         |
+| `maxTurns`       | none          | Cap runaway agentic loops                                                                                 |
+| `mcpServers`     | none          | Agent-scoped MCP servers — keeps their tool descriptions out of the parent's context                      |
+| `hooks`          | none          | Per-agent PreToolUse/PostToolUse validation. Project-level frontmatter hooks need workspace trust         |
+| `effort`         | inherits      | **Always pin.** Unset inherits session effort, silently degrades. `high` for reasoning, `low` for lookups |
+| `color`          | none          | Visual identification in multi-agent sessions                                                             |
+| `initialPrompt`  | none          | Auto-submitted as the first user turn when the agent runs as the main session agent                       |
 
 ### How `model` actually resolves
 
@@ -211,7 +233,7 @@ slash-only qualifier.
 **Verify what resolved:** read `.message.model` in `<session>/subagents/agent-<agentId>.jsonl`,
 keyed by the sibling `.meta.json`'s `toolUseId`. Treat `resolvedModel` as a cross-check only — it is
 known to misreport dispatches. (For the skill side, the instrument is different: top-level
-`.message.model` on the invoking turn. See `write-skill/references/frontmatter.md`.)
+`.message.model` on the invoking turn. See `references/frontmatter.md` in `Skill(write-skill)`.)
 
 **Fields that do NOT exist for agents** (common confusion with skills):
 
@@ -225,15 +247,16 @@ known to misreport dispatches. (For the skill side, the instrument is different:
 | Mistake                                     | Fix                                                           |
 | ------------------------------------------- | ------------------------------------------------------------- |
 | Workflow summary in description             | Remove "Returns X" / "Produces Y" — describe triggers only    |
-| Description > 250 chars                     | Trim lists; front-load the primary trigger                    |
+| Bloated description                         | Front-load the primary trigger; cut dead synonyms             |
 | System prompt instructs a tool not granted  | Check `tools:` — every verb must map to an allowed tool       |
 | Guessed filesystem paths in body            | Verify paths against docs or omit — don't hallucinate         |
 | Treats "use proactively" as auto-trigger    | It's a routing hint to parent Claude, not a harness hook      |
 | Expects parent conversation context         | Agent has fresh context — state inputs explicitly             |
 | Uses `paths:` frontmatter                   | That's a skill field; agents don't have it                    |
-| Tries to spawn sub-agents                   | Agents cannot spawn agents; chain from main or use a skill    |
+| Assumes agents cannot nest                  | Nesting works to depth 3 by default; needs `Agent` in `tools` |
 | No return contract                          | Specify exact output format — parent has to parse the message |
 | Inherits all tools                          | Always set an explicit allowlist                              |
+| Grants a tool the background filter removes | Check the keep-list — default dispatch is background          |
 | Leaves `effort` unset                       | Always pin — unset inherits session effort, silently degrades |
 | First-person voice in system prompt         | Use second-person imperative to the agent                     |
 | Assumes default Claude Code behaviors apply | System prompt REPLACES default — restate what you need        |
@@ -243,6 +266,10 @@ known to misreport dispatches. (For the skill side, the instrument is different:
 Load `Skill(write-skill)` and apply its RED → GREEN → REFACTOR loop. Agent authoring is a technique
 skill — the baseline test is **spawn an isolated agent, give it the Claude Code agent docs, and ask
 it to author your target agent**. Observe the failures, then write the skill/draft to address them.
+
+**Agent files hot-reload.** Claude Code watches `.claude/agents/` and `~/.claude/agents/`; an edit
+applies to the next dispatch within seconds, no restart. Restart only after creating a scope's first
+file in a brand-new `agents/` directory.
 
 **Application tests for the finished agent:**
 
@@ -270,7 +297,7 @@ After writing ANY agent, STOP and complete this checklist before shipping.
 ### Frontmatter
 
 - [ ] `name`: letters, numbers, hyphens only
-- [ ] `description`: ≤ 250 chars, third person, no workflow summary
+- [ ] `description`: third person, front-loaded primary trigger, no workflow summary
 - [ ] `tools`: explicit allowlist (not "all tools")
 - [ ] `model`: chosen deliberately, not default-copied — and `CLAUDE_CODE_SUBAGENT_MODEL` confirmed
       absent, since it silently outranks this field
@@ -291,9 +318,3 @@ After writing ANY agent, STOP and complete this checklist before shipping.
 - [ ] Boundary test — agent refuses out-of-scope input gracefully
 - [ ] Tool-exhaustion test — agent completes without "tool not available"
 - [ ] Trigger validation — description activates on right prompts only
-
-## Attribution
-
-Extends `Skill(write-skill)`. Authoring discipline and TDD methodology adapted from
-[obra/superpowers/writing-skills](https://github.com/obra/superpowers/tree/main/skills/writing-skills)
-by Jesse Vincent.
