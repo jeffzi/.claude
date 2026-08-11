@@ -148,13 +148,16 @@ contains the cleaned-up code; there is no separate refactor commit):
       This gate is the TDD orchestrator's own rule, not delegated to
       write-commit. Loading write-commit does not absorb or replace it.
   15. Load Skill(write-commit), then commit cycle by cycle (the agents NEVER
-      commit -- you own this), in TDD order:
-      - stage that cycle's TEST_FILE(s) only -> commit (tests first)
-      - stage that cycle's IMPLEMENTATION_FILES -> commit
-      Commits are serial even when the waves were parallel -- never interleave
-      two cycles' files in one commit. Cycles whose file sets overlap (dependent
-      waves touching the same file) merge into one commit pair: their test files
-      in one commit, their implementation files in the next.
+      commit -- you own this), ONE commit per cycle:
+      - stage that cycle's TEST_FILE(s) AND IMPLEMENTATION_FILES together
+        -> one commit
+      A cycle's tests and its implementation are one coherent purpose -- never
+      split them across two commits (write-commit's Commit Scope governs what
+      belongs in a commit; this workflow owns only when to commit and which unit
+      of work each commit covers). Commits are serial even when the waves were
+      parallel -- never interleave two cycles' files in one commit. Cycles whose
+      file sets overlap (dependent waves touching the same file) merge into a
+      single commit.
 ```
 
 ## Phase Data Contracts
