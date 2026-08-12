@@ -1,7 +1,7 @@
 # Pressure Tests for /build
 
-Scenarios to verify build's approval gate and skip logic under pressure. Follow the
-[pressure-testing methodology](../../../skills/write-skill/references/pressure-testing.md): RED (run
+Scenarios to verify build's approval gate and skip logic under pressure. Load `Skill(write-skill)`
+and follow the pressure-testing methodology from its `references/pressure-testing.md`: RED (run
 without the skill changes, watch it fail) → GREEN (run with changes, verify compliance) → REFACTOR
 (close loopholes).
 
