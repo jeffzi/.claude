@@ -5,7 +5,6 @@
 ## Table of Contents
 
 - [Entry Point](#entry-point)
-- [Wave Planning](#wave-planning)
 - [RED-GREEN-REFACTOR Loop](#red-green-refactor-loop)
 - [Phase Data Contracts](#phase-data-contracts)
 
@@ -19,23 +18,10 @@ When `/tdd` is invoked, determine the entry point before doing anything else:
   dispatch agents until the plan is approved and you're executing a specific task.
 - **Single behavior or executing a plan task** -- Proceed to the RED-GREEN-REFACTOR loop below.
 
-## Wave Planning
-
-Before the loop, partition the task's behavior groups into **waves** — from the behavior list alone,
-never from file contents (reading files to plan waves is the same violation as reading them to
-batch):
-
-- Two groups are **independent** when neither consumes anything the other introduces (no new
-  function, type, or module from one is used by the other) AND their test files and implementation
-  areas are disjoint. Independent groups share a wave.
-- A group that consumes another group's output goes in a **later wave** — its GREEN phase needs the
-  producer's code on disk (verified, not committed — commits happen after REFACTOR).
-- Unsure whether two groups are independent → serialize them. A wasted wave costs one dispatch
-  round; two agents editing the same file costs a corrupted cycle.
-
-A wave of one is the ordinary serial case; the loop below is identical for it.
-
 ## RED-GREEN-REFACTOR Loop
+
+Wave partitioning is defined in SKILL.md § Parallel Waves. A wave of one is the ordinary serial
+case; the loop below is identical for it.
 
 ```text
 LOOP (one wave per iteration; a wave = one or more independent behavior groups):
@@ -136,17 +122,10 @@ contains the cleaned-up code; there is no separate refactor commit):
   13. When an enclosing workflow defines a pre-commit verification step (e.g. a
       plan task's Verify block dispatching claim-reviewer), run it NOW and resolve
       its findings -- verification always precedes the commit, never follows it.
-  14. Approval gate -- the skill prescribes WHEN to commit; the user's approval
-      authorizes THAT it happens. A PLAN TASK is a numbered task from a plan
-      the user approved this session; everything else is AD HOC:
-      - Plan task or autocommit active -> commit proceeds without pausing
-        (approval already granted).
-      - Ad hoc -> list each cycle's test files and implementation files in
-        commit order. STOP -- no git commit in this turn. Wait for the user's
-        next message with explicit approval. "Present and proceed" in a single
-        turn is committing without approval.
-      This gate is the TDD orchestrator's own rule, not delegated to
-      write-commit. Loading write-commit does not absorb or replace it.
+  14. Approval gate -- see SKILL.md § Commit. Plan task or autocommit -> proceed;
+      ad hoc -> STOP and wait for explicit approval. This gate is the TDD
+      orchestrator's own rule, not delegated to write-commit. Loading
+      write-commit does not absorb or replace it.
   15. Load Skill(write-commit), then commit cycle by cycle (the agents NEVER
       commit -- you own this), ONE commit per cycle:
       - stage that cycle's TEST_FILE(s) AND IMPLEMENTATION_FILES together
