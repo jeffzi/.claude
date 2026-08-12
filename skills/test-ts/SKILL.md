@@ -14,20 +14,13 @@ user-invocable: false
 merge rules, parametrization, mocking anti-patterns) live in `test-core`. This file adds Vitest- and
 TypeScript-specific syntax, pitfalls, and APIs.
 
-**Default to the strictest API** (`toStrictEqual`, async timer variants, `expect.hasAssertions`) —
-loosen only when you have a reason.
+**Default to the strictest API** — loosen only when you have a reason.
 
-**Also apply:** `code-ts` rules. Exception: test helper functions don't need full JSDoc.
+**Also apply:** load `Skill(code-ts)`. Exception: test helper functions don't need full JSDoc.
 
 ## Domain Skill Detection
 
-When reviewing or writing test files, check imports for domain-specific libraries. If detected, load
-the corresponding skill for library-specific testing patterns:
-
-No overlay skills currently defined for TypeScript. When a TypeScript overlay skill is added, list
-its trigger imports here.
-
-Only load skills that are actually installed. If a skill fails to load, continue without it.
+No overlays yet. Add a detection table here when the first library overlay is introduced.
 
 ## Mandatory Rules
 
@@ -179,8 +172,7 @@ expect(result.result).toStrictEqual({ nested: { value: 42 } });
 
 ### 7. Parametrize with `it.each` / `test.for`
 
-`test-core` § 6 says: parametrize whenever the same assertion runs against varying inputs. In
-Vitest:
+Per `test-core` § 6 (parametrize over loops), in Vitest:
 
 ```typescript
 it.each([
@@ -216,27 +208,17 @@ expectTypeOf<Task>().toHaveProperty("createdAt").toEqualTypeOf<Date>();
 ```
 
 For mocking API (clearing trifecta, vi.mock factory rules, mock this/not that), fake timers API, and
-Vitest config recommendations, see `references/vitest-api.md`.
+config gotchas, see `references/vitest-api.md`.
 
 ## Pitfalls
 
-| Trap                                             | Instead                                                       |
-| ------------------------------------------------ | ------------------------------------------------------------- |
-| `toEqual` for object comparisons                 | `toStrictEqual` — catches `undefined` props, class mismatches |
-| Sync timer APIs with async code                  | `vi.advanceTimersByTimeAsync()` and friends                   |
-| `vi.useRealTimers()` at end of test              | `afterEach(() => vi.useRealTimers())`                         |
-| `as` casts in test data                          | Factory functions with `Partial<T>` overrides                 |
-| Assertions inside callbacks without guard        | `expect.hasAssertions()` or `events.once()`                   |
-| Manual try/catch for promise assertions          | `await expect(fn()).resolves.toBe(v)` / `.rejects.toThrow()`  |
-| Runtime "type tests"                             | `expectTypeOf` for compile-time assertions                    |
-| `vi.mock` factory referencing imports            | `vi.hoisted()` for factory-accessible variables               |
-| `vi.importActual` without `await`                | `async (importOriginal) => ({ ...(await importOriginal()) })` |
-| `mock.results[0].value` for async mocks          | `mock.settledResults[0]` for resolved values                  |
-| `vi.resetAllMocks()` expecting noop (Jest habit) | In Vitest 3.x it restores original implementation             |
-| Missing `default` key in `vi.mock` factory       | `{ default: ... }` — Vitest requires it explicitly            |
-| `toThrowError('')` for "any error"               | Empty string matches ALL errors (known bug). Use `toThrow()`  |
-| `expect.soft()` forgotten for multi-field checks | Collects all failures instead of stopping at first            |
-| `await sleep(100)` then assert                   | `await vi.waitFor(() => expect(...))`                         |
+| Trap                                             | Instead                                                      |
+| ------------------------------------------------ | ------------------------------------------------------------ |
+| Manual try/catch for promise assertions          | `await expect(fn()).resolves.toBe(v)` / `.rejects.toThrow()` |
+| `mock.results[0].value` for async mocks          | `mock.settledResults[0]` for resolved values                 |
+| `toThrowError('')` for "any error"               | Empty string matches ALL errors (known bug). Use `toThrow()` |
+| `expect.soft()` forgotten for multi-field checks | Collects all failures instead of stopping at first           |
+| `await sleep(100)` then assert                   | `await vi.waitFor(() => expect(...))`                        |
 
 ## Data Testing Patterns
 
@@ -250,34 +232,5 @@ Vitest config recommendations, see `references/vitest-api.md`.
 
 ## Verification
 
-**MANDATORY before completing any task:**
-
-```bash
-npx vitest run           # Run test suite
-npx tsc --noEmit         # Type check
-```
-
-**Task is NOT complete until all pass.**
-
-### Capturing test output without re-running
-
-Pipe through `tee` so the output is saved and visible in one execution. If the summary lines aren't
-immediately visible, grep the file — never re-run the command just to filter output:
-
-```bash
-npx vitest run 2>&1 | tee /tmp/test-out.txt | tail -30
-# if you need to extract specific lines afterward:
-grep -E "^(Test Files|Tests|Duration)" /tmp/test-out.txt
-```
-
-## Rationalizations
-
-| Excuse                               | Reality                                                                         |
-| ------------------------------------ | ------------------------------------------------------------------------------- |
-| "`toEqual` is fine for this"         | `toEqual` ignores `undefined` props and class differences. Use `toStrictEqual`. |
-| "Sync timer advance works here"      | Until a microtask is added inside the callback. Use async variants always.      |
-| "I'll clean up timers at the end"    | If the test throws, cleanup never runs. `afterEach` always runs.                |
-| "`as` cast is just for tests"        | Tests are contracts. A cast hides broken contracts. Use factories.              |
-| "The event listener definitely runs" | Without `hasAssertions`, a never-called listener = green test.                  |
-| "Runtime type check is enough"       | It proves nothing about compile-time safety. Use `expectTypeOf`.                |
-| "`resetAllMocks` clears everything"  | It doesn't unmock modules and restores originals in Vitest 3.x.                 |
+Run the project's own test script from `package.json` — it owns the runner flags and any coverage
+gate. If no test script exists, fall back to `npx vitest run --coverage`.

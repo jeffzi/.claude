@@ -13,9 +13,6 @@ user-invocable: false
 **This skill extends `Skill(code-core)`.** `code-core` is the primary entry point; this skill is
 loaded by `code-core` based on the rules-file dispatch table.
 
-## Overview
-
-Write production-quality Python code using type hints, modern features (3.10+), and Pythonic idioms.
 Check `pyproject.toml` `requires-python` for version-specific syntax (e.g., PEP 758 in 3.14+).
 
 ## Domain Skill Detection
@@ -38,36 +35,7 @@ Only load skills that are actually installed. If a skill fails to load, continue
 **ALWAYS place all imports at the top of the file.** No imports inside functions or conditional
 blocks (except `if TYPE_CHECKING:`).
 
-```python
-# ✓ Correct
-import os
-from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pandas import DataFrame
-
-def my_function():
-    pass
-
-# ✗ Wrong - import inside function
-def my_function():
-    import os  # BAD
-```
-
-### Type Hints Are Not Optional
-
-**ALWAYS add type hints to function signatures.** No exceptions for "simple" functions.
-
-```python
-# ✗ NEVER write this
-def process(items):
-    return [x ** 2 for x in items if x % 2 == 0]
-
-# ✓ ALWAYS write this
-def process(items: list[int]) -> list[int]:
-    return [x ** 2 for x in items if x % 2 == 0]
-```
+### Docstrings
 
 **Internal functions:** Types + clear names suffice. Add docstrings only for non-obvious logic, side
 effects, or public API.
@@ -86,21 +54,7 @@ effects, or public API.
 
 ### Dataclasses Over Manual Classes
 
-```python
-# ✗ Manual boilerplate
-class Point:
-    def __init__(self, x: int, y: int):
-        self.x = x
-        self.y = y
-
-# ✓ Dataclass
-from dataclasses import dataclass
-
-@dataclass(frozen=True, slots=True)
-class Point:
-    x: int
-    y: int
-```
+Default to `@dataclass(frozen=True, slots=True)` for data containers.
 
 **When to use alternatives:**
 
@@ -132,124 +86,7 @@ def read_file(filepath: str) -> str | None:
         return None
 ```
 
-## Quick Reference
-
-### Common Patterns
-
-| Task                | Pythonic Pattern                                        |
-| ------------------- | ------------------------------------------------------- |
-| List transformation | `[x**2 for x in nums if x % 2 == 0]`                    |
-| Count occurrences   | `from collections import Counter; Counter(items)`       |
-| Dict with defaults  | `from collections import defaultdict; defaultdict(int)` |
-| Safe dict access    | `my_dict.get(key, default)`                             |
-
-### Type Hints Reference
-
-```python
-from typing import TYPE_CHECKING
-from collections.abc import Callable, Iterable, Sequence
-
-# Basic types
-def func(x: int, y: str) -> bool: ...
-
-# Collections (Python 3.10+)
-def process(items: list[int]) -> dict[str, int]: ...
-
-# Optional/Union
-def find(key: str) -> str | None: ...
-def parse(value: int | str) -> int: ...
-
-# Callable
-def apply(func: Callable[[int], str], x: int) -> str: ...
-
-# Generic iterables
-def count(items: Iterable[str]) -> int: ...
-
-# Type-only imports (no runtime cost)
-if TYPE_CHECKING:
-    from expensive_module import ExpensiveClass
-
-def process(data: ExpensiveClass) -> None: ...
-```
-
-### Pitfalls
-
-| ✗ Never                           | ✓ Always                                            |
-| --------------------------------- | --------------------------------------------------- |
-| Obvious comments (`# add 1 to x`) | Self-documenting code, or explain WHY not WHAT      |
-| Imports inside functions          | Imports at top of file (except `if TYPE_CHECKING:`) |
-| `def func(items=[]):`             | `def func(items: list[int] \| None = None):`        |
-| `for i in range(len(items)):`     | `for item in items:` or `enumerate(items)`          |
-| `if value == None:`               | `if value is None:`                                 |
-| `if len(items) > 0:`              | `if items:`                                         |
-| `result += s` in loop             | `''.join(strings)`                                  |
-| `open('file.txt')` without `with` | `with open('file.txt') as f:`                       |
-| Bare `except:`                    | `except ValueError:` or `except Exception:`         |
-| `os.path.*`                       | `pathlib.Path`                                      |
-| Manual class for data             | `@dataclass`                                        |
-| LBYL (check before act)           | EAFP (try/except)                                   |
-| "Fix" `except A, B:` to add `()`  | Check `requires-python` — valid in 3.14+ (PEP 758)  |
-| No type hints                     | Type hints on ALL function signatures               |
-| Manual dict counting              | `Counter` or `defaultdict(int)`                     |
-
-## Comprehensions and Generators
-
-```python
-# List comprehensions - simple transformations
-squares = [x**2 for x in range(10)]
-evens = [x for x in numbers if x % 2 == 0]
-
-# Generator expressions - memory-efficient for large datasets
-total = sum(x**2 for x in huge_list)
-```
-
-**When to use:**
-
-- **List comprehension** `[x for x in items]`: Need multiple passes, small dataset
-- **Generator** `(x for x in items)`: Single pass, large dataset
-
-## Built-in Functions
-
-Prefer built-in functions over manual loops—they're faster.
-
-```python
-# ✓ Use built-ins
-total = sum(numbers)
-maximum = max(values)
-all_true = all(conditions)
-any_true = any(conditions)
-result = ', '.join(words)
-```
-
-## Error Handling
-
-### Specific Exceptions
-
-```python
-# ✓ Catch specific exceptions
-try:
-    value = int(user_input)
-except ValueError:
-    print("Invalid number")
-
-# ✗ Bare except catches KeyboardInterrupt, SystemExit
-try:
-    risky_operation()
-except:  # BAD
-    pass
-```
-
-### Exception Chaining
-
-```python
-# ✓ Preserve original traceback
-try:
-    process()
-except ValueError as e:
-    raise CustomError("Processing failed") from e
-```
-
-### Unparenthesized Except (Python 3.14+, PEP 758)
+## Unparenthesized Except (Python 3.14+, PEP 758)
 
 Python 3.14+ allows omitting parentheses around multiple exception types in `except` and `except*`
 clauses **when `as` is not used**. This is NOT the old Python 2 syntax — it is valid modern Python.
@@ -275,6 +112,8 @@ except ValueError, TypeError as e:  # SyntaxError in 3.14+, ambiguous in <3.14
 
 ## Async Code Patterns
 
+Use `asyncio.TaskGroup` (3.11+) for structured concurrency; sibling failure cancels the group.
+
 ### Bounded Concurrency
 
 Always limit concurrent tasks to prevent memory exhaustion:
@@ -295,31 +134,16 @@ async def fetch_all(urls: list[str], max_concurrent: int = 100) -> list[str]:
     return await asyncio.gather(*tasks)
 ```
 
-### TaskGroup for Structured Concurrency (Python 3.11+)
-
-```python
-async def main() -> None:
-    """Run multiple services; cancel all if any fails."""
-    async with asyncio.TaskGroup() as tg:
-        task1 = tg.create_task(service1())
-        task2 = tg.create_task(service2())
-```
-
 ## Rationalizations That Mean You're About to Fail
 
-| Excuse                              | Reality                                               |
-| ----------------------------------- | ----------------------------------------------------- |
-| "No type hints - keeping it simple" | Type hints ARE simple. They catch bugs at write-time. |
-| "This is the classic approach"      | Classic = outdated. Use modern Python features.       |
-| "Felt more natural"                 | Natural ≠ Pythonic. Follow EAFP and idioms.           |
+| Excuse                         | Reality                                         |
+| ------------------------------ | ----------------------------------------------- |
+| "This is the classic approach" | Classic = outdated. Use modern Python features. |
+| "Felt more natural"            | Natural ≠ Pythonic. Follow EAFP and idioms.     |
 
 ## Verification
 
-**MANDATORY before completing any task:**
-
-```bash
-uv tool run prek run -a   # Linting and formatting (orchestrates ruff, basedpyright, dprint, etc.)
-uv run pytest        # If tests/ exist — always run separately from linting
-```
-
-**Task is NOT complete until all pass.**
+Run the gates the project exposes — check `pyproject.toml`, a pre-commit config, a
+Makefile/justfile, or CI config to find them — using the project's own environment manager (`uv`,
+`poetry`, `hatch`, plain venv) for every command. Run the test suite separately from linting. If the
+project exposes no lint gate, fall back to `uv tool run prek run -a`.

@@ -2,7 +2,7 @@
 
 - [Mocking Quick Reference](#mocking-quick-reference)
 - [Fake Timers Quick Reference](#fake-timers-quick-reference)
-- [Vitest Config Recommendations](#vitest-config-recommendations)
+- [Config Gotcha](#config-gotcha)
 
 ## Mocking Quick Reference
 
@@ -64,21 +64,8 @@ vi.mock(import("./calculator"), async (importOriginal) => {
 — but `setTimeout` is fake and only fires when you call `vi.runAllTimers()`, which never executes
 because the test is suspended. Fix: `const p = sleep(1000); await vi.runAllTimersAsync(); await p;`
 
-## Vitest Config Recommendations
+## Config Gotcha
 
-```typescript
-import { defineConfig } from "vitest/config";
-
-export default defineConfig({
-  test: {
-    clearMocks: true, // clear call history between tests, keep implementations
-    // Use 'projects' (not deprecated 'workspace') for multi-project:
-    // projects: [
-    //   { extends: true, test: { name: 'unit', include: ['**/*.unit.test.ts'] } },
-    // ],
-  },
-});
-```
-
-If you have a separate `vitest.config.ts`, it does **not** inherit from `vite.config.ts` — use
-`mergeConfig(viteConfig, defineConfig({ test: { ... } }))`.
+The house `vitest.config.ts` is owned by `setup-ts` (`/setup-ts init` / `/setup-ts update`) — do not
+hand-edit it. If you have a separate `vitest.config.ts`, it does **not** inherit from
+`vite.config.ts` — use `mergeConfig(viteConfig, defineConfig({ test: { ... } }))`.

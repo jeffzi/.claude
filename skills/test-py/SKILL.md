@@ -15,7 +15,8 @@ user-invocable: false
 merge/redundancy, parametrize-over-loops, mocking anti-patterns) live in `test-core`. This file adds
 pytest-specific syntax, fixtures, plugins, and pitfalls.
 
-**Also apply:** `code-py` rules. Exception: test functions don't need `-> None` annotations.
+**Load `Skill(code-py)` and apply its rules.** Exception: test functions don't need `-> None`
+annotations.
 
 ## Domain Skill Detection
 
@@ -32,8 +33,8 @@ Only load skills that are actually installed. If a skill fails to load, continue
 
 ### 1. Test Names Use the Full `test_<function>_when_<condition>_does_<expected>` Form
 
-Don't abbreviate. `test_parse_rejects_empty` is better than `test_parse_1`, and
-`test_create_user_when_email_taken_raises` is better than `test_create_user_dup`.
+Don't abbreviate. `test_parse_when_input_empty_does_raise_valueerror` is better than `test_parse_1`,
+and `test_create_user_when_email_taken_does_raise` is better than `test_create_user_dup`.
 
 ### 2. Function-Scoped Fixtures by Default
 
@@ -72,76 +73,22 @@ mocker.patch("myapp.service.Client.fetch_data")
 mocker.patch("myapp.service.Client.fetch_data", autospec=True)
 ```
 
-### 5. Parametrize with `@pytest.mark.parametrize`
+## Parametrization Syntax
 
-`test-core` § 6 says: parametrize whenever the same assertion runs against varying inputs. In
-pytest:
+Use `pytest.param(..., id="...")` to name non-obvious cases:
 
 ```python
 @pytest.mark.parametrize("a,b,expected", [
     (1, 2, 3),
-    pytest.param(0, 0, 0, id="zeros"),
     pytest.param(-1, 1, 0, id="opposite-signs"),
 ])
-def test_add(a, b, expected):
-    assert add(a, b) == expected
 ```
-
-Use `pytest.param(..., id="...")` to name non-obvious cases.
-
-## Quick Reference
-
-### Fixture Scopes
-
-| Scope    | Use Case            | Watch Out            |
-| -------- | ------------------- | -------------------- |
-| function | Default, isolated   | None                 |
-| class    | Shared setup        | Mutation leaks       |
-| module   | Expensive resources | Cross-test pollution |
-| session  | One-time setup      | Never mutate         |
-
-### Mock This, Not That (Python boundaries)
-
-| Mock                 | Don't mock           |
-| -------------------- | -------------------- |
-| HTTP clients         | Business logic       |
-| Database connections | Internal functions   |
-| File I/O             | Data transformations |
-| External APIs        | Your own modules     |
-
-## Pitfalls
-
-| Never                                        | Always                                                              |
-| -------------------------------------------- | ------------------------------------------------------------------- |
-| `mocker.patch("mod.Class")` without autospec | `autospec=True` — catches wrong method names/args                   |
-| Session-scoped mutable fixtures              | Function-scoped or copy data                                        |
-| `assert x == True`                           | `assert x` or `assert x is True`                                    |
-| Bare `except` in tests                       | Let exceptions propagate                                            |
-| Interdependent tests                         | Each test sets up own context                                       |
-| Hardcoded paths                              | Use `tmp_path` fixture                                              |
-| Import boto3 before moto mock                | Import modules AFTER `@mock_aws` is active                          |
-| Classes as section headers                   | Comment section headers; classes only for shared `autouse` fixtures |
-
-## Fixture Best Practices
-
-- Use `yield` for setup/teardown (code after yield runs even if test fails)
-- `autouse=True` sparingly — only for global concerns
-- `conftest.py` for shared fixtures; factory fixtures for variations
 
 ## Data Testing Patterns
 
-| Tool                              | Use For                                                                |
-| --------------------------------- | ---------------------------------------------------------------------- |
-| `hypothesis`                      | Property-based testing — prefer over hardcoded data                    |
-| `pandera`                         | DataFrame schema validation                                            |
-| `dirty-equals`                    | Flexible assertions (`IsDatetime`, `IsUUID`, `IsPartialDict`)          |
-| `pytest.approx()`                 | Float comparisons with tolerance                                       |
-| `pd.testing.assert_frame_equal()` | DataFrame equality                                                     |
-| `time-machine`                    | Mock datetime/time                                                     |
-| `pytest-asyncio`                  | Async test support                                                     |
-| `moto`                            | AWS mocking                                                            |
-| `responses`                       | HTTP mocking                                                           |
-| `polyfactory`                     | Generate pydantic/dataclass instances (only for complex nested models) |
+Prefer `hypothesis` property-based testing over hardcoded data. Use `polyfactory` to generate
+pydantic/dataclass instances only for complex nested models. With `moto`, import the modules under
+test AFTER `@mock_aws` is active — importing boto3 clients before the mock binds them to real AWS.
 
 **Hardcoded data only for**: realistic inputs from production (e.g., actual JSON events, real API
 responses).
@@ -151,14 +98,7 @@ responses).
 
 ## Verification
 
-**MANDATORY before completing any task:**
-
-```bash
-pytest                   # Run test suite
-ruff check .             # Lint check
-```
-
-**Task is NOT complete until all pass.**
+Verification commands: see `code-py` § Verification.
 
 ## Rationalizations
 
