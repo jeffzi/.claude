@@ -52,10 +52,10 @@ states about test content — those are citeable exactly like skill rules. Comma
 build instructions are not conventions. Load all three skills, then walk the combined checklist per
 file.
 
-1. **Load `Skill(test-core)`.** The cross-language principles hub — AAA, test desiderata,
-   behavior-vs-implementation, merge/redundancy rules, false-coverage detection, parametrization,
-   mocking anti-patterns, and the universal rationalization table. These are the baseline checklist
-   for every test file, in every language.
+1. **Load `Skill(test-core)`.** The cross-language principles hub — AAA, behavior-vs-implementation,
+   merge/redundancy rules, false-coverage detection, parametrization, mocking anti-patterns, and the
+   universal rationalization table. These are the baseline checklist for every test file, in every
+   language.
 
 2. **Resolve the language skills per file.** Read the file's extension and look it up in the
    **Language Dispatch for `test-*` and `code-*`** table in `~/.claude/rules/skill-loading.md` (read

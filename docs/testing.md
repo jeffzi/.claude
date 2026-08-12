@@ -71,13 +71,10 @@ If a private function is not reachable through the public API, either it is dead
 API is too narrow. Fix the design; do not test the internals. Coverage via private imports is false
 coverage.
 
-### Test desiderata
+### Isolation and determinism
 
-Every test should satisfy: **isolated** (order-independent), **composable** (variability dimensions
-are separate), **deterministic** (same result if nothing changes), **readable** (comprehensible,
-invokes motivation), **behavioral** (sensitive to behavior, not implementation),
-**structure-insensitive** (unaffected by structural changes), **specific** (failure cause is
-obvious).
+Every test must be **isolated** (same result regardless of run order) and **deterministic** (same
+result if nothing changes).
 
 ## Architecture
 
@@ -156,8 +153,7 @@ The hub. Owns all universal principles inline:
 
 - Core principle: test behavior, not implementation
 - Arrange-Act-Assert (one canonical definition)
-- Test Desiderata
-- Good Tests table
+- Isolation and determinism
 - Fragile vs. Resilient table
 - Merge rules — Minimum Tests, Maximum Coverage
 - Never test private functions directly
@@ -186,8 +182,8 @@ Growth space for future patterns (AP7, AP8, …). Language skills do not duplica
 
 Language-specific syntax and pitfalls only. Examples of what lives here:
 
-- `test-py`: `autospec=True`, `@pytest.mark.parametrize` syntax, fixture scopes, `conftest.py`,
-  testing libraries table
+- `test-py`: `autospec=True`, naming form, no-classes-for-grouping, `pytest.param` ids,
+  hypothesis/moto/seeding guidance
 - `test-ts`: `toStrictEqual` vs `toEqual`, async timer APIs, fake timer cleanup, `test.each` vs
   `test.for`, type-safe factory pattern
 - `test-lua`: `assert.are_same` for tables, `before_each` for isolation, parametrized test
@@ -213,7 +209,6 @@ TDD orchestrator. Owns:
 - RED-GREEN-REFACTOR orchestration via `tdd-cycle` subagents
 - Plans → agents → verification flow
 - Batching rules (cohesive vs. unrelated behaviors)
-- Circuit breaker tiers
 - TDD-specific rationalizations ("I'll test after", "plan has inline impl")
 - TDD-specific red flags (code before test, orchestrator reading source, dispatching `tdd-cycle`
   directly)

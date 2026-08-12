@@ -3,8 +3,6 @@ name: test-{lang}
 description: >
   Use when writing or reviewing {Lang} tests with {runner}. Applies to {test-file-patterns}.
 user-invocable: false
-model: sonnet
-effort: high
 ---
 
 # {Lang} Testing with {Runner}
@@ -22,7 +20,7 @@ No overlays yet. Add a detection table here when the first library overlay is in
 ## Mandatory Rules
 
 <!-- Language/runner-specific rules only. Do not restate: AAA, test-behavior-not-implementation,
-     test-desiderata, merge rules, parametrize-over-loops, never-test-private. Those live
+     isolation/determinism, merge rules, parametrize-over-loops, never-test-private. Those live
      in test-core. -->
 
 ## Verification
