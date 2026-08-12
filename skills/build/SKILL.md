@@ -76,8 +76,9 @@ plan's **Goal/Architecture** header, and the reasoning stays in this dialogue.
 
 **Escape hatch — multi-plan features:** when the discussion reveals multiple independent subsystems
 (the same condition as write-plan's Scope Check), a single plan header can't hold the design. Say
-so, load `Skill(brainstorming)` to write a real spec as the umbrella document, then run Phase 2 once
-per subsystem. Otherwise, never write a spec.
+so, write a spec as the umbrella document at `.planning/spec-<slug>.md` — the agreed design,
+subsystem boundaries, and cross-subsystem constraints from Phase 1 — then run Phase 2 once per
+subsystem. Otherwise, never write a spec.
 
 ### Phase 2: Plan
 
