@@ -16,8 +16,9 @@
 
 ---
 
-How to verify skills work under pressure using TDD methodology. This reference covers the full
-testing cycle for discipline-enforcing and technique skills.
+How to verify skills work under pressure using TDD methodology. Pressure scenarios apply to
+discipline-enforcing and technique skills; reference skills still get retrieval testing and trigger
+validation — the Iron Law applies to every skill.
 
 ## When to test
 
@@ -28,8 +29,8 @@ Test skills that:
 - Could be rationalized away ("just this once")
 - Contradict immediate goals (speed over quality)
 
-Don't test: pure reference skills, skills without rules to violate, skills agents have no incentive
-to bypass.
+Don't _pressure_-test: pure reference skills, skills without rules to violate, skills agents have no
+incentive to bypass — those still get retrieval testing and trigger validation.
 
 ## TDD mapping
 

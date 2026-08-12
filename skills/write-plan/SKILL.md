@@ -12,26 +12,20 @@ argument-hint: "[task or spec]"
 
 ## Overview
 
-Write implementation plans that describe **what to build**, not how to TDD it. Each task is a
-vertical slice — a behavior or cohesive group of behaviors that could ship independently.
-
-Assume the implementing agent is skilled but has zero context for the codebase or problem domain.
-Document which files to touch, what behaviors to implement, and what to watch out for.
+Write implementation plans that describe **what to build**. Assume the implementing agent is skilled
+but has zero context for the codebase or problem domain.
 
 ## No Plan Mode
 
 This skill replaces plan mode. **Never call `EnterPlanMode`, and never steer the user into entering
-plan mode for you** — the ban is unconditional and covers the whole session, including calling it
-_before_ loading this skill: plan-mode state you created or solicited is a violation, never a
-trigger for the recovery rule below. Plan mode locks writing to a harness-assigned file outside the
-project (e.g. `~/.claude/plans/<random>.md`) and erases context on approval — the checkpoint below
-would be stranded, which is why plan mode is banned rather than patched around.
+plan mode for you** — the ban is unconditional and covers the whole session. Plan mode locks writing
+to a harness-assigned file outside the project (e.g. `~/.claude/plans/<random>.md`) and erases
+context on approval — the checkpoint below would be stranded, which is why plan mode is banned
+rather than patched around.
 
-Instead: write the plan directly to `.planning/plan-<slug>.md` (see Checkpoint), present it in
-conversation, and wait for the user's explicit approval before any implementation. Creating
-`.planning/` and the plan file is prescribed by this skill — it is not an unrequested edit and needs
-no separate permission. Approval happens in conversation, not via `ExitPlanMode`: ask explicitly
-("Approve this plan?") and wait — silence, a tangent, or a question is not approval.
+Instead: write the plan directly to `.planning/plan-<slug>.md` (see Checkpoint) and follow the
+approval protocol there. Creating `.planning/` and the plan file is prescribed by this skill — it is
+not an unrequested edit and needs no separate permission.
 
 | Excuse                                             | Reality                                                              |
 | -------------------------------------------------- | -------------------------------------------------------------------- |
@@ -41,7 +35,7 @@ no separate permission. Approval happens in conversation, not via `ExitPlanMode`
 | "I'll enter plan mode first, then load the skill"  | Pre-load entry is the same violation, not a recovery trigger.        |
 | "I can still write to `.planning/` from plan mode" | Satisfying the ban's rationale does not lift the ban.                |
 
-## Recovery: Plan Mode Already Active
+### Recovery: Plan Mode Already Active
 
 Applies when the session entered plan mode without your doing — the user toggled it, a launch flag
 or hook set it — never to state you created or solicited. Work within it, but the harness-assigned
@@ -51,9 +45,7 @@ feature, never from the harness filename — before any implementation step. Onc
 is the plan; stop referencing the scratch file.
 
 If you entered plan mode in violation of the ban, say so to the user, then route the artifact the
-same way — assigned file is scratch, plan saved to `.planning/plan-<slug>.md` immediately after
-approval. That is recovery of the artifact, not absolution: the violation is still surfaced, and
-"recovery exists" is never a reason to enter plan mode.
+same way.
 
 ## Scope Check
 
@@ -63,13 +55,12 @@ subsystem. Each plan should produce working, testable software on its own.
 ## File Structure
 
 Before defining tasks, map out which files will be created or modified and what each is responsible
-for. This is where decomposition decisions get locked in.
+for.
 
 - One clear responsibility per file. Prefer smaller, focused files.
 - Files that change together should live together. Split by responsibility, not by layer.
-- In existing codebases, follow established patterns.
 
-This structure informs task decomposition. Each task should produce self-contained changes.
+Each task should produce self-contained changes.
 
 ## Task Granularity
 
@@ -115,7 +106,9 @@ type: plan
 
 **Tech Stack:** [Key technologies/libraries]
 
-**Skills:** [Language/tech skills to load before implementation, e.g. `code-py`, `test-py`]
+**Skills:** [Only when the project has no test suite and tasks are implemented directly — skills to
+load before implementation. Tasks routed through `/tdd` omit this line; the agents resolve language
+skills themselves.]
 
 ---
 ```
@@ -167,16 +160,15 @@ per behavior across **all** tasks, stated as implemented fact:
 Claim N: [behavior from Task M, e.g. "email validation rejects empty, malformed, and duplicate
 emails"] Location: [file the task created/modified]
 
-Word every claim as the observable outcome the behavior promises (see Behavior Wording): a claim the
-reviewer can confirm by finding a call site, without tracing what it produces, is worded wrong. A
-flag-gated behavior yields a claim covering both branches.
+Word every claim as the observable outcome the behavior promises: a claim the reviewer can confirm
+by finding a call site, without tracing what it produces, is worded wrong. A flag-gated behavior
+yields a claim covering both branches.
 
 This catches cross-task integration issues that per-task verification misses (e.g. Task 3 broke Task
-1's behavior), and it is the sole claim verification for the last implementation task. For any
-`Refuted` or `Unsubstantiated` verdict, fix the gap and re-verify that claim once; if it still
-fails, surface it to the user. Mechanical claims (tests pass, build green) are not for the reviewer
-— verify those by running the commands directly. Close by reminding the user to run `/preflight`
-before pushing — plan execution defers the deep review lenses to it.
+1's behavior). For any `Refuted` or `Unsubstantiated` verdict, fix the gap and re-verify that claim
+once; if it still fails, surface it to the user. Mechanical claims (tests pass, build green) are not
+for the reviewer — verify those by running the commands directly. Close by reminding the user to run
+`/preflight` before pushing — plan execution defers the deep review lenses to it.
 ```
 
 ## Test-Only Plans
@@ -188,18 +180,11 @@ a test-only plan may omit. Adapt the task template; drop nothing else:
 
 - **Implementation:** replace `Use /tdd` with the concrete change the task makes.
 - **Verify** and **Final Task:** `claim-reviewer` **still runs — no plan ever skips it** (the
-  last-task **Verify** omission applies as usual; the Final Task covers that task). A passing suite
-  is a mechanical claim (run it directly) and does **not** prove a test asserts the right thing; a
-  green test can check the wrong behavior. Extract claims about what each test now exercises and
-  asserts (e.g. "the bucketing test covers all three buckets") and let the independent review verify
-  them.
+  last-task **Verify** omission applies as usual; the Final Task covers that task). Extract claims
+  about what each test now exercises and asserts (e.g. "the bucketing test covers all three
+  buckets") and let the independent review verify them.
 
-No matter how thoroughly the main agent reviewed its own work, independent review is required. The
-factual claim-verification pass below also runs regardless: a test-only plan still asserts facts
-about existing code.
-
-These are bright-line rules — "lean", "low-risk", "just tests", and "that's how we do it here" are
-not exceptions. The rationalizations that surface under pressure, and why each fails:
+These are bright-line rules. The rationalizations that surface under pressure:
 
 | Excuse                                                      | Reality                                                                                                                                                                                                                            |
 | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -210,16 +195,14 @@ not exceptions. The rationalizations that surface under pressure, and why each f
 
 ## What Goes in a Plan vs. What Doesn't
 
-| In the plan                | NOT in the plan              |
-| -------------------------- | ---------------------------- |
-| Behaviors to implement     | Test assertions or test code |
-| Files to create/modify     | Implementation code          |
-| Dependencies between tasks | RED/GREEN/REFACTOR steps     |
-| Non-obvious constraints    | Commit messages              |
-| Architecture decisions     | TDD mechanics                |
-|                            | Internal skill/agent names   |
-| Execution directives       |                              |
-| (`/tdd`, `claim-reviewer`) |                              |
+| In the plan                                     | NOT in the plan              |
+| ----------------------------------------------- | ---------------------------- |
+| Behaviors to implement                          | Test assertions or test code |
+| Files to create/modify                          | Implementation code          |
+| Dependencies between tasks                      | RED/GREEN/REFACTOR steps     |
+| Non-obvious constraints                         | Commit messages              |
+| Architecture decisions                          | TDD mechanics                |
+| Execution directives (`/tdd`, `claim-reviewer`) |                              |
 
 ## Plan Review
 
@@ -241,10 +224,7 @@ present, the current code behaves as described, a pattern to follow lives where 
 plan built on a stale or wrong assumption sends the implementer down a dead end. Before presenting
 the plan, verify these factual claims independently.
 
-This pass is **mandatory** and runs no matter how carefully you read the code while investigating.
-"I already verified each cited line myself during investigation" is not grounds to skip it — that is
-you checking your own work, which is exactly what an independent pass exists to catch. Confidence is
-not evidence. Dispatch the agent every time, including for test-only plans.
+This pass is **mandatory** on every plan, including test-only ones.
 
 Dispatch a single **Agent** tool call with `subagent_type: claim-reviewer` (do NOT set model — the
 agent defines its own). Extract one claim per checkable assertion the plan makes about existing
@@ -266,22 +246,17 @@ _create_; it can only verify what exists now.
 
 Create the plan at `.planning/plan-<slug>.md` **as the working file from the first draft** —
 `<slug>` is a kebab-case name derived from the feature or task (e.g.
-`.planning/plan-email-validation.md`). Create the `.planning/` directory if it doesn't exist. Draft,
-review, and revise in this file; it is the single artifact downstream tools consume. When the plan
-is ready, present it to the user in conversation and wait for explicit approval before starting
-implementation. After approval, confirm the artifact path for handoff.
+`.planning/plan-email-validation.md`). Draft, review, and revise in this file; it is the single
+artifact downstream tools consume. When the plan is ready, present it to the user in conversation
+and wait for explicit approval before starting implementation. Approval happens in conversation, not
+via `ExitPlanMode`: ask explicitly ("Approve this plan?") and wait — silence, a tangent, or a
+question is not approval. After approval, confirm the artifact path for handoff.
 
 ## Common Mistakes
 
-| Mistake                                                     | Reality                                                                    |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Tasks describe TDD steps ("write failing test", "run test") | Tasks describe **behaviors**, not test mechanics                           |
-| One task per file instead of per behavior group             | Group by coherent behavior, not by file boundary                           |
-| Implementation code or test assertions in the plan          | Plans describe what to build, not how to implement                         |
-| All changes in one task because they're related             | Independent subsystems → separate tasks (or separate plans)                |
-| Skipping the file structure section                         | Without file mapping, decomposition decisions are deferred and conflicting |
-| Plan documents the obvious (CRUD, standard patterns)        | Only document non-obvious constraints, gotchas, and dependencies           |
-| Behaviors or claims name a mechanism ("uses helper X")      | Word the observable outcome; mechanism wording passes broken code          |
-| Flag-gated behavior specs tests for one branch only         | Spec a fixture or assertion per branch — both modes, both outcomes         |
-| Entering plan mode — before or after loading this skill     | The ban is unconditional; write `.planning/plan-<slug>.md` directly        |
-| Approved plan left in the harness-assigned file             | First post-approval action is saving it to `.planning/plan-<slug>.md`      |
+| Mistake                                              | Reality                                                                    |
+| ---------------------------------------------------- | -------------------------------------------------------------------------- |
+| One task per file instead of per behavior group      | Group by coherent behavior, not by file boundary                           |
+| All changes in one task because they're related      | Independent subsystems → separate tasks (or separate plans)                |
+| Skipping the file structure section                  | Without file mapping, decomposition decisions are deferred and conflicting |
+| Plan documents the obvious (CRUD, standard patterns) | Only document non-obvious constraints, gotchas, and dependencies           |

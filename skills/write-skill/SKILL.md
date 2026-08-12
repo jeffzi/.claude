@@ -14,9 +14,6 @@ argument-hint: "[skill name or purpose]"
 **Writing skills is TDD applied to process documentation.** Run scenarios without the skill (RED),
 write the skill addressing failures (GREEN), close loopholes (REFACTOR).
 
-If you didn't watch an agent fail without the skill, you don't know if the skill prevents the right
-failures.
-
 ## Development loop
 
 1. **Capture intent.** What should the skill enable? When should it trigger (user phrases,
@@ -26,11 +23,9 @@ failures.
 3. **Draft the skill** addressing those failures (GREEN).
 4. **Pressure-test** — rerun under pressure, document rationalizations, close loopholes (REFACTOR).
    See `references/pressure-testing.md`.
-5. **Validate triggers** — verify the description activates on should-trigger queries and ignores
-   should-not-trigger queries. See the trigger-validation section in `pressure-testing.md`.
-6. **Generalize, don't overfit.** When fixing failures, make the rule cover the whole category —
-   don't encode your exact test queries verbatim. The skill fails the next unseen paraphrase if you
-   do.
+5. **Validate triggers, and generalize, don't overfit** — verify the description activates on
+   should-trigger queries and ignores should-not-trigger queries. See the trigger-validation section
+   in `pressure-testing.md`.
 
 ## When to create a skill
 
@@ -86,20 +81,17 @@ template, file organization, and description optimization (CSO).
 For workflow and task skills, every step ends on a **completion criterion** — the condition that
 tells the agent the step is done. Two properties make it a lever:
 
-- **Clarity** — the agent can tell done from not-done. A vague bound ("understanding reached")
+- **Checkable** — the agent can tell done from not-done. A vague bound ("understanding reached")
   invites premature completion: the agent rushes to the visible next step. Sharpen the bound before
   restructuring anything.
-- **Demand** — how much the bound requires. "Every modified file accounted for" forces thorough
+- **Demanding** — how much the bound requires. "Every modified file accounted for" forces thorough
   digging where "produce a change list" does not. Demand also binds flat reference: "every rule
   applied" sets an exhaustiveness bar for a checklist the same way "every step done" does for a
   sequence.
 
-The strongest criteria are both checkable and exhaustive.
-
 ## Frontmatter beyond name/description
 
-Additional optional fields control invocation, tool access, model selection, subagent execution, and
-dynamic context injection. Match each to the skill's role:
+Match each optional field to the skill's role:
 
 | Field                            | Use for                                                                                    |
 | -------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -126,10 +118,6 @@ bright-line rules, loophole closing, rationalization tables, and the
 steer-positive/adjudicate-negative zoning rule for prohibitions.
 
 ## Pressure-testing skills
-
-**The cycle:** RED (run without skill, document failures) → GREEN (write minimal skill, verify
-compliance) → REFACTOR (capture new rationalizations, add counters, re-test). Use subagents for
-isolation. Read `references/pressure-testing.md` for full methodology.
 
 ### Rationalizations for skipping tests
 
@@ -160,15 +148,13 @@ trimming words from it.
 
 ## Anti-patterns
 
-| Anti-pattern                    | What to look for                                                    |
-| ------------------------------- | ------------------------------------------------------------------- |
-| Workflow summary in description | Claude follows summary as shortcut, skips body                      |
-| Narrative example               | Session-specific stories instead of general patterns                |
-| Multi-language dilution         | Same example in 5+ languages — mediocre quality, maintenance cost   |
-| Code in flowcharts              | Implementation code in diagrams — can't copy-paste                  |
-| Generic labels                  | `helper1`, `step3` — labels without semantic meaning                |
-| Over-documenting known things   | Standard library usage Claude already knows                         |
-| Scattered concept               | One concept's definition, rules, and caveats spread across sections |
+| Anti-pattern            | What to look for                                                    |
+| ----------------------- | ------------------------------------------------------------------- |
+| Narrative example       | Session-specific stories instead of general patterns                |
+| Multi-language dilution | Same example in 5+ languages — mediocre quality, maintenance cost   |
+| Code in flowcharts      | Implementation code in diagrams — can't copy-paste                  |
+| Generic labels          | `helper1`, `step3` — labels without semantic meaning                |
+| Scattered concept       | One concept's definition, rules, and caveats spread across sections |
 
 ## Red flags — STOP and reassess
 
@@ -187,24 +173,15 @@ Test items (RED/GREEN/REFACTOR runs): use the testing checklist in `references/p
 
 ### GREEN phase — write skill
 
-- [ ] `name` uses only lowercase letters, numbers, hyphens (max 64 chars)
-- [ ] `description` starts with "Use when...", third person, no workflow summary
-- [ ] Description states what the skill is NOT for when sibling skills could match
-- [ ] SKILL.md under 500 lines; heavy content in reference files
-- [ ] Keywords cover errors, symptoms, synonyms, tool names — each synonym earns its place (a
-      realistic should-trigger query fails without it)
-- [ ] Workflow steps end on checkable, demanding completion criteria
-- [ ] One excellent code example (not multi-language)
+- [ ] Frontmatter and description meet the rules in `references/skill-structure.md` (naming, CSO,
+      keyword coverage, sibling boundaries)
+- [ ] Frontmatter fields match the role table above (see `references/frontmatter.md`)
 - [ ] Common mistakes section included
 - [ ] Consistent terminology throughout (one term per concept)
 - [ ] No time-sensitive information ("before/after some date, do X")
-- [ ] `model`/`effort` declared only if the skill is slash-invoked, and each has a stated reason;
-      otherwise both omitted (see `references/frontmatter.md`)
 
 ### For discipline skills (additional)
 
-- [ ] Bright-line rules with absolute language
-- [ ] Rationalization table from testing
-- [ ] Red flags list
-- [ ] Loopholes explicitly closed
-- [ ] Persuasion principles matched to skill type
+- [ ] Every structure in `references/persuasion-principles.md` § "Writing compliance-resistant
+      rules" present: bright lines, rationalization table from testing, red flags, loophole closure,
+      matched persuasion principles
