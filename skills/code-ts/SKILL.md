@@ -146,14 +146,11 @@ import { readFile } from "node:fs/promises";
 
 Know what survives compilation and what vanishes:
 
-| Construct                  | Runtime?       | Notes                                                   |
-| -------------------------- | -------------- | ------------------------------------------------------- |
-| `interface` / `type`       | Erased         | Zero bytes                                              |
-| `readonly`                 | Erased         | No runtime immutability — use `Object.freeze()`         |
-| `private` keyword          | Erased         | Accessible at runtime — use `#private` for enforcement  |
-| `as` / `satisfies` / `!`   | Erased         | Zero safety at runtime                                  |
-| `enum`                     | IIFE + object  | ~200 bytes each — prefer `const enum` or union literals |
-| `class` / `abstract class` | Full prototype | `abstract` keyword erased                               |
+| Construct         | Runtime?      | Notes                                                                                         |
+| ----------------- | ------------- | --------------------------------------------------------------------------------------------- |
+| `readonly`        | Erased        | No runtime immutability — use `Object.freeze()`                                               |
+| `private` keyword | Erased        | Accessible at runtime — use `#private` for enforcement                                        |
+| `enum`            | IIFE + object | ~200 bytes each — prefer union literals; `const enum` does not inline under `isolatedModules` |
 
 ### Narrowing Patterns
 
@@ -186,89 +183,33 @@ function area(shape: Shape): number {
 
 | Trap                                       | Instead                                                                          |
 | ------------------------------------------ | -------------------------------------------------------------------------------- |
-| `as` cast to silence compiler              | Narrow with type guard or schema validation                                      |
-| `any` from `JSON.parse` spreading          | Type as `unknown`, validate at boundary                                          |
-| `readonly` = immutable                     | `Object.freeze()` for runtime enforcement                                        |
-| `private` = inaccessible                   | `#private` fields (ES2022+) for runtime                                          |
 | `Partial<T>` is deep                       | Shallow only — nested objects stay required                                      |
-| `Omit<T, "key">` verifies key              | It does not — use `StrictOmit<T, K extends keyof T>`                             |
+| `Omit<T, "key">` verifies key              | It does not — define `type StrictOmit<T, K extends keyof T> = Omit<T, K>`        |
 | `"a" \| "b" \| string` narrows             | Collapses to `string` — remove the `string` widener                              |
 | `Object.keys()` returns `(keyof T)[]`      | Returns `string[]` — intentional due to structural typing                        |
-| `\|\|` for defaults                        | Use `??` — `\|\|` replaces `0`, `""`, `false`                                    |
-| `if (promise)` checks value                | Always truthy — checks object ref, not resolved value                            |
-| `return fetch()` in try/catch              | `return await` — otherwise catch is dead code                                    |
 | `.filter(x => x !== null)` narrows         | Returns original type — needs explicit type predicate                            |
 | `JSON.stringify` always returns string     | Returns `undefined` for undefined/functions/symbols; throws on BigInt/circular   |
 | Chained `.map().filter().reduce()`         | Single `for-of` loop in hot paths — no intermediate arrays                       |
 | Spread-in-reduce `{ ...acc, [key]: val }`  | O(n^2) — mutate accumulator in place                                             |
 | `interface &` intersection for composition | Use `interface extends` — intersections aren't cached, conflicts produce `never` |
 
-## Generics Gotchas
+## House tsconfig
 
-| Pattern                              | Issue                            | Fix                                          |
-| ------------------------------------ | -------------------------------- | -------------------------------------------- |
-| `T extends any ? T[] : never`        | Distributes over unions          | Wrap in tuple: `[T] extends [any]`           |
-| `IsNever<never>`                     | Returns `never` not `true`       | `[T] extends [never] ? true : false`         |
-| `infer P` in param position          | Produces intersection, not union | Expected behavior — design accordingly       |
-| Generic inferred from multiple sites | Type widens unexpectedly         | Use `NoInfer<T>` (5.4+) on secondary sites   |
-| Recursive conditional types          | ~100 depth limit (non-tail)      | Use accumulator pattern for ~1000 iterations |
-
-## Recommended `tsconfig.json`
-
-```jsonc
-{
-  "compilerOptions": {
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "noPropertyAccessFromIndexSignature": true,
-    "noImplicitOverride": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "allowUnusedLabels": false,
-    "allowUnreachableCode": false,
-    "verbatimModuleSyntax": true,
-    "isolatedModules": true,
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "target": "es2024",
-    "skipLibCheck": true,
-  },
-}
-```
-
-**Key flags outside `strict: true`** that catch entire bug categories:
-
-- **`noUncheckedIndexedAccess`** — `arr[0]` is `T | undefined`, not `T`
-- **`exactOptionalPropertyTypes`** — prevents `{ key: undefined }` where key should be absent
-- **`verbatimModuleSyntax`** — enforces `import type`, enables single-file transpilers
-- **`isolatedModules`** — compatibility with esbuild/SWC
-- **`skipLibCheck`** — 40-66% faster builds
+House tsconfig lives in `setup-ts/references/tsconfig.json` — run `/setup-ts init` or
+`/setup-ts update` to install or reconcile it; never hand-write one here.
 
 ## Rationalizations That Mean You're About to Fail
 
 | Excuse                              | Reality                                                                                  |
 | ----------------------------------- | ---------------------------------------------------------------------------------------- |
-| "Quick `as` cast, I'll fix later"   | You won't. `as` hides bugs that crash at runtime.                                        |
+| "Quick `as` cast, I'll fix later"   | Use `Set.has()` instead of `includes()`, or `isRecord` guard. Almost always avoidable.   |
 | "Types slow me down"                | Types catch bugs at write-time. Debugging is slower.                                     |
 | "This is too simple for validation" | `JSON.parse` returns `any`. One leak infects the chain.                                  |
-| "`readonly` makes it immutable"     | Erased at runtime. Use `Object.freeze()`.                                                |
-| "`private` keeps it safe"           | Erased at runtime. Use `#private` fields.                                                |
 | "`strict: true` is enough"          | Misses `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `verbatimModuleSyntax`. |
 | "I'll add `import type` later"      | Without `verbatimModuleSyntax`, bundlers can't distinguish.                              |
-| "Filter narrows the type"           | `.filter(x => x !== null)` does NOT narrow — needs type predicate.                       |
-| "This `as` cast is unavoidable"     | Use `Set.has()` instead of `includes()`, or `isRecord` guard. Almost always avoidable.   |
 
 ## Verification
 
-**MANDATORY before completing any task:**
-
-```bash
-npx tsc --noEmit      # Type checking (biome doesn't type-check)
-npx biome check .     # Linting and formatting
-npx vitest run        # If tests exist — always run separately
-```
-
-Lefthook manages git hooks. **Task is NOT complete until all pass.**
+Run the gates the project exposes: read the `scripts` in `package.json` and run its typecheck,
+lint/format, and test scripts, whatever they are named. Tests always run separately from static
+checks. If no script covers type checking, fall back to `npx tsc --noEmit`.

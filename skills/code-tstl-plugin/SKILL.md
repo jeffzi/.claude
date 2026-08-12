@@ -259,11 +259,9 @@ function compile(source: string): string {
 
 **MANDATORY before completing any task:**
 
-```bash
-npx tsc --noEmit         # Type checking (biome doesn't type-check)
-npx biome check .        # Linting and formatting
-npx vitest run           # Plugin unit tests — always run separately
-```
+Run the gates the project exposes: read the `scripts` in `package.json` and run its typecheck,
+lint/format, and test scripts, whatever they are named — plugin unit tests always run separately. If
+no script covers type checking, fall back to `npx tsc --noEmit`.
 
 Inspect test output Lua for correct transformations. Check that no `typescript-to-lua/dist/` imports
 remain. Lefthook manages git hooks. **Task is NOT complete until tests pass and all imports use the

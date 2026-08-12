@@ -25,7 +25,6 @@ corresponding skill:
 | Detection pattern                                                             | Skill to load      |
 | ----------------------------------------------------------------------------- | ------------------ |
 | `import * as tstl from "typescript-to-lua"` with `tstl.Plugin` implementation | `code-tstl-plugin` |
-| `import { ... } from "ecstatic"` (ECS game code)                              | `code-ecstatic`    |
 
 Only load skills that are actually installed. If a skill fails to load, continue without it.
 
@@ -376,11 +375,12 @@ Key TSTL settings:
 **MANDATORY before completing any task:**
 
 ```bash
-npx tstl              # Transpile — catches continue, bitwise, and other Lua 5.1 errors
-npx tsc --noEmit      # Type checking (biome doesn't type-check)
-npx biome check .     # Linting and formatting
-npx vitest run        # If tests exist — always run separately
+npx tstl              # Transpile first — catches continue, bitwise, and other Lua 5.1 errors
 ```
+
+Then run the gates the project exposes: read the `scripts` in `package.json` and run its typecheck,
+lint/format, and test scripts, whatever they are named. Tests always run separately. If no script
+covers type checking, fall back to `npx tsc --noEmit`.
 
 Inspect generated `.lua` files for `while` loops (should be `for`), `__TS__Class` (should be plain
 tables), and `__TS__New(Map)` (should be raw `{}`). Lefthook manages git hooks. **Task is NOT
