@@ -5,6 +5,8 @@ description: >
   before proposing fixes. Also use when a fix attempt fails twice — stop guessing and start
   investigating. Use when you see a stack trace and don't understand the root cause.
 argument-hint: "[error message, symptom, or failing test]"
+# Model pinned: /investigate is a direct quality-floor entry point — hypothesis falsification degrades
+# on cheaper tiers. Inert on the /fix path (Skill()-loaded inside fix's opus agent).
 model: opus
 effort: high
 ---
@@ -110,26 +112,20 @@ Format: `- [hypothesis] — disproved because [evidence]`
 Before testing a new hypothesis, scan the eliminated list. If you're about to re-investigate
 something already ruled out, stop.
 
-## Biases and Red Flags — Catch Yourself
+## Red Flags — Catch Yourself
 
-| You're thinking...                                                           | Trap                                                                  | Antidote                                                           |
-| ---------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| "Let me just try this" / "Let me fix it and see" / "The error is misleading" | **Confirmation**: only seeking evidence that supports your theory     | Actively seek disconfirming evidence. "What would prove me wrong?" |
-| "I think it might be..." / "It's probably a race condition"                  | **Anchoring**: first explanation becomes your mental anchor           | Generate 3+ hypotheses before investigating any                    |
-| "This worked in a similar case"                                              | **Availability**: recent bugs make you assume a similar cause         | Treat each bug as novel until evidence says otherwise              |
-| "I've spent hours on this, just one more try"                                | **Sunk cost**: time invested keeps you going despite counter-evidence | "If I started fresh, would I still take this path?"                |
-| Debugging your own code — you know what it was _supposed_ to do              | **Familiarity**: your intent masks what the code actually does        | Read your code as if someone else wrote it                         |
-
-## Rationalization Prevention
-
-| Excuse                                  | Reality                                                                                                  |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| "I already know what's wrong"           | If you did, you wouldn't need to investigate. Verify.                                                    |
-| "The fix is obvious"                    | Obvious fixes that skip diagnosis often mask the real issue.                                             |
-| "I'll investigate after I fix it"       | You won't. The urgency disappears once it "works."                                                       |
-| "This is taking too long, just fix it"  | Guessing takes longer. Systematic diagnosis is faster.                                                   |
-| "It's definitely this one thing"        | "Definitely" without evidence is a guess.                                                                |
-| "The fix works regardless of the cause" | Without confirming root cause, you can't know the fix is correct. The real issue resurfaces differently. |
+| You're thinking...                                                        | Reality                                                                                                                   |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| "Let me just try this" / "The fix is obvious" / "The error is misleading" | Obvious fixes that skip diagnosis mask the real issue. Actively seek disconfirming evidence: "What would prove me wrong?" |
+| "I think it might be..." / "It's probably a race condition"               | The first explanation becomes your anchor. Generate 3+ hypotheses before investigating any.                               |
+| "This worked in a similar case"                                           | Treat each bug as novel until evidence says otherwise.                                                                    |
+| "I've spent hours on this, just one more try"                             | Sunk cost. See Circuit Breaker — stop and reassess.                                                                       |
+| Debugging your own code — you know what it was _supposed_ to do           | Your intent masks what the code actually does. Read it as if someone else wrote it.                                       |
+| "I already know what's wrong"                                             | If you did, you wouldn't need to investigate. Verify.                                                                     |
+| "I'll investigate after I fix it"                                         | You won't. The urgency disappears once it "works."                                                                        |
+| "This is taking too long, just fix it"                                    | Guessing takes longer. Systematic diagnosis is faster.                                                                    |
+| "It's definitely this one thing"                                          | "Definitely" without evidence is a guess.                                                                                 |
+| "The fix works regardless of the cause"                                   | Without confirming root cause, you can't know the fix is correct. The real issue resurfaces differently.                  |
 
 ## Circuit Breaker
 
@@ -143,31 +139,10 @@ something already ruled out, stop.
 - Surface to the user: "I've tested N hypotheses without confirming a root cause. Here's what I've
   tried and ruled out. I think the issue may be in [area] — want me to investigate there, or do you
   have context that might help?"
-
-## When Investigation Finds No Root Cause
-
-If you've completed all phases and genuinely cannot identify the root cause:
-
-1. Document what you investigated and ruled out.
-2. Recommend monitoring or logging to capture the next occurrence.
-3. Surface to user with full context — let them decide next steps.
-
-**But:** 95% of "no root cause" conclusions come from incomplete investigation. Before reaching this
-point, verify you've traced the full data flow, checked all component boundaries, and reproduced
-under controlled conditions.
+- **Still no root cause after completing all phases:** recommend monitoring or logging to capture
+  the next occurrence, and surface to the user with the ruled-out list — they decide next steps.
 
 ## Handoff
 
-Investigation answers "what's wrong and why." It does not fix anything. Once root cause is
-confirmed, hand off to TDD for the fix — the confirmed root cause statement becomes input for
-writing the failing test.
-
-## Pressure Testing
-
-RED phase failures this skill was designed to address:
-
-- Agents applying "obvious" fixes without diagnosing root cause
-- Stopping investigation after the first plausible hypothesis without confirming it
-- Cycling through guesses instead of following binary search / working-backwards patterns
-
-See the Rationalization Prevention and Biases tables above for captured rationalizations.
+Investigation answers "what's wrong and why." Once root cause is confirmed, hand off to `Skill(tdd)`
+for the fix — the confirmed root cause statement becomes input for writing the failing test.
