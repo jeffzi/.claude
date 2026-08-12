@@ -51,17 +51,17 @@ script's `add` commands are the source map.
 
 | Skill                                                                  | Description                                                        |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| [`write-agent`](skills/write-agent/SKILL.md)                           | Author and review agent definition files                           |
+| [`write-agent`](skills/write-agent/SKILL.md)                           | Author agent definition files                                      |
 | [`write-doc`](skills/write-doc/SKILL.md)                               | Documentation structure and information architecture               |
 | [`write-prose`](skills/write-prose/SKILL.md)                           | Sentence-level clarity (Strunk's rules)                            |
 | [`write-commit`](skills/write-commit/SKILL.md)                         | Git commit message quality                                         |
-| [`write-skill`](skills/write-skill/SKILL.md)                           | Author and review SKILL.md files                                   |
+| [`write-skill`](skills/write-skill/SKILL.md)                           | Author SKILL.md files (review via `revise-skill`)                  |
 | [`write-plan`](skills/write-plan/SKILL.md)                             | Multi-step implementation plans                                    |
 | [`write-changelog`](skills/write-changelog/SKILL.md)                   | Keep a Changelog standard for CHANGELOG.md                         |
+| [`write-release`](skills/write-release/SKILL.md)                       | Version bump, tag, and GitHub release workflow                     |
 | [`humanizer`](skills/humanizer/SKILL.md)                               | Remove AI writing patterns from prose                              |
-| [`literature-review`](skills/literature-review/SKILL.md)               | Systematic literature reviews across academic databases            |
 | [`markdown-mermaid-writing`](skills/markdown-mermaid-writing/SKILL.md) | Markdown and Mermaid style guides, templates, and 24 diagram types |
-| [`paper-lookup`](skills/paper-lookup/SKILL.md)                         | Search 10 academic databases by keyword, DOI, or author            |
+| [`paper-lookup`](skills/paper-lookup/SKILL.md)                         | Search 11 academic databases by keyword, DOI, or author            |
 
 #### Review
 
@@ -80,24 +80,22 @@ finds. Dispatch the agent directly when you want findings without edits.
 
 #### Process
 
-| Skill                                                            | Description                                                                    |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| [`autocommit`](skills/autocommit/SKILL.md)                       | Standing commit approval — auto-commit verified work, no pushes                |
-| [`brainstorming`](skills/brainstorming/SKILL.md)                 | Explore intent and design space before implementing features                   |
-| [`build`](skills/build/SKILL.md)                                 | End-to-end feature pipeline: brainstorm → plan → TDD with quality gates        |
-| [`fix`](skills/fix/SKILL.md)                                     | Root cause investigation then TDD-driven fix                                   |
-| [`fix-ci`](skills/fix-ci/SKILL.md)                               | Diagnose and fix failing GitHub Actions CI                                     |
-| [`harden`](skills/harden/SKILL.md)                               | Bug-hunting audit + Don't Repeat Yourself (DRY) pass with diff-gated execution |
-| [`preflight`](skills/preflight/SKILL.md)                         | Gated pre-commit pipeline: review, auto-fix, verify, restore on red            |
-| [`receiving-code-review`](skills/receiving-code-review/SKILL.md) | Decide what to implement from review feedback (PR comments, agent findings)    |
-| [`plan-commit`](skills/plan-commit/SKILL.md)                     | Analyze uncommitted changes and suggest granular commits                       |
-| [`investigate`](skills/investigate/SKILL.md)                     | Systematic root cause investigation — diagnosis only, no fix                   |
-| [`research`](skills/research/SKILL.md)                           | Fact-checking and hallucination-resistant research                             |
-| [`upgrade-py`](skills/upgrade-py/SKILL.md)                       | Upgrade Python dependencies and sync versions                                  |
-| [`upgrade-ts`](skills/upgrade-ts/SKILL.md)                       | Upgrade TypeScript dependencies and sync versions                              |
-| [`setup-ts`](skills/setup-ts/SKILL.md)                           | Scaffold or update shared TS tooling config (oxlint, tsconfig, etc.)           |
-| [`distill-code`](skills/distill-code/SKILL.md)                   | Reduce code complexity after implementation (nesting, duplication, naming)     |
-| [`fallow`](skills/fallow/SKILL.md)                               | Codebase intelligence: risk, duplication, complexity, dead code (TS/JS)        |
+| Skill                                          | Description                                                                    |
+| ---------------------------------------------- | ------------------------------------------------------------------------------ |
+| [`autocommit`](skills/autocommit/SKILL.md)     | Standing commit approval — auto-commit verified work, no pushes                |
+| [`build`](skills/build/SKILL.md)               | Feature design pipeline: discuss → plan; produces an approved plan file        |
+| [`fix`](skills/fix/SKILL.md)                   | Root cause investigation then TDD-driven fix                                   |
+| [`fix-ci`](skills/fix-ci/SKILL.md)             | Diagnose and fix failing GitHub Actions CI                                     |
+| [`harden`](skills/harden/SKILL.md)             | Bug-hunting audit + Don't Repeat Yourself (DRY) pass with diff-gated execution |
+| [`preflight`](skills/preflight/SKILL.md)       | Gated pre-commit pipeline: review, auto-fix, verify, restore on red            |
+| [`plan-commit`](skills/plan-commit/SKILL.md)   | Analyze uncommitted changes and suggest granular commits                       |
+| [`investigate`](skills/investigate/SKILL.md)   | Systematic root cause investigation — diagnosis only, no fix                   |
+| [`research`](skills/research/SKILL.md)         | Fact-checking and hallucination-resistant research                             |
+| [`upgrade-py`](skills/upgrade-py/SKILL.md)     | Upgrade Python dependencies and sync versions                                  |
+| [`upgrade-ts`](skills/upgrade-ts/SKILL.md)     | Upgrade TypeScript dependencies and sync versions                              |
+| [`setup-ts`](skills/setup-ts/SKILL.md)         | Scaffold or update shared TS tooling config (oxlint, tsconfig, etc.)           |
+| [`distill-code`](skills/distill-code/SKILL.md) | Reduce code complexity after implementation (nesting, duplication, naming)     |
+| [`fallow`](skills/fallow/SKILL.md)             | Codebase intelligence: risk, duplication, complexity, dead code (TS/JS)        |
 
 #### Analysis
 
@@ -106,15 +104,14 @@ finds. Dispatch the agent directly when you want findings without edits.
 | [`polars`](skills/polars/SKILL.md)                             | DataFrames: lazy evaluation, parallel execution, Arrow backend                              |
 | [`statistical-analysis`](skills/statistical-analysis/SKILL.md) | Statistical test selection, assumption checking, APA-style reporting                        |
 | [`pymc`](skills/pymc/SKILL.md)                                 | Bayesian modeling: Markov chain Monte Carlo (MCMC), variational inference, posterior checks |
-| [`statsmodels`](skills/statsmodels/SKILL.md)                   | Regression, generalized linear models (GLM), time series, mixed models, inference tables    |
 | [`scikit-learn`](skills/scikit-learn/SKILL.md)                 | Classification, regression, clustering, preprocessing, pipelines                            |
 | [`scikit-survival`](skills/scikit-survival/SKILL.md)           | Survival analysis: Cox, random survival forest (RSF), Brier score, censored data            |
 
 #### Utility
 
-| Skill                          | Description                         |
-| ------------------------------ | ----------------------------------- |
-| [`opus`](skills/opus/SKILL.md) | Switch the active model to Opus 4.6 |
+| Skill                                  | Description                                                |
+| -------------------------------------- | ---------------------------------------------------------- |
+| [`tsgo-lsp`](skills/tsgo-lsp/SKILL.md) | Registers the TypeScript 7 native language server (`tsgo`) |
 
 ### Agents
 
@@ -134,8 +131,8 @@ finds. Dispatch the agent directly when you want findings without edits.
 | [`claim-reviewer`](agents/claim-reviewer.md)                 | Verify claims against the codebase independently        |
 
 The five `vet-*` agents are read-only: no `Edit`, `Write`, or `Bash`. They return `### Finding N`
-blocks, each carrying a confidence score (0/25/50/80/100) and a domain impact tag. The paired
-`revise-*` skill gates on the score, orders the fix queue by impact, and applies the fixes.
+blocks scored for confidence; most also carry a domain impact tag. The paired `revise-*` skill gates
+on the score, orders the fix queue by impact where the tag exists, and applies the fixes.
 
 ### Rules
 
@@ -161,12 +158,12 @@ frontmatter activate only when matching files are in context.
 
 ## Development Workflow
 
-The two most common entry points for single-session work:
+The two most common entry points:
 
-| Scope         | Tool                              | When to use                                                     |
-| ------------- | --------------------------------- | --------------------------------------------------------------- |
-| Bug fix       | [`/fix`](skills/fix/SKILL.md)     | Root cause unknown — investigates then drives TDD               |
-| Small feature | [`/build`](skills/build/SKILL.md) | Single session — brainstorm, plan, implement with quality gates |
+| Scope         | Tool                              | When to use                                                       |
+| ------------- | --------------------------------- | ----------------------------------------------------------------- |
+| Bug fix       | [`/fix`](skills/fix/SKILL.md)     | Root cause unknown — investigates then drives TDD, in one session |
+| Small feature | [`/build`](skills/build/SKILL.md) | Design and plan — execution runs later, from the plan file alone  |
 
 See the [Process](#process) skills table for additional workflows (`/harden`, `/preflight`,
 `/distill-code`, and others).
@@ -180,34 +177,33 @@ context gauge, and rate-limit pacing. The design surfaces detail only when it ma
 sessions read as gray, and extra segments appear only when they carry information.
 
 ```text
-.claude ⎇ feature-x │ Fable (high) ● ● ◎ ○ ○ │ 5h 72%↑↑ · 2h10m │ 7d 89% · 4d13h
-│         │           │     │      │           │  │   │    │       │
-│         │           │     │      │           │  │   │    │       └─ 7-day window, same anatomy
-│         │           │     │      │           │  │   │    └─ reset countdown (shown at ≥ 75%)
-│         │           │     │      │           │  │   └─ pace arrows: ↑ over · ↑↑ hot · ↓ under
-│         │           │     │      │           │  └─ usage %, gray→gold→red gradient
-│         │           │     │      │           └─ 5-hour rate-limit window
-│         │           │     │      └─ context gauge (◆ ◈ ◇ once past 200k tokens)
-│         │           │     └─ reasoning effort
-│         │           └─ model name
-│         └─ worktree name, or the git branch outside one
-└─ project directory
+.claude ⎇ feature-x │ Fable (high) ● ● ◎ ○ ○ │ 5h 78%↑↑ · 2h10m │ 7d 34%
+   │          │         │     │        │        │   │ │     │      │
+   │          │         │     │        │        │   │ │     │      └─ 7-day window, same anatomy
+   │          │         │     │        │        │   │ │     └─ reset countdown (at ≥ 75% or < 1h left)
+   │          │         │     │        │        │   │ └─ pace arrows: ↑ over · ↑↑ hot · ↓ under
+   │          │         │     │        │        │   └─ usage %, gray→gold→red gradient
+   │          │         │     │        │        └─ 5-hour rate-limit window
+   │          │         │     │        └─ context gauge
+   │          │         │     └─ reasoning effort
+   │          │         └─ model name
+   │          └─ worktree name, or the git branch outside one
+   └─ project directory
 ```
 
 The context gauge is five slots (`● ◎ ○`) whose fill and color carry the level — no percentage text.
-Rate-limit segments color their usage percentage with a continuous gray→gold→red gradient; over-pace
-arrows wear the gradient, the under-pace `↓` stays uncolored.
+Rate-limit segments color their usage percentage with a continuous gray→gold→red gradient; pace
+arrows wear the segment's gradient.
 
 Conditional elements and when they appear:
 
-| Element               | Appears                                                           |
-| --------------------- | ----------------------------------------------------------------- |
-| `⎇ name`              | Worktree name inside one, branch name in a regular checkout       |
-| `(effort)`            | Only when the model reports a reasoning effort level              |
-| Diamond gauge `◆ ◈ ◇` | Once the session's context grows past 200k tokens                 |
-| Pace arrows `↑ ↑↑ ↓`  | At ≥ 50% usage, when burn rate diverges from an even linear spend |
-| Reset countdown       | At ≥ 75% usage, when the window's reset starts to matter          |
-| Rate-limit segments   | When usage data exists (stdin rate limits, or the OAuth fallback) |
+| Element              | Appears                                                           |
+| -------------------- | ----------------------------------------------------------------- |
+| `⎇ name`             | Worktree name inside one, branch name in a regular checkout       |
+| `(effort)`           | Only when the model reports a reasoning effort level              |
+| Pace arrows `↑ ↑↑ ↓` | At ≥ 50% usage, when burn rate diverges from an even linear spend |
+| Reset countdown      | At ≥ 75% usage, or when less than an hour remains                 |
+| Rate-limit segments  | When usage data exists (stdin rate limits, or the OAuth fallback) |
 
 ### Scripts
 
