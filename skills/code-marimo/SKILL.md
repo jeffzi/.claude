@@ -2,21 +2,22 @@
 name: code-marimo
 description: >
   Use when creating reactive Python notebooks, building
-  data analysis dashboards, migrating from Jupyter, or
-  working with marimo files (.py notebooks). Also use
+  marimo data analysis dashboards, migrating from Jupyter,
+  or working with marimo files (.py notebooks). Also use
   when encountering marimo errors like "multiple
   definitions", "circular dependency", or "variable
   redeclaration". Not for standard Python scripts — use
-  code-py alone. Not for notebooks needing side
-  effects with manual execution order, variable
-  redeclaration across cells, or implicit state.
+  code-py alone. Not for Shiny apps — use code-shiny.
+  Not for notebooks needing side effects with manual
+  execution order, variable redeclaration across cells,
+  or implicit state.
 user-invocable: false
 ---
 
 # Marimo Reactive Notebooks
 
-**This skill extends `Skill(code-py)`.** `code-py` is the base for general Python standards; this
-skill adds marimo-specific reactive notebook rules on top.
+**Load `Skill(code-py)` first if not already loaded** — it carries the general Python standards this
+skill builds on; this skill adds marimo-specific reactive notebook rules.
 
 ## Overview
 
@@ -37,12 +38,8 @@ code with manual execution.
 | Stop execution    | `mo.stop(condition, output=None)`                                                |
 | Layout elements   | `mo.hstack([...])`, `mo.vstack([...])`, `mo.tabs({...})`                         |
 | SQL cell          | Create via UI or `result = mo.sql(f"""SELECT * FROM table""")`                   |
-| SQL output type   | Set to `native` in app config for best performance                               |
 | Load CSV/Parquet  | SQL: `SELECT * FROM 'data.csv'` or `SELECT * FROM 'data.parquet'`                |
-| Local variables   | Prefix with `_`: `_temp = ...` (not accessible to other cells)                   |
-| Run as script     | `uv run notebook.py` (CLI execution)                                             |
-| Check notebook    | `uv run marimo check --fix notebook.py`                                          |
-| Test notebook     | `uv run pytest notebook.py`                                                      |
+| Verify / test     | See **Testing and Validation** below                                             |
 
 ## Core Concepts
 
@@ -51,12 +48,13 @@ code with manual execution.
 - Cells execute automatically when their dependencies change
 - No manual "Run All" needed - changes propagate automatically
 - Dependency graph prevents circular references
-- UI elements trigger re-execution without explicit callbacks
+- UI elements trigger re-execution without explicit callbacks — every element exposes `.value`
 
 ### Variable Scoping
 
 - **Global variables:** Declared once, accessed by any cell
-- **Local variables:** Prefixed with `_`, scoped to single cell
+- **Local variables:** Prefix with `_` only when you want cell-local scope — other cells cannot see
+  or react to `_var`. When another cell must react to a value, drop the prefix and make it global.
 - **Cannot redeclare:** Each variable name can only be assigned in one cell
 - **Mutations not tracked:** Create new objects instead of mutating
 - **Module auto-reload:** Import helper modules; marimo reloads them automatically on change
@@ -114,65 +112,30 @@ Always use unless explicitly requested otherwise:
 - **uv** for package management
 - **DuckDB SQL** for data loading, joins, aggregations, complex transformations (via native SQL
   cells)
-- **polars** for simple operations (filtering, unique values) or when SQL can't express it (UDFs)
+- **polars** for simple operations (filtering, unique values) or when SQL can't express it (complex
+  window functions, custom UDFs, operations needing Python libraries like scipy)
 - **altair** for visualizations
 
-**SQL-first principle:** Prefer DuckDB SQL for data loading, joins, aggregations, and complex
-transformations. SQL is optimized by DuckDB's query planner and chains efficiently with `native`
-output type. Use polars for simple operations where it's more readable.
+**SQL-first principle:** DuckDB's query planner optimizes SQL, and results chain efficiently with
+the `native` output type (set it in the app config).
 
 ## Runtime Modes
 
-**Automatic (default):** Cells run automatically when dependencies change **Lazy:** Cells marked as
-stale instead of running; run manually with Run button
+- **Automatic (default):** cells run automatically when dependencies change.
+- **Lazy:** cells are marked stale instead of running; run manually with the Run button.
 
 For expensive notebooks, configure lazy mode or use `mo.stop()` to prevent expensive cells from
 running until ready.
 
 ## Common Patterns
 
-### Basic Reactive UI
-
-```python
-@app.cell
-def imports():
-    import marimo as mo
-    import polars as pl
-    import altair as alt
-    return mo, pl, alt
-
-@app.cell
-def constants():
-    MIN_POINTS = 10
-    MAX_POINTS = 100
-    return MIN_POINTS, MAX_POINTS
-
-@app.cell
-def defaults():
-    DEFAULT_POINTS = 50
-    return (DEFAULT_POINTS,)
-
-@app.cell
-def slider_ui(mo, MIN_POINTS, MAX_POINTS, DEFAULT_POINTS):
-    slider = mo.ui.slider(MIN_POINTS, MAX_POINTS, value=DEFAULT_POINTS, label="Points")
-    slider
-    return (slider,)
-
-@app.cell
-def chart(pl, alt, slider):
-    # Auto-updates when slider changes
-    data = pl.DataFrame({"x": range(slider.value)})
-    alt.Chart(data).mark_line().encode(x="x")
-    return (data,)
-```
-
 ### Avoiding Mutations
 
 ```python
-# ❌ Bad: Mutation won't trigger reactivity
+# BAD: mutation won't trigger reactivity
 original_list.append(item)
 
-# ✅ Good: Create new object
+# GOOD: create new object
 extended_list = original_list + [item]
 ```
 
@@ -194,9 +157,6 @@ expensive_computation(data)
 - Convert empty cell to SQL via cell context menu
 - Click SQL button at notebook bottom
 
-**SQL output type:** Set to `native` in app config for best performance (lazy DuckDB relations,
-efficient chaining).
-
 ```python
 # Load data directly with SQL (no polars read needed)
 weather = mo.sql(f"""
@@ -212,29 +172,20 @@ monthly = mo.sql(f"""
 """)
 ```
 
-**When to use polars instead:**
-
-- Simple operations that are more readable (e.g., `.unique()`, `.filter()`, column selection)
-- Complex window functions not expressible in SQL
-- Custom Python UDFs
-- Operations requiring Python libraries (e.g., scipy for statistics)
-
 ## Pitfalls
 
-| Issue                              | Symptom/Error                  | Fix                                          |
-| ---------------------------------- | ------------------------------ | -------------------------------------------- |
-| Variable in 2+ cells               | "Multiple definitions" error   | Assign each variable in exactly one cell     |
-| Cell A uses B, B uses A            | "Circular dependency" error    | Break cycle by extracting shared logic       |
-| Access `.value` in same cell as UI | UI value is None               | Move `.value` access to different cell       |
-| Mutating objects in-place          | Changes don't trigger re-run   | Create new objects: `new_list = list + [x]`  |
-| Using `_var` (local variable)      | Cell doesn't re-run on changes | Remove `_` prefix to make global             |
-| Output not showing                 | Missing last expression        | Ensure visualization/data is last expression |
-| Using `global` keyword             | Breaks marimo's tracking       | Never use `global`                           |
-| Using `on_change=handler`          | Callbacks unnecessary          | Remove callbacks, rely on reactive execution |
-| Using `mo.state()`                 | Can cause bugs, rarely needed  | Use UI element `.value` instead              |
-| Naming dataframes `*_df`           | Redundant, clutters code       | Use descriptive names: `weather`, `filtered` |
-
-**After fixing issues, always run:** `uv run marimo check --fix notebook.py && uv run notebook.py`
+| Issue                              | Symptom/Error                  | Fix                                                                       |
+| ---------------------------------- | ------------------------------ | ------------------------------------------------------------------------- |
+| Variable in 2+ cells               | "Multiple definitions" error   | Assign each variable in exactly one cell                                  |
+| Cell A uses B, B uses A            | "Circular dependency" error    | Break cycle by extracting shared logic                                    |
+| Access `.value` in same cell as UI | UI value is None               | Move `.value` access to different cell                                    |
+| Mutating objects in-place          | Changes don't trigger re-run   | Create new objects: `new_list = list + [x]`                               |
+| Expected a cell to react to `_var` | Cell doesn't re-run on changes | `_` is cell-local by design — drop the prefix when other cells must react |
+| Output not showing                 | Missing last expression        | Ensure visualization/data is last expression                              |
+| Using `global` keyword             | Breaks marimo's tracking       | Never use `global`                                                        |
+| Using `on_change=handler`          | Callbacks unnecessary          | Remove callbacks, rely on reactive execution                              |
+| Using `mo.state()`                 | Can cause bugs, rarely needed  | Use UI element `.value` instead                                           |
+| Naming dataframes `*_df`           | Redundant, clutters code       | Use descriptive names: `weather`, `filtered`                              |
 
 ## Rationalizations That Mean You're About to Fail
 
@@ -262,21 +213,17 @@ verification (they open UI/server, not validation).
 
 ### Linting
 
-```bash
-uv run marimo check .                        # Check all notebooks
-uv run marimo check --fix .                  # Auto-fix safe issues
-uv run marimo check --fix --unsafe-fixes .   # Fix all
-```
-
-**Error codes:** MB001-MB005 (breaking), MR001 (runtime), MF001-MF007 (formatting, auto-fixable)
+Directory-wide variants: `uv run marimo check .` (check only), `--fix .` (auto-fix safe issues),
+`--fix --unsafe-fixes .` (fix all). **Error codes:** MB001-MB005 (breaking), MR001 (runtime),
+MF001-MF007 (formatting, auto-fixable).
 
 ### Testing
 
 ```python
 @app.cell
-def __(inc):
+def test_helpers(increment):
     def test_increment():
-        assert inc(3) == 4
+        assert increment(3) == 4
     return
 ```
 
@@ -291,137 +238,7 @@ For complete API documentation, see [docs.marimo.io](https://docs.marimo.io/):
 - [Plotting](https://docs.marimo.io/api/plotting/) - Plotting integrations
 - [Markdown](https://docs.marimo.io/api/markdown/) - Markdown utilities
 
-## UI Elements
-
-**Core inputs:**
-
-- `mo.ui.slider(start, stop, value, label)` - Numeric slider
-- `mo.ui.dropdown(options, value, label)` - Dropdown select
-- `mo.ui.text(value, label)` - Text input
-- `mo.ui.checkbox(label, value)` - Checkbox
-- `mo.ui.button(value, kind)` - Button
-- `mo.ui.run_button(label, tooltip)` - Run button (doesn't auto-execute)
-
-**Data inputs:**
-
-- `mo.ui.dataframe(df)` - Interactive dataframe viewer
-- `mo.ui.data_explorer(df)` - Data exploration interface
-- `mo.ui.table(data, sortable, filterable)` - Interactive table
-- `mo.ui.file(label, multiple)` - File upload
-
-**Layouts:**
-
-- `mo.hstack([...])` - Horizontal stack
-- `mo.vstack([...])` - Vertical stack
-- `mo.tabs({key: element, ...})` - Tabbed interface
-
-**Access values:** All UI elements expose `.value` attribute
-
 ## Examples
 
-### Interactive Data Filter
-
-```python
-@app.cell
-def imports():
-    import marimo as mo
-    import polars as pl
-    import altair as alt
-    return mo, pl, alt
-
-@app.cell
-def constants():
-    IRIS_URL = "hf://datasets/scikit-learn/iris/Iris.csv"
-    return (IRIS_URL,)
-
-@app.cell
-def defaults():
-    DEFAULT_SPECIES = "All"
-    return (DEFAULT_SPECIES,)
-
-@app.cell
-def load_data(mo, IRIS_URL):
-    iris = mo.sql(f"""
-        SELECT * FROM '{IRIS_URL}'
-    """)
-    return (iris,)
-
-@app.cell
-def species_dropdown(mo, iris, DEFAULT_SPECIES):
-    species = mo.ui.dropdown(
-        options=["All"] + iris["Species"].unique().sort().to_list(),
-        value=DEFAULT_SPECIES,
-        label="Species"
-    )
-    species
-    return (species,)
-
-@app.cell
-def scatter_plot(pl, alt, iris, species):
-    filtered = iris if species.value == "All" else iris.filter(pl.col("Species") == species.value)
-    alt.Chart(filtered).mark_circle().encode(
-        x="SepalLengthCm",
-        y="SepalWidthCm",
-        color="Species"
-    )
-    return (filtered,)
-```
-
-### Data Explorer
-
-```python
-@app.cell
-def imports():
-    import marimo as mo
-    import polars as pl
-    from vega_datasets import data
-    return mo, pl, data
-
-@app.cell
-def explore_cars(mo, pl, data):
-    cars = pl.DataFrame(data.cars())
-    mo.ui.data_explorer(cars)
-    return (cars,)
-```
-
-### SQL Analysis (SQL-First Pattern)
-
-```python
-@app.cell
-def imports():
-    import marimo as mo
-    import altair as alt
-    return mo, alt
-
-@app.cell
-def constants():
-    WEATHER_URL = "https://raw.githubusercontent.com/vega/vega-datasets/refs/heads/main/data/weather.csv"
-    LOCATION = "Seattle"
-    return WEATHER_URL, LOCATION
-
-@app.cell
-def load_weather(mo, WEATHER_URL, LOCATION):
-    seattle = mo.sql(f"""
-        SELECT * FROM '{WEATHER_URL}'
-        WHERE location = '{LOCATION}'
-        ORDER BY date
-    """)
-    return (seattle,)
-
-@app.cell
-def aggregate_monthly(mo, seattle):
-    monthly_avg = mo.sql(f"""
-        SELECT date_trunc('month', date) as month,
-               avg(temp_max) as avg_high,
-               avg(temp_min) as avg_low
-        FROM seattle
-        GROUP BY 1
-        ORDER BY 1
-    """)
-    return (monthly_avg,)
-
-@app.cell
-def visualize(alt, monthly_avg):
-    alt.Chart(monthly_avg).mark_line().encode(x="month", y="avg_high")
-    return
-```
+Extended examples — interactive data filter, data explorer, SQL-first analysis — live in
+`references/examples.md`.

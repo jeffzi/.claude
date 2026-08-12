@@ -54,15 +54,14 @@ effects, or public API.
 
 ## Naming Conventions
 
-| Element             | Convention          | Example                           |
-| ------------------- | ------------------- | --------------------------------- |
-| Variables/functions | `snake_case`        | `local player_score`              |
-| Classes/modules     | `CamelCase`         | `local PlayerManager = {}`        |
-| Constants           | `UPPER_CASE`        | `local MAX_HEALTH = 100`          |
-| Private members     | `_prefix`           | `self._internal_state`            |
-| Boolean functions   | `is_`/`has_` prefix | `is_valid()`, `has_item()`        |
-| Metatables          | `*_mt` suffix       | `local Player_mt = {}`            |
-| Localized globals   | `module_function`   | `local math_random = math.random` |
+| Element             | Convention          | Example                    |
+| ------------------- | ------------------- | -------------------------- |
+| Variables/functions | `snake_case`        | `local player_score`       |
+| Classes/modules     | `CamelCase`         | `local PlayerManager = {}` |
+| Constants           | `UPPER_CASE`        | `local MAX_HEALTH = 100`   |
+| Private members     | `_prefix`           | `self._internal_state`     |
+| Boolean functions   | `is_`/`has_` prefix | `is_valid()`, `has_item()` |
+| Metatables          | `*_mt` suffix       | `local Player_mt = {}`     |
 
 ## Pitfalls
 
@@ -73,11 +72,9 @@ effects, or public API.
 | Chained `..` with 4+ strings             | `table.concat()`                        |
 | `require "mod"`                          | `require("mod")`                        |
 | `local f = function()`                   | `local function f()`                    |
-| Comments explaining WHAT code does       | Only explain WHY                        |
 | Silent failures                          | Return `nil, err` for expected failures |
 | Table creation in hot paths              | Reuse tables, reset fields              |
 | `math.random` without seeding            | `math.randomseed(os.time())` at startup |
-| Global functions in hot loops            | `local math_random = math.random`       |
 
 ### Ternary Abuse
 
@@ -130,7 +127,6 @@ end
 
 | Excuse                    | Reality                                           |
 | ------------------------- | ------------------------------------------------- |
-| "Too simple for types"    | Type annotations catch bugs at write-time.        |
 | "ipairs is more readable" | Readability doesn't matter if your code stutters. |
 | "This table is temporary" | Temporary tables cause GC spikes. Reuse them.     |
 

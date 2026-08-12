@@ -15,8 +15,8 @@ user-invocable: false
 plugin shape by complexity: plain objects for single-hook plugins, classes when you need the type
 checker or cross-hook state. Always delegate via `super` transform methods.
 
-**REQUIRED BACKGROUND:** Load `code-ts` for general TypeScript rules and `code-tstl` for Lua 5.1
-constraints. This skill adds TSTL plugin-specific patterns on top.
+**REQUIRED BACKGROUND:** Load `Skill(code-ts)` for general TypeScript rules and `Skill(code-tstl)`
+for Lua 5.1 constraints. This skill adds TSTL plugin-specific patterns on top.
 
 ## Mandatory Rules
 
@@ -108,27 +108,6 @@ export default new MyPlugin();
   somewhere to store it for visitors
 - Cross-hook state — collect data in visitors, act on it in `afterPrint`
 - Visitors + lifecycle hooks on the same plugin
-
-### Cache Expensive Lookups in `beforeTransform`
-
-```typescript
-// BAD: re-reads env var on every visited node
-visitors: {
-  [ts.SyntaxKind.ExpressionStatement]: (node, context) => {
-    if (process.env["STRIP_DEBUG"] === "1") { ... }  // N calls per compilation
-  },
-}
-
-// GOOD: read once in beforeTransform, check cached flag in visitor
-beforeTransform(program: ts.Program): void {
-  this.stripDebug = process.env["STRIP_DEBUG"] === "1";
-}
-visitors: {
-  [ts.SyntaxKind.ExpressionStatement]: (node, context) => {
-    if (this.stripDebug) { ... }  // simple boolean check
-  },
-}
-```
 
 ## Plugin Lifecycle (7 Hooks)
 
@@ -232,37 +211,28 @@ function compile(source: string): string {
 - Assert both positive (code present) and negative (code stripped) expectations
 - Check `result.diagnostics` is empty for success cases
 
-## Plugin Composition
+## Plugin Ordering
 
 - Visitor chains execute in `luaPlugins` array order from `tsconfig.json`
-- `superTransform*` calls the previous plugin in the chain, or the built-in visitor
 - Plugin order matters: stripping plugins should run before optimization plugins
-- All lifecycle hooks fire for every plugin in order
-- Only **one printer** can be active (last one wins)
 
 ## Common Mistakes and Rationalizations
 
-| Mistake                                         | What happens                                        | Instead                                                   |
-| ----------------------------------------------- | --------------------------------------------------- | --------------------------------------------------------- |
-| `import ... from "typescript-to-lua/dist/..."`  | Breaks on next minor TSTL update                    | `import * as tstl from "typescript-to-lua"`               |
-| `context.transformExpression(node)`             | Calls YOUR visitor again — stack overflow           | `context.superTransformExpression(node)`                  |
-| Class for a single-hook string processor        | Adds indirection for zero gain                      | Plain object — match shape to complexity                  |
-| Plain object with visitors or type checker      | No place to store `TypeChecker` or cross-hook state | Class-based plugin with `beforeTransform` setup           |
-| Reading env vars inside visitor body            | Re-reads on every matching node                     | Cache in `beforeTransform`                                |
-| `luaLibImport: "none" as any` in tests          | Bypasses type safety for no reason                  | `luaLibImport: tstl.LuaLibImportKind.None`                |
-| Comments explaining WHAT code does              | Noise — the code already says what                  | Comments explaining WHY the approach was chosen           |
-| `node:` prefix missing on Node.js imports       | May resolve incorrectly                             | `import * as fs from "node:fs"`                           |
-| Forgetting `return undefined` strips statements | Statement silently disappears from output           | Explicit — works for statement visitors only              |
-| Using multiple printers across plugins          | Only one printer is active globally — last one wins | Prefer AST transforms or `beforeEmit` string manipulation |
+| Mistake                                                                          | What happens                                        | Instead                                                                                                                                      |
+| -------------------------------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `import ... from "typescript-to-lua/dist/..."`                                   | Breaks on next minor TSTL update                    | `import * as tstl from "typescript-to-lua"`                                                                                                  |
+| `context.transformExpression(node)`                                              | Calls YOUR visitor again — stack overflow           | `context.superTransformExpression(node)`                                                                                                     |
+| Class for a single-hook string processor                                         | Adds indirection for zero gain                      | Plain object — match shape to complexity                                                                                                     |
+| Plain object with visitors or type checker                                       | No place to store `TypeChecker` or cross-hook state | Class-based plugin with `beforeTransform` setup                                                                                              |
+| Reading env vars inside visitor body                                             | Re-reads on every matching node                     | Cache in `beforeTransform`                                                                                                                   |
+| `luaLibImport: "none" as any` in tests                                           | Bypasses type safety for no reason                  | `luaLibImport: tstl.LuaLibImportKind.None`                                                                                                   |
+| Statement visitor returns `undefined` by accident (a code path with no `return`) | Statement silently disappears from output           | End statement visitors with an explicit `return context.superTransformStatements(node)`; expression visitors must return a `tstl.Expression` |
 
 ## Verification
 
 **MANDATORY before completing any task:**
 
-Run the gates the project exposes: read the `scripts` in `package.json` and run its typecheck,
-lint/format, and test scripts, whatever they are named — plugin unit tests always run separately. If
-no script covers type checking, fall back to `npx tsc --noEmit`.
-
-Inspect test output Lua for correct transformations. Check that no `typescript-to-lua/dist/` imports
-remain. Lefthook manages git hooks. **Task is NOT complete until tests pass and all imports use the
+Inspect test output Lua for correct transformations, and check that no `typescript-to-lua/dist/`
+imports remain. Then run the project's gates per `code-tstl`'s Verification (loaded above) — plugin
+unit tests always run separately. **Task is NOT complete until tests pass and all imports use the
 public API.**

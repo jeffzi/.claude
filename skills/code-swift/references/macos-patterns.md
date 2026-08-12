@@ -17,9 +17,9 @@
 
 Recompiling with Xcode 26 gives SwiftUI apps the new Liquid Glass design automatically.
 `NavigationSplitView` becomes a glass sidebar, `TabView` gets liquid tab bar, toolbars get glass
-appearance. One-year grace period to adapt. Temporary opt-out:
+appearance. Debugging-only escape hatch (not a supported migration path):
 
-```swift
+```bash
 defaults write com.apple.YourApp com.apple.SwiftUI.DisableSolarium -bool YES
 ```
 

@@ -13,17 +13,7 @@ user-invocable: false
 **This skill extends `Skill(test-core)`.** `test-core` is the primary entry point; this skill is
 loaded by `test-core` based on the rules-file dispatch table.
 
-**Also apply:** `code-swift` rules.
-
-## Domain Skill Detection
-
-When reviewing or writing test files, check imports for domain-specific libraries. If detected, load
-the corresponding skill for library-specific testing patterns:
-
-No overlay skills currently defined for Swift. When a Swift overlay skill is added, list its trigger
-imports here.
-
-Only load skills that are actually installed. If a skill fails to load, continue without it.
+**Load `Skill(code-swift)` and apply its rules.**
 
 ## Swift Testing vs XCTest Decision
 
@@ -65,12 +55,12 @@ func greeting(day: Day, expected: String) {
 `zip()` silently drops test cases when arrays have different lengths:
 
 ```swift
-// ❌ DANGEROUS: if Ingredient has 5 cases but Dish has 4,
+// BAD: if Ingredient has 5 cases but Dish has 4,
 // the 5th ingredient is silently never tested
 @Test(arguments: zip(Ingredient.allCases, Dish.allCases))
 func cook(_ ingredient: Ingredient, into dish: Dish) { ... }
 
-// ✅ Explicit array of tuples — nothing silently dropped
+// GOOD: explicit array of tuples — nothing silently dropped
 @Test(arguments: [
     (Ingredient.rice, Dish.onigiri),
     (Ingredient.egg, Dish.omelette),
@@ -153,11 +143,11 @@ final class MockCache: Sendable {
 ### 6. @MainActor XCTestCase Needs Sendable
 
 ```swift
-// ❌ Missing Sendable — "sending main actor-isolated value" warnings
+// BAD: missing Sendable — "sending main actor-isolated value" warnings
 @MainActor
 final class ViewModelTests: XCTestCase { ... }
 
-// ✅ Add Sendable conformance
+// GOOD: add Sendable conformance
 @MainActor
 final class ViewModelTests: XCTestCase, Sendable {
     override func setUp() async throws {  // must be async throws
@@ -166,10 +156,9 @@ final class ViewModelTests: XCTestCase, Sendable {
 }
 ```
 
-### 7. Mock at Boundaries Only
+### 7. Closure-Based Doubles Over Protocol Mocks
 
-Mock external I/O (HTTP, database, file system). Test internal logic through the public API. Prefer
-**closure-based test doubles** over protocol explosion:
+Prefer **closure-based test doubles** over protocol explosion:
 
 ```swift
 class ViewModel {
@@ -255,7 +244,7 @@ await confirmation("fires 3 times", expectedCount: 3) { confirm in
 **`withKnownIssue`** for tracked intermittent failures (keeps test running, alerts when fixed):
 
 ```swift
-withKnownIssue("SR-12345", isIntermittent: true) {
+await withKnownIssue("apple/swift-testing#1234", isIntermittent: true) {
     try await flakyNetworkCall()
     #expect(result.count > 0)
 }
@@ -282,26 +271,17 @@ import ConcurrencyExtras
 
 ### Clock Injection
 
-Three clock types: **`TestClock`** (manual control), **`ImmediateClock`** (squash time to zero),
-**`UnimplementedClock`** (fails if used unexpectedly).
+Point-Free's `swift-clocks` package (`import Clocks`) ships three clock types: **`TestClock`**
+(manual control), **`ImmediateClock`** (squash time to zero), **`UnimplementedClock`** (fails if
+used unexpectedly).
 
 ## Pitfalls
 
-| Trap                                       | Instead                                                 |
-| ------------------------------------------ | ------------------------------------------------------- |
-| `zip()` in `@Test(arguments:)`             | Explicit array of tuples — zip silently drops           |
-| Test logic mirrors implementation          | Concrete literal expected values                        |
-| `CustomExecutionTrait`                     | `TestTrait + TestScoping` protocol                      |
-| `@unchecked Sendable` on Mutex mock        | Genuine `Sendable` — Mutex is Sendable                  |
-| `@MainActor` XCTestCase without `Sendable` | Add `, Sendable` conformance                            |
-| `setUp`/`tearDown` not `async throws`      | Use async throws variants for actor-isolated code       |
-| `#expect(processExits:)`                   | `#expect(exitsWith:)` + `@_spi(Experimental)`           |
-| XCTest expectations for simple async       | `confirmation()` in Swift Testing                       |
-| `.disabled()` for known bugs               | `withKnownIssue` — keeps running, alerts when fixed     |
-| `@testable import` everywhere              | `package` access level — explicit, no optimization loss |
-| `Date()` / `Task.sleep` in production      | Inject `Clock` protocol — test with `TestClock`         |
-| Mixing `XCTAssert` and `#expect`           | One framework per test function                         |
-| Flaky async tests                          | `withMainSerialExecutor` for deterministic scheduling   |
+| Trap                                  | Instead                                                 |
+| ------------------------------------- | ------------------------------------------------------- |
+| `#expect(processExits:)`              | `#expect(exitsWith:)` + `@_spi(Experimental)`           |
+| `@testable import` everywhere         | `package` access level — explicit, no optimization loss |
+| `Date()` / `Task.sleep` in production | Inject `Clock` protocol — test with `TestClock`         |
 
 ## Memory Leak Detection
 

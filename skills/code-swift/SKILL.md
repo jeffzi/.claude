@@ -4,8 +4,8 @@ description: >
   Use when writing any Swift code, regardless of perceived simplicity or prototyping context.
   Use when you think "just a quick script" or "concurrency is overkill" — these are symptoms
   this skill applies. Also use when encountering Swift 6.x strict concurrency errors, Sendable
-  warnings, or actor isolation issues. Applies to any *.swift file. For test files (*Tests.swift),
-  also load test-swift. Not for Swift test patterns — use test-swift for that.
+  warnings, or actor isolation issues. Applies to any *.swift file. Also load test-swift for
+  *Tests.swift files.
 user-invocable: false
 ---
 
@@ -72,8 +72,9 @@ final class Cache: Sendable {
 ```
 
 **When `@unchecked Sendable` is justified:** immutable-after-init classes, types wrapping C/ObjC
-APIs with documented thread safety, or types already protected by a lock where Mutex can't be used
-(e.g., NSLock interop). Always document the invariant.
+APIs with documented thread safety, types already protected by a lock where Mutex can't be used
+(e.g., NSLock interop), or property wrappers in Sendable classes (a known conflict — apply it to the
+container, or use an actor). Always document the invariant.
 
 ## Concurrency Patterns
 
@@ -169,7 +170,7 @@ await withTaskGroup(of: Void.self) { group in
 **InlineArray** — fixed-size, stack-allocated, no heap overhead:
 
 ```swift
-var buffer: [50 of String]  // sugar syntax — NOT InlineArray<50, String>
+var buffer = [50 of String](repeating: "")  // sugar for InlineArray<50, String> — prefer the sugar spelling
 ```
 
 **Span** — safe alternative to `UnsafeBufferPointer` with compile-time lifetime enforcement:
@@ -229,8 +230,8 @@ orchestration layers.
 | Protocol method in extension only                 | Static dispatch through existential — declare in protocol body        |
 | `.reduce(initial, +)` with value-type accumulator | `.reduce(into:)` — avoids O(n^2) CoW copying                          |
 | `.sorted().first` / `.filter { }.count > 0`       | `.min()` / `.contains(where:)` — O(n) vs O(n log n)                   |
-| `InlineArray<50, String>`                         | Sugar: `[50 of String]`                                               |
-| Property wrappers in Sendable classes             | Known conflict — use `@unchecked Sendable` on container or actor      |
+| `InlineArray<50, String>` spelled out             | Prefer the sugar: `[50 of String]` (same type)                        |
+| Property wrappers in Sendable classes             | See the justified `@unchecked Sendable` cases above                   |
 
 ## macOS Development
 
