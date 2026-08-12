@@ -22,29 +22,6 @@ with safety patterns from
 
 **Core principle:** Every script uses strict mode.
 
-## When to Use
-
-Use for ALL shell scripts, including:
-
-- Automation scripts
-- Git hooks and CI/CD scripts
-- CLI wrapper tools
-- Any `.sh` file
-
-## Quick Reference
-
-| Task                 | Pattern                                  |
-| -------------------- | ---------------------------------------- |
-| Shebang              | `#!/usr/bin/env bash`                    |
-| Strict mode          | `set -euo pipefail`                      |
-| Check dependency     | `command -v tool >/dev/null \|\| exit 1` |
-| Quote variables      | `"$var"` not `$var`                      |
-| Command substitution | `$(cmd)` not backticks                   |
-| Test syntax          | `[[ ]]` not `[ ]`                        |
-| Output               | `printf "%s\n" "$msg"` not `echo`        |
-| Cleanup on exit      | `trap cleanup EXIT`                      |
-| Source file          | `. file` not `source file`               |
-
 ## Formatting
 
 Use `shfmt` defaults:
@@ -55,17 +32,10 @@ Use `shfmt` defaults:
 - **Redirects:** Following command
 - **Simplify:** Enabled
 
+Do not copy the indentation of this file's code blocks — a markdown formatter re-indents them. Write
+scripts with tabs, or run `shfmt -w` after writing.
+
 ## Mandatory Rules
-
-### Shebang
-
-**Always use portable shebang:**
-
-```bash
-#!/usr/bin/env bash
-```
-
-Not `#!/bin/bash` (path varies across systems).
 
 ### Strict Mode
 
@@ -101,63 +71,6 @@ main() {
 main "$@"
 ```
 
-### Quote All Variables
-
-**Always quote variables to prevent word splitting:**
-
-```bash
-# ✗ NEVER
-echo $var
-rm $file
-
-# ✓ ALWAYS
-echo "$var"
-rm "$file"
-```
-
-**Exception:** Inside `[[ ]]` where word splitting doesn't occur (but quote anyway for consistency).
-
-### Use printf Over echo
-
-**Prefer `printf` for reliable output:**
-
-```bash
-# ✗ Unreliable with special characters
-echo "Value: $value"
-echo -e "Line1\nLine2"
-
-# ✓ Portable and predictable
-printf "Value: %s\n" "$value"
-printf "Line1\nLine2\n"
-```
-
-### Modern Test Syntax
-
-**Use `[[ ]]` not `[ ]`:**
-
-```bash
-# ✗ Old syntax, quirky behavior
-if [ -z "$var" ]; then
-if [ "$a" = "$b" ]; then
-
-# ✓ Modern, safer
-if [[ -z "$var" ]]; then
-if [[ "$a" == "$b" ]]; then
-```
-
-### Command Substitution
-
-**Use `$()` not backticks:**
-
-```bash
-# ✗ Hard to read, can't nest
-files=`ls`
-
-# ✓ Clear, nestable
-files=$(ls)
-nested=$(echo $(date))
-```
-
 ### Trap for Cleanup
 
 **Use trap for cleanup on exit:**
@@ -183,35 +96,35 @@ temp_file=$(mktemp)
 
 ## Pitfalls
 
-| ✗ Never                       | ✓ Always                           |
-| ----------------------------- | ---------------------------------- |
-| `#!/bin/bash`                 | `#!/usr/bin/env bash`              |
-| No `set -euo pipefail`        | Strict mode at top of every script |
-| `echo` with escapes/variables | `printf` for reliable output       |
-| `[ ]` for tests               | `[[ ]]`                            |
-| Unquoted `$var`               | `"$var"`                           |
-| Backticks `` `cmd` ``         | `$(cmd)`                           |
-| `source file`                 | `. file` (POSIX)                   |
-| `cd dir && ...`               | `cd dir \|\| exit 1`               |
-| No cleanup on exit            | `trap cleanup EXIT`                |
-| `==` in `[ ]`                 | `=` in `[ ]` or `==` in `[[ ]]`    |
-| `$?` after pipe               | `${PIPESTATUS[@]}`                 |
-| `for f in $(ls)`              | `for f in ./*`                     |
-| Cat useless use               | `< file command`                   |
+| ✗ Never                                | ✓ Always                                  |
+| -------------------------------------- | ----------------------------------------- |
+| `#!/bin/bash` (path varies)            | `#!/usr/bin/env bash`                     |
+| No `set -euo pipefail`                 | Strict mode at top of every script        |
+| `echo` with escapes/variables          | `printf "%s\n" "$var"`                    |
+| `[ ]` for tests                        | `[[ ]]`                                   |
+| Unquoted `$var`                        | `"$var"`                                  |
+| Backticks `` `cmd` ``                  | `$(cmd)`                                  |
+| `. lib.sh` (bare name searches `PATH`) | `. ./lib.sh`                              |
+| `cd dir` unchecked                     | `cd dir \|\| exit 1` (or `cd dir && cmd`) |
+| No cleanup on exit                     | `trap cleanup EXIT`                       |
+| `==` in `[ ]`                          | `=` in `[ ]` or `==` in `[[ ]]`           |
+| `$?` after pipe                        | `${PIPESTATUS[@]}`                        |
+| `for f in $(ls)`                       | `for f in ./*`                            |
+| `cat file \| grep x`                   | `grep x < file`                           |
 
 ## Common Patterns
 
 ```bash
 # Iterate files (handles spaces in names)
 for file in ./*.sh; do
- [[ -e "$file" ]] || continue  # Handle empty glob
+ [[ -e "$file" ]] || continue # Handle empty glob
  process "$file"
 done
 
 # Read lines from file
 while IFS= read -r line; do
  printf "%s\n" "$line"
-done < "$input_file"
+done <"$input_file"
 
 # Exit with error message
 die() {
@@ -234,8 +147,8 @@ die() {
 **MANDATORY before completing any task:**
 
 ```bash
-shfmt -d .           # Check formatting (add -w to fix)
-shellcheck *.sh      # Lint for issues
+shfmt -d .                  # Check formatting (add -w to fix)
+shellcheck $(shfmt -f .)    # Lint every shell file shfmt finds, recursively
 ```
 
 **Task is NOT complete until both pass.**

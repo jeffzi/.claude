@@ -2,8 +2,8 @@
 name: test-lua
 description: >
   Use when writing Lua tests with busted. Apply for assertions, spies/stubs, test isolation,
-  before_each/setup patterns, coverage with luacov, or any *_test.lua files. Not for production
-  Lua code — use code-lua for that.
+  before_each/setup patterns, coverage with luacov, or any *_test.lua / *_spec.lua files. Not for
+  production Lua code — use code-lua for that.
 user-invocable: false
 ---
 
@@ -12,18 +12,12 @@ user-invocable: false
 **This skill extends `Skill(test-core)`.** `test-core` is the primary entry point; this skill is
 loaded by `test-core` based on the rules-file dispatch table.
 
-**Also apply:** `code-lua` rules. Exception: test helper functions don't need full LuaLS
-annotations.
+**Load `Skill(code-lua)` and apply its rules.** Exception: test helper functions don't need full
+LuaLS annotations.
 
-## Domain Skill Detection
-
-When reviewing or writing test files, check imports/requires for domain-specific libraries. If
-detected, load the corresponding skill for library-specific testing patterns:
-
-No overlay skills currently defined for Lua. When a Lua overlay skill is added, list its trigger
-modules here.
-
-Only load skills that are actually installed. If a skill fails to load, continue without it.
+Universal testing principles (behavior vs. implementation, AAA structure, mocking at boundaries,
+test independence) live in `test-core`; this skill adds busted-specific syntax, assertions, spies,
+and pitfalls.
 
 ## Mandatory Rules
 
@@ -133,17 +127,17 @@ end)
 
 ## Assertion Quick Reference
 
-| Pattern               | Assertion                                                                  |
-| --------------------- | -------------------------------------------------------------------------- |
-| Equality (primitives) | `assert.are_equal(expected, actual)`                                       |
-| Deep table comparison | `assert.are_same(expected, actual)`                                        |
-| Truthy/falsy          | `assert.is_true(val)` / `assert.is_false(val)`                             |
-| Nil checks            | `assert.is_nil(val)` / `assert.is_not_nil(val)`                            |
-| Error thrown          | `assert.has_error(fn)` / `assert.has_error(fn, "msg")`                     |
-| No error              | `assert.has_no_error(fn)`                                                  |
-| String contains       | `assert.matches("pattern", str)`                                           |
-| Type check            | `assert.is_number(val)` / `assert.is_string(val)` / `assert.is_table(val)` |
-| Near (floats)         | `assert.is_near(expected, actual, tolerance)`                              |
+| Pattern               | Assertion                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Equality (primitives) | `assert.are_equal(expected, actual)`                                                                                      |
+| Deep table comparison | `assert.are_same(expected, actual)`                                                                                       |
+| Truthy/falsy          | `assert.is_true(val)` / `assert.is_false(val)` — fails on non-boolean truthy; for nil checks use `assert.is_not_nil(val)` |
+| Nil checks            | `assert.is_nil(val)` / `assert.is_not_nil(val)`                                                                           |
+| Error thrown          | `assert.has_error(fn)` / `assert.has_error(fn, "msg")`                                                                    |
+| No error              | `assert.has_no_error(fn)`                                                                                                 |
+| String contains       | `assert.matches("pattern", str)`                                                                                          |
+| Type check            | `assert.is_number(val)` / `assert.is_string(val)` / `assert.is_table(val)`                                                |
+| Near (floats)         | `assert.is_near(expected, actual, tolerance)`                                                                             |
 
 **Argument order:** `expected` first, then `actual`. Consistent with busted convention.
 
@@ -163,21 +157,6 @@ end)
 | Check not called                | `assert.spy(s).was_not_called()`            |
 | Restore original                | `s:revert()`                                |
 
-## Pitfalls
-
-| Trap                               | Instead                                                        |
-| ---------------------------------- | -------------------------------------------------------------- |
-| `assert.are_equal()` for tables    | `assert.are_same()` — deep comparison                          |
-| `assert.are.equal()` (dots)        | `assert.are_equal()` (underscores)                             |
-| `setup` for mutable state          | `before_each` — fresh state per test                           |
-| Forgetting `spy:revert()`          | Always revert in `after_each`                                  |
-| Loops inside `it` blocks           | Generate `it` blocks at describe level                         |
-| `assert.is_true(x)` for nil check  | `assert.is_not_nil(x)` — `is_true` fails on non-boolean truthy |
-| Shared tables across tests         | Create new tables in `before_each`                             |
-| Testing private functions directly | Test through public API                                        |
-| Mocking internal modules           | Mock at system boundaries (I/O, HTTP, DB)                      |
-| Interdependent test order          | Each test sets up its own context                              |
-
 ## Rationalizations
 
 | Excuse                                  | Reality                                                      |
@@ -190,13 +169,5 @@ end)
 
 ## Verification
 
-**MANDATORY before completing any task:**
-
-```bash
-luacheck .                  # Lint
-llscheck --checklevel Hint  # Types
-busted                      # Tests
-busted --coverage && luacov # Coverage (if .luacov exists)
-```
-
-**Task is NOT complete until all pass.**
+Run `code-lua`'s verification block (loaded above). One difference: `busted` is unconditional here —
+a test task always has tests to run.

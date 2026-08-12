@@ -14,7 +14,7 @@ user-invocable: false
 **Core principle:** Write TypeScript that generates the Lua code an expert would write by hand.
 Every idiomatic TypeScript pattern has a TSTL-specific cost — know it and avoid it in hot paths.
 
-**REQUIRED BACKGROUND:** Load `code-ts` first for general TypeScript rules. This skill adds
+**REQUIRED BACKGROUND:** Load `Skill(code-ts)` first for general TypeScript rules. This skill adds
 TSTL-specific patterns on top.
 
 ## Domain Skill Detection
@@ -22,9 +22,9 @@ TSTL-specific patterns on top.
 When reviewing or writing TSTL code, check for plugin development patterns. If detected, load the
 corresponding skill:
 
-| Detection pattern                                                             | Skill to load      |
-| ----------------------------------------------------------------------------- | ------------------ |
-| `import * as tstl from "typescript-to-lua"` with `tstl.Plugin` implementation | `code-tstl-plugin` |
+| Detection pattern                                                             | Skill to load             |
+| ----------------------------------------------------------------------------- | ------------------------- |
+| `import * as tstl from "typescript-to-lua"` with `tstl.Plugin` implementation | `Skill(code-tstl-plugin)` |
 
 Only load skills that are actually installed. If a skill fails to load, continue without it.
 
@@ -81,7 +81,7 @@ gap to Lua's 1-based tables. That arithmetic fires on **every read and write in 
 ```typescript
 // BAD: 0-indexed array — TSTL adds +1 on every access
 const enemies: Enemy[] = [];
-for (const i of $range(1, enemies.length)) {
+for (const i of $range(0, enemies.length - 1)) {
   const e = enemies[i]; // transpiles to: enemies[i + 1]
 }
 
@@ -102,7 +102,10 @@ Key API differences vs TypeScript arrays:
 | Append      | `arr.push(v)`    | `tbl.set(tbl.length() + 1, v)` |
 
 **Exception:** When iterating with `for...of` (not indexed access), TSTL uses `ipairs` — no `+1` is
-added. The rule applies to any code that indexes by a numeric variable.
+added, though `ipairs` is still slower than a numeric `$range()` loop when you can index directly.
+The rule applies to any code that indexes by a numeric variable.
+
+For O(1) removal in hot paths, use swap-with-last + `pop()` instead of `splice()`.
 
 ### Use `const enum` — Always
 
@@ -283,43 +286,27 @@ for (const e of events) { parts.push(`[${e.time}] ${e.msg}`); }
 const log = table.concat(parts, "\n");
 ```
 
-For interop patterns (`@noSelf`, `LuaMultiReturn`, external declarations, global callbacks), see
-`references/interop.md`.
-
-### TS-vs-Lua Correctness Caveats
+## TS-vs-Lua Correctness Caveats
 
 Silent behavioral differences between TypeScript and transpiled Lua — these won't error, they'll
 just do the wrong thing:
 
-| Caveat                             | JS behavior                       | Lua behavior                | Fix                                                          |
-| ---------------------------------- | --------------------------------- | --------------------------- | ------------------------------------------------------------ |
-| `undefined` vs `null`              | Distinct values                   | Both are `nil`              | Prefer `undefined`; never rely on the distinction            |
-| Assign `undefined` to key          | Key exists with value `undefined` | Key is **deleted**          | Use sentinel (`-1`, `""`) if key must persist                |
-| Boolean coercion: `0`, `""`, `NaN` | All falsy                         | All **truthy**              | Explicit comparisons: `x !== 0`, `x !== ""`, `x === x` (NaN) |
-| `==` vs `===`                      | Loose vs strict equality          | Both compile to strict `==` | Always use `===` (enable `eqeqeq` lint rule)                 |
-| `for...in` on arrays               | Iterates string indices           | **Forbidden**               | `$range()` or `for...of`                                     |
-| `Array.fill(v, start, end)`        | Clamps `end` to array length      | Fills to `end` regardless   | Be explicit about bounds                                     |
-| `Array.sort` stability             | Stable (ES2019+)                  | **Not guaranteed**          | Implement stable sort if equal-element order matters         |
-| Key iteration order                | Insertion order (ES2015+)         | **Unspecified**             | Use arrays when order matters                                |
-| `async`/`await` execution order    | Deferred (microtask queue)        | **Immediate** resolution    | Use coroutines instead (see Mandatory Rules)                 |
+| Caveat                             | JS behavior                       | Lua behavior                | Fix                                                                                        |
+| ---------------------------------- | --------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------ |
+| `undefined` vs `null`              | Distinct values                   | Both are `nil`              | Prefer `undefined`; never rely on the distinction                                          |
+| Assign `undefined` to key          | Key exists with value `undefined` | Key is **deleted**          | Use sentinel (`-1`, `""`) if key must persist                                              |
+| Boolean coercion: `0`, `""`, `NaN` | All falsy                         | All **truthy**              | Explicit comparisons: `x !== 0`, `x !== ""`, `x === x` (NaN); `??` not `\|\|` for defaults |
+| `==` vs `===`                      | Loose vs strict equality          | Both compile to strict `==` | Always use `===` (enable `eqeqeq` lint rule)                                               |
+| `for...in` on arrays               | Iterates string indices           | **Forbidden**               | `$range()` or `for...of`                                                                   |
+| `Array.fill(v, start, end)`        | Clamps `end` to array length      | Fills to `end` regardless   | Be explicit about bounds                                                                   |
+| `Array.sort` stability             | Stable (ES2019+)                  | **Not guaranteed**          | Implement stable sort if equal-element order matters                                       |
+| Key iteration order                | Insertion order (ES2015+)         | **Unspecified**             | Use arrays when order matters                                                              |
+| `async`/`await` execution order    | Deferred (microtask queue)        | **Immediate** resolution    | Use coroutines instead (see Mandatory Rules)                                               |
 
-## Pitfalls
+## Interop
 
-| Trap                             | Instead                                                         |
-| -------------------------------- | --------------------------------------------------------------- |
-| `for (let i = 0; ...)`           | `for (const i of $range(start, end))`                           |
-| `T[]` / `Array<T>`               | `new LuaTable<number, T>()`                                     |
-| `new Map()` / `new Set()`        | `new LuaMap()` / `new LuaSet()`                                 |
-| `class` for hot-path entities    | Interface + free functions                                      |
-| `continue` in loops              | Invert condition                                                |
-| `{...obj}` in loops              | Mutate in place                                                 |
-| `.filter().map().reduce()` chain | Single `for` loop with `$range()`                               |
-| `enum Foo { }`                   | `const enum Foo { }`                                            |
-| `\|\|` for defaults              | `??` — Lua treats `0`, `""`, and `NaN` as truthy                |
-| `splice()` in hot paths          | Swap-with-last + `pop()` for O(1) removal                       |
-| `Math.fn()` in tight loops       | Cache as local: `const cos = Math.cos`                          |
-| Building strings with `+=`       | Collect in array, `table.concat()` once                         |
-| Regular `for-of` on arrays       | `$range()` — `for-of` uses `ipairs` (slower than numeric `for`) |
+For interop patterns (`@noSelf`, `LuaMultiReturn`, external declarations, global callbacks), see
+`references/interop.md`.
 
 ## Recommended `tsconfig.json`
 
@@ -383,5 +370,5 @@ lint/format, and test scripts, whatever they are named. Tests always run separat
 covers type checking, fall back to `npx tsc --noEmit`.
 
 Inspect generated `.lua` files for `while` loops (should be `for`), `__TS__Class` (should be plain
-tables), and `__TS__New(Map)` (should be raw `{}`). Lefthook manages git hooks. **Task is NOT
-complete until output Lua looks like code an expert would write.**
+tables), and `__TS__New(Map)` (should be raw `{}`). **Task is NOT complete until output Lua looks
+like code an expert would write.**
