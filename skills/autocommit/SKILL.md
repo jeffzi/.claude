@@ -30,9 +30,9 @@ confirmation. Stay in this mode until the user says to exit.
 ## The grant
 
 When a requested task's edits pass full verification, commit without asking. Load
-`Skill(write-commit)` for message composition and granularity rules; **this mode is the standing
-approval its Execution and Confirm steps require** — skip the AskUserQuestion confirmation, never
-block a commit on it.
+`Skill(write-commit)` for message composition and granularity rules; **this mode pre-satisfies the
+approval gate in its `references/interactive-flow.md`** — skip the AskUserQuestion confirmation,
+never block a commit on it.
 
 ## Bright lines — the grant changes nothing else
 
