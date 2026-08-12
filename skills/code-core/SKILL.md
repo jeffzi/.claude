@@ -9,9 +9,6 @@ user-invocable: false
 
 # Production Code — Cross-Language Principles
 
-**Core principle:** Production-grade from keystroke one. There is no such thing as temporary code
-that stays temporary.
-
 After loading this skill, read the file's extension, look it up in the Language Dispatch table in
 `rules/skill-loading.md`, and load the matching `Skill(code-{lang})` leaf. The leaf owns all
 language-specific idioms, pitfalls, and verification commands.
@@ -21,16 +18,8 @@ language-specific idioms, pitfalls, and verification commands.
 ### 1. Quick Code IS Production Code
 
 Code written "just to test something" gets committed. Scripts written "just for CI" run in
-production for years. There are no throwaway files.
-
-Write every file as if it ships today:
-
-- Type-annotate every public function signature.
-- Add error handling before it's needed.
-- Follow the language's idiomatic style unconditionally.
-- Do not leave `TODO` comments that track missing behavior — implement it or open a ticket.
-
-The leaf skill owns the language-specific syntax for each of these. The rule is universal.
+production for years. There are no throwaway files. Write every file as if it ships today, and do
+not leave `TODO` comments that track missing behavior — implement it or open a ticket.
 
 ### 2. No Obvious Comments — Explain Why, Not What
 
@@ -56,23 +45,6 @@ Same subject, opposite verdicts — the difference is whether it constrains the 
 When a constraint is buried in past tense, keep the constraint and drop the narration — don't delete
 both.
 
-```text
-# BAD — restates the code
-total = 0  # initialize total
-for item in items:  # loop through items
-    total += item  # add to total
-
-# BAD — line number drifts on next edit
-# see line 42 for the retry logic
-
-# GOOD — explains a non-obvious constraint
-# Use 4095 not 4096: kernel reserves the top page in this range (see POSIX §12.2.3)
-LIMIT = 4095
-
-# GOOD — names the function, not the line
-# see validate_token() for the retry logic
-```
-
 **Line-anchored suppressions bind to their target line.** `*-ignore-next-line`,
 `eslint-disable-next-line`, `# noqa`, `@ts-expect-error` and kin suppress the line immediately after
 (or on) them. When editing near one — including adding the explanatory comment these suppressions
@@ -93,9 +65,6 @@ annotated. No exceptions for:
 - "It's internal" — internal functions are the most-changed and most-broken.
 - "I'll add types when the code stabilizes" — types are what make the code stable.
 
-The leaf skill owns the language-specific syntax: PEP 484 signatures in Python, `unknown` over `any`
-in TypeScript, LuaLS annotations in Lua, Sendable in Swift, none required in shell.
-
 ### 4. Errors Must Surface
 
 An error swallowed is a bug waiting to manifest somewhere unrelated. **Errors must propagate to a
@@ -108,20 +77,9 @@ Never:
 - Return `null`/`nil`/`false` from a function that can legitimately return those values on the
   success path — callers cannot distinguish error from valid result.
 
-The leaf skill owns the language mechanism:
-
-- Python: EAFP with specific exception types, `ExceptionGroup` for task failures.
-- TypeScript: `return await` in try/catch, every Promise `.catch()`ed or `await`ed.
-- Lua: `nil, err` return tuples for expected failures.
-- Swift: typed throws, `withTaskCancellationHandler`, no fire-and-forget `Task { }`.
-- Shell: `set -euo pipefail`, `trap` for cleanup.
-
 ### 5. Verification Is Mandatory Before Completion
 
 **A task is NOT complete until lint, type-check, and tests all pass.**
-
-"Should work" is not verification. "Looks correct" is not verification. Running the commands and
-seeing green output is verification. The leaf skill owns the exact commands.
 
 Common traps:
 
@@ -141,8 +99,7 @@ conventions, and bind nothing.
 
 ## Universal Rationalizations
 
-These excuses apply in every language. Recognize them as signals that a shortcut is about to be
-taken.
+**Violating the letter of these rules is violating the spirit of the rules.**
 
 | Excuse                                      | Reality                                                      |
 | ------------------------------------------- | ------------------------------------------------------------ |
@@ -154,12 +111,7 @@ taken.
 | "I'll add error handling once it's working" | Broken error handling is harder to add than to build in.     |
 | "The test suite would have caught this"     | Not if it wasn't run.                                        |
 
-The leaf skill has language-specific rationalizations for idiomatic traps that don't apply
-cross-language (e.g., "as casts are fine in TypeScript", "LuaLS annotations slow me down").
-
 ## Red Flags — Stop and Fix
-
-If any of these are true, stop before proceeding:
 
 - A function signature has no type annotations in a typed language.
 - A comment describes what the next line of code does.
@@ -170,32 +122,3 @@ If any of these are true, stop before proceeding:
 - A `catch`/`except`/`recover` block is empty or only logs.
 - Code contains `@ts-ignore`, `# type: ignore`, `#pragma: no cover`, or equivalent suppression
   without an explanatory comment.
-
-## Downstream Consumers
-
-| Caller                                | How code-core is loaded                                                      |
-| ------------------------------------- | ---------------------------------------------------------------------------- |
-| `rules/skill-loading.md` action table | Loaded automatically when writing code — hub dispatches to leaf              |
-| `vet-code` agent                      | Loads `Skill(code-core)` in its own context; hub dispatches to the leaf      |
-| `tdd` (code/GREEN side)               | Should load `Skill(code-core)` before writing production code in GREEN phase |
-
-**Overlays** (e.g., `code-shiny`, `code-marimo`, `code-tstl`, `polars`) are loaded by the base
-_leaf_ skill's own Domain Skill Detection — not by this hub. The hub has no knowledge of overlays.
-
-## Language Dispatch
-
-Look up the file's extension in `rules/skill-loading.md` under **Language Dispatch for test-\* and
-code-\*** — the `Code skill` column. Load that skill.
-
-```text
-rules/skill-loading.md → Code skill column
-  .py, .pyi        →  Skill(code-py)
-  .ts, .tsx, …     →  Skill(code-ts)
-  .lua             →  Skill(code-lua)
-  .swift           →  Skill(code-swift)
-  .sh, .bash       →  Skill(code-shell)
-  .sql             →  Skill(code-sql)
-```
-
-If the extension is not listed, check whether a `code-{lang}` skill exists under `skills/` with a
-matching `paths:` glob. If none exists, note "no matching skill" rather than guessing.

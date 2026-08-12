@@ -196,12 +196,11 @@ The hub. Owns all universal rules inline:
 - Core principle: quick code is production code
 - No obvious comments — explain why, not what
 - Types are not optional (every public signature)
-- Errors must surface (per-language mechanism list)
+- Errors must surface
 - Verification is mandatory before completion
+- Project conventions bind like skill rules
 - Universal rationalizations table
 - Red flags list
-- Downstream consumers table
-- Language dispatch block
 
 No `references/` subdirectory — `code-core` is self-contained. Unlike `test-core`'s
 `references/anti-patterns.md`, there is no separate catalogue of code anti-patterns yet; all
@@ -212,10 +211,10 @@ universal guidance fits inline.
 Language-specific syntax, idioms, verification commands, pitfalls, and language-specific
 rationalizations. One entry per leaf:
 
-- **`code-py`**: PEP 484 type hints, ruff, uv, EAFP exception patterns, `pyproject.toml` version
-  check, imports-at-top rule
-- **`code-ts`**: Strict tsconfig flags, no `as` casts (+ acceptable uses), no `any` leaks from
-  `JSON.parse`, no floating promises, `unknown` + schema validation at boundaries
+- **`code-py`**: Modern 3.10+ syntax, dataclass defaults, EAFP exception patterns, `pyproject.toml`
+  version check, imports-at-top rule, PEP 758
+- **`code-ts`**: No `as` casts (+ acceptable uses), no `any` leaks from `JSON.parse`, no floating
+  promises, `unknown` + schema validation at boundaries, house-tsconfig pointer to `setup-ts`
 - **`code-lua`**: LuaLS annotations, `nil, err` return tuples, naming conventions
 - **`code-swift`**: Strict concurrency, `Sendable`, typed throws, no fire-and-forget `Task { }`,
   `withTaskCancellationHandler`

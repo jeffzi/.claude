@@ -14,9 +14,7 @@ mocks, or tempted to add test-only methods to production code.
 - [Anti-Pattern 5: Integration Tests as Afterthought](#anti-pattern-5-integration-tests-as-afterthought)
 - [Anti-Pattern 6: Stacked Assertions Over Varying Inputs](#anti-pattern-6-stacked-assertions-over-varying-inputs)
 - [When Mocks Become Too Complex](#when-mocks-become-too-complex)
-- [Quick Reference](#quick-reference)
 - [Red Flags](#red-flags)
-- [The Bottom Line](#the-bottom-line)
 
 ## Overview
 
@@ -386,34 +384,7 @@ BEFORE writing `for case in cases:` inside a test:
 
 **Consider:** Integration tests with real components are often simpler than complex mocks.
 
-## Quick Reference
-
-| Anti-Pattern                    | Fix                                           |
-| ------------------------------- | --------------------------------------------- |
-| Assert on mock elements         | Test real component or unmock it              |
-| Test-only methods in production | Move to test utilities                        |
-| Mock without understanding      | Understand dependencies first, mock minimally |
-| Incomplete mocks                | Mirror real API completely                    |
-| Tests as afterthought           | TDD — tests first                             |
-| Stacked assertions in a loop    | Parametrize — one test per case               |
-| Over-complex mocks              | Consider integration tests                    |
-
 ## Red Flags
 
-- Assertion checks for `*-mock` test IDs
-- Methods only called in test files
-- Mock setup is >50% of the test body
-- Test fails when you remove a mock
 - Can't explain why the mock is needed
 - Mocking "just to be safe"
-- Hand-rolled `for case in cases` loop driving the same assertion
-
-## The Bottom Line
-
-**Mocks are tools to isolate, not things to test.** **Tests are diagnostic instruments — they lose
-their value the moment they assert more than one thing at a time.**
-
-If TDD reveals you're testing mock behavior, you've gone wrong. Fix: test real behavior, or question
-why you're mocking at all.
-
-If your test body contains a loop over cases, parametrize. Each input deserves its own test.
