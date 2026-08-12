@@ -71,9 +71,9 @@ conventions.
 
 ## Documentation prose rules
 
-For sentence-level clarity (active voice, omitting needless words, concrete language), invoke the
-`write-prose` skill before writing or editing prose. The rules below are specific to documentation
-writing:
+For sentence-level clarity (active voice, omitting needless words, concrete language), load
+`Skill(write-prose)` and apply its rules before writing or editing prose. The rules below are
+specific to documentation writing:
 
 - **Second person for instructions.** "You can configure..." or imperative "Configure..." — not "The
   user can configure..." You are talking to the reader.

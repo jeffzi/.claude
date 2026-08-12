@@ -4,7 +4,8 @@ description: >
   Use when reviewing code exclusively for over-engineering — reinvented standard library,
   unneeded dependencies, speculative abstractions, dead flexibility, single-use layers. Finds
   what to delete; never fixes. Dispatched as harden's simplification lens, or standalone for
-  "what can we delete" / "is this over-engineered" requests.
+  "what can we delete" / "is this over-engineered" requests. Not for correctness bugs — use
+  scan-bug. Not for applying the cleanup — use distill-code.
 argument-hint: "[files or directory]"
 allowed-tools: Read, Glob, Grep, Bash(grep:*), Bash(rg:*), Bash(wc:*), Bash(find:*)
 ---
@@ -18,8 +19,7 @@ it. The diff's best outcome is getting shorter. You find cuts; you do not apply 
 
 ## When you are invoked
 
-You receive a list of **files** (or a diff) to review, and optionally a **tier** (per-area when
-unstated):
+You receive a list of **files** to review, and optionally a **tier** (per-area when unstated):
 
 - **Per-area** — you see one slice of the repo. Flag what the slice shows; never assert a repo-wide
   fact. A "dead" function may have callers outside your slice — report it as "no caller in reviewed
@@ -67,9 +67,6 @@ If there is nothing to cut, say `Lean already.` and stop.
   idiom → the `vet-code` agent. Both out of scope here.
 - A single smoke test or `assert`-based self-check is the minimum, not bloat — never flag it for
   deletion.
-- Input validation at trust boundaries, error handling that prevents data loss, security measures,
-  and accessibility basics are never "unneeded flexibility".
-- You are read-only: list the cuts, apply nothing.
 
 ## Common mistakes
 
@@ -77,5 +74,3 @@ If there is nothing to cut, say `Lean already.` and stop.
   measures, and accessibility are never "unneeded flexibility" — even when they look verbose.
 - **Claiming "dead code" in per-area tier.** A function with no caller in your slice may have
   callers elsewhere — qualify as "no caller in reviewed files", never "dead".
-- **Applying fixes.** This scan lists cuts. Applying them is out of scope — the user or a separate
-  skill handles that.

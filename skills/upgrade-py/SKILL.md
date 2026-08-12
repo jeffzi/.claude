@@ -1,6 +1,7 @@
 ---
 name: upgrade-py
-description: Use when upgrading Python dependencies in lock file and pyproject.toml
+description: Upgrades all Python dependencies with uv, syncs pyproject.toml constraints and prek hook pins, then runs prek and pytest.
+# Quality floor: resolving post-upgrade prek/pytest breakage from major bumps needs more than the cheap tier.
 model: sonnet
 effort: medium
 allowed-tools: >
@@ -28,15 +29,11 @@ Upgrade all project dependencies while keeping pyproject.toml constraints in syn
 | Upgrade lock file                 | Upgrading dependencies       |
 | Update pyproject.toml constraints | Updating version constraints |
 | Upgrade prek hooks                | Upgrading prek hooks         |
-| Sync pinned versions              | Syncing pinned versions      |
+| Sync exact pins                   | Syncing exact pins           |
 | Run prek checks                   | Running prek                 |
 | Run tests                         | Running tests                |
 
-Update tasks with TaskUpdate as you progress:
-
-- Set `status: in_progress` when starting each phase (shows spinner with activeForm text)
-- Set `status: completed` when done (shows checkmark)
-- If a conditional step is skipped (e.g., no changes needed), mark it completed immediately
+If a conditional step is skipped (e.g., no changes needed), mark its task completed immediately.
 
 ## Pinning Strategy
 
@@ -56,22 +53,19 @@ Update tasks with TaskUpdate as you progress:
 2. Find all dependencies explicitly mentioned in the pyproject.toml file. Use `uv pip list` to show
    the packages that are now installed.
 
-3. Update non-exact dependencies in pyproject.toml based on `uv pip list`. For major >= 1, use
-   caret: `>=MAJOR.MINOR,<NEXT_MAJOR` — drop the patch (e.g., installed 2.12.5 → `>=2.12,<3`). For
-   0.x, use the exact installed version as floor: `>=INSTALLED` (e.g., 0.29.0 → `>=0.29.0`). Skip
-   `==` pins — those are synced from prek in step 6. If constraints already match, skip to next
-   step.
+3. Update non-exact dependencies in pyproject.toml based on `uv pip list`, applying the Pinning
+   Strategy above (e.g., installed 2.12.5 → `>=2.12,<3`; installed 0.29.0 → `>=0.29.0`). Skip exact
+   pins — those are synced from prek in step 6. If constraints already match, skip to next step.
 
 4. Run `uv sync --all-groups` again to ensure the updated constraints work (skip if no changes were
    made)
 
 5. Run `uv tool run prek autoupdate` to upgrade prek hook versions
 
-6. Update pinned versions in pyproject.toml to match prek hook revs in .pre-commit-config.yaml (ruff
-   must be kept in sync between both files). If versions already match, skip to next step.
+6. Update exact (`==`) pins in pyproject.toml to match prek hook revs in .pre-commit-config.yaml. If
+   versions already match, skip to next step.
 
-7. Run `uv sync --all-groups` again to install the updated pinned versions (skip if no changes were
-   made)
+7. Run `uv sync --all-groups` again to install the updated exact pins (skip if no changes were made)
 
 8. Run `uv tool run prek run -a` and fix any issues (run again if files were modified)
 
@@ -79,9 +73,6 @@ Update tasks with TaskUpdate as you progress:
 
 ## Important Notes
 
-- Exact-pinned (`==`) tools must match between pyproject.toml and the prek config
-  (.pre-commit-config.yaml). The flow is: prek autoupdate bumps the hook rev → you update the `==`
-  pin in pyproject.toml to match
 - Preserve all comments in pyproject.toml
 - Unless explicitly noted, DO NOT upgrade to pre-release or alpha versions. Upgrade only to stable
   versions.

@@ -1,6 +1,6 @@
 ---
 name: upgrade-ts
-description: Use when upgrading TypeScript dependencies in package.json and lock file
+description: Upgrades all TypeScript dependencies with npm, normalizes package.json ranges, then runs tsc, oxlint/oxfmt, and vitest.
 allowed-tools: >
   Read, Grep, Edit, Bash(npm update:*),
   Bash(npm outdated:*), Bash(npm install:*),
@@ -8,16 +8,19 @@ allowed-tools: >
   Bash(npx oxlint:*), Bash(npx oxfmt:*), Bash(npx vitest:*)
 model: sonnet
 effort: medium
+disable-model-invocation: true
 ---
 
 # Upgrade All TypeScript Dependencies
 
 Upgrade all project dependencies while keeping package.json version ranges current.
 
+**Prerequisites:** an npm project (not pnpm/yarn/bun) with oxlint, oxfmt, and vitest as
+devDependencies. On a different package manager or toolchain, say so and stop.
+
 ## Context
 
-- Outdated packages:
-  !`npm outdated 2>/dev/null || echo "(npm not available or no outdated packages)"`
+- Outdated packages: !`npm outdated --long 2>/dev/null; true`
 
 ## Task Tracking
 
@@ -31,11 +34,7 @@ Upgrade all project dependencies while keeping package.json version ranges curre
 | Run lint and format checks      | Running lint checks          |
 | Run tests                       | Running tests                |
 
-Update tasks with TaskUpdate as you progress:
-
-- Set `status: in_progress` when starting each phase (shows spinner with activeForm text)
-- Set `status: completed` when done (shows checkmark)
-- If a conditional step is skipped (e.g., no changes needed), mark it completed immediately
+If a conditional step is skipped (e.g., no changes needed), mark its task completed immediately.
 
 ## Pinning Strategy
 
@@ -58,7 +57,7 @@ Update tasks with TaskUpdate as you progress:
 
 3. For packages shown as outdated: update the version range in package.json using caret with patch
    dropped — `^MAJOR.MINOR.0` (e.g., latest is 3.2.1 → `^3.2.0`). Skip exact pins — those are for
-   tools shared across config files. If no packages are outdated, skip to step 6.
+   tools shared across config files. If no packages are outdated, skip to step 5.
 
 4. Run `npm install` to regenerate the lock file with the updated constraints
 
@@ -85,7 +84,7 @@ Update tasks with TaskUpdate as you progress:
 - For major version bumps, check the library's migration guide before accepting the upgrade
 - If type errors arise from upgraded `@types` packages, ensure the `@types` version aligns with the
   corresponding library version
-- Preserve all comments in package.json
+- Preserve `"//"` keys and existing key ordering in package.json
 
 ## Files Included in Context
 

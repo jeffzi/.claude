@@ -1,9 +1,10 @@
 ---
 name: setup-ts
-description: Use when setting up shared TypeScript tooling config in a project (oxlint, oxfmt, cspell, markdownlint-cli2, fallow, tsconfig, editorconfig, gitignore) or bringing an existing project's config up to date with the house rules — "/setup-ts init", "/setup-ts update", "scaffold my TS config", "update my configs". Not for dependency version bumps alone — that is upgrade-ts, which update chains.
+description: Scaffolds or reconciles the house TypeScript tooling config (init | update), then chains upgrade-ts.
 argument-hint: init | update
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion, Bash(cp:*), Bash(ls:*), Bash(mkdir:*), Bash(ln:*), Bash(diff:*), Skill
+# Quality floor: the update reconcile is a key-by-key judgment pass (stale default vs deliberate override); the cheap tier batch-accepts.
 model: sonnet
 effort: medium
 ---
@@ -42,22 +43,19 @@ a fixed destination in the project root:
 | `agents-md`                                     | `AGENTS.md`                |
 | `package.json`                                  | `package.json`             |
 
-Copy to the **Destination** name, not the template name — seven differ: `fallow.json` →
-`.fallowrc.json`, `commitlintrc.json` → `.commitlintrc.json`, `editorconfig` → `.editorconfig`,
-`gitignore` → `.gitignore`, `npmrc` → `.npmrc`, `agents-md` → `AGENTS.md`, and `ci.yml` →
-`.github/workflows/ci.yml`. Create missing destination directories (`.github/workflows/`) before
-copying. `editorconfig`, `gitignore`, and `npmrc` are stored dot-less, and `agents-md` under a
-neutralized name, because the real names would take effect on this skills repo itself (an
-`AGENTS.md` in `references/` would be auto-loaded as agent instructions when editing templates
-here).
+Copy to the **Destination** column name, not the template name; create missing destination
+directories (`.github/workflows/`) before copying. `editorconfig`, `gitignore`, and `npmrc` are
+stored dot-less, and `agents-md` under a neutralized name, because the real names would take effect
+on this skills repo itself (an `AGENTS.md` in `references/` would be auto-loaded as agent
+instructions when editing templates here).
 
 `AGENTS.md` ships with a companion symlink: in both `init` and `update`, after the copy, ensure
 `CLAUDE.md` exists as a symlink to it (`ln -s AGENTS.md CLAUDE.md`). If `CLAUDE.md` already exists
 as a regular file, never replace it — surface it and let the user decide (usually: merge its content
 into `AGENTS.md`, then symlink).
 
-**Project-owned keys** are listed in `references/project-owned-keys.md`. Exclude them from every
-reconcile bucket — never surface as drift.
+**Project-owned keys** are listed in `${CLAUDE_SKILL_DIR}/references/project-owned-keys.md`. Exclude
+them from every reconcile bucket — never surface as drift.
 
 ## init
 
@@ -102,8 +100,12 @@ container:
   overwrite.
 - **Key in project, dropped from template** (retired rule) → stage as a _removal candidate_. Do not
   auto-delete.
-- **Project-owned key** (see table above) → leave untouched, never surface, and never treat as a
-  removal candidate just because it is absent from the project.
+- **Project-owned key** (listed in `${CLAUDE_SKILL_DIR}/references/project-owned-keys.md`) → leave
+  untouched, never surface, and never treat as a removal candidate just because it is absent from
+  the project.
+
+A conflict may be a _stale old default_ or a _deliberate override_ — without stored provenance the
+skill cannot tell, so never auto-accept; the user decides at the question below.
 
 Then present the staged changes with `AskUserQuestion` so the user decides in one pass — one
 question per file that has changes, options like:
@@ -116,35 +118,17 @@ question per file that has changes, options like:
 Apply the chosen edits with `Edit`/`Write`, preserving comments and key order. `.editorconfig` has
 no keys to merge — if it differs, offer replace-or-keep. `.gitignore` is line-based and additive:
 ensure the template's lines exist, and keep project-added lines without surfacing them as drift.
-`package.json` is scoped: only reconcile `scripts` and `devDependencies`. Within `scripts`,
-reconcile both keys and values (same leaf-path rules as config files). Within `devDependencies`,
-reconcile keys only — a dep in the template but absent in the project is staged as an _add_; a dep
-in the project but absent from the template is project-specific and left alone; a dep in both with a
-different version range is **not** a conflict (version management is `/upgrade-ts`'s job). All other
-top-level keys are project-owned — skip them entirely, never surface drift.
+`package.json` scope rules live in `${CLAUDE_SKILL_DIR}/references/project-owned-keys.md`; within
+`scripts`, reconcile both keys and values (same leaf-path rules as config files).
 
 After configs are reconciled, bump the dependencies by invoking `Skill(upgrade-ts)` — do not
 reimplement its pinning strategy here.
 
-Finish by reporting: files changed, keys added/updated/removed, and that `/upgrade-ts` ran.
-
-## Notes
-
-- These templates were formerly an npm package (`@jeffzi/config`) consumed via `extends`. The skill
-  replaces that: no publish, no `npm update`, no peer-dep range juggling — `update` is the
-  propagation mechanism, and the interactive reconcile is the part a versioned package could never
-  do.
-- The honest limit of the reconcile: without stored provenance the skill cannot distinguish a _stale
-  old default_ from a _deliberate override_ — both show as a conflict. That is the safe failure
-  mode; you batch-accept the stale ones.
+Finish by reporting: files changed, keys added/updated/removed, and that `Skill(upgrade-ts)` ran.
 
 ## Common mistakes
 
-- **Eyeballing diffs.** Visual scanning across batched Read outputs misses single-line differences —
-  always run `diff` first.
-- **Reconciling project-owned keys.** A project-owned key that differs from the template is not
-  drift — see `references/project-owned-keys.md`.
-- **Treating version-range differences as conflicts.** Version management is `/upgrade-ts`'s job;
-  version drift in `devDependencies` is never a conflict.
-- **Overwriting in init mode.** `init` copies missing files only — existing files are skipped, never
-  replaced. That is `update`'s job.
+- **Eyeballing diffs.** Batched Read outputs "compared" visually let single-line differences slip
+  through — the `diff` step is mandatory for every file pair.
+- **Surfacing project-owned keys as drift.** The user sees noise conflicts on `cspell.json` words or
+  `tsconfig` paths — exclude the owned keys before staging anything.
