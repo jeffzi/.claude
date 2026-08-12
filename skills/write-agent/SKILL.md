@@ -81,8 +81,7 @@ description: Use PROACTIVELY after edits to Python files to audit for SQL inject
 
 "Use PROACTIVELY" tells parent Claude _when to delegate_. It does NOT cause the harness to
 auto-invoke on file events. For event-based triggering, configure a PostToolUse hook in
-`settings.json` that dispatches the agent — see `Skill(update-config)`. Agents have no `paths:`
-frontmatter field; that's a skill-only feature.
+`settings.json` that dispatches the agent.
 
 ## Tool surface
 
@@ -165,6 +164,10 @@ You are a [role]. [One-sentence purpose.]
 
 [Constraints, non-goals, edge cases.]
 
+## When NOT to use
+
+[Only when the agent has a peer it could be confused with.]
+
 ## Output format
 
 [Exact format of the return message — see Return contract below.]
@@ -192,15 +195,16 @@ STATUS: FAILED_CORRECTLY
 
 ## Frontmatter decisions
 
-Required: `name`, `description`. Quick decisions for the common optional fields:
+Required: `name` (lowercase letters, numbers, hyphens only), `description`. Quick decisions for the
+common optional fields:
 
 | Field            | Default       | Pick differently when                                                                                     |
 | ---------------- | ------------- | --------------------------------------------------------------------------------------------------------- |
 | `model`          | inherits      | Reasoning-heavy → `opus`; judgment on bounded input → `sonnet`; mechanical lookup → `haiku`               |
-| `tools`          | all inherited | ALWAYS restrict — set an explicit allowlist                                                               |
+| `tools`          | all inherited | ALWAYS restrict                                                                                           |
 | `memory`         | none          | Agent benefits from persistent learning across runs (`user`, `project`, or `local` scope)                 |
 | `isolation`      | none          | Modifies files + parallel runs could conflict → `worktree` (branches from default branch, not HEAD)       |
-| `background`     | Claude picks  | Default is background (v2.1.198+); `true` forces it even when parent wants the result now                 |
+| `background`     | Claude picks  | `true` forces background even when parent wants the result now                                            |
 | `skills`         | none          | Preload full skill content at startup; can't preload `disable-model-invocation` skills                    |
 | `permissionMode` | inherits      | Needs `plan`, `acceptEdits`, `dontAsk`… Parent `bypassPermissions`/`acceptEdits`/auto override it         |
 | `maxTurns`       | none          | Cap runaway agentic loops                                                                                 |
@@ -265,7 +269,7 @@ known to misreport dispatches. (For the skill side, the instrument is different:
 
 Load `Skill(write-skill)` and apply its RED → GREEN → REFACTOR loop. Agent authoring is a technique
 skill — the baseline test is **spawn an isolated agent, give it the Claude Code agent docs, and ask
-it to author your target agent**. Observe the failures, then write the skill/draft to address them.
+it to author your target agent**. Observe the failures, then draft the agent to address them.
 
 **Agent files hot-reload.** Claude Code watches `.claude/agents/` and `~/.claude/agents/`; an edit
 applies to the next dispatch within seconds, no restart. Restart only after creating a scope's first
@@ -284,37 +288,4 @@ file in a brand-new `agents/` directory.
 **Trigger validation** (same as write-skill): 5-8 should-trigger and 5-8 should-not-trigger prompts.
 Does the description activate on the right ones without false positives?
 
-## Deployment checklist
-
-After writing ANY agent, STOP and complete this checklist before shipping.
-
-### RED phase — baseline
-
-- [ ] Ran baseline: asked an isolated agent to author this without the skill
-- [ ] Documented failures and rationalizations verbatim
-- [ ] Decided: subagent, skill, or `context: fork`
-
-### Frontmatter
-
-- [ ] `name`: letters, numbers, hyphens only
-- [ ] `description`: third person, front-loaded primary trigger, no workflow summary
-- [ ] `tools`: explicit allowlist (not "all tools")
-- [ ] `model`: chosen deliberately, not default-copied — and `CLAUDE_CODE_SUBAGENT_MODEL` confirmed
-      absent, since it silently outranks this field
-- [ ] `effort`: pinned explicitly — never left unset
-
-### Body
-
-- [ ] Voice: second person, imperative ("You are X. You do Y.")
-- [ ] Fresh context acknowledged — states what inputs the agent receives
-- [ ] Every instruction maps to an allowed tool
-- [ ] Output format specified with exact structure
-- [ ] No hallucinated filesystem paths
-- [ ] "When NOT to use" section if the agent has a peer it could be confused with
-
-### Testing
-
-- [ ] Application test on 2+ realistic scenarios
-- [ ] Boundary test — agent refuses out-of-scope input gracefully
-- [ ] Tool-exhaustion test — agent completes without "tool not available"
-- [ ] Trigger validation — description activates on right prompts only
+**Do not ship until all four application tests and trigger validation pass.**
