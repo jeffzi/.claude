@@ -79,7 +79,8 @@ resolved in the Arguments section). Group them by logical purpose:
 
 Output a numbered plan. For each proposed commit:
 
-1. **Subject line** — following write-commit guidelines (under 50 chars, impact-focused).
+1. **Subject line** — following write-commit guidelines (full subject under 72 chars, description
+   under 50, impact-focused).
 2. **Body** (optional) — only if the subject alone doesn't tell the full story.
 3. **Files** — list the files that would be staged for this commit.
 
