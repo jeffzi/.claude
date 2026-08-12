@@ -6,7 +6,7 @@ description: >
   auditing existing changelogs against the Keep a Changelog
   standard. Not for release notes in documentation — use write-doc for that.
 argument-hint: "[version or date range]"
-allowed-tools: Read, Edit(CHANGELOG.md), Edit(**/CHANGELOG.md), Bash(git log:*), Bash(git tag:*), Bash(git describe:*)
+allowed-tools: Read, Glob, Edit(CHANGELOG.md), Edit(**/CHANGELOG.md), Write(CHANGELOG.md), Write(**/CHANGELOG.md), Bash(git log:*), Bash(git tag:*), Bash(git describe:*)
 ---
 
 # Changelog
@@ -18,8 +18,10 @@ catch format; this catches judgment calls — entry curation, grouping, and read
 
 - Last tag: !`git describe --tags --abbrev=0 2>/dev/null || echo "(no tags yet)"`
 - Commits since last tag:
-  !`git log $(git describe --tags --abbrev=0)..HEAD --oneline 2>/dev/null ||`
-  `git log --oneline | head -30 2>/dev/null`
+
+```!
+git log "$(git describe --tags --abbrev=0 2>/dev/null)..HEAD" --oneline 2>/dev/null || git log --oneline -30
+```
 
 ## Rules
 
@@ -44,7 +46,7 @@ catch format; this catches judgment calls — entry curation, grouping, and read
 | T2 | Every entry under a `### Type` heading — no bare bullets under version                |
 | T3 | Entries under the correct type (bug fix → `Fixed`, not `Changed`)                     |
 
-### Entry Quality (Q1–Q4)
+### Entry Quality (Q1–Q5)
 
 | #  | Rule                                                                                                                         |
 | -- | ---------------------------------------------------------------------------------------------------------------------------- |
@@ -56,11 +58,13 @@ catch format; this catches judgment calls — entry curation, grouping, and read
 
 ## Process
 
-1. **Rule-by-rule review** — one rule at a time across the full file:
+1. **Rule-by-rule review** — one rule at a time, scoped to `$ARGUMENTS` (a version or date range)
+   when supplied, otherwise the full file:
    - **(a)** S1–S8 top to bottom
    - **(b)** T1–T3 for every version section
-   - **(c)** Q1–Q4 for every bullet point
-2. Fix violations found
+   - **(c)** Q1–Q5 for every bullet point
+2. **Report or fix, per caller mode** — every violation carries a line ref, rule ID, and fix. Edit
+   in place only when the invocation requested changes; a read-only caller gets the report alone.
 
 ## Common Mistakes
 
@@ -74,8 +78,6 @@ catch format; this catches judgment calls — entry curation, grouping, and read
 
 ## Output
 
-**From preflight/workflow:** Output NOTHING — accumulate internally.
-
-**Standalone:** List ONLY violations (line ref + description). If clean: "No issues found."
+List ONLY violations (line ref + description). If clean: "No issues found."
 
 Never output rule tables with "None found" rows, passed-check summaries, or progress updates.

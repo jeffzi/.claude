@@ -4,19 +4,18 @@ description: |
   Use when creating, editing, or reviewing documentation — READMEs, tutorials, how-to guides,
   reference docs, API docs, contributing guides, architecture decision records, error messages,
   release notes, or any prose-heavy technical document meant for human readers. Also use when the
-  user asks to "write docs", "add a README", "document this", "improve the docs", "write release
-  notes", or asks about documentation structure, information architecture, or doc best practices.
-  Does not cover inline code docstrings — those belong to language-specific skills like code-py,
-  code-ts. Not for CHANGELOG.md files — use write-changelog. For sentence-level prose clarity,
-  use write-prose instead.
+  user asks to "write docs" or "document this", or asks about documentation structure, information
+  architecture, or doc best practices. Does not cover inline code docstrings — those belong to
+  language-specific skills like code-py, code-ts. Not for CHANGELOG.md files — use write-changelog.
+  Not for reviewing an existing doc and fixing what the review finds — use revise-doc. For
+  sentence-level prose clarity, use write-prose instead.
 argument-hint: "[doc type or target file]"
 ---
 
 # Writing Documentation
 
 Documentation exists to help someone accomplish something. Every sentence either helps the reader or
-wastes their time. These guidelines synthesize the Write the Docs community's collective wisdom on
-creating effective technical documentation.
+wastes their time.
 
 ## Before you write
 
@@ -30,14 +29,8 @@ actually have, not an imagined universal audience.
 
 ### Choose the right document type (Diataxis)
 
-If the document type isn't obvious from context, use AskUserQuestion to ask:
-
-- **Question:** "What type of documentation are you writing?"
-- **Options:**
-  - **Tutorial** — step-by-step learning ("teach me")
-  - **How-to guide** — task-focused ("help me accomplish X")
-  - **Reference** — lookup documentation ("what are the exact details?")
-  - **Explanation** — conceptual deep dive ("why does it work this way?")
+If the document type isn't obvious from context, use AskUserQuestion to ask "What type of
+documentation are you writing?" with the four types below as options.
 
 Documentation serves four distinct purposes. Mixing them is the primary structural anti-pattern — it
 produces docs that do none well.
@@ -57,7 +50,8 @@ landing page), quickstart (a ruthlessly scoped tutorial variant — 3 minutes to
 contributing guide, ADR, error messages, FAQ (supplement only — never primary docs), release notes.
 
 Read `references/doc-types.md` for the document type you're writing — it has detailed templates and
-examples for each type listed above.
+examples for README, tutorial, how-to, reference, explanation, contributing guide, ADR, FAQ,
+quickstart, and release notes. Error messages are covered below.
 
 Read `references/writing-principles.md` for core principles (ARID, SKIMMABLE, EXEMPLARY, CONSISTENT,
 CURRENT), structure principles, source principles, documentation prose rules, and accessibility
@@ -68,13 +62,7 @@ guidelines.
 ### Heading hierarchy
 
 Use headings to create a scannable outline. A reader should understand the page's structure from
-headings alone.
-
-- **H1**: Page title (one per page).
-- **H2**: Major sections. These are what show in a table of contents.
-- **H3**: Subsections within an H2.
-- Don't skip levels (H2 to H4). Don't nest deeper than H4 — if you need H5, the page is too long or
-  needs splitting.
+headings alone. Don't nest deeper than H4 — if you need H5, the page is too long or needs splitting.
 
 ### Code examples
 
@@ -82,7 +70,6 @@ headings alone.
 - Use realistic names and values. `user_email = "alice@example.com"` teaches more than `x = "foo"`.
 - Annotate non-obvious lines with comments. Don't comment the obvious.
 - Show output when it helps — especially for CLI commands.
-- Specify the language in fenced code blocks for syntax highlighting.
 
 ### Admonitions and callouts
 
@@ -112,20 +99,17 @@ sections.
 
 ## Anti-patterns
 
-| Pattern                              | Problem                                                                 |
-| ------------------------------------ | ----------------------------------------------------------------------- |
-| Wall of text with no headings        | Nobody reads it. Readers scan; prose blocks get skipped.                |
-| Starting with installation           | Open with _what it does and why_ before _how to install_.               |
-| "Simply run..." or "Just add..."     | Minimizing language alienates struggling readers.                       |
-| FAQ as primary documentation         | FAQs accumulate junk and bypass proper structure.                       |
-| Bare links ("click here")            | Screen readers read link text out of context. Describe the destination. |
-| Screenshots of text/code             | Can't be searched, copied, or read by screen readers. Use actual text.  |
-| Mixing tutorial and reference        | Each doc type serves a different need; mixing serves none.              |
-| "See above" / "As mentioned earlier" | Readers land mid-page from search. They didn't read above.              |
-| Documenting internals as user docs   | Users don't care about your class hierarchy. Document behavior.         |
-| Partial coverage without warning     | Like a map showing half the fire hydrants — it misleads.                |
-| Undefined abbreviations              | Never assume the reader knows your acronyms.                            |
-| Incorrect docs left in place         | Worse than missing documentation.                                       |
+Further anti-patterns (minimizing language, bare links, screenshots of text, partial coverage, stale
+docs) live in `references/writing-principles.md`.
+
+| Pattern                              | Problem                                                         |
+| ------------------------------------ | --------------------------------------------------------------- |
+| Wall of text with no headings        | Nobody reads it. Readers scan; prose blocks get skipped.        |
+| Starting with installation           | Open with _what it does and why_ before _how to install_.       |
+| FAQ as primary documentation         | FAQs accumulate junk and bypass proper structure.               |
+| "See above" / "As mentioned earlier" | Readers land mid-page from search. They didn't read above.      |
+| Documenting internals as user docs   | Users don't care about your class hierarchy. Document behavior. |
+| Undefined abbreviations              | Never assume the reader knows your acronyms.                    |
 
 ## When reviewing existing docs
 
@@ -134,15 +118,16 @@ sections.
 3. **Check skimmability.** Can someone find a specific answer in 30 seconds? If not, restructure.
 4. **Check completeness.** Within its scope, does it cover everything? Partial coverage misleads.
 5. **Check examples.** Are there code examples? Do they work? Are they realistic?
-6. **Check prose.** Invoke the `write-prose` skill and apply its rules. Cut filler, fix passive
-   voice.
+6. **Check prose.** Load `Skill(write-prose)` and apply every rule it states. Cut filler, fix
+   passive voice.
 7. **Check accessibility.** Alt text on images? Headings for screen readers? No color-only cues?
 8. **Check currentness.** Are version numbers, links, and instructions still accurate?
 9. **Check abbreviations.** All defined before first use?
 
 ## References
 
-- `references/doc-types.md` — Detailed templates for each documentation type
+- `references/doc-types.md` — Detailed templates for each documentation type (except error messages,
+  covered above)
 - `references/writing-principles.md` — Content, structure, source principles; prose rules;
   accessibility and inclusivity guidelines
-- `write-prose` skill — Sentence-level prose clarity rules (Strunk's _Elements of Style_)
+- `Skill(write-prose)` — Sentence-level prose clarity rules (Strunk's _Elements of Style_)

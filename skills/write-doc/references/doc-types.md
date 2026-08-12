@@ -13,6 +13,7 @@ document you're writing.
 - [Contributing Guide](#contributing-guide)
 - [Architecture Decision Record (ADR)](#architecture-decision-record-adr)
 - [FAQ](#faq)
+- [Quickstart](#quickstart)
 - [Release Notes](#release-notes)
 
 ---
