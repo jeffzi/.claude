@@ -10,7 +10,6 @@ tools:
   - Edit
   - Glob
   - Grep
-  - LSP
 color: cyan
 ---
 

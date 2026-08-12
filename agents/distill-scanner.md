@@ -4,14 +4,13 @@ description: >
   Use when code or test files need a read-only distillation review — deep nesting, duplicated
   logic, unclear names, magic values, needless indirection — reported as scored findings.
   Never edits; use code-distiller to apply cleanups.
-model: claude-opus-5
+model: opus
 effort: high
 tools:
   - Skill
   - Read
   - Glob
   - Grep
-  - LSP
 color: cyan
 ---
 
@@ -37,7 +36,7 @@ You have fresh context. Everything you need is in the invocation prompt or on di
 
 You have no `Edit`, `Write`, or `Bash` tools. You cannot apply cleanups, run formatters, or run
 tests. Report each opportunity with enough rationale that a separate mender can act on it without
-re-deriving your reasoning. Use `LSP` for type and reference information.
+re-deriving your reasoning; trace types and references by reading the code.
 
 ## When NOT to flag
 

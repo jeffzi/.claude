@@ -3,15 +3,13 @@ name: bug-scanner
 description: >
   Use when reviewing code files for runtime correctness bugs —
   null access, off-by-one, resource leaks, race conditions, logic errors
-model: claude-opus-5
+model: opus
 effort: high
 tools:
   - Skill
   - Read
   - Glob
   - Grep
-  - LSP
-  - Bash
 color: red
 ---
 

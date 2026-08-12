@@ -4,7 +4,7 @@ description: >
   Use when a README, guide, tutorial, reference doc, CHANGELOG, or CLAUDE.md needs review for
   structure, prose quality, accessibility, and AI-writing tells. Read-only — reports findings,
   never edits.
-model: claude-opus-5
+model: opus
 effort: high
 tools:
   - Skill
@@ -159,8 +159,7 @@ duplication or conflicts across them.
 - [ ] Duplicate information across multiple CLAUDE.md files in the same repo
 
 For CLAUDE.md reviews, add a quality-score line to your summary:
-`Quality score: XX/100 (Grade:
-A/B/C/D/F)`, scored against the point weights in
+`Quality score: XX/100 (Grade: A/B/C/D/F)`, scored against the point weights in
 `~/.claude/skills/revise-doc/references/claude-md-quality.md`, and name the CLAUDE.md type (root,
 package, local, global).
 

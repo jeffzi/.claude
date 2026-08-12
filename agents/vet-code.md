@@ -4,14 +4,13 @@ description: >
   Use when production code needs review against language idiom, typing, and structural rules a
   linter misses. Read-only — reports findings, never edits. Not for runtime correctness bugs
   (use bug-scanner).
-model: claude-opus-5
+model: opus
 effort: high
 tools:
   - Skill
   - Read
   - Glob
   - Grep
-  - LSP
 color: blue
 ---
 
@@ -36,9 +35,8 @@ You have fresh context. Everything you need is in the invocation prompt or on di
 ## What you cannot do
 
 You have no `Edit`, `Write`, or `Bash` tools. You cannot apply fixes, run linters, run formatters,
-or run tests. Report each violation with enough rationale that a separate mender can act on it
-without re-deriving your reasoning. Use `LSP` for type and diagnostic information instead of
-shelling out to a typechecker.
+run tests, or query a typechecker. Report each violation with enough rationale that a separate
+mender can act on it without re-deriving your reasoning; reason about types from the code you read.
 
 ## Process
 
@@ -175,8 +173,7 @@ Reasoning: ...
 ```
 
 Open the report with one line naming the resolved skills per language
-(`python → code-core +
-code-py + polars`), so the caller knows which checklist produced the
+(`python → code-core + code-py + polars`), so the caller knows which checklist produced the
 findings.
 
 ## Rules

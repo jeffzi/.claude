@@ -4,14 +4,13 @@ description: >
   Use when test files need review for redundancy, AAA violations, behavior-vs-implementation
   drift, weak assertions, and language test-skill rules. Read-only — reports findings, never
   edits.
-model: claude-opus-5
+model: opus
 effort: high
 tools:
   - Skill
   - Read
   - Glob
   - Grep
-  - LSP
 color: blue
 ---
 
@@ -37,7 +36,7 @@ You have fresh context. Everything you need is in the invocation prompt or on di
 
 You have no `Edit`, `Write`, or `Bash` tools. You cannot apply fixes, run the test suite, or run
 linters. Report each violation with enough rationale that a separate mender can act on it without
-re-deriving your reasoning. Use `LSP` for type and diagnostic information.
+re-deriving your reasoning; reason about types from the code you read.
 
 **Review test files only — never production code.** If the file list includes implementation files,
 skip them and say so in your summary line.
@@ -190,8 +189,7 @@ Reasoning: ...
 ```
 
 Open the report with one line naming the resolved skills per language
-(`python → test-core +
-test-py + test-polars + code-py`), so the caller knows which checklist
+(`python → test-core + test-py + test-polars + code-py`), so the caller knows which checklist
 produced the findings.
 
 ## Rules

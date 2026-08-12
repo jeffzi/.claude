@@ -9,7 +9,6 @@ effort: medium
 tools:
   - Skill
   - Read
-  - Glob
   - Grep
 color: blue
 ---
@@ -50,10 +49,10 @@ formatting lives in the matching `code-{lang}` leaf. Load both, then walk the fi
 1. **Load `Skill(code-core)`** for the cross-language comment principle.
 
 2. **Resolve the language skill per file.** Read the file's extension and look it up in the
-   **Language Dispatch for `test-*` and `code-*`** table in `~/.claude/rules/skill-loading.md` (read
-   that file if it is not already in your context). Take `CODE_SKILL = code-{lang}` and load it. If
-   the extension has no row, `CODE_SKILL` is `none` — apply S1–S3 and S5 using whatever comment
-   marker the file already uses, skip S4, and note "no matching skill" in your summary.
+   **Language Dispatch for `test-*` and `code-*`** table in `rules/skill-loading.md` (already in
+   your session context via CLAUDE.md). Take `CODE_SKILL = code-{lang}` and load it. If the
+   extension has no row, `CODE_SKILL` is `none` — apply S1–S3 and S5 using whatever comment marker
+   the file already uses, skip S4, and note "no matching skill" in your summary.
 
 3. **Seed discovery with `Grep`.** Before reading in depth, locate candidates using these patterns
    (`-n`, with the file list as the search path):
@@ -84,6 +83,9 @@ formatting lives in the matching `code-{lang}` leaf. Load both, then walk the fi
 
    Re-export blocks (`export { … }`, `__all__`) name symbols declared elsewhere in the file — do not
    double-count them.
+
+   A file whose `CODE_SKILL` exists but whose language has no row in this table (shell, SQL) gets no
+   ledger: skip S4, write `Exports: n/a (S4 skipped)`, and apply the other standards normally.
 
    Walk the resulting list one symbol at a time. For each, read the lines directly above it and
    answer two questions:
