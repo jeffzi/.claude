@@ -21,8 +21,9 @@ allowed-tools:
 
 # Fix CI — Diagnose, Fix on a Branch, Squash Back
 
-Drive a failing run to green on a throwaway `fix-ci/*` branch, then squash-merge the proven fix
-back: **one clean commit** on the target branch, no "fix ci" trail, no history rewritten.
+Drive a failing run to green on a throwaway `fix-ci/*` branch, then squash-merge the proven fix back
+onto the **target branch** — the branch whose CI is red: **one clean commit**, no "fix ci" trail, no
+history rewritten.
 
 **Foundational principle:** Violating the letter of these rules is violating the spirit. Green
 obtained by deleting the signal (skipped test, `# type: ignore`, widened assertion, disabled lint
@@ -34,13 +35,13 @@ rule) is not green — it is a hidden red.
 - Head: !`git rev-parse --short HEAD 2>/dev/null || true` on branch:
   !`git branch --show-current 2>/dev/null || true`
 
-Ignore this block when `$0` names a different PR, run, or SHA — the entry-point table governs.
+Ignore this block when `\$0` names a different PR, run, or SHA — the entry-point table governs.
 
 ## The loop
 
 ```text
 warm up signing → locate run → wait if running → read failing logs → triage
-→ check branch CI coverage → touch marker → checkout PR branch → branch fix-ci/<slug>
+→ touch marker → checkout PR branch → check branch CI coverage → branch fix-ci/<slug>
 → reproduce locally → fix → verify locally → commit → push branch → watch its run
 → green? squash back : loop (max 3 pushed attempts) → rm marker (EVERY exit path)
 ```
@@ -56,37 +57,25 @@ never block on AskUserQuestion. The only stops are the Stop conditions below.
 The git-guard hook blocks all pushes; this loop's sanctioned path:
 
 ```bash
-touch "$(git rev-parse --git-dir)/fix-ci-active"    # at loop start
+touch "$(git rev-parse --git-dir)/fix-ci-active"    # after triage, once a fix request is confirmed — never for read-only asks
 rm -f "$(git rev-parse --git-dir)/fix-ci-active"    # at loop end — ALWAYS
 ```
-
-Raw `git push` is permission-denied everywhere and never used. **The loop's only push path is the
-wrapper** `~/.claude/scripts/fix-ci-push.sh`, which itself refuses to run without a fresh marker,
-accepts only `-u`/`--set-upstream`/`--delete`, and rejects every force form and any deletion outside
-`fix-ci/*`. The guard additionally allows `git branch -D` scoped to `fix-ci/*` while the marker
-exists, and still blocks `--amend` and `--no-verify`.
 
 **Bright lines:**
 
 - Remove the marker on EVERY exit path — green, stuck, handback, or error; it is the loop's last
-  command. The guard ignores and sweeps markers older than 30 minutes (abandonment fails closed), so
-  re-`touch` it each iteration to keep a long run alive.
+  command.
 - The marker sanctions only what this file names — amend, reset, rebase, checkout stay forbidden —
   and is never touched outside this workflow.
-- Fix attempts never land directly on the original branch — they live on `fix-ci/*` until proven.
+- Fix attempts never land directly on the target branch — they live on `fix-ci/*` until proven.
 
-**Signing warm-up — the FIRST action of any fix request,** before any `gh` call: when
-`git config commit.gpgsign` is true, trigger one signature immediately, while the user is still at
-the keyboard to approve it — later unattended commits reuse the authorization. Never for read-only
-asks (nothing will be committed).
-
-```bash
-git tag -s fix-ci-warmup -m warmup && git tag -d fix-ci-warmup
-```
+**On a fix request, read `references/push-protocol.md` before the first push** — it carries the
+wrapper contract (the only push path), the marker TTL, the signing warm-up (the FIRST action of any
+fix request), and the squash-back procedure.
 
 ## The fix branch
 
-**Bright line: triage is remote, reproduction is local — and local means on the failing branch.**
+**Bright line: triage is remote, reproduction is local — and local means on the target branch.**
 Reading CI logs via `gh` is triage; running any local command that touches project files (linters,
 test runners, reading configs, checking versions) is reproduction. No local reproduction until you
 are on the PR branch. "Just checking one thing" on main is reproduction on the wrong branch.
@@ -111,18 +100,12 @@ Attempts are plain commits; the squash erases them, so retries never amend or fo
 branch triggers no workflow, open the PR early (`gh pr create --fill --base <original>`) to fire
 `pull_request` workflows.
 
-**No CI coverage on the branch → hard stop.** Check `.github/workflows/*` triggers before branching:
-nothing fires on branch pushes or `pull_request` → investigate and report only, noting
-`workflow_dispatch` when offered. Never use the target branch itself as the CI test bed.
+**No CI coverage on the branch → hard stop.** Check `.github/workflows/*` triggers on the
+checked-out PR branch, before `git switch -c fix-ci/*`: nothing fires on branch pushes or
+`pull_request` → investigate and report only, noting `workflow_dispatch` when offered. Never use the
+target branch itself as the CI test bed.
 
-**Squash back when the branch's run is green** (message per `Skill(write-commit)`):
-
-| Target branch    | How                                                                                                                                                                                                                         |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| main/master      | `gh pr merge --squash --delete-branch` — server-side, no local push of main needed                                                                                                                                          |
-| a feature branch | `git switch <branch>` → `git merge --squash fix-ci/<slug>` → commit → `~/.claude/scripts/fix-ci-push.sh origin <branch>` → `git branch -D fix-ci/<slug>` → `~/.claude/scripts/fix-ci-push.sh origin --delete fix-ci/<slug>` |
-
-Then confirm the target branch's own new run goes green.
+**Squash back when the branch's run is green** — procedure in `references/push-protocol.md`.
 
 ## Locate the run (stale-SHA safe)
 
@@ -135,7 +118,7 @@ gh run list --commit <sha> --json databaseId,workflowName,event,status,conclusio
 Always key runs off the head SHA, never "latest run" — every push rotates the SHA, and older runs
 are stale. The `event` field distinguishes `push`- from `pull_request`-triggered runs.
 
-| Given ($0 or context)        | Entry point                                           |
+| Given (\$0 or context)       | Entry point                                           |
 | ---------------------------- | ----------------------------------------------------- |
 | PR number                    | `gh pr checks $0` / `gh pr view $0 --json headRefOid` |
 | Run id                       | `gh run view $0`                                      |
@@ -210,7 +193,7 @@ squash an unproven fix into the target.
 | "Merge normally — squash loses the detail"         | The attempts are noise by design. Squash is the contract.                |
 | "I'll leave the marker, I might loop again later"  | A lingering marker disarms the guard repo-wide. Remove it now.           |
 | "The file isn't mine / pre-existing failure"       | It's a CI error; the request is fixing CI errors. No origin talk.        |
-| "I can analyze from main / read the diff remotely" | Reproduce means run the code. Switch to the failing branch first.        |
+| "I can analyze from main / read the diff remotely" | Reproduce means run the code. Switch to the target branch first.         |
 | "I'm still triaging, just checking one thing"      | Running a local command is reproduction, not triage. Checkout first.     |
 | "`gh pr checkout` failed, I'll work from main"     | Fix the checkout or use manual fetch+switch. Main is never the fallback. |
 | "Push #4 will surely be the one"                   | Three misses means the model of the bug is wrong. Hand back.             |
@@ -223,7 +206,7 @@ squash an unproven fix into the target.
 - Running any local project command (linter, test, config read) before `gh pr checkout`
 - `gh pr checkout` failed and about to proceed on main instead of fixing the checkout
 - Editing code before reproducing the failure locally
-- About to commit a fix attempt on the original branch instead of `fix-ci/*`
+- About to commit a fix attempt on the target branch instead of `fix-ci/*`
 - About to merge the fix branch without `--squash`, or squash a branch whose run isn't green
 - Typing raw `git push` — the wrapper is the only push path — or `--force` in any form, `--amend`,
   or `--no-verify` anywhere in this loop

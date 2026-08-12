@@ -1,9 +1,8 @@
 ---
 name: build
 description: >
-  Use when a new feature, component, or non-trivial behavior change needs design discussion and an
-  implementation plan. Produces an approved plan file — never executes it. Not for bug fixes (use
-  /fix).
+  Designs a feature interactively and produces an approved plan file at .planning/plan-<slug>.md —
+  never executes it.
 argument-hint: "[feature description, or path to an existing spec]"
 disable-model-invocation: true
 model: opus
@@ -54,8 +53,7 @@ contract): the plan file is the entire handoff to whichever session executes it,
 dialogue never travels with it. Design decisions the executor must know belong in the plan, not in
 this conversation.
 
-The plan at `.planning/plan-<slug>.md` is the pipeline's single artifact. There is no separate spec
-document unless the escape hatch in Phase 1 fires.
+The plan at `.planning/plan-<slug>.md` is the pipeline's single artifact.
 
 This skill pins `model: opus` / `effort: high`, live on every invocation: phases 1–2 adjudicate
 design in the main context — exactly where a cheaper tier rationalizes shallow discussion and
@@ -83,16 +81,16 @@ subsystem. Otherwise, never write a spec.
 ### Phase 2: Plan
 
 Load `Skill(write-plan)` with the agreed design as input (and the spec path, when the escape hatch
-produced one). The plan lands at `.planning/plan-<slug>.md`; carry that path forward as `PLAN_PATH`.
-write-plan owns the plan's format and task structure — do not restate or override its rules here.
+produced one). write-plan owns the plan's format, task structure, and presentation protocol — do not
+restate or override its rules here. Carry its plan path forward as `PLAN_PATH`.
 
-**Approval gate:** Present the plan inline — its full structure (goal, tasks, behaviors, Verify
+**Approval gate:** present the plan inline — its full structure (goal, tasks, behaviors, Verify
 blocks) so the user is not required to open the file — then use `AskUserQuestion` with two options
 (if the tool is unavailable, ask the same two options in prose and wait; the gate is the
 requirement, the tool is the vehicle):
 
-- **Approve** → stop. Confirm `PLAN_PATH` and that execution happens in a separate session from the
-  plan file. Do not start any task "to get a head start" — /build's work ends at the approved plan.
+- **Approve** → stop. /build's work ends at the approved plan — do not start any task "to get a head
+  start"; execution happens in a separate session from the plan file.
 - **Edit plan** → apply requested changes, re-present, repeat until approved.
 
 **Checkpoint:** Confirm the plan file exists on disk at `PLAN_PATH` before closing. If it does not,

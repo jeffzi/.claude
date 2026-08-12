@@ -1,9 +1,9 @@
 ---
 name: plan-commit
 description: >
-  Use when you have uncommitted changes and want to organize, split, or plan atomic commits
-  before pushing. Not for a single obvious commit — use write-commit directly.
+  Groups uncommitted changes into atomic commits and executes them after approval.
 argument-hint: "[path ...] [--exclude path ...]"
+# Quality floor: grouping a mixed diff into atomic commits is judgment work the cheap tier misfires on.
 model: sonnet
 disable-model-invocation: true
 effort: medium
@@ -61,14 +61,12 @@ Read the diffs and untracked files. **Only consider in-scope files** (per the IN
 resolved in the Arguments section). Group them by logical purpose:
 
 - Changes that serve the same goal belong together (e.g. a function + its test + its import).
-- **Never create a `test:` commit separate from its implementation — no exceptions.** A test-only
-  commit split from the feature/fix it validates is not atomic: it can't pass without the
-  implementation, and the implementation can't be verified without the test. Bundle them:
-  `feat(X): add Y` with both production code and its tests.
-- **Never create a `docs:` commit for documentation that accompanies a behavior change.** If a
-  commit changes user-facing behavior and the repo has in-repo docs affected by that change, update
-  them in the same commit. A docs-only follow-up means the docs were wrong between the two commits.
-  Trivial internal refactors with no user-facing effect don't need doc updates.
+- **Never create a `test:` commit separate from its implementation — no exceptions.** Tests ship in
+  their feature's commit: `feat(X): add Y` with both production code and its tests (rationale in
+  write-commit, loaded in Step 1).
+- **Never create a `docs:` commit for documentation that accompanies a behavior change.** Docs
+  affected by a user-facing change ship in that change's commit. Trivial internal refactors with no
+  user-facing effect don't need doc updates.
 - Unrelated changes should be separate commits (e.g. a bug fix and a new feature).
 - Prefer fewer, meaningful commits over many trivial ones. Don't split just to split.
 - Respect file boundaries only when they align with purpose boundaries.
@@ -79,8 +77,7 @@ resolved in the Arguments section). Group them by logical purpose:
 
 Output a numbered plan. For each proposed commit:
 
-1. **Subject line** — following write-commit guidelines (full subject under 72 chars, description
-   under 50, impact-focused).
+1. **Subject line** — following write-commit guidelines.
 2. **Body** (optional) — only if the subject alone doesn't tell the full story.
 3. **Files** — list the files that would be staged for this commit.
 
@@ -127,14 +124,10 @@ If a commit fails, stop immediately and report the error. Do not continue with r
 
 ## Common Mistakes
 
-| Mistake                                                             | Fix                                                                         |
-| ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| A file appears in multiple commits because it changed incrementally | Include it in the most relevant commit and note the constraint to the user  |
-| Over-splitting one logical change into many trivial commits         | Group by purpose — three files serving the same goal belong in one commit   |
-| Splitting tests into a `test:` commit separate from the feature/fix | Tests validate the implementation — bundle them in the same commit          |
-| Splitting doc updates into a `docs:` commit after the feature/fix   | If the commit changes user-facing behavior, update affected docs with it    |
-| Pushing after executing the plan                                    | The skill ends at commit. Never push — the user controls that step          |
-| Including out-of-scope files in a commit                            | Re-read the INCLUDE/EXCLUDE filter; stage only files that passed the filter |
+| Mistake                                                             | Fix                                                                        |
+| ------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| A file appears in multiple commits because it changed incrementally | Include it in the most relevant commit and note the constraint to the user |
+| Over-splitting one logical change into many trivial commits         | Group by purpose — three files serving the same goal belong in one commit  |
 
 ## Rationalization Guard
 

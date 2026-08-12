@@ -1,10 +1,8 @@
 ---
 name: harden
 description: >
-  Use when running a hardening round, DRY pass, or zero-diff refactor — a repo-wide audit whose
-  fixes must leave behavior (or generated output) provably unchanged. Not for a single bug with
-  unknown root cause (use /fix), new feature work (use tdd), or one-module cleanup (use
-  distill-code).
+  Repo-wide hardening round: audit fan-out, classified plan, gated execution with provably
+  unchanged output.
 argument-hint: "[optional area]"
 # opus/high: the round adjudicates diffs and classifies claims — a cheaper tier accepts dirty hunks
 model: opus
@@ -22,21 +20,17 @@ means unchanged, not "semantically equivalent."
 ## Artifacts and Cross-Round Memory
 
 - **`<repo-root>/.planning/hardening-ledger.md`** — the only kept artifact and the only cross-round
-  memory: a single list of refuted claims, recorded at the **mechanism level with no line numbers**
-  (line references rot on the next refactor; the mechanism that disproves a claim stays checkable).
+  memory: a single list of refuted claims, recorded at the **mechanism level with no line numbers**.
   Read only the ledger before auditing. It de-duplicates _claims_ during verification; it never
   exempts an _area_ from a scan.
 - **A ledger entry is trusted only while its disproof holds.** Before skipping a re-reported claim,
-  re-check the recorded mechanism (e.g. "not dead — reached via the X emission path": confirm that
-  path still exists). If the mechanism no longer holds, delete the entry and verify the claim afresh
-  — refutations decay as code changes, exactly the way "audited clean" notes do.
+  re-check the recorded mechanism; if it no longer holds, delete the entry and verify the claim
+  afresh.
 - **`<repo-root>/.planning/hardening-wip.md`** — the durable plan file and cross-session resume
-  point (the designated plan-mode file is session-scoped and undiscoverable from a later session).
-  Authored **directly** at step 3, refreshed at step 4 if the user cuts or reorders at the gate, so
-  the executed plan matches the approved one byte-for-byte. Resuming it never carries approval — the
-  first Bright Line still forces a re-present. A single reused, disposable filename, **not** a
-  numbered series, never retained past the round, never read by a future round. Delete it when the
-  round closes.
+  point. Authored **directly** at step 3, refreshed at step 4 if the user cuts or reorders at the
+  gate, so the executed plan matches the approved one byte-for-byte. Resuming it never carries
+  approval. One reused, disposable filename — never a numbered series, never read by a future round;
+  delete it when the round closes.
 
 ## Project Harness Lookup
 
@@ -76,29 +70,23 @@ harness at runtime; nothing project-specific belongs in this skill.
 is unreachable without a user-approved plan. Read `references/round-lifecycle.md` for the full
 per-step mechanics before running a round.
 
-1. **Audit fan-out.** Parallel read-only finders across every Scan Area: correctness on
-   `subagent_type: bug-scanner`, simplification on `subagent_type: simplification-scanner` — never
-   one lens on the other's agent, never a `model`/`effort` override, never a pasted rubric. The
-   simplification lens is mandatory: per-area finders plus exactly one global finder. Finders only
-   _list_ claims; no edits.
+1. **Audit fan-out.** Parallel read-only finders (correctness on `subagent_type: bug-scanner`,
+   simplification on `subagent_type: simplification-scanner`) across every Scan Area — narrow only
+   to the area named in the invocation argument, if any. Finders only _list_ claims; no edits.
 
-2. **Verify claim.** A finder reports a _claim_, not a finding. Re-read the mechanism at the line
-   level, build a repro, classify per the table below. False claims are appended to the ledger,
-   never silently dropped.
+2. **Verify claim.** A finder reports a _claim_, not a finding — re-read the mechanism, build a
+   repro, classify per the table below. False claims are appended to the ledger.
 
 3. **Write plan.** Load `Skill(write-plan)`; author the plan **once**, directly to
-   `<repo-root>/.planning/hardening-wip.md`, **before entering plan mode**. Then verify it with
-   `claim-reviewer` — one re-verification per disputed finding, after which it goes to the user
-   marked **contested**, never silently dropped.
+   `<repo-root>/.planning/hardening-wip.md`, **before entering plan mode**; verify it with
+   `claim-reviewer`.
 
-4. **Approval gate.** Enter plan mode, present via `ExitPlanMode`, and wait for the go-ahead. On
-   approval, update the wip file so the executed plan matches the approved one byte-for-byte.
+4. **Approval gate.** Enter plan mode, present via `ExitPlanMode`, wait for the go-ahead; on
+   approval, sync the wip file to the approved plan.
 
-5. **Execute.** Tasks run lowest → highest risk; each task is a contiguous, fully-committed commit
-   range before the next begins — one commit for a direct-edit task, tdd's own commit sequence for a
-   `/tdd` task. Load skills per the harness's **Skill Dispatch** table. Run the harness's per-task
-   gate as an opaque command block on every task's final tree before its closing commit, the
-   **Round-Completion Gate** at the end, then delete the working plan.
+5. **Execute.** Tasks run lowest → highest risk. Load skills per the harness's **Skill Dispatch**
+   table; run the per-task gate before each task's closing commit, the **Round-Completion Gate** at
+   the end, then delete the working plan.
 
 ## Finding Classification
 
