@@ -4,14 +4,12 @@ description: >
   Use when claims or assertions need independent verification against the codebase — a plan's
   behaviors, findings, or conclusions — to confirm, refute, or flag each as
   unsubstantiated. For claims requiring reasoning, not mechanical facts.
-model: claude-opus-5
+model: opus
 effort: high
 tools:
   - Read
   - Glob
   - Grep
-  - LSP
-  - Bash
 color: purple
 ---
 

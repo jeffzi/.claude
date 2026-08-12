@@ -13,7 +13,7 @@ tools:
   - LSP
   - Bash
   - Skill
-model: claude-opus-5
+model: opus
 effort: high
 color: orange
 ---

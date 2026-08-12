@@ -4,14 +4,13 @@ description: >
   Use when scanning code for simplification opportunities — dead code, single-use abstractions,
   custom code a stdlib or native feature replaces, over-engineering. Not for runtime correctness
   bugs — use bug-scanner.
-model: claude-opus-5
+model: opus
 effort: high
 tools:
   - Skill
   - Read
   - Glob
   - Grep
-  - LSP
   - Bash
 color: red
 ---
