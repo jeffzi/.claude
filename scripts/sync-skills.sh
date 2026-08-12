@@ -7,12 +7,10 @@ set -euo pipefail
 common=(-g -a claude-code -y --copy)
 
 npx --yes skills add K-Dense-AI/claude-scientific-skills "${common[@]}" \
-	--skill literature-review --skill markdown-mermaid-writing --skill paper-lookup \
+	--skill markdown-mermaid-writing --skill paper-lookup \
 	--skill polars --skill pymc --skill scikit-learn --skill scikit-survival \
-	--skill statistical-analysis --skill statsmodels
+	--skill statistical-analysis
 
 npx --yes skills add blader/humanizer "${common[@]}"
 
-npx --yes skills add obra/superpowers "${common[@]}" --skill brainstorming
-
-npx --yes skills add fallow-rs/fallow-skills "${common[@]}"
+npx --yes skills add fallow-rs/fallow-skills "${common[@]}" --skill fallow

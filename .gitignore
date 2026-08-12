@@ -26,7 +26,6 @@
 !skills/**
 
 # Externally synced skills (installed by scripts/sync-skills.sh via `npx skills`)
-skills/literature-review/
 skills/markdown-mermaid-writing/
 skills/paper-lookup/
 skills/polars/
@@ -34,11 +33,8 @@ skills/pymc/
 skills/scikit-learn/
 skills/scikit-survival/
 skills/statistical-analysis/
-skills/statsmodels/
 skills/humanizer/
-skills/brainstorming/
 skills/fallow/
-skills/fallow-review/
 
 # Allow rules
 !rules/
