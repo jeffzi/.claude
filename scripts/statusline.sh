@@ -35,16 +35,21 @@ sha256_hex() {
 	fi
 }
 
-# Probe once at source-time: discover whether stat speaks BSD (-f %m) or
-# GNU (-c %Y), testing against the script itself (guaranteed to exist).
-# STAT_FMT stays empty when neither form works — file_mtime returns
-# STAT_UNUSABLE_STATUS for every existing file in that case.
-STAT_FMT=""
-if stat -f %m "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
-	STAT_FMT="-f %m"
-elif stat -c %Y "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
-	STAT_FMT="-c %Y"
-fi
+# Discovers whether stat speaks BSD (-f %m) or GNU (-c %Y), testing against the
+# script itself (guaranteed to exist). Emits the working format on stdout, or
+# nothing when neither form works — file_mtime returns STAT_UNUSABLE_STATUS for
+# every existing file in that case. A function rather than inline probing so
+# tests can re-probe under a stubbed PATH without re-sourcing the script —
+# re-sourcing trips the readonly declarations above (fatal on bash 3.2).
+detect_stat_fmt() {
+	if stat -f %m "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
+		printf -- '-f %%m'
+	elif stat -c %Y "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
+		printf -- '-c %%Y'
+	fi
+}
+
+STAT_FMT=$(detect_stat_fmt)
 
 # Reads the OAuth usage endpoint for the account keyed by $1 and emits the stdin
 # .rate_limits shape on stdout (resets_at as epoch seconds).
@@ -207,7 +212,9 @@ refresh_usage_cache() {
 	local lock="${cache}.lock"
 	# BASHPID separates renders that share a $$ (subshells of one parent); $RANDOM keeps
 	# a recycled pid from producing the name a killed render's claim already carries.
-	local owner="owner.${BASHPID}.${RANDOM}"
+	# macOS ships bash 3.2, which has no BASHPID — fall back to $$ there and let
+	# $RANDOM alone separate same-parent subshells.
+	local owner="owner.${BASHPID:-$$}.${RANDOM}"
 	usage_lock_acquire "$lock" "$owner" "$throttle" "$now" || return 0
 	# A killed render (SIGTERM/SIGINT) must not strand the lock for the full throttle
 	# window; EXIT/INT/TERM traps are safe here, unlike RETURN, because $lock and $owner
