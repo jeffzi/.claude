@@ -4,14 +4,15 @@ load helpers/statusline
 
 setup_file() {
 	for fn in format_context_bar usage_color format_pace format_dir main \
-		file_mtime sha256_hex fetch_usage_fallback refresh_usage_cache; do
+		file_mtime sha256_hex fetch_usage_fallback refresh_usage_cache \
+		transcript_model_family; do
 		declare -F "$fn" >/dev/null || {
 			printf 'FATAL: %s is not defined after sourcing %s\n' "$fn" "$SCRIPT" >&2
 			return 1
 		}
 	done
 
-	export C_RESET EMPTY HALF FILLED
+	export RESET EMPTY HALF FILLED
 
 	export NOW=1700000000
 	export PACE_WINDOW=$FIVE_HOUR_SECONDS
@@ -30,7 +31,12 @@ setup_file() {
 	export MAIN_CASES
 	MAIN_CASES=$(mktemp -d "${TMPDIR:-/tmp}/statusline-cases.XXXXXX")
 
-	export STDIN_ENVELOPE='{"hook_event_name":"Status","session_id":"statusline-test","transcript_path":"/tmp/statusline-transcript.jsonl","cwd":"/tmp/statusline-proj","version":"1.0.0","output_style":{"name":"default"},"context_window":{"used_percentage":45}}'
+	# transcript_path points inside the per-run case root at a file no case
+	# writes, so the shared envelope never annotates the model segment and no
+	# stray file on the host can make it do so.
+	export STDIN_ENVELOPE
+	STDIN_ENVELOPE=$(printf '{"hook_event_name":"Status","session_id":"statusline-test","transcript_path":"%s","cwd":"/tmp/statusline-proj","version":"1.0.0","output_style":{"name":"default"},"context_window":{"used_percentage":45}}' \
+		"$MAIN_CASES/absent-transcript.jsonl")
 	export STDIN_MODEL_WORKSPACE='{"model":{"id":"claude-opus-4-1","display_name":"Opus 4.6"},"workspace":{"current_dir":"/tmp/statusline-proj","project_dir":"/tmp/statusline-proj"}}'
 
 	export MAIN_STDIN
@@ -445,6 +451,181 @@ teardown_file() {
 }
 
 # ---------------------------------------------------------------------------
+# Transcript model family
+# ---------------------------------------------------------------------------
+
+@test "the last assistant record supplies the family" {
+	local path
+	path=$(write_transcript family-last \
+		"$(assistant_record claude-opus-4-1)" \
+		"$(assistant_record claude-sonnet-5)")
+	assert_family family-last "$path" "sonnet"
+}
+
+@test "a dated model ID keeps only the family token" {
+	local path
+	path=$(write_transcript family-dated "$(assistant_record claude-haiku-4-5-20251001)")
+	assert_family family-dated "$path" "haiku"
+}
+
+@test "an unfamiliar family token passes through" {
+	local path
+	path=$(write_transcript family-unfamiliar "$(assistant_record claude-fable-5)")
+	assert_family family-unfamiliar "$path" "fable"
+}
+
+# ---------------------------------------------------------------------------
+# Transcript records that cannot supply the family
+# ---------------------------------------------------------------------------
+
+@test "a sidechain record never supplies the family" {
+	local path
+	path=$(write_transcript family-sidechain \
+		"$(assistant_record claude-sonnet-5)" \
+		"$(sidechain_record claude-haiku-4-5)")
+	assert_family family-sidechain "$path" "sonnet"
+}
+
+@test "an assistant record without a model never supplies the family" {
+	local path
+	path=$(write_transcript family-modelless \
+		"$(assistant_record claude-sonnet-5)" \
+		"$(modelless_record)")
+	assert_family family-modelless "$path" "sonnet"
+}
+
+@test "a synthetic error record never supplies the family" {
+	local path
+	path=$(write_transcript family-synthetic \
+		"$(assistant_record claude-sonnet-5)" \
+		"$(assistant_record '<synthetic>')")
+	assert_family family-synthetic "$path" "sonnet"
+}
+
+@test "a non-assistant record never supplies the family" {
+	local path
+	path=$(write_transcript family-user \
+		"$(assistant_record claude-sonnet-5)" \
+		"$(typed_record user claude-haiku-4-5)")
+	assert_family family-user "$path" "sonnet"
+}
+
+# ---------------------------------------------------------------------------
+# Nothing to annotate
+# ---------------------------------------------------------------------------
+
+@test "an empty transcript path prints nothing" {
+	assert_family family-empty-arg "" ""
+}
+
+@test "a nonexistent transcript prints nothing" {
+	assert_family family-absent "$MAIN_CASES/family-absent/nope.jsonl" ""
+}
+
+@test "an empty transcript prints nothing" {
+	local path
+	path=$(write_transcript family-empty-file)
+	assert_family family-empty-file "$path" ""
+}
+
+@test "a transcript whose every record is disqualified prints nothing" {
+	local path
+	path=$(write_transcript family-none \
+		"$(typed_record user claude-sonnet-5)" \
+		"$(sidechain_record claude-haiku-4-5)" \
+		"$(modelless_record)")
+	assert_family family-none "$path" ""
+}
+
+# ---------------------------------------------------------------------------
+# Transcript tail cap
+# ---------------------------------------------------------------------------
+
+@test "the partial line at the tail cap boundary is skipped" {
+	local path
+	path=$(write_transcript family-boundary \
+		"$(padded_assistant_record claude-ghost-1 $((TRANSCRIPT_TAIL_BYTES + 100)))" \
+		"$(assistant_record claude-sonnet-5)")
+	assert_family family-boundary "$path" "sonnet"
+}
+
+@test "a record older than the tail cap is out of reach" {
+	local path
+	path=$(write_transcript family-out-of-reach \
+		"$(assistant_record claude-opus-4-1)" \
+		"$(padded_user_record $((TRANSCRIPT_TAIL_BYTES + 100)))")
+	assert_family family-out-of-reach "$path" ""
+}
+
+# ---------------------------------------------------------------------------
+# Model family annotation
+# ---------------------------------------------------------------------------
+
+@test "a transcript served by another family annotates the model segment" {
+	local path out
+	path=$(write_transcript annotate-other "$(assistant_record claude-sonnet-5)")
+	out=$(main_render annotate-other "$(annotation_stdin "$path")" "$MAIN_PAYLOAD" | strip_ansi)
+	assert_whole_line "$out" "Opus 4.6→sonnet (high)"
+}
+
+@test "the annotation renders in the default foreground" {
+	local path out
+	path=$(write_transcript annotate-color "$(assistant_record claude-sonnet-5)")
+	# Unstripped: the annotation reads as one contiguous run only if no escape
+	# sits between the display name and the effort suffix.
+	out=$(main_render annotate-color "$(annotation_stdin "$path")" "$MAIN_PAYLOAD")
+	assert_contains "$out" "Opus 4.6→sonnet (high)"
+}
+
+@test "a transcript served by the configured family leaves the line as it renders today" {
+	local path out
+	path=$(write_transcript annotate-same "$(assistant_record claude-opus-4-5)")
+	out=$(main_render annotate-same "$(annotation_stdin "$path")" "$MAIN_PAYLOAD" | strip_ansi)
+	assert_whole_line "$out" "Opus 4.6 (high)"
+}
+
+# ---------------------------------------------------------------------------
+# Nothing to annotate with: the segment stays as it is
+# ---------------------------------------------------------------------------
+
+@test "no transcript_path on stdin: the segment renders unannotated" {
+	assert_unannotated_render degraded-no-path \
+		"$(stdin_without '.transcript_path' "$(annotation_stdin "$MAIN_CASES/unused.jsonl")")"
+}
+
+@test "an empty transcript_path: the segment renders unannotated" {
+	assert_unannotated_render degraded-empty-path "$(annotation_stdin "")"
+}
+
+@test "a transcript_path pointing at no file: the segment renders unannotated" {
+	assert_unannotated_render degraded-missing \
+		"$(annotation_stdin "$MAIN_CASES/degraded-missing/nope.jsonl")"
+}
+
+@test "an unreadable transcript: the segment renders unannotated" {
+	local path
+	path=$(write_transcript degraded-unreadable "$(assistant_record claude-sonnet-5)")
+	chmod 000 "$path"
+	assert_unannotated_render degraded-unreadable "$(annotation_stdin "$path")"
+}
+
+@test "a transcript with no qualifying record: the segment renders unannotated" {
+	local path
+	path=$(write_transcript degraded-no-family \
+		"$(typed_record user claude-sonnet-5)" \
+		"$(sidechain_record claude-sonnet-5)" \
+		"$(modelless_record)")
+	assert_unannotated_render degraded-no-family "$(annotation_stdin "$path")"
+}
+
+@test "no model.id on stdin: nothing to compare against, so the segment renders unannotated" {
+	local path
+	path=$(write_transcript degraded-no-model-id "$(assistant_record claude-sonnet-5)")
+	assert_unannotated_render degraded-no-model-id \
+		"$(stdin_without '.model.id' "$(annotation_stdin "$path")")"
+}
+
+# ---------------------------------------------------------------------------
 # Whole line
 # ---------------------------------------------------------------------------
 
@@ -559,7 +740,7 @@ teardown_file() {
 		missing_sha256_render
 }
 
-@test "render succeeds without security on PATH: context gauge and model name present" {
+@test "render succeeds when usage fetch fails: context gauge and model name present" {
 	local out
 	out=$(main_render no-security "$MAIN_STDIN" | strip_ansi)
 	assert_contains "$out" "● ● ◎ ○ ○"
@@ -582,33 +763,22 @@ teardown_file() {
 # Usage fallback: 300s throttle between attempts
 # ---------------------------------------------------------------------------
 
-@test "fallback throttle: first call reaches the endpoint" {
+@test "fallback throttle: first call reaches the endpoint and maps the usage payload" {
 	fallback_case throttle
-	fallback_fetch throttle 0 "$USAGE_BODY" "$FB_BASE" >/dev/null
-	assert_attempts throttle 1
-}
-
-@test "fallback throttle: first call maps the usage payload" {
-	fallback_case throttle-map
 	local out
-	out=$(fallback_fetch throttle-map 0 "$USAGE_BODY" "$FB_BASE")
+	out=$(fallback_fetch throttle 0 "$USAGE_BODY" "$FB_BASE")
+	assert_attempts throttle 1
 	assert_fallback_json "$out" '.five_hour.used_percentage' 42
 	assert_fallback_json "$out" '.five_hour.resets_at' "$FIVE_HOUR_RESET_EPOCH"
 	assert_fallback_json "$out" '.seven_day.used_percentage' 13
 }
 
-@test "fallback throttle: 250s after a success, no request sent" {
+@test "fallback throttle: 250s after a success, no request sent and the cached payload is served" {
 	fallback_case throttle-250
 	fallback_fetch throttle-250 0 "$USAGE_BODY" "$FB_BASE" >/dev/null
-	fallback_fetch throttle-250 0 "$USAGE_BODY" $((FB_BASE + 250)) >/dev/null
-	assert_attempts throttle-250 1
-}
-
-@test "fallback throttle: 250s after a success, the cached payload is served" {
-	fallback_case throttle-250-cache
-	fallback_fetch throttle-250-cache 0 "$USAGE_BODY" "$FB_BASE" >/dev/null
 	local out
-	out=$(fallback_fetch throttle-250-cache 0 "$USAGE_BODY" $((FB_BASE + 250)))
+	out=$(fallback_fetch throttle-250 0 "$USAGE_BODY" $((FB_BASE + 250)))
+	assert_attempts throttle-250 1
 	assert_fallback_json "$out" '.five_hour.used_percentage' 42
 }
 
@@ -623,16 +793,11 @@ teardown_file() {
 # Usage fallback: failures keep the last good payload
 # ---------------------------------------------------------------------------
 
-@test "fallback failure: curl error, the request was attempted" {
+@test "fallback failure: curl error, the request was attempted and the last good payload still served" {
 	seed_good_cache curl-failure
-	fallback_fetch curl-failure 7 "" $((FB_BASE + 400)) >/dev/null
-	assert_attempts curl-failure 2
-}
-
-@test "fallback failure: curl error, the last good payload still served" {
-	seed_good_cache curl-failure-served
 	local out
-	out=$(fallback_fetch curl-failure-served 7 "" $((FB_BASE + 400)))
+	out=$(fallback_fetch curl-failure 7 "" $((FB_BASE + 400)))
+	assert_attempts curl-failure 2
 	assert_fallback_json "$out" '.five_hour.used_percentage' 42
 }
 
@@ -663,18 +828,12 @@ teardown_file() {
 	assert_fallback_json "$out" '.five_hour.used_percentage' 42
 }
 
-@test "error body counts as a failed attempt: backing off 800s later" {
+@test "error body counts as a failed attempt: backing off 800s later, never reaching the cache" {
 	seed_good_cache rate-limited-backoff
 	fallback_fetch rate-limited-backoff 0 "$RATE_LIMITED_BODY" $((FB_BASE + 400)) >/dev/null
-	fallback_fetch rate-limited-backoff 0 "$USAGE_BODY" $((FB_BASE + 800)) >/dev/null
-	assert_attempts rate-limited-backoff 2
-}
-
-@test "error body never reaches the cache" {
-	seed_good_cache rate-limited-cache
-	fallback_fetch rate-limited-cache 0 "$RATE_LIMITED_BODY" $((FB_BASE + 400)) >/dev/null
 	local out
-	out=$(fallback_fetch rate-limited-cache 0 "$USAGE_BODY" $((FB_BASE + 800)))
+	out=$(fallback_fetch rate-limited-backoff 0 "$USAGE_BODY" $((FB_BASE + 800)))
+	assert_attempts rate-limited-backoff 2
 	assert_fallback_json "$out" '.five_hour.used_percentage' 42
 }
 
