@@ -23,6 +23,29 @@ readonly USAGE_BACKOFF_SECONDS=900
 # plain non-zero so callers can tell a broken tool from a file that is simply not there.
 readonly STAT_UNUSABLE_STATUS=3
 
+# Portable SHA-256: reads stdin, emits the first 8 hex characters on stdout.
+# macOS ships shasum; some Linux distros ship only sha256sum.
+sha256_hex() {
+	if command -v shasum >/dev/null 2>&1; then
+		shasum -a 256 | cut -c1-8
+	elif command -v sha256sum >/dev/null 2>&1; then
+		sha256sum | cut -c1-8
+	else
+		return 1
+	fi
+}
+
+# Probe once at source-time: discover whether stat speaks BSD (-f %m) or
+# GNU (-c %Y), testing against the script itself (guaranteed to exist).
+# STAT_FMT stays empty when neither form works — file_mtime returns
+# STAT_UNUSABLE_STATUS for every existing file in that case.
+STAT_FMT=""
+if stat -f %m "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
+	STAT_FMT="-f %m"
+elif stat -c %Y "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
+	STAT_FMT="-c %Y"
+fi
+
 # Reads the OAuth usage endpoint for the account keyed by $1 and emits the stdin
 # .rate_limits shape on stdout (resets_at as epoch seconds).
 #
@@ -34,7 +57,10 @@ readonly STAT_UNUSABLE_STATUS=3
 fetch_usage_payload() {
 	local suffix="$1" service="Claude Code-credentials" token response
 	[[ "$suffix" != "default" ]] && service="${service}-${suffix}"
-	token=$(security find-generic-password -s "$service" -w 2>/dev/null | jq -r '.claudeAiOauth.accessToken // empty') || return
+	local cred_file="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json"
+	token=$(security find-generic-password -s "$service" -w 2>/dev/null | jq -r '.claudeAiOauth.accessToken // empty') ||
+		token=$(jq -r '.claudeAiOauth.accessToken // empty' "$cred_file" 2>/dev/null) ||
+		return
 	[[ -n "$token" ]] || return 1
 	response=$(curl -s --max-time 2 \
 		-H "Authorization: Bearer $token" \
@@ -51,11 +77,14 @@ fetch_usage_payload() {
 # The mtime of path $1 in epoch seconds on stdout. Exit 1 when the path is absent, which
 # is an ordinary condition here — an unclaimed lock, a first render with no marker yet —
 # and callers absorb it with a fallback. Exit STAT_UNUSABLE_STATUS when the path is there
-# and stat still cannot answer: that is a stat without -f (GNU coreutils), a broken
+# but the startup probe found no usable stat format (STAT_FMT is empty): a broken
 # environment rather than a missing file, and callers report it instead.
 file_mtime() {
-	stat -f %m "$1" 2>/dev/null && return 0
 	[[ -e "$1" ]] || return 1
+	if [[ -n "$STAT_FMT" ]]; then
+		# shellcheck disable=SC2086 # STAT_FMT must word-split into two arguments
+		stat $STAT_FMT "$1" 2>/dev/null && return 0
+	fi
 	return "$STAT_UNUSABLE_STATUS"
 }
 
@@ -206,7 +235,7 @@ refresh_usage_cache() {
 fetch_usage_fallback() {
 	local now="$1"
 	local suffix="default" cache marker last_attempt verdict throttle
-	[[ -n "${CLAUDE_CONFIG_DIR:-}" ]] && suffix=$(printf '%s' "$CLAUDE_CONFIG_DIR" | shasum -a 256 | cut -c1-8)
+	[[ -n "${CLAUDE_CONFIG_DIR:-}" ]] && suffix=$(printf '%s' "$CLAUDE_CONFIG_DIR" | sha256_hex)
 	cache="${TMPDIR:-/tmp}/claude-statusline-usage-${suffix}.json"
 	marker="${cache}.attempt"
 	last_attempt=$(file_mtime "$marker") || {
@@ -414,12 +443,16 @@ format_dir() {
 # render to pre-empt a failure file_mtime already detects at the point of use.
 check_deps() {
 	local tool
-	for tool in jq curl security shasum date; do
+	for tool in jq curl date; do
 		command -v "$tool" >/dev/null || {
 			render_failure "missing required tool: $tool"
 			return 1
 		}
 	done
+	command -v shasum >/dev/null 2>&1 || command -v sha256sum >/dev/null 2>&1 || {
+		render_failure "missing required tool: shasum or sha256sum"
+		return 1
+	}
 }
 
 # Extracts a batch of jq expressions from $1 as a single line, joined on
@@ -481,18 +514,19 @@ main() {
 	# then — so a 0 means stale stdin data. The fallback is live server data and
 	# needs no such gate.
 	rate_limits_json=""
-	((api_ms > 0)) && rate_limits_json=$(printf '%s' "$input" | jq -c '.rate_limits // empty') || true
+	if ((api_ms > 0)); then
+		rate_limits_json=$(printf '%s' "$input" | jq -c '.rate_limits // empty') || true
+	fi
 	if [[ -z "$rate_limits_json" ]]; then
-		rate_limits_json=$(fetch_usage_fallback "$now") || {
-			local fallback_status=$?
-			# The fallback's throttle is read off a file's mtime, so a stat that cannot
-			# answer would poll the endpoint on every render — the failure it reports is
-			# worth the line rather than a degraded render that looks healthy.
-			if ((fallback_status == STAT_UNUSABLE_STATUS)); then
-				render_failure "unusable required tool: stat"
-				return 0
-			fi
-		}
+		local fallback_status=0
+		rate_limits_json=$(fetch_usage_fallback "$now") || fallback_status=$?
+		# The fallback's throttle is read off a file's mtime, so a stat that cannot
+		# answer would poll the endpoint on every render — the failure it reports is
+		# worth the line rather than a degraded render that looks healthy.
+		if ((fallback_status == STAT_UNUSABLE_STATUS)); then
+			render_failure "unusable required tool: stat"
+			return 0
+		fi
 	fi
 
 	local five_h="" five_h_reset="" week="" week_reset="" limits_out=""
