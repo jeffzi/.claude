@@ -353,10 +353,10 @@ probe_then_mtime() {
 	(
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
 		export PATH="$stat_dir:$PATH"
-		unset STAT_FMT
-		# shellcheck disable=SC1090  # dynamic source path
-		# </dev/null keeps main (which reads stdin) from consuming test input while the script loads.
-		. "$SCRIPT" </dev/null
+		# Re-probe via the function rather than re-sourcing the script: a second
+		# source re-runs the readonly declarations, which is fatal on bash 3.2.
+		# shellcheck disable=SC2034 # consumed by file_mtime, defined in the sourced script
+		STAT_FMT=$(detect_stat_fmt)
 		file_mtime "$target_path"
 	)
 }
