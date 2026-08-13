@@ -206,7 +206,9 @@ Will Claude follow this skill effectively?
 
 - [ ] Body sections adapted to content, not rigidly following a template
 - [ ] Common mistakes or rationalizations section present
-- [ ] Naming uses verb-first active voice with hyphens (`write-skill` not `skill-writing`)
+- [ ] Naming follows type convention: action skills (discipline, technique, pattern) use verb-first
+      active voice (`write-skill` not `skill-writing`); reference skills use the domain or tool name
+      directly (`polars`, `fallow`)
 
 ### Content integrity
 
