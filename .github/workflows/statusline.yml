@@ -1,0 +1,32 @@
+name: statusline
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install tools
+        run: |
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew install bats-core shellcheck shfmt
+          else
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq shellcheck
+            sudo npm install -g bats
+            go install mvdan.cc/sh/v3/cmd/shfmt@latest
+            echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          fi
+        shell: bash
+      - name: Lint
+        run: shellcheck scripts/statusline.sh tests/helpers/statusline.bash
+      - name: Format
+        run: shfmt -d scripts/statusline.sh tests/helpers/statusline.bash
+      - name: Run tests
+        run: bats tests/test_statusline.bats
