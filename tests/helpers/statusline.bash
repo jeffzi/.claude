@@ -8,7 +8,6 @@ SCRIPT="$TEST_DIR/../scripts/statusline.sh"
 # </dev/null keeps main (which reads stdin) from consuming test input while the script loads.
 . "$SCRIPT" </dev/null
 
-C_RESET=$'\033[0m'
 EMPTY="○"
 HALF="◎"
 FILLED="●"
@@ -39,8 +38,8 @@ assert_bar() {
 	color=$(usage_color "$pct")
 	for ((i = 0; i < ${#pattern}; i++)); do
 		case "${pattern:i:1}" in
-		F) expected+="${sep}${color}${filled}${C_RESET}" ;;
-		H) expected+="${sep}${color}${half}${C_RESET}" ;;
+		F) expected+="${sep}${color}${filled}${RESET}" ;;
+		H) expected+="${sep}${color}${half}${RESET}" ;;
 		E) expected+="${sep}${empty}" ;;
 		*)
 			printf 'invalid pattern char: %s\n' "${pattern:i:1}" >&2
@@ -164,6 +163,37 @@ assert_leading_segment() {
 	assert_exact "${plain%% │ *}" "$expected"
 }
 
+# Pins the whole composed line around a given model segment, so a change to the
+# segment cannot quietly disturb the gauge, the usage segments, or the dir name.
+# The 5h countdown's minutes are matched rather than pinned: setup_file captures
+# MAIN_NOW while main() reads its own clock at render time, so the digits roll
+# whenever execution lags setup by more than a few seconds.
+assert_whole_line() {
+	local plain="$1" model="$2" normalized
+	normalized=$(printf '%s' "$plain" | sed -E 's/· 4h[0-9]+m/· 4h#m/')
+	assert_exact "$normalized" "statusline-proj │ ${model} ● ● ◎ ○ ○ │ 5h 78%↑↑ · 4h#m │ 7d 7%"
+}
+
+# Every degraded transcript lookup must leave the model segment exactly as it
+# renders with no transcript at all: unannotated, exit 0, no literal "null" from
+# a missing stdin field, and no failure line on either stream — an annotation
+# that cannot be computed is not a render failure.
+assert_unannotated_render() {
+	local case_name="$1" stdin="$2" status=0 out plain err
+	out=$(main_render "$case_name" "$stdin" "$MAIN_PAYLOAD") || status=$?
+	plain=$(printf '%s' "$out" | strip_ansi)
+	assert_contains "$plain" "Opus 4.6 (high)" || return 1
+	assert_not_contains "$plain" "→" || return 1
+	assert_not_contains "$plain" "null" || return 1
+	assert_not_contains "$plain" "statusline:" || return 1
+	if ((status != 0)); then
+		printf 'expected exit 0, got %s\n' "$status" >&2
+		return 1
+	fi
+	err=$(<"$MAIN_CASES/$case_name/stderr")
+	assert_not_contains "$err" "statusline:"
+}
+
 # Degraded mode must both fall back gracefully (exit 0) and print the correct
 # fallback content; either check alone would pass a render that is broken in the other way.
 assert_degraded_render() {
@@ -236,6 +266,23 @@ assert_no_stray_dirs() {
 	fi
 }
 
+# The family must arrive on stdout alone: an empty expectation means "no annotation",
+# which only reads as such if the call also exits 0 and leaves stderr silent. Checking
+# stdout alone would pass a lookup that printed nothing but shouted a failure line.
+assert_family() {
+	local case_name="$1" path="$2" expected="$3" dir out err status=0
+	dir="$MAIN_CASES/$case_name"
+	mkdir -p "$dir"
+	out=$(transcript_model_family "$path" 2>"$dir/family-stderr") || status=$?
+	assert_exact "$out" "$expected" || return 1
+	if ((status != 0)); then
+		printf 'expected exit 0, got %s\n' "$status" >&2
+		return 1
+	fi
+	err=$(<"$dir/family-stderr")
+	assert_exact "$err" ""
+}
+
 # ---------------------------------------------------------------------------
 # Domain helpers
 # ---------------------------------------------------------------------------
@@ -287,6 +334,21 @@ stdin_json() {
 
 full_stdin_json() {
 	jq -c --argjson base "$STDIN_MODEL_WORKSPACE" --argjson extra "$1" '. * $base * $extra' <<<"$STDIN_ENVELOPE"
+}
+
+# Stdin for the model-family annotation cases: a per-case transcript plus an
+# effort level, which pins where the annotation sits relative to the suffix.
+annotation_stdin() {
+	local path="$1" extra
+	extra=$(jq -cn --arg path "$path" '{transcript_path: $path, effort: {level: "high"}}')
+	full_stdin_json "$extra"
+}
+
+# Deletes a field from a rendered stdin JSON: `. * $extra` merging can empty a
+# field but never make it absent, and absent is its own degraded input.
+stdin_without() {
+	local filter="$1" stdin="$2"
+	printf '%s' "$stdin" | jq -c "del($filter)"
 }
 
 main_render() {
@@ -536,6 +598,64 @@ cred_fetch() {
 		export STUB_ATTEMPTS="$dir/attempts" STUB_CURL_BODY="$dir/body"
 		fetch_usage_payload default
 	)
+}
+
+# ---------------------------------------------------------------------------
+# Transcript fixtures
+# ---------------------------------------------------------------------------
+#
+# Records carry the fields the model lookup reads (type, isSidechain,
+# message.model); the rest of a real transcript record is irrelevant to it.
+
+assistant_record() {
+	local model="$1"
+	printf '{"isSidechain":false,"type":"assistant","message":{"role":"assistant","model":"%s"}}' "$model"
+}
+
+sidechain_record() {
+	local model="$1"
+	printf '{"isSidechain":true,"type":"assistant","message":{"role":"assistant","model":"%s"}}' "$model"
+}
+
+modelless_record() {
+	printf '{"isSidechain":false,"type":"assistant","message":{"role":"assistant"}}'
+}
+
+# A record of some other type that still carries a model, so a lookup that
+# ignores .type has something wrong to find.
+typed_record() {
+	local type="$1" model="$2"
+	printf '{"isSidechain":false,"type":"%s","message":{"role":"%s","model":"%s"}}' "$type" "$type" "$model"
+}
+
+pad_of() {
+	printf '%*s' "$1" '' | tr ' ' 'x'
+}
+
+padded_assistant_record() {
+	local model="$1" pad
+	pad=$(pad_of "$2")
+	printf '{"isSidechain":false,"type":"assistant","message":{"role":"assistant","model":"%s","pad":"%s"}}' "$model" "$pad"
+}
+
+padded_user_record() {
+	local pad
+	pad=$(pad_of "$1")
+	printf '{"isSidechain":false,"type":"user","message":{"role":"user","content":"%s"}}' "$pad"
+}
+
+# No records means an empty transcript.
+write_transcript() {
+	local case_name="$1" dir path record
+	shift
+	dir="$MAIN_CASES/$case_name"
+	mkdir -p "$dir"
+	path="$dir/transcript.jsonl"
+	: >"$path"
+	for record in "$@"; do
+		printf '%s\n' "$record" >>"$path"
+	done
+	printf '%s' "$path"
 }
 
 cred_no_security_case() {

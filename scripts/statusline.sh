@@ -22,6 +22,16 @@ readonly USAGE_BACKOFF_SECONDS=900
 # file_mtime's exit status for a stat that cannot answer at all, kept distinct from a
 # plain non-zero so callers can tell a broken tool from a file that is simply not there.
 readonly STAT_UNUSABLE_STATUS=3
+# How much of the tail of a session transcript transcript_model_family reads. A
+# transcript grows without bound while the newest assistant record sits at its end, and
+# every render pays for whatever jq has to parse. Generous enough that a few large tool
+# results cannot push the newest assistant record out of reach; small enough that the
+# read stays a fraction of a millisecond.
+readonly TRANSCRIPT_TAIL_BYTES=262144
+
+# ---------------------------------------------------------------------------
+# Portable stat & hash utilities
+# ---------------------------------------------------------------------------
 
 # Portable SHA-256: reads stdin, emits the first 8 hex characters on stdout.
 # macOS ships shasum; some Linux distros ship only sha256sum.
@@ -50,6 +60,10 @@ detect_stat_fmt() {
 }
 
 STAT_FMT=$(detect_stat_fmt)
+
+# ---------------------------------------------------------------------------
+# Usage fetch, lock, and cache
+# ---------------------------------------------------------------------------
 
 # Reads the OAuth usage endpoint for the account keyed by $1 and emits the stdin
 # .rate_limits shape on stdout (resets_at as epoch seconds).
@@ -262,6 +276,10 @@ fetch_usage_fallback() {
 	cat "$cache"
 }
 
+# ---------------------------------------------------------------------------
+# Rendering: countdown, color, gauge
+# ---------------------------------------------------------------------------
+
 # Time left before a window resets, for both the 5h and the 7d one: "4d13h" once a day
 # is on the clock, "2h10m" below that, "45m" below an hour. Zero units are dropped ("5d",
 # "2h"), and minutes stop carrying information beside days, so they are left out there.
@@ -409,7 +427,7 @@ format_context_bar() {
 	((quarters > max_quarters)) && quarters=$max_quarters
 	for ((slot = 0; slot < GAUGE_SLOTS; slot++)); do
 		local q=$((quarters - slot * QUARTERS_PER_SLOT))
-		if ((q >= 3)); then
+		if ((q >= QUARTERS_PER_SLOT - 1)); then
 			out+="${sep}${color}${full}${RESET}"
 		elif ((q >= 1)); then
 			out+="${sep}${color}${half}${RESET}"
@@ -420,6 +438,10 @@ format_context_bar() {
 	done
 	printf '%s' "$out"
 }
+
+# ---------------------------------------------------------------------------
+# Directory and git
+# ---------------------------------------------------------------------------
 
 # The branch checked out at $1, empty when there is no name to give: the path is outside a
 # repository, HEAD is detached, or git is not installed. All three are ordinary here, so they
@@ -441,6 +463,10 @@ format_dir() {
 	[[ -n "$name" ]] && out+=" ⎇ ${name}"
 	printf '%s' "$out"
 }
+
+# ---------------------------------------------------------------------------
+# Dependency checks and field extraction
+# ---------------------------------------------------------------------------
 
 # Fail fast with the culprit named instead of letting a missing tool surface as a
 # misleading downstream error: absent jq reads as a stdin parse failure. The name reaches
@@ -479,6 +505,57 @@ jq_fields() {
 	printf '%s' "$json" | jq -r "$expr"' | map(tostring) | join("\u001f")'
 }
 
+# ---------------------------------------------------------------------------
+# Model family detection
+# ---------------------------------------------------------------------------
+
+# The family token of a model ID: "opus" out of "claude-opus-4-1-20250805". Anything that
+# does not name a Claude model has no family, and says so with silence rather than a
+# guess. Both sides of the annotation comparison in main reduce through here, so the two
+# families can never be derived by rules that have drifted apart.
+model_family() {
+	local id="$1"
+	[[ "$id" == claude-* ]] || return 0
+	id=${id#claude-}
+	printf '%s' "${id%%-*}"
+}
+
+# The model family ("opus", "sonnet") of the newest assistant turn in the transcript at
+# $1 — the family of the model the API actually served. stdin's .model only tracks the
+# /model setting, which a per-turn skill override never touches, so .message.model on an
+# assistant record is the only ground truth available.
+#
+# Emits nothing, exit zero, whenever the transcript cannot answer: no path, no file, no
+# record naming a real model. That silence is the answer — the caller renders no
+# annotation — so none of it is reported as a failure. Records that cannot answer are
+# skipped rather than trusted: a sidechain record carries a subagent's model, and an
+# error record carries the literal "<synthetic>" in place of an ID.
+#
+# One tail plus one jq, because the script forks on every render (see jq_fields). The
+# tail cut lands mid-line, so lines are parsed one at a time under `try`: the partial
+# head is dropped the same way any malformed line is, instead of failing the whole pass.
+transcript_model_family() {
+	local path="$1" served
+	[[ -n "$path" && -f "$path" ]] || return 0
+	served=$(tail -c "$TRANSCRIPT_TAIL_BYTES" "$path" 2>/dev/null | jq -Rrn '
+		[
+			inputs
+			| try (
+				fromjson
+				| select(.type == "assistant" and .isSidechain != true)
+				| .message.model
+				| select(type == "string" and startswith("claude-"))
+			) catch empty
+		]
+		| last // empty
+	' 2>/dev/null) || return 0
+	model_family "$served"
+}
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
 # Reports $1 on the status line itself, not only on stderr. Every field the line draws
 # comes out of one jq pass, so a pass that fails leaves nothing to draw — and a
 # statusline that prints nothing is indistinguishable from a working render with nothing
@@ -490,7 +567,7 @@ render_failure() {
 }
 
 main() {
-	local input model effort dir worktree branch pct api_ms rate_limits_json now
+	local input model model_id effort dir worktree branch pct api_ms transcript_path rate_limits_json now
 	# check_deps has already named the culprit on stdout; the zero exit is what makes the
 	# host render that line instead of discarding it.
 	check_deps || return 0
@@ -500,16 +577,29 @@ main() {
 	local jq_out
 	jq_out=$(jq_fields "$input" '[
 		(.model.display_name // ""),
+		(.model.id // ""),
 		(.effort.level // ""),
 		(.workspace.current_dir // ""),
 		(.workspace.git_worktree // ""),
 		(.context_window.used_percentage // 0 | floor),
-		(.cost.total_api_duration_ms // 0)
+		(.cost.total_api_duration_ms // 0),
+		(.transcript_path // "")
 	]') || {
 		render_failure "stdin parse failed"
 		return 0
 	}
-	IFS=$'\037' read -r model effort dir worktree pct api_ms <<<"$jq_out"
+	IFS=$'\037' read -r model model_id effort dir worktree pct api_ms transcript_path <<<"$jq_out"
+
+	# A skill can pin a turn to another model without touching the /model setting stdin
+	# reports, so name the family that actually served the last turn when the two differ.
+	# Either family coming back empty means there is nothing to compare, not a mismatch.
+	local served_family configured_family
+	served_family=$(transcript_model_family "$transcript_path")
+	configured_family=$(model_family "$model_id")
+	if [[ -n "$served_family" && -n "$configured_family" && "$served_family" != "$configured_family" ]]; then
+		# Braced: bash reads the arrow's leading byte as part of an unbraced name.
+		model="${model}→${served_family}"
+	fi
 	[[ -n "$effort" ]] && model="$model ($effort)"
 
 	# Asking git costs a fork on every render, so skip it when the worktree name already

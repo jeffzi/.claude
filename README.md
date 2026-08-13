@@ -201,10 +201,38 @@ Conditional elements and when they appear:
 | Element              | Appears                                                           |
 | -------------------- | ----------------------------------------------------------------- |
 | `⎇ name`             | Worktree name inside one, branch name in a regular checkout       |
+| `→family`            | When the last API call was served by another model family         |
 | `(effort)`           | Only when the model reports a reasoning effort level              |
 | Pace arrows `↑ ↑↑ ↓` | At ≥ 50% usage, when burn rate diverges from an even linear spend |
 | Reset countdown      | At ≥ 75% usage, or when less than an hour remains                 |
 | Rate-limit segments  | When usage data exists (stdin rate limits, or the OAuth fallback) |
+
+#### Installation
+
+The statusline runs on macOS and Linux. Prerequisites: `bash`, `jq`, `curl`, `date`, and `shasum` or
+`sha256sum`. Rate-limit polling uses the OAuth usage endpoint — on macOS via Keychain (`security`),
+on Linux via `~/.claude/.credentials.json`.
+
+```bash
+mkdir -p ~/.claude/scripts
+curl -fsSL https://raw.githubusercontent.com/jeffzi/.claude/main/scripts/statusline.sh \
+  -o ~/.claude/scripts/statusline.sh
+```
+
+Add to your `~/.claude/settings.json`:
+
+```json
+"statusLine": {
+  "type": "command",
+  "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/scripts/statusline.sh"
+}
+```
+
+To run the tests:
+
+```bash
+bats tests/test_statusline.bats
+```
 
 ### Scripts
 
@@ -247,6 +275,13 @@ declaration overrides the user's `/model` choice for the whole turn, so it needs
 
 The upstream docs describe both fields as applying "when this skill is active", with no
 invocation-path qualifier. That is why this is written down here.
+
+**Known regressiony:** even on the slash path, `model:` is currently parsed but never applied — the
+session transcript records the resolved override in the turn's `command_permissions` attachment, yet
+every API call still runs on the session model. Verified across a month of transcripts: no slash
+invocation of a model-pinned command was ever served by its pinned model. `effort:` never reaches
+the attachment at all and may be dropped the same way. Until the fix lands upstream, treat both
+fields as documentation of intent, not behavior.
 
 **Agent frontmatter is live on every dispatch**, but four things can set it. First present wins:
 
