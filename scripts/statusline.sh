@@ -250,7 +250,9 @@ fetch_usage_fallback() {
 		((mtime_status == STAT_UNUSABLE_STATUS)) && return "$mtime_status"
 		last_attempt=0
 	}
-	{ verdict=$(<"$marker"); } 2>/dev/null || verdict=""
+	# cat rather than $(<): when the marker is absent, bash 5.2 exits the shell on the
+	# failed $(<) redirection despite the || fallback (fixed in 5.3, absent in 3.2).
+	verdict=$(cat "$marker" 2>/dev/null) || verdict=""
 	throttle=$USAGE_POLL_SECONDS
 	[[ "$verdict" == "failed" ]] && throttle=$USAGE_BACKOFF_SECONDS
 	if ((now - last_attempt >= throttle)); then
