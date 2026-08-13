@@ -67,6 +67,7 @@ script's `add` commands are the source map.
 
 | Skill                                                        | Description                                                         |
 | ------------------------------------------------------------ | ------------------------------------------------------------------- |
+| [`revise-core`](skills/revise-core/SKILL.md)                 | Shared revise protocol hub (triage gates, impact ordering, reports) |
 | [`revise-code`](skills/revise-code/SKILL.md)                 | Review code for idiom/type/structure violations, then fix           |
 | [`revise-test`](skills/revise-test/SKILL.md)                 | Review tests for redundancy and Arrange-Act-Assert issues, then fix |
 | [`revise-doc`](skills/revise-doc/SKILL.md)                   | Review docs for structural and prose issues, then fix               |
