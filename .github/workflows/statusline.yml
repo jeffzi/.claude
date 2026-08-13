@@ -17,8 +17,11 @@ jobs:
           if [[ "$RUNNER_OS" == "macOS" ]]; then
             brew install bats-core shellcheck shfmt
           else
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq shellcheck
+            # apt ships an old shellcheck (0.9.0 on ubuntu 24.04) whose diagnostics
+            # diverge from brew's; install the latest stable release binary so both
+            # runners lint with the same codes.
+            curl -sSL https://github.com/koalaman/shellcheck/releases/download/stable/shellcheck-stable.linux.x86_64.tar.xz \
+              | tar -xJ && sudo mv shellcheck-stable/shellcheck /usr/local/bin/
             sudo npm install -g bats
             go install mvdan.cc/sh/v3/cmd/shfmt@latest
             echo "$HOME/go/bin" >> "$GITHUB_PATH"
