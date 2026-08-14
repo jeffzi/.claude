@@ -5,15 +5,15 @@ only here — reviewers report everything.
 
 ## Queues
 
-- Collect all `### Finding N` blocks from every lens. They share one format and one scoring rubric —
-  Score is confidence on the five-value scale (0/25/50/80/100), Impact is the consequence tag — so
-  they share one queue.
+- Collect all `### Finding N` blocks from every lens. They share one format and one verdict enum —
+  Verdict is confidence (`false-positive` / `suspected` / `unconfirmed` / `confirmed`), Impact is
+  the consequence tag — so they share one queue.
 - Keep a per-agent tally (found / fixed / report-only) as you go; the report's Review Agents table
   is built from it.
-- Discard findings with score 0 (false positives — list below).
-- Partition: score ≥ 75 → fix queue; 0 < score < 75 → report-only queue.
+- Discard `false-positive` findings (list below).
+- Partition: `confirmed` → fix queue; `suspected` → report-only queue; `unconfirmed` → adjudication.
 
-**False positives (score = 0, discard):**
+**False positives (`false-positive`, discard):**
 
 - Pre-existing issues outside the diff (when scope is `changed`)
 - Linter/typechecker would catch (unused imports, missing type hints, style violations) — the gates
@@ -35,36 +35,38 @@ enums are reproduced here so no agent definition needs consulting:
 | vet-comments               | misdirection   | coverage     | noise      | structure   |
 | bug-scanner                | corruption     | wrong-result | crash      | degradation |
 
-A finding ≥ 50 with no Impact line is treated as rank 1 — never demoted for missing metadata. Ranks
-drive the mender Severity line (rank 1–2 → high, rank 3–4 → medium) and the report order.
+An `unconfirmed` or `confirmed` finding with no Impact line is treated as rank 1 — never demoted for
+missing metadata. Ranks drive the mender Severity line (rank 1–2 → high, rank 3–4 → medium) and the
+report order.
 
-## Adjudicating uncertain claims
+## Adjudicating unconfirmed findings
 
-A 50 means "named it, could not confirm it", and it is often a one-read question. When the
-report-only queue holds 50s from `bug-scanner`, or vet-lens 50s whose named rule is a project
-CLAUDE.md convention (factual applicability questions — is this file generated, does the exemption
-apply), dispatch one **Agent** call, `subagent_type: claim-reviewer` (do NOT set model — the agent
-defines its own), carrying one claim per such finding:
+`unconfirmed` means "named the rule, could not confirm the violation", and it is often a one-read
+question. When `unconfirmed` findings exist from any lens, dispatch one **Agent** call,
+`subagent_type: claim-reviewer` (do NOT set model — the agent defines its own), carrying one claim
+per `unconfirmed` finding:
 
 ```text
 Claim N: [issue from the finding] exists at [file:line]
 Location: [file:line]
 ```
 
-Only these qualify: factual claims a fresh context can settle. A vet-lens 50 citing a skill rule
-asserts an uncertain style judgment — re-adjudicating style costs an agent and settles nothing; it
-stays report-only. The reviewer re-derives evidence from the files, unrestricted by the step 1
-target list. Route each verdict:
+Every `unconfirmed` finding is adjudicated — no carve-out by lens or rule type. The reviewer
+re-derives evidence from the files, unrestricted by the step 1 target list. Route each verdict:
 
-- `Verified` with score ≥ 75 → promote to the fix queue at score 80, keeping the finding's original
-  Impact tag. Promotion rides the existing fix round — adjudication never adds one.
+- `Verified` with claim-reviewer score ≥ 75 → promote to the fix queue as `confirmed`, keeping the
+  finding's original Impact tag. Promotion rides the existing fix round — adjudication never adds
+  one.
 - `Refuted` → discard, tallied as an adjudicated false positive.
-- `Unsubstantiated`, or any verdict scored below 75 → stays report-only; its `Reason Not Fixed` cell
-  says "adjudicated: unsubstantiated".
+- Otherwise → report-only; its `Reason Not Fixed` cell says "adjudicated: unsubstantiated".
+
+`suspected` findings are never adjudicated — nothing nameable to verify. They stay report-only.
 
 ## Mistakes
 
-- ❌ Adjudicating style 50s → only `bug-scanner` 50s and convention-cited 50s go to `claim-reviewer`
-- ❌ Promoting on `Unsubstantiated` → only a `Verified` verdict ≥ 75 promotes, and only to 80
+- ❌ Skipping adjudication for style `unconfirmed` findings → every `unconfirmed` finding is
+  adjudicated, no exceptions
+- ❌ Promoting on `Unsubstantiated` → only a `Verified` verdict with claim-reviewer score ≥ 75
+  promotes
 - ❌ Checking the empty-fix-queue before adjudication → the check runs after; a promoted finding can
   populate an empty queue

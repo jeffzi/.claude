@@ -42,8 +42,8 @@ Review a SKILL.md with the `vet-skill` agent, then apply the fixes here. The age
    A description rewrite changes when the skill triggers. After rewriting one, re-read it against
    the skill's actual body and confirm it still describes what the skill does.
 
-   Done when the fix queue is empty — every ≥ 75 finding applied, the last no less carefully than
-   the first.
+   Done when the fix queue is empty — every `confirmed` finding applied, the last no less carefully
+   than the first.
 
 5. **Verify.**
    - The fix queue is empty, and each applied fix named its checklist item.
@@ -64,13 +64,13 @@ Review a SKILL.md with the `vet-skill` agent, then apply the fixes here. The age
 
 ### Fixed
 
-| Issue | Location | Checklist item | Impact | Score |
-| ----- | -------- | -------------- | ------ | ----- |
+| Issue | Location | Checklist item | Impact | Verdict |
+| ----- | -------- | -------------- | ------ | ------- |
 
 ### Left alone
 
-| Issue | Location | Impact | Score | Why not fixed |
-| ----- | -------- | ------ | ----- | ------------- |
+| Issue | Location | Impact | Verdict | Why not fixed |
+| ----- | -------- | ------ | ------- | ------------- |
 
 ### Verification
 
@@ -80,10 +80,10 @@ reference links resolved]
 
 ## Common mistakes
 
-- ❌ Fixing score-0 findings → the agent already classified them as false positives
+- ❌ Fixing `false-positive` findings → the agent already classified them as false positives
 - ❌ Rewriting a description without re-reading the body → the new triggers stop matching the skill
 - ❌ Editing frontmatter without `references/frontmatter.md` open → field semantics are easy to get
   backwards
-- ❌ Silently dropping sub-75 findings → they belong in the report
-- ❌ Treating `polish` or `compliance` as skippable → impact orders the queue; only the score gates
-  it
+- ❌ Silently dropping `suspected` or unsubstantiated findings → they belong in the report
+- ❌ Treating `polish` or `compliance` as skippable → impact orders the queue; only the verdict
+  gates it. Every `confirmed` finding gets fixed, last no less than first

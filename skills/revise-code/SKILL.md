@@ -52,13 +52,13 @@ fix.
 
 ### Fixed
 
-| Issue | Location | Rule | Impact | Score |
-| ----- | -------- | ---- | ------ | ----- |
+| Issue | Location | Rule | Impact | Verdict |
+| ----- | -------- | ---- | ------ | ------- |
 
 ### Left alone
 
-| Issue | Location | Impact | Score | Why not fixed |
-| ----- | -------- | ------ | ----- | ------------- |
+| Issue | Location | Impact | Verdict | Why not fixed |
+| ----- | -------- | ------ | ------- | ------------- |
 
 ### Verification
 
@@ -67,10 +67,10 @@ fix.
 
 ## Common mistakes
 
-- ❌ Fixing score-0 findings → the agent already classified them as false positives
+- ❌ Fixing `false-positive` findings → the agent already classified them as false positives
 - ❌ Editing before loading `code-core` and the language leaf → the fix drifts from the same rules
   that produced the finding
-- ❌ Silently dropping sub-75 findings → they belong in the report
-- ❌ Treating `clarity` or `structure` as skippable → impact orders the queue; only the score gates
-  it. Every ≥ 75 finding gets fixed, last no less than first
+- ❌ Silently dropping `suspected` or unsubstantiated findings → they belong in the report
+- ❌ Treating `clarity` or `structure` as skippable → impact orders the queue; only the verdict
+  gates it. Every `confirmed` finding gets fixed, last no less than first
 - ❌ Reporting fixes without running verification → "should work" is not verification

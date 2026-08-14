@@ -48,22 +48,22 @@ distill-scanner — including lenses that returned "No findings."; plus a `claim
 adjudication or fix verification ran, mapped as Found = claims sent, Fixed = `Verified`, Report-only
 = `Refuted` + `Unsubstantiated`)
 
-## Issues Fixed (score ≥ 75)
+## Issues Fixed (confirmed)
 
 Rows ordered by impact rank, worst first.
 
-| Issue | Location | Impact | Score | Agent |
-| ----- | -------- | ------ | ----- | ----- |
+| Issue | Location | Impact | Verdict | Agent |
+| ----- | -------- | ------ | ------- | ----- |
 
 ## Issues Reported (not auto-fixed)
 
-| Issue | Location | Impact | Score | Reason Not Fixed |
-| ----- | -------- | ------ | ----- | ---------------- |
+| Issue | Location | Impact | Verdict | Reason Not Fixed |
+| ----- | -------- | ------ | ------- | ---------------- |
 
 ## Post-Fix Bugs (unresolved)
 
-| Issue | Location | Impact | Score |
-| ----- | -------- | ------ | ----- |
+| Issue | Location | Impact | Verdict |
+| ----- | -------- | ------ | ------- |
 
 (Only bugs still in the delivered tree: post-corrective findings, and any post-fix finding that went
 unfixed. A bug a mender introduced and the corrective round removed is internal churn — the

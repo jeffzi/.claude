@@ -2,7 +2,8 @@
 name: revise-test
 description: >
   Use when test files need review for redundancy, AAA violations, behavior-vs-implementation
-  drift, and weak assertions, and the violations fixed in place.
+  drift, and weak assertions, and the violations fixed in place. Not for writing new tests — use
+  tdd. Not for failing tests with unknown root cause — use /fix.
 argument-hint: "[test file or directory]"
 model: opus
 effort: high
@@ -52,13 +53,13 @@ Review test files with the `vet-test` agent, then apply the fixes here. The agen
 
 ### Fixed
 
-| Issue | Location | Rule | Impact | Score |
-| ----- | -------- | ---- | ------ | ----- |
+| Issue | Location | Rule | Impact | Verdict |
+| ----- | -------- | ---- | ------ | ------- |
 
 ### Left alone
 
-| Issue | Location | Impact | Score | Why not fixed |
-| ----- | -------- | ------ | ----- | ------------- |
+| Issue | Location | Impact | Verdict | Why not fixed |
+| ----- | -------- | ------ | ------- | ------------- |
 
 ### Verification
 
@@ -67,12 +68,12 @@ Review test files with the `vet-test` agent, then apply the fixes here. The agen
 
 ## Common mistakes
 
-- ❌ Fixing score-0 findings → the agent already classified them as false positives
+- ❌ Fixing `false-positive` findings → the agent already classified them as false positives
 - ❌ Editing before loading `test-core` and the language leaf → the fix drifts from the same rules
   that produced the finding
 - ❌ Deleting a test to make a finding go away → merging redundant tests is a fix; dropping coverage
   is not
-- ❌ Silently dropping sub-75 findings → they belong in the report
-- ❌ Treating `clarity` or `cost` as skippable → impact orders the queue; only the score gates it.
-  Every ≥ 75 finding gets fixed, last no less than first
+- ❌ Silently dropping `suspected` or unsubstantiated findings → they belong in the report
+- ❌ Treating `clarity` or `cost` as skippable → impact orders the queue; only the verdict gates it.
+  Every `confirmed` finding gets fixed, last no less than first
 - ❌ Reporting fixes without re-running the suite → "should work" is not verification

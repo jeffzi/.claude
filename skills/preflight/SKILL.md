@@ -16,7 +16,8 @@ Automated pre-commit review: a gated pipeline with one verified fix pass. Not a 
 iterations, no ledger, no cross-round dedup.
 
 **Core principle:** High precision over high recall. Of the findings the review agents return, only
-those scored ≥ 75 are auto-fixed; the rest are reported, not applied.
+`confirmed` findings (including adjudication-promoted ones) are auto-fixed; the rest are reported,
+not applied.
 
 **Invariant:** Never leave the tree worse than it was found. Every edit round is preceded by a
 snapshot and followed by a gate. On a red gate the snapshot guarantees recovery — and its scope is
@@ -263,9 +264,10 @@ Errored, or `completed` with empty or unusable output → stop and surface it
 ### Step 4: Triage and Fix
 
 **Triage** — one orchestrator pass over every lens's output. Read `references/triage.md` now and
-follow it exactly: discard score-0 false positives (its list), partition on score (≥ 75 → fix queue,
-else report-only), rank Impact tags against its per-lens enum table, adjudicate qualifying 50s
-through one `claim-reviewer` dispatch, and keep the per-agent tally it defines.
+follow it exactly: discard `false-positive` findings (its list), partition on verdict (`confirmed` →
+fix queue, `suspected` → report-only, `unconfirmed` → adjudication), rank Impact tags against its
+per-lens enum table, adjudicate all `unconfirmed` findings through one `claim-reviewer` dispatch,
+and keep the per-agent tally it defines.
 
 **Empty fix queue — checked after adjudication → mark tasks 4 and 5 `completed`, skip to step 6.**
 
@@ -333,7 +335,7 @@ fan-out for, so this is `bug-scanner` only.
   scanner read it in full; never `cat` it into your own context.
 - Prompt as in step 3, scope `changed`.
 
-**If it returns findings ≥ 75:** one corrective round, then stop fixing regardless.
+**If it returns `confirmed` findings:** one corrective round, then stop fixing regardless.
 
 1. Snapshot the edited files:
    `node ${CLAUDE_SKILL_DIR}/scripts/snapshot.ts save <scratchpad>/preflight-snap-2 <edited files>`
@@ -344,7 +346,7 @@ fan-out for, so this is `bug-scanner` only.
    single repair attempt is gate machinery, not a round — the round cap counts scan-driven fix
    rounds.
 4. **Scan the corrective edits** — dispatch `bug-scanner` once more, scoped to the files the
-   corrective menders touched, with a fresh diff. Its findings — at any score — are report-only by
+   corrective menders touched, with a fresh diff. Its findings — at any verdict — are report-only by
    the round cap: they join the Post-Fix Bugs (unresolved) table, never a fix queue. No snapshot or
    gate follows; a scan that cannot trigger edits needs neither. This is not a third round — the cap
    counts edit rounds, and a read-only scan edits nothing. Without it, the corrective menders' code
@@ -352,8 +354,8 @@ fan-out for, so this is `bug-scanner` only.
 
 Anything found after the corrective round is a report, not another iteration — including bugs you
 notice yourself while reading a mender's report. The cap counts edit rounds, not who spotted the
-issue, and a round done "properly" with snapshot and gate is still a third round. Findings < 75 join
-the report-only queue.
+issue, and a round done "properly" with snapshot and gate is still a third round. Below-`confirmed`
+findings join the report-only queue.
 
 **Verify the fix claims** — every mender report asserts issues were resolved; the gates only proved
 nothing broke, and the scans only hunted new bugs. Read `references/verification.md` now and follow
@@ -400,6 +402,6 @@ Each step states its own counters inline; triage and verification mistakes live 
 files. Only rules not stated elsewhere appear here:
 
 - ❌ Auto-fixing linter issues → the gates run the project's configured tools; linter-catchable
-  findings score 0
+  findings are `false-positive`
 - ❌ Skipping the post-corrective scan because its findings can't be fixed → the report is the
   point; unscanned mender code is how bugs ship silently under a green gate

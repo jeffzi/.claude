@@ -3,6 +3,7 @@ name: revise-doc
 description: >
   Use when a README, guide, tutorial, reference doc, CHANGELOG, or CLAUDE.md needs review for
   structure, prose quality, accessibility, and AI-writing tells, and the issues fixed in place.
+  Not for creating or structuring new documentation — use write-doc.
 argument-hint: "[doc file or directory]"
 model: opus
 effort: high
@@ -23,7 +24,7 @@ Review documentation with the `vet-doc` agent, then apply the fixes here. The ag
    - No argument → documentation files in the current diff (`.md`, `README*`, `CHANGELOG*`).
 
 2. **Dispatch the reviewer:** `subagent_type: vet-doc`. The agent routes CHANGELOG.md to
-   `write-changelog` rules and CLAUDE.md to the CLAUDE.md checklist automatically.
+   `write-changelog` rules and CLAUDE.md to `references/claude-md-quality.md` automatically.
 
 3. **Triage the findings.** Impact enum: `misinformation` → `access` → `navigation` → `polish`.
    Content a reader would act on and fail gets fixed even when the session is cut short; a prose
@@ -51,13 +52,13 @@ Review documentation with the `vet-doc` agent, then apply the fixes here. The ag
 
 ### Fixed
 
-| Issue | Location | Rule | Impact | Score |
-| ----- | -------- | ---- | ------ | ----- |
+| Issue | Location | Rule | Impact | Verdict |
+| ----- | -------- | ---- | ------ | ------- |
 
 ### Left alone
 
-| Issue | Location | Impact | Score | Why not fixed |
-| ----- | -------- | ------ | ----- | ------------- |
+| Issue | Location | Impact | Verdict | Why not fixed |
+| ----- | -------- | ------ | ------- | ------------- |
 
 ### Verification
 
@@ -68,10 +69,10 @@ For CLAUDE.md targets, add the agent's quality score line.
 
 ## Common mistakes
 
-- ❌ Fixing score-0 findings → the agent already classified them as false positives
+- ❌ Fixing `false-positive` findings → the agent already classified them as false positives
 - ❌ Editing prose without loading `write-prose` → the rewrite drifts from the rule that produced
   the finding
 - ❌ "Fixing" a staleness finding by rewording rather than checking the code → verify first
-- ❌ Silently dropping sub-75 findings → they belong in the report
-- ❌ Treating `polish` or `navigation` as skippable → impact orders the queue; only the score gates
-  it. Every ≥ 75 finding gets fixed, last no less than first
+- ❌ Silently dropping `suspected` or unsubstantiated findings → they belong in the report
+- ❌ Treating `polish` or `navigation` as skippable → impact orders the queue; only the verdict
+  gates it. Every `confirmed` finding gets fixed, last no less than first

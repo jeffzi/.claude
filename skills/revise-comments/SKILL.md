@@ -26,9 +26,9 @@ Review comments with the `vet-comments` agent, then apply the fixes here. The ag
 2. **Dispatch the reviewer:** `subagent_type: vet-comments`. The agent loads `code-core` plus the
    language leaf and walks standards S1–S5.
 
-3. **Triage the findings** on score alone — this skill declares no impact enum. One declared triage
-   branch runs before the score gates: findings marked `out-of-scope: code bug` → never fix here.
-   Surface them; they need `/fix`.
+3. **Triage the findings** on verdict alone — this skill declares no impact enum. One declared
+   triage branch runs before the verdict gates: findings marked `out-of-scope: code bug` → never fix
+   here. Surface them; they need `/fix`.
 
 4. **Apply the fixes.** Load `Skill(code-core)` and the matching `code-{lang}` leaf for the
    language's doc-comment conventions. Name the standard (S1–S5) each fix satisfies.
@@ -61,13 +61,13 @@ Review comments with the `vet-comments` agent, then apply the fixes here. The ag
 
 ### Fixed
 
-| Issue | Location | Standard | Score |
-| ----- | -------- | -------- | ----- |
+| Issue | Location | Standard | Verdict |
+| ----- | -------- | -------- | ------- |
 
 ### Left alone
 
-| Issue | Location | Score | Why not fixed |
-| ----- | -------- | ----- | ------------- |
+| Issue | Location | Verdict | Why not fixed |
+| ----- | -------- | ------- | ------------- |
 
 ### Surfaced (out of scope)
 
