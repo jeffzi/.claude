@@ -1,9 +1,7 @@
 ---
 name: revise-core
 description: >
-  Shared protocol for the revise-* skills — process skeleton, score-gate triage, enum-conditional
-  impact ordering, review-only handling, and report rules. Loaded by revise-code, revise-comments,
-  revise-doc, revise-skill, and revise-test before step 1; never invoked directly.
+  Use when a revise-* leaf loads the shared protocol before step 1. Never invoke directly.
 user-invocable: false
 ---
 
@@ -11,10 +9,7 @@ user-invocable: false
 
 Every `/revise-*` leaf loads this skill before step 1 and declares the domain slots: the `vet-*`
 reviewer, the target filter and no-argument file set, an impact enum (optional), the step-4 skill
-loads, the verify checks, and the report template. This load runs caller→hub — the same relation as
-the main thread loading `code-core` before writing code. It is not the back-edge `docs/languages.md`
-forbids ("leaves never load their hub back"): that rule governs leaves the hub itself loads, and
-this hub never loads or dispatches a `revise-*` skill — each one is its own entry point.
+loads, the verify checks, and the report template.
 
 ## Protocol
 
@@ -27,15 +22,25 @@ the leaf's no-argument file set, scope `changed`.
 **Do NOT set model — the agent defines its own.** Pass the file list, the review scope, and the diff
 when scope is `changed`. The agent returns `### Finding N` blocks.
 
-**Step 3 — Triage the findings** using the score the agent assigned:
+**Step 3 — Triage the findings** using the verdict the agent assigned:
 
-- Score 0 → discard, it is a declared false positive.
-- Score ≥ 75 → fix queue.
-- Score below 75 → report-only queue. Do not fix these silently; they go in the report so the user
-  can decide.
+- `false-positive` → discard.
+- `confirmed` → fix queue.
+- `suspected` → report-only queue.
+- `unconfirmed` → adjudication (step 3a).
 
 A leaf may declare additional routing branches that gate findings out before anything enters the fix
 queue; apply those branches first.
+
+**Step 3a — Adjudicate unconfirmed findings.** When `unconfirmed` findings exist after leaf-declared
+branches run, dispatch one **Agent** call, `subagent_type: claim-reviewer` (do NOT set model — the
+agent defines its own). Carry one claim per `unconfirmed` finding, stating it as an implemented
+fact. Route the results:
+
+- `Verified` with claim-reviewer score ≥ 75 → promote to the fix queue as `confirmed`, keeping its
+  original Impact tag.
+- `Refuted` → discard, reported as an adjudicated false positive.
+- Otherwise → report-only queue with reason "adjudicated: unsubstantiated".
 
 **When the leaf declares an impact enum:** order the fix queue by impact, not by finding number,
 following the leaf's tier chain. Within one impact tier, keep the agent's order. A finding with no
@@ -52,8 +57,8 @@ time.
 ## Review-only requests
 
 When the user asks to review without fixing — "just review", "report only", "don't change anything",
-"what would you fix" — stop after step 3 and report the findings. Do not apply anything. This is a
-legitimate request, not an obstacle to work around.
+"what would you fix" — stop after step 3 (including adjudication) and report the findings. Do not
+apply anything. This is a legitimate request, not an obstacle to work around.
 
 ## Report rules
 
@@ -63,4 +68,6 @@ Omit empty sections. When the agent returned `No findings.`, say so in one line 
 
 - ❌ Setting a model on the Agent call → the agent declares its own; overriding it downgrades the
   review
-- ❌ Skipping the leaf's declared triage branches → they gate findings out before the score does
+- ❌ Skipping the leaf's declared triage branches → they gate findings out before the verdict does
+- ❌ Skipping adjudication because the unconfirmed queue "looks like style nits" → every
+  `unconfirmed` finding is adjudicated, no exceptions

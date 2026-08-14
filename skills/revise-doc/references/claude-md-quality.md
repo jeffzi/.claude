@@ -1,5 +1,15 @@
 # CLAUDE.md Quality Reference
 
+## Contents
+
+- [Scoring Rubric](#scoring-rubric)
+- [Red Flags](#red-flags)
+- [Update Guidelines](#update-guidelines)
+- [Templates](#templates)
+- [CLAUDE.md File Types](#claudemd-file-types)
+
+---
+
 ## Scoring Rubric
 
 Total: 100 points across six criteria. Grade thresholds: A (90-100), B (70-89), C (50-69), D

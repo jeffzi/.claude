@@ -118,7 +118,7 @@ If any of these are true, stop before proceeding:
      ├── code-swift       ← leaf: strict concurrency, Sendable, typed throws
      └── code-shell       ← leaf: bash/sh only; auto-activates via paths glob (see §Design decisions)
 
- vet-code agent ─first-step→  Skill(code-core)  (loaded inside the agent; hub does the rest)
+ vet-code agent ─first-step→  Skill(vet-core) → Skill(code-core)  (loaded inside the agent; hub does the rest)
  tdd (GREEN)    ─first-step→  Skill(code-core)
 ```
 
@@ -252,10 +252,12 @@ they load at import-detection time by the base leaf.
 Read-only review agent (`agents/vet-code.md`), dispatched as `subagent_type: vet-code`. Owns the
 review _process_, not the review _criteria_. Process:
 
-1. Load `Skill(code-core)` — hub dispatches to `code-{lang}` and overlays via DSD
-2. Walk the combined checklist rule-by-rule (not scanning) for each mandatory rule, pitfall entry,
+1. Load `Skill(vet-core)` — the shared reviewer contract (scoring verdicts, scope, Impact, output
+   grammar) all five `vet-*` agents fill with their domain slots
+2. Load `Skill(code-core)` — hub dispatches to `code-{lang}` and overlays via DSD
+3. Walk the combined checklist rule-by-rule (not scanning) for each mandatory rule, pitfall entry,
    and Instead-of/Use table from the loaded skills
-3. Return `### Finding N` blocks — Issue, Location, Score, Reasoning
+4. Return `### Finding N` blocks — Issue, Location, Verdict, Impact, Reasoning
 
 The agent has no `Edit`, `Write`, or `Bash` tools: it reports, and the caller fixes. `/revise-code`
 is the interactive entry point that dispatches it and then applies the findings.

@@ -91,7 +91,7 @@ result if nothing changes).
      └── test-swift       ← leaf: Swift Testing, XCTest, concurrency
 
  tdd            ─first-step→  Skill(test-core)  (hub does the rest)
- vet-test agent ─first-step→  Skill(test-core)   (loaded inside the agent)
+ vet-test agent ─first-step→  Skill(vet-core) → Skill(test-core)   (loaded inside the agent)
                      └─also→  rules dispatch → Skill(code-{lang})  (code-side review)
 ```
 
@@ -209,16 +209,14 @@ TDD orchestrator. Owns:
 - RED-GREEN-REFACTOR orchestration via `tdd-cycle` subagents
 - Plans → agents → verification flow
 - Batching rules (cohesive vs. unrelated behaviors)
-- TDD-specific rationalizations ("I'll test after", "plan has inline impl")
+- TDD-specific rationalizations ("I'll test after", "plan has inline impl") — inlined in the
+  SKILL.md body
 - TDD-specific red flags (code before test, orchestrator reading source, dispatching `tdd-cycle`
-  directly)
+  directly) — inlined in the SKILL.md body
+
+Cross-language testing principles (the "what makes a good test" content) live in `test-core`.
 
 First step before the first RED-GREEN cycle: `Skill(test-core)`.
-
-### `tdd/references/philosophy.md`
-
-TDD-orchestration-only content: the Iron Law, TDD-specific rationalizations, TDD-specific red flags.
-Cross-language testing principles (the "what makes a good test" content) live in `test-core`.
 
 ### `tdd/references/orchestration-flow.md`
 
@@ -234,11 +232,13 @@ here; restated copies drift.
 Read-only review agent (`agents/vet-test.md`), dispatched as `subagent_type: vet-test`. Owns the
 review _process_, not the review _criteria_. Process:
 
-1. Load `Skill(test-core)` — cascades to `test-{lang}` and overlays via DSD
-2. Look up the target extension in the rules-file Language Dispatch table → `code-{lang}`
-3. Load `Skill(code-{lang})`
-4. Walk the combined checklist rule-by-rule (not scanning)
-5. Return `### Finding N` blocks — Issue, Location, Score, Reasoning
+1. Load `Skill(vet-core)` — the shared reviewer contract (scoring verdicts, scope, Impact, output
+   grammar) all five `vet-*` agents fill with their domain slots
+2. Load `Skill(test-core)` — cascades to `test-{lang}` and overlays via DSD
+3. Look up the target extension in the rules-file Language Dispatch table → `code-{lang}`
+4. Load `Skill(code-{lang})`
+5. Walk the combined checklist rule-by-rule (not scanning)
+6. Return `### Finding N` blocks — Issue, Location, Verdict, Impact, Reasoning
 
 The agent has no `Edit`, `Write`, or `Bash` tools: it reports, and the caller fixes. `/revise-test`
 is the interactive entry point that dispatches it and then applies the findings.
