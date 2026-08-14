@@ -2,14 +2,35 @@
 
 ## Contents
 
+- [When to create a skill](#when-to-create-a-skill) — create vs. don't-create tests
 - [Frontmatter](#frontmatter) — name and description fields
 - [Body sections](#body-sections) — adapting structure to content
+- [Steps and completion criteria](#steps-and-completion-criteria) — checkable, demanding step bounds
 - [Co-location](#co-location) — grouping one concept's material under one heading
 - [File organization](#file-organization) — what stays inline vs references
 - [Claude Search Optimization (CSO)](#claude-search-optimization-cso) — descriptions, keywords,
   leading words, naming
 
 ---
+
+## When to create a skill
+
+**Create when:**
+
+- A technique wasn't intuitively obvious
+- The pattern applies broadly across projects
+- Others (or future Claude instances) would benefit
+- You need to enforce discipline under pressure
+
+**Don't create for:**
+
+- One-off solutions — just do the work
+- Standard practices Claude already knows
+- Project-specific conventions — put those in CLAUDE.md
+- Mechanical constraints — automate with regex, linting, or CI instead
+- Facts the environment already answers — `package.json` scripts, `--help` output, directory layout.
+  A skill restating them is a cache that goes stale; document only what no lookup reveals (unwritten
+  conventions, rationale, gotchas)
 
 ## Frontmatter
 
@@ -62,6 +83,19 @@ Inline code for simple patterns. Link to reference file for heavy content.
 
 What goes wrong + fixes. For discipline skills: rationalization table.
 ```
+
+## Steps and completion criteria
+
+For workflow and task skills, every step ends on a **completion criterion** — the condition that
+tells the agent the step is done. Two properties make it a lever:
+
+- **Checkable** — the agent can tell done from not-done. A vague bound ("understanding reached")
+  invites premature completion: the agent rushes to the visible next step. Sharpen the bound before
+  restructuring anything.
+- **Demanding** — how much the bound requires. "Every modified file accounted for" forces thorough
+  digging where "produce a change list" does not. Demand also binds flat reference: "every rule
+  applied" sets an exhaustiveness bar for a checklist the same way "every step done" does for a
+  sequence.
 
 ## Co-location
 
@@ -161,9 +195,11 @@ restating one idea across a sentence; each is a candidate to collapse into a sin
 
 ### Naming
 
-Use verb-first, active voice with hyphens:
+**Action skills** (discipline, technique, pattern): verb-first, active voice with hyphens.
 
 - `write-skill` not `skill-writing`
 - `condition-based-waiting` not `async-test-helpers`
 
-Gerunds work well for processes: `creating-skills`, `testing-skills`.
+**Reference skills**: use the domain or tool name directly — `polars`, `fallow`, `scikit-learn`.
+Forcing a verb prefix (`use-polars`, `learn-fallow`) hurts discoverability; users search for the
+tool name, not an action.

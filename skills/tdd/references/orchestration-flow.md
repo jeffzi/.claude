@@ -18,6 +18,11 @@ When `/tdd` is invoked, determine the entry point before doing anything else:
   dispatch agents until the plan is approved and you're executing a specific task.
 - **Single behavior or executing a plan task** -- Proceed to the RED-GREEN-REFACTOR loop below.
 
+When the project has a test suite, plans describe **behaviors to implement** plus the files they
+touch -- implementation details compromise the agents' context isolation; file paths do not (the
+orchestrator hands `tdd-cycle` the test file paths anyway). When the project has no test suite,
+plans describe implementation directly -- TDD constraints don't apply.
+
 ## RED-GREEN-REFACTOR Loop
 
 Wave partitioning is defined in SKILL.md § Parallel Waves. A wave of one is the ordinary serial
@@ -31,7 +36,9 @@ LOOP (one wave per iteration; a wave = one or more independent behavior groups):
        the task's behavior list and the Agent calls: language detection (e.g. TSTL markers)
        is tdd-cycle's own hub dispatch, and every suite run happens in step 4, after the
        agents return. Announcing the dispatch is not the dispatch. Wave planning uses the
-       behavior list only -- it licenses no reads.
+       behavior list only -- it licenses no reads. (Reading this skill's own reference
+       files is part of the skill load, not prep -- the ban covers target files and
+       suite runs.)
     1. Dispatch ONE tdd-cycle agent per behavior group in the wave, ALL in a single
        parallel message (do NOT set model -- the agent defines its own). Each prompt carries:
        - Task description (what behaviors to test -- may be a cohesive batch)
@@ -51,7 +58,9 @@ LOOP (one wave per iteration; a wave = one or more independent behavior groups):
        resolve themselves when the owning agent finishes -- and surface the rest to
        the user at task close, never silently dropped
        Then clear the guards the agents raised -- never mid-wave; a running agent
-       still needs its markers:
+       still needs its markers. (These are guard files this workflow's own agents
+       created; removing them is part of the workflow, not a destructive operation
+       on user work.)
        git_dir=$(git rev-parse --git-dir)
        rm -f "$git_dir/tdd-cycle-active" "$git_dir"/tdd-red-phase*
        (while tdd-cycle-active exists, a hook blocks all git add/commit -- including
@@ -101,8 +110,8 @@ dispatch in this sequence):
          changed files (distillation rewrites the code its comments describe);
          it is read-only and returns ### Finding N blocks
       c. Triage the findings -- no skill loads, no file reads:
-         score 0 -> discard; score >= 75 -> fix queue; below 75 -> report to the
-         user at task close, never silently dropped
+         confirmed -> fix queue; suspected or unconfirmed -> report to the user
+         at task close, never silently dropped
       d. Fix queue non-empty -> group findings into transitive file groups
          (findings sharing any target file share a group); dispatch one
          code-mender per group in a single parallel message, passing per finding:
@@ -122,7 +131,8 @@ contains the cleaned-up code; there is no separate refactor commit):
   13. When an enclosing workflow defines a pre-commit verification step (e.g. a
       plan task's Verify block dispatching claim-reviewer), run it NOW and resolve
       its findings -- verification always precedes the commit, never follows it.
-  14. Approval gate -- see SKILL.md § Commit. Plan task or autocommit -> proceed;
+  14. Approval gate -- see SKILL.md § The Loop, the "Commit last" bullet. Plan task
+      or autocommit -> proceed;
       ad hoc -> STOP and wait for explicit approval. This gate is the TDD
       orchestrator's own rule, not delegated to write-commit. Loading
       write-commit does not absorb or replace it.

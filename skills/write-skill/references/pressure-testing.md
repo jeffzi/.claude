@@ -13,6 +13,7 @@
 - [Trigger validation](#trigger-validation) — verify description activates on the right prompts
 - [Tooling: automate the loop with skill-creator](#tooling-automate-the-loop-with-skill-creator)
 - [Testing checklist](#testing-checklist)
+- [Deployment checklist](#deployment-checklist) — GREEN-phase writing quality, discipline extras
 
 ---
 
@@ -274,3 +275,22 @@ same.
 - [ ] Updated description with violation symptoms
 - [ ] Re-tested — agent still complies
 - [ ] Meta-tested to verify clarity
+
+## Deployment checklist
+
+Writing-quality items to verify alongside the testing checklist above before deploying.
+
+**GREEN phase — write skill:**
+
+- [ ] Frontmatter and description meet the rules in `skill-structure.md` (naming, CSO, keyword
+      coverage, sibling boundaries)
+- [ ] Frontmatter fields match the role table in SKILL.md (see `frontmatter.md`)
+- [ ] Common mistakes section included
+- [ ] Consistent terminology throughout (one term per concept)
+- [ ] No time-sensitive information ("before/after some date, do X")
+
+**For discipline skills (additional):**
+
+- [ ] Every structure in `persuasion-principles.md` § "Writing compliance-resistant rules" present:
+      bright lines, rationalization table from testing, red flags, loophole closure, matched
+      persuasion principles

@@ -10,22 +10,15 @@ argument-hint: "[task or spec]"
 
 # Writing Plans
 
-## Overview
-
-Write implementation plans that describe **what to build**. Assume the implementing agent is skilled
-but has zero context for the codebase or problem domain.
+**Violating the letter of these rules is violating their spirit.**
 
 ## No Plan Mode
 
 This skill replaces plan mode. **Never call `EnterPlanMode`, and never steer the user into entering
-plan mode for you** — the ban is unconditional and covers the whole session. Plan mode locks writing
-to a harness-assigned file outside the project (e.g. `~/.claude/plans/<random>.md`) and erases
-context on approval — the checkpoint below would be stranded, which is why plan mode is banned
-rather than patched around.
-
-Instead: write the plan directly to `.planning/plan-<slug>.md` (see Checkpoint) and follow the
-approval protocol there. Creating `.planning/` and the plan file is prescribed by this skill — it is
-not an unrequested edit and needs no separate permission.
+plan mode for you** — the ban is unconditional and covers the whole session. Plan mode writes to a
+harness-assigned file outside the project and erases context on approval, stranding the Checkpoint.
+Write the plan to `.planning/plan-<slug>.md` instead (see Checkpoint) — creating it is prescribed,
+not an unrequested edit.
 
 | Excuse                                             | Reality                                                              |
 | -------------------------------------------------- | -------------------------------------------------------------------- |
@@ -35,63 +28,30 @@ not an unrequested edit and needs no separate permission.
 | "I'll enter plan mode first, then load the skill"  | Pre-load entry is the same violation, not a recovery trigger.        |
 | "I can still write to `.planning/` from plan mode" | Satisfying the ban's rationale does not lift the ban.                |
 
-### Recovery: Plan Mode Already Active
+Plan mode already active? See `references/plan-mode-recovery.md`. Entered it yourself? Same routing
+after disclosing the violation.
 
-Applies when the session entered plan mode without your doing — the user toggled it, a launch flag
-or hook set it — never to state you created or solicited. Work within it, but the harness-assigned
-file is scratch: the plan-mode approval dialog counts as the user's approval, and the first action
-after it is saving the approved plan verbatim to `.planning/plan-<slug>.md` — slug derived from the
-feature, never from the harness filename — before any implementation step. Once the copy exists, it
-is the plan; stop referencing the scratch file.
+## Scope and Files
 
-If you entered plan mode in violation of the ban, say so to the user, then route the artifact the
-same way.
+Multiple independent subsystems → suggest one plan per subsystem. Before defining tasks, map
+created/modified files and each file's single responsibility — files that change together live
+together. Done when every touched file sits in exactly one task's **Files** list.
 
-## Scope Check
+## Tasks and Behaviors
 
-If the spec covers multiple independent subsystems, suggest breaking into separate plans — one per
-subsystem. Each plan should produce working, testable software on its own.
+Each task is a **behavior group** — behaviors sharing one implementation area; tasks say **what** to
+build, never how to test it:
 
-## File Structure
+```text
+Good task: "Implement email validation: reject empty, malformed, and duplicate emails."
+Bad task:  "Step 1: Write failing test for empty email. Step 2: Run test. Step 3: Implement…"
+```
 
-Before defining tasks, map out which files will be created or modified and what each is responsible
-for.
+Word behaviors per `references/behavior-wording.md`: observable outcomes, never mechanisms;
+flag-gated → both branches with coverage each; drop mechanism, never outcome. Done when every spec
+requirement sits in exactly one task's **Behaviors** list.
 
-- One clear responsibility per file. Prefer smaller, focused files.
-- Files that change together should live together. Split by responsibility, not by layer.
-
-Each task should produce self-contained changes.
-
-## Task Granularity
-
-Each task is a **behavior group** — one behavior or a cohesive batch of related behaviors that share
-the same implementation area. Tasks describe **what** to build, not **how** to test it.
-
-**Good task:** "Implement email validation: reject empty, malformed, and duplicate emails."
-
-**Bad task:** "Step 1: Write failing test for empty email. Step 2: Run test. Step 3: Implement
-validation. Step 4: Run test. Step 5: Commit."
-
-## Behavior Wording
-
-Write each behavior as an **observable outcome** — what renders, returns, or exits, under which
-input or mode — never as the mechanism that produces it. "The `Note:` label uses the shared styling
-helper" is satisfied by a call that styles nothing (`formatLabel(false)`); "the `Note:` label
-renders yellow-underlined when color is on, plain when off" is not. Name a mechanism only in
-addition to the outcome, never instead of it. Downstream verification checks exactly what the
-sentence says — a mechanism-worded behavior gets verified at mechanism level and passes a broken
-implementation.
-
-For a behavior gated on a flag or mode (color, output format, verbosity, TTY), state the outcome of
-**both branches** and spec test coverage for both — a fixture or assertion per branch. A behavior
-whose tests exercise only one branch is unverified on the other.
-
-Under length pressure, compress by dropping the mechanism, never the outcome. "Stay consistent with
-the plan's concise style" is not a reason to word a behavior as a helper call.
-
-## Plan Document Header
-
-Every plan starts with:
+## Plan Header
 
 ```markdown
 ---
@@ -139,16 +99,13 @@ agent with this task's behavioral claims. Fix any `Refuted`/`Unsubstantiated` ve
 committing.
 ```
 
-The **Verify** block goes on every task **except the last implementation task** — the Final Task
-re-verifies that task's claims immediately after it, and no later task builds on it, so a per-task
-pass there is pure overlap. The exception covers exactly one task: the one directly before the Final
-Task. Token pressure never removes **Verify** from any earlier task — those have dependents, and a
-defect caught late costs rework in every task built on it. A single-task plan has no per-task
-**Verify** at all; the Final Task is its verification.
+The **Verify** block goes on every task except the one directly before the Final Task — the Final
+Task re-verifies it immediately. Token pressure never removes **Verify** from an earlier task; a
+single-task plan has only the Final Task.
 
 ## Final Verification Task
 
-Every plan ends with this task, verbatim except for the claims:
+Every plan ends with this task, verbatim except the claims:
 
 ```markdown
 ### Final Task: Verify Implementation
@@ -173,18 +130,10 @@ for the reviewer — verify those by running the commands directly. Close by rem
 
 ## Test-Only Plans
 
-When every task's deliverable is test code — fixing, adding, or repairing tests with **no
-production-code changes** — the red-green cycle does not apply: there is no production behavior to
-drive from a failing test, and the tests are themselves the deliverable. `/tdd` is the **only** step
-a test-only plan may omit. Adapt the task template; drop nothing else:
-
-- **Implementation:** replace `Use /tdd` with the concrete change the task makes.
-- **Verify** and **Final Task:** `claim-reviewer` **still runs — no plan ever skips it** (the
-  last-task **Verify** omission applies as usual; the Final Task covers that task). Extract claims
-  about what each test now exercises and asserts (e.g. "the bucketing test covers all three
-  buckets") and let the independent review verify them.
-
-These are bright-line rules. The rationalizations that surface under pressure:
+When every task's deliverable is test code with **no production-code changes**, `/tdd` is the
+**only** step the plan may omit — replace **Implementation** with the concrete change. **Verify**
+(same before-Final-Task exception as Task Structure) and the Final Task `claim-reviewer` **still run
+— no plan ever skips them**; claims cover what each test now exercises and asserts.
 
 | Excuse                                                      | Reality                                                                                                                                                                                                                            |
 | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -193,7 +142,7 @@ These are bright-line rules. The rationalizations that surface under pressure:
 | "I already read every cited line, so the pass is redundant" | You verified your own work; independent review catches what your reading missed. Confidence is not evidence.                                                                                                                       |
 | "Low-risk cleanup — the reviewer's time is expensive"       | Risk and cost do not change the rule. `claim-reviewer` runs on every plan.                                                                                                                                                         |
 
-## What Goes in a Plan vs. What Doesn't
+## Plan Contents
 
 | In the plan                                     | NOT in the plan              |
 | ----------------------------------------------- | ---------------------------- |
@@ -204,53 +153,31 @@ These are bright-line rules. The rationalizations that surface under pressure:
 | Architecture decisions                          | TDD mechanics                |
 | Execution directives (`/tdd`, `claim-reviewer`) |                              |
 
-## Plan Review
+## Review Before Presenting
 
-For plans with 2+ tasks, dispatch one **Agent** call with `subagent_type: general-purpose` and
-`model: sonnet`, passing the spec and the draft plan, to check completeness, spec alignment, and
-task decomposition. The model is pinned because this agent checks a written plan against a supplied
-spec rather than diagnosing anything. Max 3 review iterations, then surface to user. Reviewers are
-advisory.
-
-This review is independent of claim verification below — send both agents in a single message so
-they run in parallel.
-
-For smaller plans, review inline before presenting to the user.
-
-## Verify Plan Claims
-
-A plan asserts facts about the codebase — files it will modify already exist, named symbols are
-present, the current code behaves as described, a pattern to follow lives where the plan says. A
-plan built on a stale or wrong assumption sends the implementer down a dead end. Before presenting
-the plan, verify these factual claims independently.
-
-This pass is **mandatory** on every plan, including test-only ones.
-
-Dispatch a single **Agent** tool call with `subagent_type: claim-reviewer` (do NOT set model — the
-agent defines its own). Extract one claim per checkable assertion the plan makes about existing
-code:
-
-```text
-Claim N: [the plan's factual assertion about the codebase]
-Location: [file:line or symbol the claim names, if any]
-```
-
-The agent returns a `### Claim N` block per claim (`Verdict: Verified | Refuted | Unsubstantiated`,
-`Score`, `Evidence`, `Reasoning`). For any `Refuted` or `Unsubstantiated` verdict, re-check the
-claim against the code once: if the reviewer is right, correct the plan — fix the path, re-scope the
-task, or drop the assumption — before presenting it; if your re-check confirms the claim, keep it
-and cite the confirming evidence in the plan. Do not feed the agent claims about code the plan will
-_create_; it can only verify what exists now.
+Run both passes per `references/plan-review.md` in one parallel message: the advisory plan review
+(2+ tasks) and **Verify Plan Claims — mandatory on every plan, including test-only ones** — dispatch
+`claim-reviewer` (no model set), one claim per checkable assertion about existing code;
+`Refuted`/`Unsubstantiated` → re-check once, correct or cite evidence.
 
 ## Checkpoint
 
-Create the plan at `.planning/plan-<slug>.md` **as the working file from the first draft** —
-`<slug>` is a kebab-case name derived from the feature or task (e.g.
-`.planning/plan-email-validation.md`). Draft, review, and revise in this file; it is the single
-artifact downstream tools consume. When the plan is ready, present it to the user in conversation
-and wait for explicit approval before starting implementation. Approval happens in conversation, not
-via `ExitPlanMode`: ask explicitly ("Approve this plan?") and wait — silence, a tangent, or a
-question is not approval. After approval, confirm the artifact path for handoff.
+Create the plan at `.planning/plan-<slug>.md` **as the working file from the first draft**; draft,
+review, and revise there (`<slug>` kebab-cased from the feature). When ready, present it in
+conversation and wait for explicit approval before implementation. Approval happens in conversation,
+not via `ExitPlanMode`: ask explicitly ("Approve this plan?") and wait — silence, a tangent, or a
+question is not approval.
+
+## Red Flags
+
+| Red flag — you are rationalizing if                                            |
+| ------------------------------------------------------------------------------ |
+| Drafting a sentence explaining why this plan doesn't need `claim-reviewer`     |
+| About to call `EnterPlanMode` or suggest the user toggle plan mode             |
+| Drafting plan content in conversation instead of in `.planning/plan-<slug>.md` |
+| Removing a **Verify** block to shorten the plan                                |
+| Treating a question, tangent, or silence as approval                           |
+| Putting test assertions, implementation code, or RED/GREEN steps into a task   |
 
 ## Common Mistakes
 
