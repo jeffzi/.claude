@@ -15,6 +15,7 @@ document you're writing.
 - [FAQ](#faq)
 - [Quickstart](#quickstart)
 - [Release Notes](#release-notes)
+- [Error Messages](#error-messages)
 
 ---
 
@@ -489,3 +490,16 @@ Each entry should answer:
   - **Consequence**: What users experienced
   - **Fix**: What was changed
   - **Result**: What users should see now
+
+---
+
+## Error Messages
+
+Error messages are documentation at the point of failure. **Be Helpful, Be Human, Be Humble.**
+
+- **Say what happened.** "Connection to database timed out after 30s" — not "An error occurred."
+- **Say why.** "The host `db.example.com` is unreachable" — not just "Connection failed."
+- **Say what to do.** "Check the database host in `config.yaml` and verify port 5432 is open."
+- **Include specifics.** Show the actual values that failed (host, port, expected vs got).
+- **Be brief.** Error messages are read under stress. Every extra word adds friction.
+- **Don't blame the user.** "Invalid email format" — not "You entered an invalid email."

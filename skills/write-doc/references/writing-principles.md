@@ -9,6 +9,7 @@
   readability
 - [Accessibility and inclusivity](#accessibility-and-inclusivity) — content accessibility,
   screenshots, reducing bias
+- [Structure and formatting](#structure-and-formatting) — headings, code examples, admonitions
 
 ---
 
@@ -115,3 +116,28 @@ specific to documentation writing:
 Use diverse, inclusive example names from varied cultural backgrounds. Replace animal-violence
 idioms: "accomplish two things at once" instead of "kill two birds with one stone." Established
 technical terms (kill, canary deployment, monkey-patching) have precise meanings and are fine.
+
+## Structure and formatting
+
+### Heading hierarchy
+
+Use headings to create a scannable outline. A reader should understand the page's structure from
+headings alone. Don't nest deeper than H4 — if you need H5, the page is too long or needs splitting.
+
+### Code examples
+
+- Show working code. Code that almost works teaches the reader to distrust your docs.
+- Use realistic names and values. `user_email = "alice@example.com"` teaches more than `x = "foo"`.
+- Annotate non-obvious lines with comments. Don't comment the obvious.
+- Show output when it helps — especially for CLI commands.
+
+### Admonitions and callouts
+
+Use sparingly. When everything is a warning, nothing is.
+
+- **Note**: Extra context that's useful but not critical.
+- **Tip**: A shortcut or best practice.
+- **Warning**: Something that could cause problems if missed.
+- **Caution/Danger**: Data loss, security risk, irreversible action.
+
+If a page has more than 3-4 callouts, most of them should be regular prose.
