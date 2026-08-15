@@ -242,6 +242,20 @@ refresh_usage_cache() {
 	trap - EXIT INT TERM
 }
 
+# Emits cache $1's payload on stdout with any window whose resets_at has already
+# passed before $2 (now) removed. Empty stdout on success means every window present
+# has expired; a non-zero exit means jq itself failed to read the cache.
+filter_expired_windows() {
+	local cache="$1" now="$2"
+	jq -c --argjson now "$now" '
+		(if .five_hour.resets_at != null and .five_hour.resets_at < $now
+		 then del(.five_hour) else . end)
+		| (if .seven_day.resets_at != null and .seven_day.resets_at < $now
+		   then del(.seven_day) else . end)
+		| select(.five_hour != null or .seven_day != null)
+	' "$cache"
+}
+
 # Team-plan sessions never receive the unified rate-limit headers, so stdin lacks
 # .rate_limits entirely even though the data exists server-side
 # (anthropics/claude-code#63659). Fetch it from the OAuth usage endpoint instead,
@@ -269,11 +283,34 @@ fetch_usage_fallback() {
 	verdict=$(cat "$marker" 2>/dev/null) || verdict=""
 	throttle=$USAGE_POLL_SECONDS
 	[[ "$verdict" == "failed" ]] && throttle=$USAGE_BACKOFF_SECONDS
+
+	local should_refresh=0
 	if ((now - last_attempt >= throttle)); then
+		should_refresh=1
+	elif [[ -f "$cache" ]] && [[ "$verdict" != "failed" ]]; then
+		# When every cached window has expired, the poll throttle guards data no
+		# render can use — bypass it to pull a fresh window.  The failure backoff
+		# still applies: a down endpoint stays down regardless of expiry.
+		local all_expired
+		all_expired=$(jq --argjson now "$now" '
+			[.five_hour.resets_at, .seven_day.resets_at]
+			| map(select(. != null))
+			| length > 0 and all(. < $now)
+		' "$cache" 2>/dev/null) || all_expired="false"
+		[[ "$all_expired" == "true" ]] && should_refresh=1
+	fi
+	if ((should_refresh)); then
 		refresh_usage_cache "$suffix" "$cache" "$marker" "$throttle" "$now"
 	fi
+
 	[[ -f "$cache" ]] || return 1
-	cat "$cache"
+
+	# Stale rate-limit data from an earlier window would misrepresent current usage.
+	# When every window is filtered, there is nothing to render.
+	local filtered
+	filtered=$(filter_expired_windows "$cache" "$now") || return 1
+	[[ -n "$filtered" ]] || return 1
+	printf '%s' "$filtered"
 }
 
 # ---------------------------------------------------------------------------

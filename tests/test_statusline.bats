@@ -45,12 +45,12 @@ setup_file() {
 	export FALLBACK_ROOT
 	FALLBACK_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/statusline-fallback.XXXXXX")
 
-	export USAGE_BODY='{"five_hour":{"utilization":42,"resets_at":"2023-11-14T22:13:20Z"},"seven_day":{"utilization":13,"resets_at":"2023-11-20T22:13:20Z"}}'
-	export FIVE_HOUR_RESET_EPOCH=1700000000
+	export USAGE_BODY='{"five_hour":{"utilization":42,"resets_at":"2099-12-31T23:59:59Z"},"seven_day":{"utilization":13,"resets_at":"2100-01-06T00:00:00Z"}}'
+	export FIVE_HOUR_RESET_EPOCH=4102444799
 	export RATE_LIMITED_BODY='{"error":{"type":"rate_limit_error","message":"rate limit exceeded"}}'
 	export NOT_JSON_BODY='<html>429 Too Many Requests</html>'
 
-	export FRESH_USAGE_BODY='{"five_hour":{"utilization":55,"resets_at":"2023-11-14T22:13:20Z"},"seven_day":{"utilization":13,"resets_at":"2023-11-20T22:13:20Z"}}'
+	export FRESH_USAGE_BODY='{"five_hour":{"utilization":55,"resets_at":"2099-12-31T23:59:59Z"},"seven_day":{"utilization":13,"resets_at":"2100-01-06T00:00:00Z"}}'
 
 	export FB_BASE
 	FB_BASE=$(date +%s)
@@ -842,6 +842,64 @@ teardown_file() {
 	local out
 	out=$(fallback_fetch not-json 0 "$NOT_JSON_BODY" $((FB_BASE + 400)))
 	assert_fallback_json "$out" '.five_hour.used_percentage' 42
+}
+
+# ---------------------------------------------------------------------------
+# Usage fallback: expired windows are filtered
+# ---------------------------------------------------------------------------
+
+@test "fallback expiry: an expired five_hour window is filtered, seven_day still served" {
+	fallback_case expire-partial
+	local body
+	body=$(make_expiry_body $((FB_BASE + 100)) $((FB_BASE + 10000)))
+	fallback_fetch expire-partial 0 "$body" "$FB_BASE" >/dev/null
+	local out
+	out=$(fallback_fetch expire-partial 0 "$body" $((FB_BASE + 200)))
+	# five_hour has expired — must not appear in output
+	assert_fallback_json "$out" '.five_hour.used_percentage // empty' ""
+	# seven_day has not expired — must still be present
+	assert_fallback_json "$out" '.seven_day.used_percentage' 13
+}
+
+@test "fallback expiry: all windows expired returns exit 1" {
+	fallback_case expire-all
+	local body
+	body=$(make_expiry_body $((FB_BASE + 100)) $((FB_BASE + 100)))
+	fallback_fetch expire-all 0 "$body" "$FB_BASE" >/dev/null
+	local status=0
+	fallback_fetch expire-all 0 "$body" $((FB_BASE + 200)) >/dev/null || status=$?
+	((status != 0))
+}
+
+# ---------------------------------------------------------------------------
+# Usage fallback: expired cache opens the poll throttle
+# ---------------------------------------------------------------------------
+
+@test "fallback expiry: all expired bypasses USAGE_POLL_SECONDS throttle" {
+	fallback_case expire-throttle
+	local body
+	body=$(make_expiry_body $((FB_BASE + 100)) $((FB_BASE + 100)))
+	fallback_fetch expire-throttle 0 "$body" "$FB_BASE" >/dev/null
+	# 200s < USAGE_POLL_SECONDS (300s), but all windows are expired — refresh anyway
+	local fresh_body
+	fresh_body=$(make_expiry_body $((FB_BASE + 5000)) $((FB_BASE + 50000)))
+	fallback_fetch expire-throttle 0 "$fresh_body" $((FB_BASE + 200)) >/dev/null
+	assert_attempts expire-throttle 2
+}
+
+@test "fallback expiry: expired cache still respects USAGE_BACKOFF_SECONDS on failure" {
+	fallback_case expire-backoff
+	local body
+	body=$(make_expiry_body $((FB_BASE + 100)) $((FB_BASE + 100)))
+	fallback_fetch expire-backoff 0 "$body" "$FB_BASE" >/dev/null
+	# Trigger a failed refresh after the poll window
+	fallback_fetch expire-backoff 7 "" $((FB_BASE + 400)) >/dev/null || true
+	assert_attempts expire-backoff 2
+	# Within backoff: no new refresh, but all windows are expired — exit 1
+	local status=0
+	fallback_fetch expire-backoff 0 "$body" $((FB_BASE + 600)) >/dev/null || status=$?
+	assert_attempts expire-backoff 2
+	((status != 0))
 }
 
 # ---------------------------------------------------------------------------

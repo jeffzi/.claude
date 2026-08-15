@@ -658,6 +658,17 @@ write_transcript() {
 	printf '%s' "$path"
 }
 
+epoch_to_iso() {
+	date -u -r "$1" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date -u -d "@$1" '+%Y-%m-%dT%H:%M:%SZ'
+}
+
+make_expiry_body() {
+	local five_h_reset="$1" seven_d_reset="$2" five_h_util="${3:-42}" seven_d_util="${4:-13}"
+	printf '{"five_hour":{"utilization":%s,"resets_at":"%s"},"seven_day":{"utilization":%s,"resets_at":"%s"}}' \
+		"$five_h_util" "$(epoch_to_iso "$five_h_reset")" \
+		"$seven_d_util" "$(epoch_to_iso "$seven_d_reset")"
+}
+
 cred_no_security_case() {
 	local dir="$CRED_ROOT/no-security" tool path
 	make_fallback_bin "$dir" nogate absent
