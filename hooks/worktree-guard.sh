@@ -7,10 +7,8 @@ set -euo pipefail
 # Blocks ExitWorktree when the worktree has uncommitted changes.
 # Prevents losing in-progress work after context compression.
 
-# Skip if not in a git repo
 git --no-optional-locks rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
-# Check for uncommitted changes (staged, unstaged, untracked)
 dirty=false
 git --no-optional-locks diff --quiet 2>/dev/null || dirty=true
 git --no-optional-locks diff --cached --quiet 2>/dev/null || dirty=true

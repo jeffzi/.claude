@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+readonly STARTUP_TIMEOUT_SECONDS=30
+
 # ╭────────────────────────────────────────────────────────╮
 # │                   Shiny Check Hook                     │
 # ╰────────────────────────────────────────────────────────╯
@@ -9,10 +11,8 @@ set -euo pipefail
 # then kills the server. Catches import errors, broken
 # templates, and runtime init failures that tests alone miss.
 
-# Skip silently if uv not installed
 command -v uv >/dev/null || exit 0
 
-# Get staged Python files
 staged_files=$(git --no-optional-locks diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep '\.py$' || true)
 
 [[ -z "$staged_files" ]] && exit 0
@@ -20,7 +20,7 @@ staged_files=$(git --no-optional-locks diff --cached --name-only --diff-filter=A
 pid=""
 output_file=""
 
-# shellcheck disable=SC2329
+# shellcheck disable=SC2329  # called via trap on line 31
 cleanup() {
 	if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
 		kill "$pid" 2>/dev/null || true
@@ -50,9 +50,9 @@ while IFS= read -r file_path; do
 	uv run shiny run "$file_path" --port 0 >"$output_file" 2>&1 &
 	pid=$!
 
-	# Wait up to 30s for startup or process exit
+	# Wait up to STARTUP_TIMEOUT_SECONDS for startup or process exit
 	success=false
-	for ((i = 0; i < 30; i++)); do
+	for ((i = 0; i < STARTUP_TIMEOUT_SECONDS; i++)); do
 		if ! kill -0 "$pid" 2>/dev/null; then
 			break
 		fi
