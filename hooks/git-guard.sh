@@ -11,11 +11,17 @@ command -v jq >/dev/null || {
 	exit 1
 }
 
-# fix-ci policy, shared with the wrapper that fronts the loop's pushes. The hook
-# runs with cwd set to the repo it is guarding, so this is sourced by absolute
-# path — never relative to cwd.
+# The hook runs with cwd set to the repo it is guarding, so sourced scripts are
+# resolved from the script's own location — never relative to cwd or $HOME.
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# fix-ci policy, shared with the wrapper that fronts the loop's pushes.
 # shellcheck source=SCRIPTDIR/../scripts/fix-ci-policy.sh
-. "$HOME/.claude/scripts/fix-ci-policy.sh"
+. "$HOOK_DIR/../scripts/fix-ci-policy.sh"
+
+# git subcommand parsing, shared with hooks/git-lock-guard.sh.
+# shellcheck source=SCRIPTDIR/../scripts/git-parse.sh
+. "$HOOK_DIR/../scripts/git-parse.sh"
 
 input=$(cat)
 full_command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
@@ -28,49 +34,7 @@ git --no-optional-locks rev-parse --git-dir >/dev/null 2>&1 || exit 0
 # │                  Git Command Parsing                       │
 # ╰────────────────────────────────────────────────────────────╯
 
-# Extract git subcommand, handling global options like -C path
-# Usage: subcmd=$(get_git_subcmd "$command")
-get_git_subcmd() {
-	local cmd="$1"
-	local in_git=false
-	local skip_next=false
-
-	for word in $cmd; do
-		if $skip_next; then
-			skip_next=false
-			continue
-		fi
-
-		# Wait for 'git'
-		if ! $in_git; then
-			[[ "$word" == "git" ]] && in_git=true
-			continue
-		fi
-
-		case "$word" in
-		-C | -c | --git-dir | --work-tree | --namespace)
-			skip_next=true
-			continue
-			;;
-		-C* | -c*)
-			# -C and -c can have value attached (-Cpath)
-			continue
-			;;
-		--*=* | -*)
-			# Long option with value or other short option
-			continue
-			;;
-		*)
-			# First non-option word is the subcommand
-			printf '%s' "$word"
-			return 0
-			;;
-		esac
-	done
-	return 1
-}
-
-# Uses global $command variable (set per sub-command in the main loop)
+# Uses global $command (set per sub-command in the main loop)
 is_git_subcmd() {
 	local expected="$1"
 	local actual
@@ -130,8 +94,9 @@ check_tdd_cycle_marker() {
 # git dir comes from the command's own `-C` / `--git-dir`, so a marker in one
 # repo never relaxes a command aimed at another.
 #
-# The loop never rewrites history: force-push in every form (including
-# --force-with-lease), `git commit --amend`, and --no-verify stay blocked.
+# The loop never rewrites remote history: force-push in every form (including
+# --force-with-lease) and --no-verify stay blocked, so a local amend cannot
+# reach the remote except as a rejected non-fast-forward push.
 #
 # The marker expires so an interrupted session cannot leave a repo relaxed
 # forever. Outside the freshness window the marker counts as absent and gets
@@ -364,22 +329,19 @@ check_destructive_operations() {
 	fi
 
 	# ── Reflog / prune ──────────────────────────────────────────
-	# git reflog expire/delete destroys reflog entries
+	# git reflog expire/delete
 	is_git_subcmd "reflog" && [[ "$command" =~ [[:space:]](expire|delete)([[:space:]]|$) ]] &&
 		block_destructive "git reflog expire/delete" "Destroys reflog entries, making recovery impossible."
 
-	# git prune removes unreachable objects
+	# git prune
 	is_git_subcmd "prune" &&
 		block_destructive "git prune" "Removes unreachable objects. Let git gc handle pruning safely."
 
-	# git gc --prune= forces immediate pruning of objects
+	# git gc --prune=
 	is_git_subcmd "gc" && [[ "$command" =~ [[:space:]]--prune= ]] &&
 		block_destructive "git gc --prune" "Immediate pruning risks losing recoverable objects."
 
 	# ── Commit ───────────────────────────────────────────────────
-	# git commit --amend rewrites history
-	is_git_subcmd "commit" && [[ "$command" =~ --amend ]] &&
-		block_destructive "git commit --amend" "Rewrites the previous commit. Use with caution on shared branches."
 
 	# ── History extraction with redirect (overwrite working tree) ─
 	# git show / cat-file with stdout redirect (> but not 2>)
@@ -515,16 +477,31 @@ check_single_command() {
 	check_destructive_operations
 }
 
-# Split chained commands (&&, ||, ;, |) and check each independently.
-# This prevents bypasses like: git add . && git checkout -- .
-# where only the first git subcommand would otherwise be checked.
-# Order matters: || before | to avoid partial replacement.
-while IFS= read -r subcmd; do
-	# Trim leading/trailing whitespace
-	subcmd="${subcmd#"${subcmd%%[![:space:]]*}"}"
-	subcmd="${subcmd%"${subcmd##*[![:space:]]}"}"
-	[[ -z "$subcmd" ]] && continue
-	check_single_command "$subcmd"
-done <<<"$(printf '%s' "$full_command" | awk '{gsub(/&&/,"\n"); gsub(/\|\|/,"\n"); gsub(/\|/,"\n"); gsub(/;/,"\n"); print}')"
+# Split chained commands (&&, ||, ;, |) and check each fragment independently.
+# This prevents bypasses like `git add . && git checkout -- .`, where only the
+# first git subcommand would otherwise be checked.
+#
+# Quoted text is data, not commands: backslash escapes and quoted regions are
+# collapsed to a space before splitting, so a commit message that merely names
+# a banned command is not an invocation. A double-quoted region is opaque all
+# the way to its closing quote, heredocs nested in `-m "$(cat <<'EOF' …)"`
+# included. Trade-off, accepted for simplicity: arguments inside quotes escape
+# the path and flag checks.
+sanitized=$(printf '%s' "$full_command" | awk -v q="'" '
+	{ buf = buf $0 "\n" }
+	END {
+		gsub(/\\./, " ", buf)
+		gsub(/"[^"]*"/, " ", buf)
+		gsub(q "[^" q "]*" q, " ", buf)
+		gsub(/&&|\|\||[|;]/, "\n", buf)
+		printf "%s", buf
+	}')
+
+while IFS= read -r fragment; do
+	fragment="${fragment#"${fragment%%[![:space:]]*}"}"
+	fragment="${fragment%"${fragment##*[![:space:]]}"}"
+	[[ -z "$fragment" ]] && continue
+	check_single_command "$fragment"
+done <<<"$sanitized"
 
 exit 0
