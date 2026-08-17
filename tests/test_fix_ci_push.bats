@@ -113,6 +113,7 @@ teardown_file() {
 @test "force flag: push -f is refused" {
 	run_wrapper "$REFUSE" -f origin fix-ci/lint
 	assert_refused
+	assert_ref_absent "$(bare_of "$REFUSE")" fix-ci/lint
 }
 
 @test "force flag: push --force-with-lease is refused" {
@@ -145,14 +146,7 @@ teardown_file() {
 @test "delete scope: push :main (delete refspec) is refused" {
 	run_wrapper "$REFUSE" origin :main
 	assert_refused
-}
-
-@test "delete scope: origin main survives every refusal" {
 	assert_ref_present "$(bare_of "$REFUSE")" main
-}
-
-@test "delete scope: no branch leaked into origin from refusals" {
-	assert_ref_absent "$(bare_of "$REFUSE")" fix-ci/lint
 }
 
 @test "delete scope: push --delete fix-ci/lint succeeds" {
