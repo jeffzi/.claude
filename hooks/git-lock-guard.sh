@@ -79,12 +79,26 @@ wait_for_lock() {
 	return 0 # Lock cleared — success
 }
 
+_detect_lock_stat_fmt() {
+	if stat -f %m "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
+		printf -- '-f %%m'
+	elif stat -c %Y "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
+		printf -- '-c %%Y'
+	fi
+}
+_LOCK_STAT_FMT=$(_detect_lock_stat_fmt)
+
 get_lock_age() {
 	local lock_path="$1"
 	# Single stat call avoids a TOCTOU window between existence check and read.
 	# If the lock vanished between the timeout and this call, mod_time stays 0.
 	local mod_time
-	mod_time=$(stat -f %m "$lock_path" 2>/dev/null || echo 0)
+	if [[ -n "$_LOCK_STAT_FMT" ]]; then
+		# shellcheck disable=SC2086 # _LOCK_STAT_FMT must word-split into two arguments
+		mod_time=$(stat $_LOCK_STAT_FMT "$lock_path" 2>/dev/null || echo 0)
+	else
+		mod_time=0
+	fi
 	printf "%d" "$(($(date +%s) - mod_time))"
 }
 

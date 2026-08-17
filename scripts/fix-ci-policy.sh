@@ -17,15 +17,27 @@
 # abandoned by an interrupted session ages out.
 readonly FIX_CI_MARKER_TTL_SECONDS=1800
 
+# BSD stat uses `-f %m`, GNU stat uses `-c %Y`. Probe once at source-time against
+# a file guaranteed to exist (this script itself). Callers run on both Darwin
+# (local) and Linux (CI).
+_detect_stat_fmt() {
+	if stat -f %m "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
+		printf -- '-f %%m'
+	elif stat -c %Y "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
+		printf -- '-c %%Y'
+	fi
+}
+_FIX_CI_STAT_FMT=$(_detect_stat_fmt)
+
 # True when the marker proves a loop is live right now. The window is bounded on
 # both sides: a marker aged past the TTL, dated ahead of now by a skewed clock or
 # by hand, or whose mtime cannot be read at all proves nothing either way, and
 # every one of those reads as absent.
-#
-# `stat -f %m` is BSD/macOS; both callers only ever run on Darwin.
 fix_ci_marker_fresh() {
 	local marker="$1" mtime now
-	mtime=$(stat -f %m "$marker" 2>/dev/null) || return 1
+	[[ -n "$_FIX_CI_STAT_FMT" ]] || return 1
+	# shellcheck disable=SC2086 # _FIX_CI_STAT_FMT must word-split into two arguments
+	mtime=$(stat $_FIX_CI_STAT_FMT "$marker" 2>/dev/null) || return 1
 	now=$(date +%s)
 	((now >= mtime && now - mtime <= FIX_CI_MARKER_TTL_SECONDS))
 }
