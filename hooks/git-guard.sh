@@ -6,7 +6,6 @@ set -euo pipefail
 # ╰────────────────────────────────────────────────────────────╯
 # Prevents committing plan files, auto-pushing, and destructive operations
 
-# Check dependencies
 command -v jq >/dev/null || {
 	printf "Error: jq is required\n" >&2
 	exit 1
@@ -21,10 +20,8 @@ command -v jq >/dev/null || {
 input=$(cat)
 full_command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 
-# Exit if no command found
 [[ -z "$full_command" ]] && exit 0
 
-# Skip if not in a git repo
 git --no-optional-locks rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
 # ╭────────────────────────────────────────────────────────────╮
@@ -50,7 +47,6 @@ get_git_subcmd() {
 			continue
 		fi
 
-		# Handle options that take a separate argument
 		case "$word" in
 		-C | -c | --git-dir | --work-tree | --namespace)
 			skip_next=true
@@ -74,7 +70,6 @@ get_git_subcmd() {
 	return 1
 }
 
-# Check if command is a git command with specific subcommand
 # Uses global $command variable (set per sub-command in the main loop)
 is_git_subcmd() {
 	local expected="$1"
@@ -391,7 +386,7 @@ check_destructive_operations() {
 	if is_git_subcmd "show" || is_git_subcmd "cat-file"; then
 		# Strip fd-specific redirects (2>, 3>, etc.) then check if > remains
 		local _stripped
-		_stripped=$(printf '%s' "$command" | sed 's/[0-9]>//g')
+		_stripped=$(printf '%s' "$command" | sed 's/[2-9]>//g')
 		[[ "$_stripped" =~ \> ]] &&
 			block_destructive "git show/cat-file with redirect" \
 				"Writing git history content to files can overwrite working tree changes."
@@ -414,6 +409,58 @@ check_destructive_operations() {
 # │                    Command Checking                        │
 # ╰────────────────────────────────────────────────────────────╯
 
+check_add_safety() {
+	for pattern in "${PLAN_PATTERNS_GREP[@]}"; do
+		if printf '%s' "$command" | grep -q "$pattern"; then
+			printf "Error: Cannot stage plan files matching '%s'. These are temporary analysis files.\n" "$pattern" >&2
+			exit 2
+		fi
+	done
+
+	if [[ "$command" =~ [[:space:]](\.|-[aA]|--all)([[:space:]]|$) ]]; then
+		local root
+		root=$(git --no-optional-locks rev-parse --show-toplevel 2>/dev/null) || return 0
+		local pending_files
+		pending_files=$(git --no-optional-locks -C "$root" ls-files --others --modified --exclude-standard 2>/dev/null)
+		check_plan_files "$pending_files" || exit 2
+	fi
+
+	# Block all force-adds — -f/--force bypasses gitignore, the only
+	# reason to use it is to track ignored files, which is forbidden.
+	if [[ "$command" =~ [[:space:]](-f|--force)([[:space:]]|$) ]]; then
+		block_destructive "git add --force" \
+			"Force-adding bypasses gitignore rules. Never track ignored files."
+	fi
+
+	# Check explicitly named paths against gitignore (local + global + .git/info/exclude)
+	local _found_add=false _past_dashdash=false
+	local -a _add_paths=()
+	for _word in $command; do
+		if ! $_found_add; then
+			[[ "$_word" == "add" ]] && _found_add=true
+			continue
+		fi
+		if [[ "$_word" == "--" ]]; then
+			_past_dashdash=true
+			continue
+		fi
+		if $_past_dashdash; then
+			_add_paths+=("$_word")
+			continue
+		fi
+		case "$_word" in
+		-* | .) continue ;; # skip flags and broad-scope dot
+		*) _add_paths+=("$_word") ;;
+		esac
+	done
+	for _path in ${_add_paths[@]+"${_add_paths[@]}"}; do
+		if git --no-optional-locks check-ignore -q -- "$_path" 2>/dev/null; then
+			block_destructive "git add (gitignored)" \
+				"'$_path' matches a gitignore rule (local or global). Do not track ignored files."
+		fi
+	done
+}
+
 # Check a single (sub-)command against all safety rules.
 # Sets global $command so is_git_subcmd and regex checks work.
 check_single_command() {
@@ -424,7 +471,6 @@ check_single_command() {
 		check_tdd_cycle_marker "$(get_git_subcmd "$command")"
 	fi
 
-	# Block push operations
 	if is_git_subcmd "push" && ! fix_ci_allows_push; then
 		[[ -n "$fix_ci_push_denial_reason" ]] &&
 			block_destructive "$fix_ci_push_denial_op" "$fix_ci_push_denial_reason"
@@ -432,61 +478,10 @@ check_single_command() {
 		exit 2
 	fi
 
-	# Block git add with explicit plan file paths
 	if is_git_subcmd "add"; then
-		for pattern in "${PLAN_PATTERNS_GREP[@]}"; do
-			if printf '%s' "$command" | grep -q "$pattern"; then
-				printf "Error: Cannot stage plan files matching '%s'. These are temporary analysis files.\n" "$pattern" >&2
-				exit 2
-			fi
-		done
-
-		# Block broad adds (git add ., git add -A, git add -a, git add --all) if plan files would be included
-		if [[ "$command" =~ [[:space:]](\.|-[aA]|--all)([[:space:]]|$) ]]; then
-			local root
-			root=$(git --no-optional-locks rev-parse --show-toplevel 2>/dev/null) || return 0
-			local pending_files
-			pending_files=$(git --no-optional-locks -C "$root" ls-files --others --modified --exclude-standard 2>/dev/null)
-			check_plan_files "$pending_files" || exit 2
-		fi
-
-		# Block all force-adds — -f/--force bypasses gitignore, the only
-		# reason to use it is to track ignored files, which is forbidden.
-		if [[ "$command" =~ [[:space:]](-f|--force)([[:space:]]|$) ]]; then
-			block_destructive "git add --force" \
-				"Force-adding bypasses gitignore rules. Never track ignored files."
-		fi
-
-		# Check explicitly named paths against gitignore (local + global + .git/info/exclude)
-		local _found_add=false _past_dashdash=false
-		local -a _add_paths=()
-		for _word in $command; do
-			if ! $_found_add; then
-				[[ "$_word" == "add" ]] && _found_add=true
-				continue
-			fi
-			if [[ "$_word" == "--" ]]; then
-				_past_dashdash=true
-				continue
-			fi
-			if $_past_dashdash; then
-				_add_paths+=("$_word")
-				continue
-			fi
-			case "$_word" in
-			-* | .) continue ;; # skip flags and broad-scope dot
-			*) _add_paths+=("$_word") ;;
-			esac
-		done
-		for _path in "${_add_paths[@]}"; do
-			if git --no-optional-locks check-ignore -q -- "$_path" 2>/dev/null; then
-				block_destructive "git add (gitignored)" \
-					"'$_path' matches a gitignore rule (local or global). Do not track ignored files."
-			fi
-		done
+		check_add_safety
 	fi
 
-	# Block commits if plan files are already staged
 	if is_git_subcmd "commit"; then
 		# Remind to load write-commit skill
 		printf "STOP: You MUST load Skill(write-commit) before committing. If you have not loaded it yet, abort and load it now.\n" >&2
@@ -498,7 +493,6 @@ check_single_command() {
 		check_plan_files "$staged_files" || exit 2
 	fi
 
-	# Block git worktree remove if the target worktree has uncommitted changes
 	if is_git_subcmd "worktree" && [[ "$command" =~ [[:space:]]remove([[:space:]]|$) ]]; then
 		# Extract worktree path: last non-flag argument after 'remove'
 		local wt_path="" found_remove=false
@@ -518,7 +512,6 @@ check_single_command() {
 		fi
 	fi
 
-	# Check destructive operations
 	check_destructive_operations
 }
 
