@@ -20,7 +20,7 @@ staged_files=$(git --no-optional-locks diff --cached --name-only --diff-filter=A
 pid=""
 output_file=""
 
-# shellcheck disable=SC2329  # called via trap on line 31
+# shellcheck disable=SC2329  # called via the EXIT trap set below
 cleanup() {
 	if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
 		kill "$pid" 2>/dev/null || true

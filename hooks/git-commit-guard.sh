@@ -14,22 +14,30 @@ cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 # Do not extract only -m "...": heredoc and -F commits would be missed.
 reason=""
 
-# Numeric phase ID as scope: feat(03.5-01): or feat(05-01):
-if printf '%s' "$cmd" | grep -qE '\([0-9]+\.?[0-9]*-[0-9]+\)'; then
-	reason="Commit scope contains an internal phase ID (e.g. 05-01). Use a module name instead."
-# Phase slug as scope: feat(05-layout-transitions-hud):
-elif printf '%s' "$cmd" | grep -qE '\([0-9]{2,}-[a-z][a-z-]*\)'; then
-	reason="Commit scope contains a phase slug (e.g. 05-layout-transitions). Use a module name instead."
-# TDD cycle labels
-elif printf '%s' "$cmd" | grep -qiE '(RED-GREEN|TDD RED|TDD GREEN|RED phase|GREEN phase|REFACTOR phase)'; then
-	reason="Commit message contains a TDD process label. Describe what was built, not the cycle."
-# Internal .planning/ path references
-elif printf '%s' "$cmd" | grep -q '\.planning/'; then
-	reason="Commit message references an internal .planning/ path."
-# Phase-numbered SUMMARY files: 05-01-SUMMARY.md
-elif printf '%s' "$cmd" | grep -qE '[0-9]{2,}-[0-9]+-SUMMARY\.md'; then
-	reason="Commit message references an internal SUMMARY file. Describe the effect instead."
-fi
+# Each check pairs a grep invocation (flags + pattern) with its block reason.
+# Numeric phase ID (03.5-01, 05-01) / phase slug / TDD labels / .planning/ path / SUMMARY file.
+check_flags=(-qE -qE -qiE -qE -qE)
+check_patterns=(
+	'\([0-9]+\.?[0-9]*-[0-9]+\)'
+	'\([0-9]{2,}-[a-z][a-z-]*\)'
+	'(RED-GREEN|TDD RED|TDD GREEN|RED phase|GREEN phase|REFACTOR phase)'
+	'\.planning/'
+	'[0-9]{2,}-[0-9]+-SUMMARY\.md'
+)
+check_reasons=(
+	"Commit scope contains an internal phase ID (e.g. 05-01). Use a module name instead."
+	"Commit scope contains a phase slug (e.g. 05-layout-transitions). Use a module name instead."
+	"Commit message contains a TDD process label. Describe what was built, not the cycle."
+	"Commit message references an internal .planning/ path."
+	"Commit message references an internal SUMMARY file. Describe the effect instead."
+)
+
+for i in "${!check_patterns[@]}"; do
+	if printf '%s' "$cmd" | grep "${check_flags[$i]}" "${check_patterns[$i]}"; then
+		reason="${check_reasons[$i]}"
+		break
+	fi
+done
 
 if [[ -n "$reason" ]]; then
 	jq -n --arg r "BLOCKED: $reason" '{ "decision": "block", "reason": $r }'
