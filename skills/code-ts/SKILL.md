@@ -181,17 +181,18 @@ function area(shape: Shape): number {
 
 ## Pitfalls
 
-| Trap                                       | Instead                                                                          |
-| ------------------------------------------ | -------------------------------------------------------------------------------- |
-| `Partial<T>` is deep                       | Shallow only — nested objects stay required                                      |
-| `Omit<T, "key">` verifies key              | It does not — define `type StrictOmit<T, K extends keyof T> = Omit<T, K>`        |
-| `"a" \| "b" \| string` narrows             | Collapses to `string` — remove the `string` widener                              |
-| `Object.keys()` returns `(keyof T)[]`      | Returns `string[]` — intentional due to structural typing                        |
-| `.filter(x => x !== null)` narrows         | Returns original type — needs explicit type predicate                            |
-| `JSON.stringify` always returns string     | Returns `undefined` for undefined/functions/symbols; throws on BigInt/circular   |
-| Chained `.map().filter().reduce()`         | Single `for-of` loop in hot paths — no intermediate arrays                       |
-| Spread-in-reduce `{ ...acc, [key]: val }`  | O(n^2) — mutate accumulator in place                                             |
-| `interface &` intersection for composition | Use `interface extends` — intersections aren't cached, conflicts produce `never` |
+| Trap                                                                                  | Instead                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Partial<T>` is deep                                                                  | Shallow only — nested objects stay required                                                                                                                                                                                                                           |
+| `Omit<T, "key">` verifies key                                                         | It does not — define `type StrictOmit<T, K extends keyof T> = Omit<T, K>`                                                                                                                                                                                             |
+| `"a" \| "b" \| string` narrows                                                        | Collapses to `string` — remove the `string` widener                                                                                                                                                                                                                   |
+| `Object.keys()` returns `(keyof T)[]`                                                 | Returns `string[]` — intentional due to structural typing                                                                                                                                                                                                             |
+| `.filter(x => x !== null)` narrows                                                    | Returns original type — needs explicit type predicate                                                                                                                                                                                                                 |
+| `JSON.stringify` always returns string                                                | Returns `undefined` for undefined/functions/symbols; throws on BigInt/circular                                                                                                                                                                                        |
+| Chained `.map().filter().reduce()`                                                    | Single `for-of` loop in hot paths — no intermediate arrays                                                                                                                                                                                                            |
+| Spread-in-reduce `{ ...acc, [key]: val }`                                             | O(n^2) — mutate accumulator in place                                                                                                                                                                                                                                  |
+| `interface &` intersection for composition                                            | Use `interface extends` — intersections aren't cached, conflicts produce `never`                                                                                                                                                                                      |
+| `exactOptionalPropertyTypes`: conditional-spreading every `T \| undefined` assignment | On types you own where a present-`undefined` key is harmless, declare `x?: T \| undefined` and assign plainly; keep bare `?:` + `...(v !== undefined && { x: v })` only where a stray `undefined` key clobbers spread-merged defaults or leaks via `Object.keys`/JSON |
 
 ## House tsconfig
 
