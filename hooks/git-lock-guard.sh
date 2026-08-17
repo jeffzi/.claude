@@ -23,51 +23,12 @@ full_command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 
 git --no-optional-locks rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
-# ╭────────────────────────────────────────────────────────────╮
-# │                  Git Command Parsing                       │
-# ╰────────────────────────────────────────────────────────────╯
-
-# Extract git subcommand, handling global options like -C path
-# Usage: subcmd=$(get_git_subcmd "$command")
-get_git_subcmd() {
-	local cmd="$1"
-	local in_git=false
-	local skip_next=false
-
-	for word in $cmd; do
-		if $skip_next; then
-			skip_next=false
-			continue
-		fi
-
-		# Wait for 'git'
-		if ! $in_git; then
-			[[ "$word" == "git" ]] && in_git=true
-			continue
-		fi
-
-		case "$word" in
-		-C | -c | --git-dir | --work-tree | --namespace)
-			skip_next=true
-			continue
-			;;
-		-C* | -c*)
-			# -C and -c can have value attached (-Cpath)
-			continue
-			;;
-		--*=* | -*)
-			# Long option with value or other short option
-			continue
-			;;
-		*)
-			# First non-option word is the subcommand
-			printf '%s' "$word"
-			return 0
-			;;
-		esac
-	done
-	return 1
-}
+# git subcommand parsing, shared with hooks/git-guard.sh. The hook runs with
+# cwd set to the repo it is guarding, so this is resolved from the script's
+# own location — never relative to cwd or $HOME.
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=SCRIPTDIR/../scripts/git-parse.sh
+. "$HOOK_DIR/../scripts/git-parse.sh"
 
 # ╭────────────────────────────────────────────────────────────╮
 # │          Index-Mutating Subcommands Check                  │

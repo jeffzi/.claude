@@ -9,8 +9,8 @@ user first and explain why. This includes but is not limited to:
   (without `--staged`), `reset` (all forms including `reset HEAD`), `clean`, `stash`,
   `apply -R`/`--reverse`. To unstage files, use `git restore --staged <path>` instead of
   `git reset`.
-- **Git (rewriting history / bypassing safeguards)**: `commit --amend`, `push --force`, `rebase`
-  (with uncommitted changes), `branch -D`, `--no-verify` on any command.
+- **Git (rewriting history / bypassing safeguards)**: `push --force`, `rebase` (with uncommitted
+  changes), `branch -D`, `--no-verify` on any command.
 - **Git (tracking ignored files)**: `add -f`/`--force` on gitignored files. Never force-add files
   that match a local or global gitignore rule.
 - **File overwriting**: Reading content from git history (`git show`, `git cat-file`) and writing it

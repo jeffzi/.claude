@@ -2,12 +2,15 @@
 # Shared helpers for hook and wrapper test suites (bats).
 
 HELPERS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+readonly HELPERS_DIR
 PROJECT_DIR=$(cd "$HELPERS_DIR/../.." && pwd)
+readonly PROJECT_DIR
 
-GIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-guard.sh"
-GIT_COMMIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-commit-guard.sh"
-FIX_CI_PUSH_WRAPPER="$PROJECT_DIR/scripts/fix-ci-push.sh"
+readonly GIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-guard.sh"
+readonly GIT_COMMIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-commit-guard.sh"
+readonly FIX_CI_PUSH_WRAPPER="$PROJECT_DIR/scripts/fix-ci-push.sh"
 BASH_BIN=$(command -v bash)
+readonly BASH_BIN
 
 # ── Hook invocation ──────────────────────────────────────────────────────────
 
@@ -211,7 +214,9 @@ marker_path() {
 # One minute past the marker's 30-minute freshness TTL, and 60 minutes ahead
 # for clock-skew coverage (see fix-ci-policy.sh's FIX_CI_MARKER_TTL_SECONDS).
 export STALE_OFFSET_MINUTES=-31
+readonly STALE_OFFSET_MINUTES
 export FUTURE_OFFSET_MINUTES=+60
+readonly FUTURE_OFFSET_MINUTES
 
 backdate_marker() {
 	touch -t "$(date_offset_minutes "$2" +%Y%m%d%H%M)" "$(marker_path "$1")"

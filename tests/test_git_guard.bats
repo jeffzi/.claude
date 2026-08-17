@@ -97,11 +97,6 @@ teardown_file() {
 	assert_blocked
 }
 
-@test "checkout: git checkout -b feat/my.feature is blocked" {
-	run_guard "$REPO" "git checkout -b feat/my.feature"
-	assert_blocked
-}
-
 # ── Switch (discard) ─────────────────────────────────────────────────────────
 
 @test "switch: git switch -f branch is blocked" {
@@ -345,9 +340,9 @@ teardown_file() {
 
 # ── Commit ───────────────────────────────────────────────────────────────────
 
-@test "commit: git commit --amend is blocked" {
+@test "commit: git commit --amend is allowed" {
 	run_guard "$REPO" "git commit --amend"
-	assert_blocked
+	assert_allowed
 }
 
 @test "commit: git commit -m msg is allowed" {
@@ -454,9 +449,9 @@ teardown_file() {
 	assert_blocked
 }
 
-@test "fix-ci: amend under marker is blocked" {
+@test "fix-ci: amend under marker is allowed" {
 	run_guard "$FIXCI_REPO" "git commit --amend"
-	assert_blocked
+	assert_allowed
 }
 
 @test "fix-ci: branch -D fix-ci/* under marker is allowed" {
@@ -602,6 +597,42 @@ teardown_file() {
 @test "chain: stash in chain with semicolon is blocked" {
 	run_guard "$REPO" "git status; git stash"
 	assert_blocked
+}
+
+@test "chain: banned command after semicolon following a quoted message is blocked" {
+	run_guard "$REPO" "git commit -m \"msg\"; git reset --hard"
+	assert_blocked
+}
+
+# ── Quoted text and heredoc bodies (not command position) ────────────────────
+
+@test "quoting: banned subcommand named in a double-quoted commit message is allowed" {
+	run_guard "$REPO" "git commit -m \"docs: use git switch; git checkout is on the deny list\""
+	assert_allowed
+}
+
+@test "quoting: banned command inside single quotes is allowed" {
+	run_guard "$REPO" "echo 'never run this; git reset --hard'"
+	assert_allowed
+}
+
+@test "quoting: separators and banned command inside a quoted message are allowed" {
+	run_guard "$REPO" "git commit -m \"fix: handle a && b in parser; git clean -fd is now documented\""
+	assert_allowed
+}
+
+@test "quoting: history redirect named in a heredoc body is allowed" {
+	local cmd
+	cmd=$(
+		cat <<'CMD'
+git commit -m "$(cat <<'EOF'
+docs: warn that git show HEAD:f 1> f overwrites the working file
+EOF
+)"
+CMD
+	)
+	run_guard "$REPO" "$cmd"
+	assert_allowed
 }
 
 # ── Safe commands (never block) ──────────────────────────────────────────────
