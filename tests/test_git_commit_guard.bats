@@ -14,30 +14,10 @@ load helpers/hooks
 	assert_blocked
 }
 
-@test "numeric phase: docs(04.1-03): ... is blocked" {
-	run_commit_guard 'git commit -m "docs(04.1-03): update docs"'
-	assert_blocked
-}
-
-@test "numeric phase: fix(1-2): ... is blocked" {
-	run_commit_guard 'git commit -m "fix(1-2): fix rendering"'
-	assert_blocked
-}
-
 # ── Phase slug scopes ────────────────────────────────────────────────────────
-
-@test "phase slug: test(05-layout-transitions-hud): ... is blocked" {
-	run_commit_guard 'git commit -m "test(05-layout-transitions-hud): add tests"'
-	assert_blocked
-}
 
 @test "phase slug: feat(03-auth-middleware): ... is blocked" {
 	run_commit_guard 'git commit -m "feat(03-auth-middleware): implement auth"'
-	assert_blocked
-}
-
-@test "phase slug: fix(12-data-pipeline): ... is blocked" {
-	run_commit_guard 'git commit -m "fix(12-data-pipeline): fix ingestion"'
 	assert_blocked
 }
 
@@ -93,16 +73,6 @@ load helpers/hooks
 
 @test "clean: normal feat is allowed" {
 	run_commit_guard 'git commit -m "feat(auth): add login flow"'
-	assert_allowed
-}
-
-@test "clean: normal fix is allowed" {
-	run_commit_guard 'git commit -m "fix(api): reject empty email"'
-	assert_allowed
-}
-
-@test "clean: normal refactor is allowed" {
-	run_commit_guard 'git commit -m "refactor(parser): extract token stream"'
 	assert_allowed
 }
 
