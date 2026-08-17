@@ -2,6 +2,7 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "ignorePatterns": [".agents", ".claude", ".planning", ".research", "coverage", "dist"],
   "printWidth": 100,
+  "proseWrap": "always",
   "sortImports": true,
   "sortPackageJson": true
 }
