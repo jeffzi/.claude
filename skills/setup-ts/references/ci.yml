@@ -16,6 +16,7 @@ jobs:
   ci:
     permissions:
       contents: read
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -40,17 +41,14 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          go install github.com/rhysd/actionlint/cmd/actionlint@latest
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-          pipx install zizmor
+          pipx install zizmor==1.29.0
+          echo "$(python3 -m site --user-base)/bin" >> "$GITHUB_PATH"
 
       - name: Check
         if: runner.os == 'Linux'
-        run: npm run check:static
+        run: npm run check
 
       - name: Test
         run: npm test
-
-      - name: Quality
-        if: runner.os == 'Linux'
-        run: npm run check:quality

@@ -6,6 +6,8 @@ Never surface as drift.
 
 | File                             | Owned keys                                                 |
 | -------------------------------- | ---------------------------------------------------------- |
+| `.oxlintrc.json`                 | `overrides`, `ignorePatterns`                              |
+| `.markdownlint-cli2.jsonc`       | `ignores` (project may add entries)                        |
 | `fallow.json` → `.fallowrc.json` | `entry`                                                    |
 | `cspell.json`                    | `words`                                                    |
 | `tsconfig.build.json`            | `outDir`, `rootDir`, `include`                             |

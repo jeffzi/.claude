@@ -4,6 +4,8 @@
   "language": "en",
   "files": ["**/*.{ts,tsx,mts,cts,md}"],
   "ignorePaths": [
+    ".agents",
+    ".claude",
     ".planning",
     ".research",
     "*.tsbuildinfo",

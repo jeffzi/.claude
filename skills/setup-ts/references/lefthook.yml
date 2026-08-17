@@ -2,31 +2,39 @@
 pre-commit:
   commands:
     lint:
+      priority: 1
       glob: "**/*.{ts,tsx,mts,cts,js}"
       run: npx oxlint --fix {staged_files}
       stage_fixed: true
     md:
+      priority: 1
       glob: "**/*.md"
       run: npx markdownlint-cli2 --fix {staged_files}
       stage_fixed: true
     fmt:
+      priority: 2
       glob: "**/*.{ts,tsx,mts,cts,js,json,jsonc,md,yml,yaml}"
       # oxfmt errors when every staged file is ignored; oxlint exits 0 and needs no guard
       run: npx oxfmt --no-error-on-unmatched-pattern {staged_files}
       stage_fixed: true
     type:
+      priority: 3
       glob: "**/*.{ts,tsx,mts,cts}"
       run: npm run check:type
     quality:
+      priority: 3
       glob: "**/*.{ts,tsx,mts,cts,js,json}"
       run: npm run check:quality
     typelint:
+      priority: 3
       glob: "**/*.{ts,tsx,mts,cts}"
       run: npm run check:typelint
     spelling:
+      priority: 3
       glob: "**/*.{ts,tsx,mts,cts,md}"
-      run: npx cspell --no-progress --no-summary {staged_files}
+      run: npx cspell --no-progress --no-summary --no-must-find-files {staged_files}
     actions:
+      priority: 3
       glob: ".github/workflows/*.yml"
       run: actionlint {staged_files} && zizmor {staged_files}
 
@@ -37,8 +45,11 @@ commit-msg:
 
 pre-push:
   commands:
-    check:
-      run: npm run check
+    # Tests first: check's fallow health step reads coverage/, which only a
+    # test run produces. On a fresh clone the first push would otherwise fail.
     test:
-      glob: "**/*.{ts,tsx,mts,cts}"
+      priority: 1
       run: npm test
+    check:
+      priority: 2
+      run: npm run check
