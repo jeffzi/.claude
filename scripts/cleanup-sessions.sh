@@ -8,12 +8,13 @@ dry_run=true
 
 numfmt_bytes() {
 	local bytes=$1
-	if [[ "$bytes" -ge 1073741824 ]]; then
-		printf "%.1f GB" "$(echo "$bytes / 1073741824" | bc -l)"
-	elif [[ "$bytes" -ge 1048576 ]]; then
-		printf "%.1f MB" "$(echo "$bytes / 1048576" | bc -l)"
-	elif [[ "$bytes" -ge 1024 ]]; then
-		printf "%.1f KB" "$(echo "$bytes / 1024" | bc -l)"
+	local -r GiB=1073741824 MiB=1048576 KiB=1024
+	if [[ "$bytes" -ge "$GiB" ]]; then
+		printf "%.1f GB" "$(echo "$bytes / $GiB" | bc -l)"
+	elif [[ "$bytes" -ge "$MiB" ]]; then
+		printf "%.1f MB" "$(echo "$bytes / $MiB" | bc -l)"
+	elif [[ "$bytes" -ge "$KiB" ]]; then
+		printf "%.1f KB" "$(echo "$bytes / $KiB" | bc -l)"
 	else
 		printf "%d B" "$bytes"
 	fi
@@ -37,14 +38,15 @@ file_size() {
 		printf '0'
 		return
 	}
-	# shellcheck disable=SC2086 # STAT_SIZE_FMT must word-split into two arguments
+	# shellcheck disable=SC2086 # deliberate unquoted expansion of a single-token format string
 	stat $STAT_SIZE_FMT "$1" 2>/dev/null || printf '0'
 }
 
 cleanup_find() {
 	local dir="$1" label="$2"
 	shift 2
-	local count=0 bytes=0 size
+	local size
+	count=0 bytes=0
 	[[ -d "$dir" ]] || return 0
 	while IFS= read -r -d '' file; do
 		size=$(file_size "$file")
@@ -52,7 +54,7 @@ cleanup_find() {
 		count=$((count + 1))
 		$dry_run || rm -f "$file"
 	done < <(find "$dir" "$@" -type f -mtime +"$max_age_days" -print0)
-	if [[ "$count" -gt 0 ]]; then
+	if [[ -n "$label" && "$count" -gt 0 ]]; then
 		printf '  %s: %d files (%s)\n' "$label" "$count" "$(numfmt_bytes "$bytes")"
 		total_files=$((total_files + count))
 		total_bytes=$((total_bytes + bytes))
@@ -79,12 +81,9 @@ for project_dir in "$PROJECTS_DIR"/*/; do
 	project_name=$(basename "$project_dir")
 	project_files=0 project_dirs=0 project_bytes=0
 
-	while IFS= read -r -d '' file; do
-		size=$(file_size "$file")
-		project_bytes=$((project_bytes + size))
-		project_files=$((project_files + 1))
-		$dry_run || rm -f "$file"
-	done < <(find "$project_dir" -maxdepth 1 -name "*.jsonl" -type f -mtime +"$max_age_days" -print0)
+	cleanup_find "$project_dir" "" -maxdepth 1 -name "*.jsonl"
+	project_files=$((project_files + count))
+	project_bytes=$((project_bytes + bytes))
 
 	while IFS= read -r -d '' dir; do
 		dirname=$(basename "$dir")
