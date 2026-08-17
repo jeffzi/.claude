@@ -49,9 +49,11 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Tests first: check's fallow health step reads coverage/, which only
+      # a test run produces.
+      - name: Test
+        run: npm test
+
       - name: Check
         if: runner.os == 'Linux'
         run: npm run check
-
-      - name: Test
-        run: npm test
