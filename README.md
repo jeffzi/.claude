@@ -230,7 +230,7 @@ Add to your `~/.claude/settings.json`:
 To run the tests:
 
 ```bash
-bats tests/test_statusline.bats
+bats tests/
 ```
 
 ### Scripts
