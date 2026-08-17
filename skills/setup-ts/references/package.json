@@ -14,7 +14,7 @@
     "check:package": "run-s build && publint && attw --pack . --profile esm-only",
     "check:quality": "fallow --fail-on-issues --quiet",
     "check:security": "fallow security",
-    "check:spelling": "cspell --no-progress \"**/*.{ts,tsx,mts,cts,md}\"",
+    "check:spelling": "cspell --no-progress --no-must-find-files \"**/*.{ts,tsx,mts,cts,md}\"",
     "check:static": "run-s -c check:lint check:md check:fmt check:actions check:typelint check:spelling check:type",
     "check:type": "tsc -p tsconfig.json --noEmit",
     "check:typelint": "oxlint --type-aware",
@@ -42,10 +42,10 @@
     "oxlint": "^1.74.0",
     "oxlint-tsgolint": "^0.25.0",
     "publint": "^0.3.22",
+    "npm-run-all2": "^9.0.0",
     "tsx": "^4.23.0",
     "typescript": "^7.0.0",
-    "vitest": "^4.1.0",
-    "npm-run-all2": "^9.0.0"
+    "vitest": "^4.1.0"
   },
   "overrides": {
     "markdownlint-cli2": {

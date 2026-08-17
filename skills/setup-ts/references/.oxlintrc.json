@@ -5,7 +5,7 @@
     "perf": "error",
     "suspicious": "error"
   },
-  "ignorePatterns": ["dist", "coverage", "node_modules", ".claude", ".agent"],
+  "ignorePatterns": [".agents", ".claude", ".planning", ".research", "coverage", "dist", "node_modules"],
   "overrides": [
     {
       "files": ["scripts/**"],
