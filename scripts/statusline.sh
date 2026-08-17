@@ -29,9 +29,9 @@ readonly STAT_UNUSABLE_STATUS=3
 # read stays a fraction of a millisecond.
 readonly TRANSCRIPT_TAIL_BYTES=262144
 
-# ---------------------------------------------------------------------------
-# Portable stat & hash utilities
-# ---------------------------------------------------------------------------
+# ╭────────────────────────────────────────────────────────────╮
+# │               Portable stat & hash utilities               │
+# ╰────────────────────────────────────────────────────────────╯
 
 # Portable SHA-256: reads stdin, emits the first 8 hex characters on stdout.
 # macOS ships shasum; some Linux distros ship only sha256sum.
@@ -61,9 +61,9 @@ detect_stat_fmt() {
 
 STAT_FMT=$(detect_stat_fmt)
 
-# ---------------------------------------------------------------------------
-# Usage fetch, lock, and cache
-# ---------------------------------------------------------------------------
+# ╭────────────────────────────────────────────────────────────╮
+# │                Usage fetch, lock, and cache                │
+# ╰────────────────────────────────────────────────────────────╯
 
 # Reads the OAuth usage endpoint for the account keyed by $1 and emits the stdin
 # .rate_limits shape on stdout (resets_at as epoch seconds).
@@ -313,9 +313,9 @@ fetch_usage_fallback() {
 	printf '%s' "$filtered"
 }
 
-# ---------------------------------------------------------------------------
-# Rendering: countdown, color, gauge
-# ---------------------------------------------------------------------------
+# ╭────────────────────────────────────────────────────────────╮
+# │             Rendering: countdown, color, gauge             │
+# ╰────────────────────────────────────────────────────────────╯
 
 # Time left before a window resets, for both the 5h and the 7d one: "4d13h" once a day
 # is on the clock, "2h10m" below that, "45m" below an hour. Zero units are dropped ("5d",
@@ -476,9 +476,9 @@ format_context_bar() {
 	printf '%s' "$out"
 }
 
-# ---------------------------------------------------------------------------
-# Directory and git
-# ---------------------------------------------------------------------------
+# ╭────────────────────────────────────────────────────────────╮
+# │                     Directory and git                      │
+# ╰────────────────────────────────────────────────────────────╯
 
 # The branch checked out at $1, empty when there is no name to give: the path is outside a
 # repository, HEAD is detached, or git is not installed. All three are ordinary here, so they
@@ -501,9 +501,9 @@ format_dir() {
 	printf '%s' "$out"
 }
 
-# ---------------------------------------------------------------------------
-# Dependency checks and field extraction
-# ---------------------------------------------------------------------------
+# ╭────────────────────────────────────────────────────────────╮
+# │           Dependency checks and field extraction           │
+# ╰────────────────────────────────────────────────────────────╯
 
 # Fail fast with the culprit named instead of letting a missing tool surface as a
 # misleading downstream error: absent jq reads as a stdin parse failure. The name reaches
@@ -542,9 +542,9 @@ jq_fields() {
 	printf '%s' "$json" | jq -r "$expr"' | map(tostring) | join("\u001f")'
 }
 
-# ---------------------------------------------------------------------------
-# Model family detection
-# ---------------------------------------------------------------------------
+# ╭────────────────────────────────────────────────────────────╮
+# │                   Model family detection                   │
+# ╰────────────────────────────────────────────────────────────╯
 
 # The family token of a model ID: "opus" out of "claude-opus-4-1-20250805". Anything that
 # does not name a Claude model has no family, and says so with silence rather than a
@@ -589,9 +589,9 @@ transcript_model_family() {
 	model_family "$served"
 }
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
+# ╭────────────────────────────────────────────────────────────╮
+# │                        Entry point                         │
+# ╰────────────────────────────────────────────────────────────╯
 
 # Reports $1 on the status line itself, not only on stderr. Every field the line draws
 # comes out of one jq pass, so a pass that fails leaves nothing to draw — and a
