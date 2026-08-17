@@ -6,10 +6,8 @@ set -euo pipefail
 # ╰────────────────────────────────────────────────────────╯
 # Validates marimo notebooks before git commit
 
-# Skip silently if uvx not installed
 command -v uvx >/dev/null || exit 0
 
-# Get staged Python files
 staged_files=$(git --no-optional-locks diff --cached --name-only --diff-filter=ACM 2>/dev/null | grep '\.py$' || true)
 
 [[ -z "$staged_files" ]] && exit 0
@@ -18,7 +16,6 @@ failed=0
 while IFS= read -r file_path; do
 	[[ -f "$file_path" ]] || continue
 
-	# Check if the file appears to be a marimo notebook
 	if grep -qE '(import marimo|@app\.cell)' "$file_path" 2>/dev/null; then
 		printf "Running marimo check on %s...\n" "$file_path"
 

@@ -11,20 +11,16 @@ set -euo pipefail
 # Output: stderr on timeout with diagnostic info
 # Exit: 0 to allow, 2 to block
 
-# Check jq dependency
 command -v jq >/dev/null || exit 0
 
 # Read JSON input
 input=$(cat)
 full_command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 
-# Exit if no command found
 [[ -z "$full_command" ]] && exit 0
 
-# Skip if not a git command
 [[ "$full_command" =~ ^[[:space:]]*git([[:space:]]|$) ]] || exit 0
 
-# Skip if not in a git repo
 git --no-optional-locks rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
 # ╭────────────────────────────────────────────────────────────╮
@@ -50,7 +46,6 @@ get_git_subcmd() {
 			continue
 		fi
 
-		# Handle options that take a separate argument
 		case "$word" in
 		-C | -c | --git-dir | --work-tree | --namespace)
 			skip_next=true
@@ -117,7 +112,6 @@ wait_for_lock() {
 		((elapsed += 100))
 	done
 
-	# Check if lock still exists after timeout
 	if [[ -f "$lock_path" ]]; then
 		return 1 # Lock persisted — timeout
 	fi
@@ -159,7 +153,6 @@ print_diagnostic() {
 git_dir=$(git --no-optional-locks rev-parse --git-dir)
 lock_path="$git_dir/index.lock"
 
-# Extract subcommand from the full command
 subcmd=$(get_git_subcmd "$full_command") || exit 0
 
 # If not a mutating command, allow immediately

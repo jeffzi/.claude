@@ -11,8 +11,7 @@ cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 [[ -n "$cmd" ]] || exit 0
 [[ "$cmd" =~ git[[:space:]].*commit ]] || exit 0
 
-# Scan the full command — covers -m "...", --message=, heredocs, and -F input.
-# Previous approach extracted only -m "..." which silently missed heredoc commits.
+# Do not extract only -m "...": heredoc and -F commits would be missed.
 reason=""
 
 # Numeric phase ID as scope: feat(03.5-01): or feat(05-01):
