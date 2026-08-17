@@ -348,9 +348,38 @@ check_destructive_operations() {
 		block_destructive "git branch -D" "Force-deletes branch, may lose unmerged commits."
 
 	# ── Restore ──────────────────────────────────────────────────
-	# git restore without --staged discards changes
-	is_git_subcmd "restore" && [[ ! "$command" =~ --staged ]] &&
-		block_destructive "git restore (discard)" "Discards uncommitted changes to files."
+	if is_git_subcmd "restore"; then
+		# --worktree / -W discards working tree changes even when combined with --staged
+		[[ "$command" =~ [[:space:]](-W|--worktree)([[:space:]]|$) ]] &&
+			block_destructive "git restore --worktree" "Discards uncommitted changes to files."
+
+		# Without --staged, restore discards working-tree changes
+		[[ ! "$command" =~ --staged ]] &&
+			block_destructive "git restore (discard)" "Discards uncommitted changes to files."
+	fi
+
+	# ── Rm ───────────────────────────────────────────────────────
+	# git rm deletes files from the working tree unless --cached or dry-run (-n/--dry-run)
+	if is_git_subcmd "rm"; then
+		[[ "$command" =~ [[:space:]]--cached([[:space:]]|$) ]] && return 0
+		[[ "$command" =~ [[:space:]]--dry-run([[:space:]]|$) ]] && return 0
+		# Bundled short flags containing n (dry-run): -n, -rn, -fn, etc.
+		[[ "$command" =~ [[:space:]]-[a-zA-Z]*n ]] && return 0
+		block_destructive "git rm" "Deletes files from the working tree. Use --cached to only unstage."
+	fi
+
+	# ── Reflog / prune ──────────────────────────────────────────
+	# git reflog expire/delete destroys reflog entries
+	is_git_subcmd "reflog" && [[ "$command" =~ [[:space:]](expire|delete)([[:space:]]|$) ]] &&
+		block_destructive "git reflog expire/delete" "Destroys reflog entries, making recovery impossible."
+
+	# git prune removes unreachable objects
+	is_git_subcmd "prune" &&
+		block_destructive "git prune" "Removes unreachable objects. Let git gc handle pruning safely."
+
+	# git gc --prune= forces immediate pruning of objects
+	is_git_subcmd "gc" && [[ "$command" =~ [[:space:]]--prune= ]] &&
+		block_destructive "git gc --prune" "Immediate pruning risks losing recoverable objects."
 
 	# ── Commit ───────────────────────────────────────────────────
 	# git commit --amend rewrites history
