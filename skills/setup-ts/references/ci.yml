@@ -46,6 +46,9 @@ jobs:
           pipx install zizmor==1.29.0
           echo "$(python3 -m site --user-base)/bin" >> "$GITHUB_PATH"
 
+      - name: Build
+        run: npm run build
+
       - name: Check
         if: runner.os == 'Linux'
         run: npm run check

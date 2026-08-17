@@ -32,9 +32,8 @@
     "@commitlint/cli": "^21.2.0",
     "@commitlint/config-conventional": "^21.2.0",
     "@types/node": "^26.1.0",
-    "@vitest/coverage-v8": "^4.1.0",
+    "@vitest/coverage-istanbul": "^4.1.0",
     "cspell": "^10.0.0",
-    "esbuild": "^0.28.0",
     "fallow": "^3.6.0",
     "lefthook": "^2.1.0",
     "markdownlint-cli2": "^0.23.0",
@@ -43,7 +42,6 @@
     "oxlint-tsgolint": "^0.25.0",
     "publint": "^0.3.22",
     "npm-run-all2": "^9.0.0",
-    "tsx": "^4.23.0",
     "typescript": "^7.0.0",
     "vitest": "^4.1.0"
   },
