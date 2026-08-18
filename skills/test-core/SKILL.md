@@ -38,7 +38,10 @@ Every test function has three distinct phases, in order:
 3. **Assert** — verify the expected outcome
 
 No logic between phases. No assertions in Arrange. One Act per test. "And" in the test name? Split
-it. Name the behavior the test proves, never an ordinal (`test1`).
+it. Name the behavior the test proves, never an ordinal (`test1`). Separate phases with a blank
+line, not with comments — `// Arrange`, `// Act`, `// Assert` labels restate what the code structure
+already shows. Remove bare labels entirely; strip the prefix from comments that carry a real
+explanation.
 
 ### 2. Test Behavior, Not Implementation
 
@@ -137,6 +140,7 @@ with gate functions and fixes.
 | "Too simple to test"                     | Simple code breaks. Test takes 30 seconds.                      |
 | "Tests look reasonable"                  | "Reasonable" skips pairwise comparison. Apply the merge table.  |
 | "AAA is implied"                         | Implicit ≠ verified. Check phase separation per test.           |
+| "AAA comments help readability"          | A blank line separates phases; the label restates the obvious.  |
 | "Each edge case deserves its own test"   | Same code path + different inputs = merge. See merge table.     |
 | "I need to verify the mock was called"   | Assert the outcome, not the wiring. See behavior-vs-impl table. |
 | "Testing _func directly boosts coverage" | Coverage via private imports is fake. Drive through public API. |
@@ -156,3 +160,4 @@ STOP and re-check if any of these are true:
 - You cannot explain, in one sentence, what behavior the test proves
 - A loop inside the test body is performing the same assertion with different inputs
 - A test imports from `_internals` / `_private` / other private modules
+- A test has `// Arrange`, `// Act`, or `// Assert` phase-label comments

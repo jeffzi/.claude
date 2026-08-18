@@ -57,6 +57,7 @@ Load all three, then walk the five standards.
    | `[a-f0-9]{7,40}`                                                                                                                                          | commit hashes in comments |
    | `(====\|####\|#region\|/region)`                                                                                                                          | non-standard separators   |
    | `(originally\|used to\|earlier version\|previously\|no longer\|Historically\|we considered\|rejected\|trade-off)`                                         | history narration (S5)    |
+   | `(Arrange\|Act\|Assert)\b`                                                                                                                                | AAA phase-label noise     |
 
    These are _seeds_, not verdicts. Read every hit in full context before deciding. A match inside a
    string literal, URL, or version number is not a comment issue.
@@ -112,10 +113,19 @@ A step comment that restates the code is a violation. Patterns that almost alway
 
 > "Check if …", "Get the …", "Set the …", "Add … to …", "Create a …", "Declare the …", "Initialize
 > …", "Build the …", "Update the …", "Remove …", "Return the …", "Loop through …", "Iterate over …",
-> "Call …", "Handle the …"
+> "Call …", "Handle the …", "Arrange …", "Act …", "Assert …"
 
 If the step genuinely needs a label and there is nothing non-obvious to say, the comment goes — the
 code is the label.
+
+**AAA phase labels** — `Arrange`, `Act`, `Assert` — always restate the test structure; blank lines
+already separate phases. Judge the label separately from what follows the dash. A bare label
+(`// Arrange`) is removed. A label prefixing a real why
+(`// Assert — factory failure surfaced once;
+latching skips the append`) is still an S1 finding on
+the prefix — the fix strips the prefix and keeps the why:
+`// factory failure surfaced once; latching skips the append`. The content after the dash being
+valuable does not clear the label before it.
 
 A confirmed restatement is `confirmed`, whether it sits inside a function or in a doc block. Do not
 demote to `unconfirmed` because the comment is short, the block is otherwise well-formed, or the fix
@@ -272,6 +282,7 @@ codegen markers, license blocks) and never a `TODO`/`FIXME` pointing at future w
 | Non-standard separator (`=====`, `#region`, box drawing)                | Violation — replace with house banner shape (S2)                       |
 | Narrates a past implementation, dropped dep, rejected alternative       | Violation — S5; extract any constraint as an imperative, drop the rest |
 | Aside about a caller/consumer this code neither controls nor constrains | Violation — S5; rewrite as the constraint on editing below, or drop    |
+| AAA phase label (`// Arrange`, `// Act —`, `// Assert —`)               | Violation — S1; bare → remove; prefix + why → strip prefix, keep why   |
 | Names what a future edit must not break                                 | Clean — keep, whatever tense it uses                                   |
 
 ## Preservation rules
