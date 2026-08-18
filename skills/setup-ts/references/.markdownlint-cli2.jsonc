@@ -1,26 +1,24 @@
 {
   "config": {
     "default": true,
-    "MD013": false,
+    "MD013": { "line_length": 100, "code_blocks": true, "tables": false },
     "MD024": {
-      "siblings_only": true
+      "siblings_only": true,
     },
     "MD033": false,
     "MD044": {
       "names": ["ESLint", "GitHub", "JavaScript", "Node.js", "npm", "TypeScript", "Vitest"],
-      "code_blocks": false
+      "code_blocks": false,
     },
-    "MD060": false
+    "MD060": false,
   },
   "ignores": [
-    ".agents/**",
-    ".claude/**",
     ".planning/**",
     ".research/**",
     ".stryker-tmp/**",
     "AGENTS.md",
     "CLAUDE.md",
     "LICENSE",
-    "node_modules/**"
-  ]
+    "node_modules/**",
+  ],
 }
