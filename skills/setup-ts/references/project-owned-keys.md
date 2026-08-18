@@ -6,7 +6,7 @@ Never surface as drift.
 
 | File                             | Owned keys                                                 |
 | -------------------------------- | ---------------------------------------------------------- |
-| `.oxlintrc.json`                 | `overrides`, `ignorePatterns`                              |
+| `.oxlintrc.json`                 | `overrides` (entries and extra rules), `ignorePatterns`    |
 | `.markdownlint-cli2.jsonc`       | `ignores` (project may add entries)                        |
 | `fallow.json` → `.fallowrc.json` | `entry`                                                    |
 | `cspell.json`                    | `words`                                                    |
@@ -15,6 +15,12 @@ Never surface as drift.
 | `vitest.config.ts`               | `coverage.thresholds` values                               |
 | `AGENTS.md`                      | Every section except `## Commands`                         |
 | `package.json`                   | Every top-level key except `scripts` and `devDependencies` |
+
+`.oxlintrc.json` `overrides` is owned at the entry level, not the rule level: a project may add
+entries, add globs, and add rules, but every rule the template sets inside an override entry is a
+house rule and must be present in the project entry that matches the same glob (e.g. the tests
+entry's `"max-lines": "off"` — the top-level size rules depend on it). Reconcile those rule keys
+with the same add/conflict logic as `rules`; treat only project-added rules as owned.
 
 Within `devDependencies`, version ranges are project-owned — only the key set is reconciled
 (presence/absence); version bumps are `/upgrade-ts`'s job.

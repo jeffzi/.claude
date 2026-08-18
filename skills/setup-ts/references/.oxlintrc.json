@@ -16,7 +16,7 @@
     {
       "files": ["tests/**", "**/*.test.ts", "**/*.spec.ts"],
       "rules": {
-        "max-lines": "off",
+        "max-lines": ["error", { "max": 800, "skipBlankLines": true, "skipComments": true }],
         "max-lines-per-function": "off",
         "no-control-regex": "off",
         "unicorn/consistent-function-scoping": "off"
