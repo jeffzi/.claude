@@ -16,8 +16,6 @@
     ".planning/**",
     ".research/**",
     ".stryker-tmp/**",
-    "AGENTS.md",
-    "CLAUDE.md",
     "LICENSE",
     "node_modules/**",
   ],
