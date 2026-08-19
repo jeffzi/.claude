@@ -65,15 +65,15 @@ script's `add` commands are the source map.
 
 #### Review
 
-| Skill                                                        | Description                                                         |
-| ------------------------------------------------------------ | ------------------------------------------------------------------- |
-| [`revise-code`](skills/revise-code/SKILL.md)                 | Review code for idiom/type/structure violations, then fix           |
-| [`revise-test`](skills/revise-test/SKILL.md)                 | Review tests for redundancy and Arrange-Act-Assert issues, then fix |
-| [`revise-doc`](skills/revise-doc/SKILL.md)                   | Review docs for structural and prose issues, then fix               |
-| [`revise-comments`](skills/revise-comments/SKILL.md)         | Review comment style, banners, and anchors, then fix                |
-| [`revise-skill`](skills/revise-skill/SKILL.md)               | Review SKILL.md files for quality and structure, then fix           |
-| [`scan-bug`](skills/scan-bug/SKILL.md)                       | Scan for runtime bugs: null access, leaks, races, logic errors      |
-| [`scan-simplification`](skills/scan-simplification/SKILL.md) | Scan for over-engineering and unneeded complexity                   |
+| Skill                                                        | Description                                                    |
+| ------------------------------------------------------------ | -------------------------------------------------------------- |
+| [`revise-code`](skills/revise-code/SKILL.md)                 | Review code for idiom/type/structure violations, then fix      |
+| [`revise-test`](skills/revise-test/SKILL.md)                 | Review tests (per-file + cross-file on directories), then fix  |
+| [`revise-doc`](skills/revise-doc/SKILL.md)                   | Review docs for structural and prose issues, then fix          |
+| [`revise-comments`](skills/revise-comments/SKILL.md)         | Review comment style, banners, and anchors, then fix           |
+| [`revise-skill`](skills/revise-skill/SKILL.md)               | Review SKILL.md files for quality and structure, then fix      |
+| [`scan-bug`](skills/scan-bug/SKILL.md)                       | Scan for runtime bugs: null access, leaks, races, logic errors |
+| [`scan-simplification`](skills/scan-simplification/SKILL.md) | Scan for over-engineering and unneeded complexity              |
 
 Each `/revise-*` command dispatches the matching read-only `vet-*` agent, then applies what it
 finds. Dispatch the agent directly when you want findings without edits.
@@ -122,6 +122,7 @@ finds. Dispatch the agent directly when you want findings without edits.
 | [`distill-scanner`](agents/distill-scanner.md)               | Read-only distillation review: nesting, duplication     |
 | [`vet-code`](agents/vet-code.md)                             | Review code against idiom, type, and structure rules    |
 | [`vet-test`](agents/vet-test.md)                             | Review tests for redundancy, AAA, and drift             |
+| [`vet-test-suite`](agents/vet-test-suite.md)                 | Review whole test suite for cross-file redundancy       |
 | [`vet-doc`](agents/vet-doc.md)                               | Review docs for structure, prose, accessibility         |
 | [`vet-comments`](agents/vet-comments.md)                     | Review comment style, banners, and anchors              |
 | [`vet-skill`](agents/vet-skill.md)                           | Review SKILL.md files for quality and structure         |
@@ -130,7 +131,7 @@ finds. Dispatch the agent directly when you want findings without edits.
 | [`tdd-cycle`](agents/tdd-cycle.md)                           | Context-isolated RED-GREEN cycle agent                  |
 | [`claim-reviewer`](agents/claim-reviewer.md)                 | Verify claims against the codebase independently        |
 
-The five `vet-*` agents are read-only: no `Edit`, `Write`, or `Bash`. They return `### Finding N`
+The six `vet-*` agents are read-only: no `Edit`, `Write`, or `Bash`. They return `### Finding N`
 blocks scored for confidence; most also carry a domain impact tag. The paired `revise-*` skill gates
 on the score, orders the fix queue by impact where the tag exists, and applies the fixes.
 

@@ -5,16 +5,17 @@ in the same session. Plan mode context is erased on approval; never mark a skill
 loaded". When a skill, command, or rule prescribes an agent instead of a load, dispatch it — see
 "Agent dispatch is pre-approved" below.
 
-| Action                                    | Skill to load first                                                             |
-| ----------------------------------------- | ------------------------------------------------------------------------------- |
-| EnterPlanMode or writing a plan           | `Skill(write-plan)`                                                             |
-| Writing code                              | `Skill(code-core)` (hub — loads the language skill via Language Dispatch below) |
-| Writing tests                             | `Skill(test-core)` (hub — loads the language skill via Language Dispatch below) |
-| Running TDD cycle                         | `Skill(tdd)` (hub load + RED-GREEN orchestration)                               |
-| Reviewing code or tests                   | Dispatch `subagent_type: vet-code` / `vet-test`, or run `/revise-*` to also fix |
-| User explicitly asks to commit            | `Skill(write-commit)`                                                           |
-| Bug or regression with unknown root cause | `/fix` command — investigates, then TDD                                         |
-| New feature in a project with tests       | `Skill(tdd)` — start red–green cycle directly                                   |
+| Action                                    | Skill to load first                                                                          |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------- |
+| EnterPlanMode or writing a plan           | `Skill(write-plan)`                                                                          |
+| Writing code                              | `Skill(code-core)` (hub — loads the language skill via Language Dispatch below)              |
+| Writing tests                             | `Skill(test-core)` (hub — loads the language skill via Language Dispatch below)              |
+| Running TDD cycle                         | `Skill(tdd)` (hub load + RED-GREEN orchestration)                                            |
+| Reviewing code or tests                   | Dispatch `subagent_type: vet-code` / `vet-test`, or run `/revise-*` to also fix              |
+| Reviewing a whole test suite              | Dispatch `subagent_type: vet-test-suite`; `/revise-test` with a directory also dispatches it |
+| User explicitly asks to commit            | `Skill(write-commit)`                                                                        |
+| Bug or regression with unknown root cause | `/fix` command — investigates, then TDD                                                      |
+| New feature in a project with tests       | `Skill(tdd)` — start red–green cycle directly                                                |
 
 If no matching skill exists for a language or framework, note that explicitly in the plan rather
 than silently skipping the step.

@@ -2,8 +2,10 @@
 name: revise-test
 description: >
   Use when test files need review for redundancy, AAA violations, behavior-vs-implementation
-  drift, and weak assertions, and the violations fixed in place. Not for writing new tests — use
-  tdd. Not for failing tests with unknown root cause — use /fix.
+  drift, and weak assertions, and the violations fixed in place. Also use when a test suite needs
+  cross-file fixes — extracting shared fixtures, merging duplicate tests across files, deleting
+  duplicate traversals. Not for suite review without fixes — dispatch vet-test-suite. Not for
+  writing new tests — use tdd. Not for failing tests with unknown root cause — use /fix.
 argument-hint: "[test file or directory]"
 model: opus
 effort: high
@@ -16,31 +18,56 @@ effort: high
 Load `Skill(revise-core)` before step 1 — it carries the shared protocol (triage gates, impact
 ordering, review-only handling, report rules) that every step below follows.
 
-Review test files with the `vet-test` agent, then apply the fixes here. The agent finds; you fix.
+Review test files with the `vet-test` agent (and `vet-test-suite` for directory targets), then apply
+the fixes here. The agents find; you fix.
+
+## Changed files (no-argument path)
+
+```!
+git diff --name-only 2>/dev/null
+git diff --cached --name-only 2>/dev/null
+git ls-files --others --exclude-standard 2>/dev/null
+```
 
 ## Process
 
-1. **Resolve targets and scope.**
-   - No argument → the current diff (`git diff --name-only`, `git diff --cached --name-only`,
-     `git ls-files --others --exclude-standard`).
+1. **Resolve targets.**
+   - No argument → the changed files listed above.
+   - File or directory argument → that path.
    - Filter to test files only. Production code belongs to `/revise-code`.
 
-2. **Dispatch the reviewer:** `subagent_type: vet-test`. The agent loads `test-core` plus the
-   language leaves.
+2. **Dispatch the reviewers.**
+   - Dispatch `subagent_type: vet-test` per bucket, following the revise-core bucketing rule.
+   - **Directory targets only:** also dispatch exactly one `subagent_type: vet-test-suite` with the
+     whole directory, scope `full` — never one per bucket: cross-file duplication crosses
+     directories, and the suite agent scales by inventory, not by reading. It joins the same
+     parallel message. `STATUS: WRONG_INPUT` → discard it; the per-file agents still run.
 
 3. **Triage the findings.** Impact enum: `coverage` → `fragility` → `cost` → `clarity`. Coverage
    holes get fixed even when the session is cut short; a misleading name waits.
 
 4. **Apply the fixes.** Load `Skill(test-core)` and the matching `test-{lang}` leaf before editing —
-   you are writing tests, and the leaf's rules govern the replacement as much as they governed the
-   finding. For each, name the rule the fix satisfies.
+   the leaf's rules govern the replacement as much as they governed the finding. For each, name the
+   rule the fix satisfies.
 
    Deleting a redundant test is a fix; deleting a test because it fails is not. If a finding would
-   reduce coverage rather than redundancy, surface it instead of applying it.
+   reduce what the suite covers (not how many times it covers it), surface it instead of applying.
 
-5. **Verify.** Run the test suite. Every test must still pass, and the suite must still cover what
-   it covered before. A failing suite means the fix is wrong — revert that fix and move it to the
-   report-only queue with the failure attached.
+   **Cross-file merges** (suite-agent findings). When the same behavior is pinned in two files:
+   - Keep the pin at the level that owns the behavior — the finding's Reasoning names the file.
+   - Fold assertions unique to the deleted copy into the survivor, parametrizing where the finding
+     says so.
+   - Delete the duplicate file or test block.
+
+   **Fixture extraction** (suite-agent findings). Extract cloned setup (mock preambles, stub
+   factories, duplicated helpers) to the project's existing shared-fixture location (e.g.
+   `tests/fixtures/`).
+
+5. **Verify.** Before applying any fix, record test file count, test count, and test LOC. After all
+   fixes: run the test suite — every test passes, and the test count differs from the recorded count
+   only by the tests the fix queue merged or deleted, each accounted for by a named surviving pin. A
+   failing suite means the fix is wrong — revert that fix and move it to the report-only queue with
+   the failure attached.
 
 6. **Report** (template below).
 
@@ -61,6 +88,16 @@ Review test files with the `vet-test` agent, then apply the fixes here. The agen
 | Issue | Location | Impact | Verdict | Why not fixed |
 | ----- | -------- | ------ | ------- | ------------- |
 
+### Suite delta (when suite-agent findings were fixed)
+
+| Metric | Before | After |
+| ------ | ------ | ----- |
+| Files  |        |       |
+| Tests  |        |       |
+| LOC    |        |       |
+
+Fixtures created: [list or "none"]
+
 ### Verification
 
 [test command → pass/fail, test count before and after]
@@ -68,12 +105,11 @@ Review test files with the `vet-test` agent, then apply the fixes here. The agen
 
 ## Common mistakes
 
-- ❌ Fixing `false-positive` findings → the agent already classified them as false positives
-- ❌ Editing before loading `test-core` and the language leaf → the fix drifts from the same rules
-  that produced the finding
-- ❌ Deleting a test to make a finding go away → merging redundant tests is a fix; dropping coverage
-  is not
-- ❌ Silently dropping `suspected` or unsubstantiated findings → they belong in the report
-- ❌ Treating `clarity` or `cost` as skippable → impact orders the queue; only the verdict gates it.
-  Every `confirmed` finding gets fixed, last no less than first
-- ❌ Reporting fixes without re-running the suite → "should work" is not verification
+- ❌ Fixing `false-positive` findings
+- ❌ Editing before loading `test-core` and the language leaf
+- ❌ Deleting a test to make a finding go away
+- ❌ Treating `clarity` or `cost` as skippable — the verdict gates the queue; impact only orders it
+- ❌ Reporting fixes without re-running the suite
+- ❌ Skipping the `vet-test-suite` dispatch on a directory target
+- ❌ Dispatching `vet-test-suite` per bucket
+- ❌ Keeping a merged test in an arbitrary file
