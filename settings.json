@@ -211,7 +211,7 @@
     }
   },
   "outputStyle": "Terse",
-  "effortLevel": "high",
+  "effortLevel": "medium",
   "promptSuggestionEnabled": false,
   "tui": "fullscreen",
   "autoMemoryEnabled": false,
