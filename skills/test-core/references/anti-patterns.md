@@ -1,7 +1,8 @@
 # Testing Anti-Patterns
 
 **Load this reference when:** writing or changing tests, adding mocks, reviewing tests that use
-mocks, or tempted to add test-only methods to production code.
+mocks, writing a test that varies inputs over one code path, or tempted to add test-only methods to
+production code.
 
 ## Table of Contents
 
@@ -11,8 +12,7 @@ mocks, or tempted to add test-only methods to production code.
 - [Anti-Pattern 2: Test-Only Methods in Production](#anti-pattern-2-test-only-methods-in-production)
 - [Anti-Pattern 3: Mocking Without Understanding](#anti-pattern-3-mocking-without-understanding)
 - [Anti-Pattern 4: Incomplete Mocks](#anti-pattern-4-incomplete-mocks)
-- [Anti-Pattern 5: Integration Tests as Afterthought](#anti-pattern-5-integration-tests-as-afterthought)
-- [Anti-Pattern 6: Stacked Assertions Over Varying Inputs](#anti-pattern-6-stacked-assertions-over-varying-inputs)
+- [Anti-Pattern 5: Stacked Assertions Over Varying Inputs](#anti-pattern-5-stacked-assertions-over-varying-inputs)
 - [When Mocks Become Too Complex](#when-mocks-become-too-complex)
 - [Red Flags](#red-flags)
 
@@ -255,33 +255,7 @@ BEFORE creating a mock response:
   If uncertain: include all documented fields.
 ```
 
-## Anti-Pattern 5: Integration Tests as Afterthought
-
-**The violation:**
-
-```text
-Implementation complete
-No tests written
-"Ready for testing"
-```
-
-**Why this is wrong:**
-
-- Testing is part of implementation, not an optional follow-up
-- TDD would have caught this
-- You can't claim complete without tests
-
-**The fix:**
-
-```text
-TDD cycle:
-  1. Write failing test
-  2. Implement to pass
-  3. Refactor
-  4. THEN claim complete
-```
-
-## Anti-Pattern 6: Stacked Assertions Over Varying Inputs
+## Anti-Pattern 5: Stacked Assertions Over Varying Inputs
 
 **The violation:**
 
