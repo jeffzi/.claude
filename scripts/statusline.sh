@@ -407,11 +407,12 @@ format_limit_segment() {
 	color=$(usage_color "$used_int")
 	pace=$(format_pace "$used_int" "$reset_epoch" "$window_sec" "$now")
 	reset=$(format_countdown "$reset_epoch" "$now")
-	# The countdown earns its place once usage is high enough to matter, or once the
-	# window is about to close — a sub-hour reset is worth knowing regardless of usage.
+	# The countdown earns its place once usage is high enough to matter, once the
+	# window is about to close, or once a pace arrow signals the burn rate is worth
+	# watching — a sub-hour reset is worth knowing regardless of usage.
 	if [[ -n "$reset" ]]; then
 		local remaining=$((reset_epoch - now))
-		if ((used_int >= COUNTDOWN_MIN_PCT || (remaining > 0 && remaining < COUNTDOWN_URGENT_SECONDS))); then
+		if ((used_int >= COUNTDOWN_MIN_PCT || (remaining > 0 && remaining < COUNTDOWN_URGENT_SECONDS))) || [[ -n "$pace" ]]; then
 			detail=" · ${reset}"
 		fi
 	fi

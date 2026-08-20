@@ -308,8 +308,8 @@ teardown_file() {
 	assert_segment_plain "5h" 100 "$NOW" "$PACE_WINDOW" " │ 5h 100%"
 }
 
-@test "74%: below the threshold, no countdown follows" {
-	assert_segment_plain "5h" 74 "$PACE_RESET" "$PACE_WINDOW" " │ 5h 74%↓"
+@test "74%: below the percentage threshold, but the pace arrow brings the countdown" {
+	assert_segment_plain "5h" 74 "$PACE_RESET" "$PACE_WINDOW" " │ 5h 74%↓ · 1h"
 }
 
 @test "75%: at the threshold, the countdown appears" {
