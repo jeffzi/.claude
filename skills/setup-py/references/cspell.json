@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json",
+  "version": "0.2",
+  "language": "en",
+  "files": ["**/*.{py,pyi,md}"],
+  "words": [
+    "isort",
+    "prek",
+    "pylint",
+    "pyproject",
+    "pyrefly",
+    "pytest",
+    "Taskfile",
+    "venv",
+    "virtualenvs",
+    "zizmor"
+  ],
+  "ignorePaths": [
+    ".hypothesis",
+    ".planning",
+    ".pytest_cache",
+    ".research",
+    ".ruff_cache",
+    ".venv",
+    "build",
+    "coverage.xml",
+    "dist",
+    "htmlcov",
+    "uv.lock"
+  ]
+}

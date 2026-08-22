@@ -1,0 +1,112 @@
+[project]
+name = "project"
+version = "0.0.0"
+description = ""
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "diff-cover>=10.5,<11",
+  "hypothesis>=6.165,<7",
+  "prek>=0.4.14,<0.5",
+  "pyrefly>=1.2,<2",
+  "pytest>=9.1,<10",
+  "pytest-cov>=7.1,<8",
+  "pytest-randomly>=4.1,<5",
+  "pytest-sugar>=1.1,<2",
+  "pytest-xdist>=3.8,<4",
+  "ruff>=0.16.4,<0.17",
+]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv]
+required-version = ">=0.11.31"
+exclude-newer = "7 days"
+preview-features = ["malware-check"]
+
+[tool.uv.audit]
+malware-check = true
+
+[tool.pyrefly]
+preset = "strict"
+project-includes = ["src", "tests"]
+python-version = "3.12"
+search-path = ["src"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  # --- Docstrings (relaxed for practicality) ---
+  "D100", # missing docstring in public module
+  "D104", # missing docstring in public package
+  "D105", # missing docstring in magic method
+  "D107", # missing docstring in __init__ (doc at class level)
+  # --- Style preferences ---
+  "COM812", # trailing comma (handled by formatter)
+  "ISC001", # single-line implicit string concat (conflicts with formatter)
+  "G004", # logging f-string (acceptable for modern Python)
+  "CPY001", # missing copyright notice (not wanted on every file)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402", "F401"]
+"**/{tests,docs}/*" = ["D101", "D102", "D103", "E402"]
+"**/tests/*" = [
+  "ANN001",  # missing type annotation for function argument
+  "ANN003",  # missing type annotation for **kwargs
+  "ANN201",  # missing return type for public function
+  "ANN202",  # missing return type for private function
+  "ANN204",  # missing return type for special method
+  "ANN401",  # dynamically typed expression (Any) — mock/fixture returns
+  "ARG001",  # unused function argument (injected fixtures)
+  "ARG002",  # unused method argument
+  "FBT001",  # boolean positional arg (parametrize values)
+  "INP001",  # implicit namespace package (tests have no __init__.py)
+  "PERF401", # manual list comprehension (perf irrelevant in tests)
+  "PLR2004", # magic value in comparison (assert x == 42)
+  "PLC0415", # import outside top-level (local test imports)
+  "PT012",   # pytest.raises block with multiple statements
+  "RUF043",  # pytest.raises(match) ambiguous pattern
+  "S101",    # use of assert
+  "S105",    # hardcoded password string
+  "S106",    # hardcoded password argument
+  "S108",    # hardcoded temp file path
+  "SIM117",  # nested with statements (raises + patch)
+  "SLF001",  # private member access
+  "TRY301",  # raise within try
+  "E501",    # line too long (long fixture data)
+]
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-n auto --cov --cov-report=term-missing"
+
+[tool.coverage.run]
+branch = true
+parallel = true
+omit = ["tests/**/conftest.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.",
+  "raise NotImplementedError",
+]
+show_missing = true
+fail_under = 90

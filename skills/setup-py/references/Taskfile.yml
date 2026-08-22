@@ -1,0 +1,62 @@
+version: "3"
+
+vars:
+  PYTHONS: "3.12 3.13 3.14"
+
+tasks:
+  default:
+    cmds:
+      - task --list --sort none
+    silent: true
+
+  _require-uv:
+    internal: true
+    preconditions:
+      - sh: command -v uv
+        msg: "uv is required — install: https://docs.astral.sh/uv/getting-started/installation/"
+
+  _require-dprint:
+    internal: true
+    preconditions:
+      - sh: command -v dprint
+        msg: "dprint is required — install: https://dprint.dev/install/"
+
+  install:
+    desc: Sync the project and dev dependencies from the lockfile
+    deps: [_require-uv]
+    cmds:
+      - uv sync --locked
+      - uv run prek install
+
+  test:
+    desc: "Run the test suite on the default interpreter (pass extra args after --)"
+    deps: [install]
+    cmds:
+      - uv run pytest {{.CLI_ARGS}}
+
+  test:matrix:
+    desc: Run the test suite on every supported Python version
+    deps: [_require-uv]
+    cmds:
+      - for: { var: PYTHONS, split: " " }
+        cmd: uv run --python {{.ITEM}} --locked pytest
+
+  check:
+    desc: Run every pre-commit hook across the repo (lint, format, type, spelling, actions, ...)
+    deps: [_require-uv, _require-dprint]
+    cmds:
+      - uv run prek run -a
+
+  check:fix:
+    desc: Auto-fix everything that supports it (ruff lint, ruff format, dprint, markdownlint)
+    deps: [install, _require-dprint]
+    cmds:
+      - uv run ruff check --fix
+      - uv run ruff format
+      - dprint fmt
+      - uv run prek run -a markdownlint-cli2
+
+  clean:
+    desc: Remove build artifacts, caches, and virtualenvs
+    cmds:
+      - rm -rf .venv .venv-* dist *.egg-info .pytest_cache
