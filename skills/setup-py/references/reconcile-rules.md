@@ -12,8 +12,9 @@ Apply the chosen edits with `Edit`/`Write`, preserving comments and key order.
   in the project is an _add_; a project-dropped hook is a _removal candidate_; `rev` values are
   never a conflict — they belong to `/upgrade-py`.
 - `AGENTS.md` reconciles at the section level, not by leaf path: reconcile only the house sections
-  `## Commands`, `## Git hygiene`, and `## Anti-patterns` against the template; leave every other
-  section untouched and never surface it as drift (see project-owned-keys.md).
+  `## Commands`, `## Git hygiene`, `## Linter and type-checker configuration`, and
+  `## Spelling (cspell)` against the template; leave every other section untouched and never surface
+  it as drift (see project-owned-keys.md).
 - `Taskfile.yml` and the `.github/workflows/*.yml` files are house-owned but routinely extended:
   ensure the template's tasks/jobs/steps are present, and keep project-added tasks, jobs, matrix
   entries, and steps without surfacing them as drift. If a template task/job differs, offer

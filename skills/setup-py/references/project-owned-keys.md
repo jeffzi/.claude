@@ -4,19 +4,19 @@ Keys the template ships with a default value but the project may freely override
 reconcile bucket — read them (so they aren't miscounted as removals) but keep their value as-is.
 Never surface as drift.
 
-| File                       | Owned keys                                                                                   |
-| -------------------------- | -------------------------------------------------------------------------------------------- |
-| `pyproject.toml`           | All of `[project]`, `[project.scripts]`, `[project.urls]`, `[project.optional-dependencies]` |
-| `pyproject.toml`           | `requires-python`, `[tool.ruff] target-version`, `[tool.pyrefly] python-version`             |
-| `pyproject.toml`           | `[tool.coverage.report] fail_under` (project may raise the floor)                            |
-| `.pre-commit-config.yaml`  | every `rev:` value (upgrade-py owns hook pins)                                               |
-| `.markdownlint-cli2.jsonc` | project-added rule entries                                                                   |
-| `cspell.json`              | `words`, project-added `ignorePaths` entries                                                 |
-| `dprint.json`              | `excludes`, project-added `includes` entries                                                 |
-| `AGENTS.md`                | Every section except `## Commands`, `## Git hygiene`, `## Anti-patterns`                     |
-| `Taskfile.yml`             | project-added tasks                                                                          |
-| `.github/workflows/*.yml`  | project-added jobs, steps, and matrix entries                                                |
-| `LICENSE`, `README.md`     | entirely project-owned once present (bootstrap-only, never reconciled)                       |
+| File                       | Owned keys                                                                                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `pyproject.toml`           | All of `[project]`, `[project.scripts]`, `[project.urls]`, `[project.optional-dependencies]`                             |
+| `pyproject.toml`           | `requires-python`, `[tool.ruff] target-version`, `[tool.pyrefly] python-version`                                         |
+| `pyproject.toml`           | `[tool.coverage.report] fail_under` (project may raise the floor)                                                        |
+| `.pre-commit-config.yaml`  | every `rev:` value (upgrade-py owns hook pins)                                                                           |
+| `.markdownlint-cli2.jsonc` | project-added rule entries                                                                                               |
+| `cspell.json`              | `words`, project-added `ignorePaths` entries                                                                             |
+| `dprint.json`              | `excludes`, project-added `includes` entries                                                                             |
+| `AGENTS.md`                | Every section except `## Commands`, `## Git hygiene`, `## Linter and type-checker configuration`, `## Spelling (cspell)` |
+| `Taskfile.yml`             | project-added tasks                                                                                                      |
+| `.github/workflows/*.yml`  | project-added jobs, steps, and matrix entries                                                                            |
+| `LICENSE`, `README.md`     | entirely project-owned once present (bootstrap-only, never reconciled)                                                   |
 
 `pyproject.toml` `[project]` is entirely project-owned (name, version, description, `dependencies`,
 readme). The Python version keys (`requires-python`, Ruff `target-version`, pyrefly
