@@ -2,6 +2,11 @@
   "env": {
     "CLAUDE_CODE_ENABLE_TELEMETRY": "0"
   },
+  "attribution": {
+    "commit": "",
+    "pr": "",
+    "sessionUrl": false
+  },
   "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
@@ -71,13 +76,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.claude/hooks/git-lock-guard.sh",
-            "if": "Bash(git *)"
+            "command": "$HOME/.claude/hooks/git-lock-guard.sh"
           },
           {
             "type": "command",
-            "command": "$HOME/.claude/hooks/git-guard.sh",
-            "if": "Bash(git *)"
+            "command": "$HOME/.claude/hooks/git-guard.sh"
           },
           {
             "type": "command",
@@ -198,7 +201,6 @@
     "rust-analyzer-lsp@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": false,
     "swift-lsp@claude-plugins-official": true,
-    "pyright-lsp@claude-plugins-official": true,
     "clangd-lsp@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true
   },
@@ -212,7 +214,19 @@
   },
   "outputStyle": "Terse",
   "effortLevel": "medium",
+  "modelSettings": {
+    "fable": {
+      "effortLevel": "high"
+    },
+    "opus": {
+      "effortLevel": "medium"
+    },
+    "sonnet": {
+      "effortLevel": "medium"
+    }
+  },
   "promptSuggestionEnabled": false,
+  "askUserQuestionTimeout": "never",
   "tui": "fullscreen",
   "autoMemoryEnabled": false,
   "skipDangerousModePermissionPrompt": true,
