@@ -7,10 +7,10 @@ description: >
 user-invocable: false
 ---
 
-# Test Core — Cross-Language Testing Principles
+# Test Core
 
-**Core principle:** Test behavior, not implementation. A refactor that preserves observable behavior
-should never break a test. Violating the letter of these rules is violating the spirit of the rules.
+Test behavior, not implementation. A refactor that preserves observable behavior should never break
+a test. Violating the letter of these rules is violating their spirit.
 
 ## Dispatch
 
@@ -25,7 +25,7 @@ should never break a test. Violating the letter of these rules is violating the 
 5. No row for the extension → check for `Skill(test-*)` via Glob; if none matches, note "no matching
    test skill" and proceed using project conventions.
 
-## The Principles
+## Principles
 
 ### 1. Arrange-Act-Assert
 
@@ -42,8 +42,7 @@ shows. Remove bare labels; strip the prefix from comments that carry a real expl
 
 ### 2. Test Behavior, Not Implementation
 
-Assert what the code **does** (outputs, return values, side effects, state changes), not **how** it
-does it internally.
+Assert what the code **does** (outputs, side effects, state changes), never **how**.
 
 | Fragile (implementation-coupled)               | Resilient (behavior-focused)                         |
 | ---------------------------------------------- | ---------------------------------------------------- |
@@ -56,8 +55,8 @@ does it internally.
 
 ### 3. Never Test Private Functions Directly
 
-If a private function (`_helper`, `_parse`, etc.) isn't reachable through the public API, either
-it's dead code or the public API is too narrow — fix the design, don't test the internals.
+A private function unreachable through the public API is dead code or a too-narrow API — fix the
+design, don't test internals.
 
 ```python
 # BAD: testing private function directly to pad coverage
@@ -71,10 +70,10 @@ mock_engine.calculate_percentage.assert_called_once_with(0.15)
 assert checkout.total == 85.00  # 15% discount applied to $100
 ```
 
-### 4. False Coverage — Mocks That Assert Their Own Return Value
+### 4. False Coverage
 
-A test that mocks a collaborator and asserts the mock's own return value exercises zero real logic.
-**If removing the production code wouldn't fail the test, the test covers nothing.**
+Mocking a collaborator and asserting the mock's own return value exercises zero real logic. **If
+removing the production code wouldn't fail the test, the test covers nothing.**
 
 ### 5. Minimum Tests, Maximum Coverage
 
@@ -84,44 +83,37 @@ A test that mocks a collaborator and asserts the mock's own return value exercis
 | Related edge cases (None, empty, 0) | Complex setup differs |
 | Same behavior across APIs           | Tests need isolation  |
 
-Test trivial behavior only when needed to traverse a code path for coverage — and traverse each
-trivial path **once** across the entire suite, as one parametrized test per call shape (or one test
-with grouped asserts per subject), never one test function per assert, and never a repeated Act
-sliced across tests.
+Test trivial behavior only to traverse a code path — **once** across the entire suite: one
+parametrized test per call shape (or one test with grouped asserts per subject), never one test
+function per assert or a repeated Act sliced across tests.
 
-Every test is **isolated** (same result in any run order) and **deterministic** (same result if
-nothing changes).
+Every test is **isolated** — same result in any run order — and **deterministic**.
 
 ### 6. Parametrize Over Loops
 
-When the same code path runs with varying inputs, use the language's parametrization mechanism —
-**not** a loop inside a single test function.
+Same code path, varying inputs → the language's parametrization mechanism, **never** an in-test loop
+— unless the loop _is_ the behavior under test (then it is the Act)
+([fix per language](references/anti-patterns.md#anti-pattern-5-stacked-assertions-over-varying-inputs)).
 
-Rationale and the parametrized fix per language:
-[Stacked Assertions](references/anti-patterns.md#anti-pattern-5-stacked-assertions-over-varying-inputs).
+### 7. Project Conventions Bind Equally
 
-### 7. Project Conventions Bind Like These Principles
-
-The project's CLAUDE.md (and files it imports, such as AGENTS.md) may state testing conventions —
-fixture layout, naming patterns, forbidden helpers, required markers. They bind with equal force:
-follow them when writing tests, and cite them when reviewing (`CLAUDE.md: "<quoted convention>"`).
-Only imperative rules about test content qualify — command references and build instructions are
-documentation, not conventions.
+Testing conventions in the project's CLAUDE.md (and imports like AGENTS.md) bind with equal force:
+follow them when writing, cite them when reviewing (`CLAUDE.md: "<quoted convention>"`). Only
+imperative rules about test content qualify — command references and build instructions are
+documentation.
 
 ## When Adding Coverage
 
-Coverage gap-filling is test-only: never modify implementation files, and STOP and surface any bug a
-new test reveals — don't encode buggy behavior as "expected" or tweak inputs to dodge it. Apply the
-[merge table](#5-minimum-tests-maximum-coverage) before adding a test function, and extend the
-feature's existing test file — never create `*_coverage`/`*_extra` parallel files.
+Gap-filling is test-only: never modify implementation files. STOP and surface any bug a new test
+reveals — never encode it as "expected" or tweak inputs to dodge it. Apply the
+[merge table](#5-minimum-tests-maximum-coverage) before each new test function; extend the feature's
+existing test file, never `*_coverage`/`*_extra` parallel files.
 
 ## Mocking Anti-Patterns
 
-Before adding a mock, asserting on a mock, reviewing a file that uses mocks, or writing or reviewing
-a test that varies inputs over one code path, load `references/anti-patterns.md` — mocking
-anti-patterns 1–4 and stacked assertions over varying inputs, with gate functions and fixes.
-
-**One-line summary:** Mocks are tools to isolate, not things to test.
+Load `references/anti-patterns.md` before adding or reviewing mocks, adding a test-only method to
+production code, or varying inputs over one code path. Mocks are tools to isolate, not things to
+test.
 
 ## Universal Rationalizations
 

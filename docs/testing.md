@@ -61,7 +61,7 @@ If removing the production code would not fail the test, the test covers nothing
 
 Mock at system boundaries — I/O, network, clock. Test internal logic through the public API.
 
-The full anti-pattern catalogue (six patterns with gate functions and fixes) lives in
+The full anti-pattern catalogue (five patterns with gate functions and fixes) lives in
 `test-core/references/anti-patterns.md`. Load it before writing or reviewing any code that uses
 mocks.
 
@@ -167,16 +167,15 @@ mocks.
 
 ### `test-core/references/anti-patterns.md`
 
-Six mock anti-patterns with gate functions and fixes:
+Five anti-patterns with gate functions and fixes:
 
 1. Testing mock behavior
 2. Test-only methods in production
 3. Mocking without understanding
 4. Incomplete mocks
-5. Integration tests as afterthought
-6. Stacked assertions over varying inputs
+5. Stacked assertions over varying inputs
 
-Growth space for future patterns (AP7, AP8, …). Language skills do not duplicate these.
+Growth space for future patterns (AP6, AP7, …). Language skills do not duplicate these.
 
 ### `test-{lang}` (pure leaves)
 
