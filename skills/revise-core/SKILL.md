@@ -18,6 +18,14 @@ The leaf's numbered steps refine these rules; the rules here bind every leaf. Ne
 an **Agent** call — each agent defines its own. Violating the letter of this protocol is violating
 its spirit — there are no technicalities.
 
+**Step 0 — Check for a checkpoint.** Before any leaf step, Glob `.planning/revise-<leaf>-*.md`. This
+step is never skipped — the leaf's numbered steps start after it. Found a checkpoint with
+`status: in-progress` and `pending` findings?
+
+- Same target → skip steps 1–3b and enter step 4 with its queue: the reviews are already paid for.
+- Different target, or no argument given → ask the user: resume the checkpoint or start fresh on the
+  new scope. Never silently ignore an in-progress checkpoint.
+
 **Step 1 — Resolve targets and scope.** A path argument → those files, reduced by the leaf's target
 filter, scope `full`. No argument → the leaf's no-argument file set, scope `changed`.
 
@@ -45,18 +53,32 @@ finding, stating it as an implemented fact. Route the results:
 - `Refuted` → discard, reported as an adjudicated false positive.
 - Otherwise → report-only queue with reason "adjudicated: unsubstantiated".
 
+**Step 3b — Checkpoint the queue.** Write `.planning/revise-<leaf>-<slug>.md` — `<leaf>` is the
+invoked command (`test`, `code`, …), `<slug>` kebab-cased from the path argument or `changed` for
+the no-argument scope. Header: leaf, target, scope, `status: in-progress`. Body: every finding's
+full `### Finding N` block with a `Status:` line — `pending` for the fix queue,
+`report-only: <reason>`, or `discarded`. Step 4 never starts before this file exists: writing it
+requires every bucket merged and triage complete, so a reviewer still running means no fixing yet.
+
 **When the leaf declares an impact enum:** order the fix queue by its tier chain; within a tier,
 keep the agent's order. A finding with no Impact line takes the top tier — never demoted for missing
 metadata.
 
-**Step 4 — Apply the fixes.** Load the leaf's step-4 skills before editing. Fix one finding at a
-time. Done when the fix queue is empty — every `confirmed` finding applied, each naming the rule it
-satisfies. A fix that cannot be applied moves to the report-only queue with its reason attached —
-never dropped.
+**Step 4 — Apply the fixes.** Load the leaf's step-4 skills before editing. The checkpoint file is
+the queue — read `pending` findings from it, never from conversation memory, and update each
+finding's `Status:` (`fixed`, or `report-only: <reason>`) as it lands, so an interrupted run resumes
+from the file. Fix one finding at a time. Done when the fix queue is empty — every `confirmed`
+finding applied, each naming the rule it satisfies. Exactly two things move a queued finding to the
+report-only queue, reason attached, never dropped: a leaf-declared surfacing rule routes it out, or
+its applied fix fails the leaf's verify checks and is reverted. Effort is not a third: file count,
+breadth, "requires a shared fixture", or "deserves its own dedicated pass" never route a finding out
+— a `confirmed` finding that is laborious is applied in this run, however many files it touches.
 
 **Step 5 — Verify** with the leaf's checks.
 
-**Step 6 — Report** with the leaf's template, under the report rules below.
+**Step 6 — Report** with the leaf's template, under the report rules below — generated from the
+checkpoint file, which now has no `pending` findings. Set its header to `status: complete`, then ask
+the user whether to delete the checkpoint or keep it; never delete without asking.
 
 ## Review-only requests
 
@@ -78,3 +100,6 @@ with its verdict and the reason it was not fixed — no finding leaves the pipel
 | "These unconfirmed findings are obviously nits"       | Every `unconfirmed` finding is adjudicated, no exceptions.             |
 | "The leaf's triage branches don't apply here"         | They gate findings out before the verdict does; run them first.        |
 | "The user said review-only but clearly wants the fix" | Review-only is a legitimate request; stop after step 3.                |
+| "This finding is too broad — it needs its own pass"   | Breadth is effort, not a verdict. The fix queue drains this run.       |
+| "Early buckets are back — I can start fixing those"   | Step 4 is gated on the checkpoint; no file, no fixes.                  |
+| "The leaf's process starts at step 1"                 | Step 0 runs first, every invocation. Glob before anything else.        |

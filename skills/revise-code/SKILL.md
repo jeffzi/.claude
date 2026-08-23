@@ -67,10 +67,9 @@ fix.
 
 ## Common mistakes
 
-- ❌ Fixing `false-positive` findings → the agent already classified them as false positives
-- ❌ Editing before loading `code-core` and the language leaf → the fix drifts from the same rules
-  that produced the finding
-- ❌ Silently dropping `suspected` or unsubstantiated findings → they belong in the report
-- ❌ Treating `clarity` or `structure` as skippable → impact orders the queue; only the verdict
-  gates it. Every `confirmed` finding gets fixed, last no less than first
-- ❌ Reporting fixes without running verification → "should work" is not verification
+- Fixing `false-positive` findings
+- Editing before loading `code-core` and the language leaf
+- Applying a fix that changes behavior instead of surfacing it
+- Treating `clarity` or `structure` as skippable — the verdict gates the queue; impact only orders
+  it
+- Reporting fixes without running lint, type-check, and tests

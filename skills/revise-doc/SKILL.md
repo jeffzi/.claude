@@ -69,10 +69,8 @@ For CLAUDE.md targets, add the agent's quality score line.
 
 ## Common mistakes
 
-- ❌ Fixing `false-positive` findings → the agent already classified them as false positives
-- ❌ Editing prose without loading `write-prose` → the rewrite drifts from the rule that produced
-  the finding
-- ❌ "Fixing" a staleness finding by rewording rather than checking the code → verify first
-- ❌ Silently dropping `suspected` or unsubstantiated findings → they belong in the report
-- ❌ Treating `polish` or `navigation` as skippable → impact orders the queue; only the verdict
-  gates it. Every `confirmed` finding gets fixed, last no less than first
+- Fixing `false-positive` findings
+- Editing prose without loading `write-prose`
+- "Fixing" a staleness finding by rewording rather than checking the code
+- Treating `polish` or `navigation` as skippable — the verdict gates the queue; impact only orders
+  it

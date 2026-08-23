@@ -53,6 +53,11 @@ git ls-files --others --exclude-standard 2>/dev/null
    Deleting a redundant test is a fix; deleting a test because it fails is not. If a finding would
    reduce what the suite covers (not how many times it covers it), surface it instead of applying.
 
+   **Apply suite-agent findings first**, before per-file fixes touch the same files — extraction and
+   merges reshape the preambles per-file fixes would otherwise edit twice. They are this skill's
+   job, not a follow-up: a `confirmed` suite finding spanning many files is applied in this run
+   (revise-core step 4), never deferred to a "dedicated pass" or a proposed plan.
+
    **Cross-file merges** (suite-agent findings). When the same behavior is pinned in two files:
    - Keep the pin at the level that owns the behavior — the finding's Reasoning names the file.
    - Fold assertions unique to the deleted copy into the survivor, parametrizing where the finding
@@ -105,11 +110,13 @@ Fixtures created: [list or "none"]
 
 ## Common mistakes
 
-- ❌ Fixing `false-positive` findings
-- ❌ Editing before loading `test-core` and the language leaf
-- ❌ Deleting a test to make a finding go away
-- ❌ Treating `clarity` or `cost` as skippable — the verdict gates the queue; impact only orders it
-- ❌ Reporting fixes without re-running the suite
-- ❌ Skipping the `vet-test-suite` dispatch on a directory target
-- ❌ Dispatching `vet-test-suite` per bucket
-- ❌ Keeping a merged test in an arbitrary file
+- Fixing `false-positive` findings
+- Editing before loading `test-core` and the language leaf
+- Deleting a test to make a finding go away
+- Treating `clarity` or `cost` as skippable — the verdict gates the queue; impact only orders it
+- Reporting fixes without re-running the suite
+- Skipping the `vet-test-suite` dispatch on a directory target
+- Deferring `confirmed` suite-agent findings to a "separate dedicated pass" — cross-file extraction
+  and merges are step 4 work, this run
+- Dispatching `vet-test-suite` per bucket
+- Keeping a merged test in an arbitrary file

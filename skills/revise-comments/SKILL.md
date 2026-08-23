@@ -81,7 +81,7 @@ Review comments with the `vet-comments` agent, then apply the fixes here. The ag
 
 ## Common mistakes
 
-- ❌ Fixing a code bug the agent surfaced → comments-only boundary; route it to `/fix`
-- ❌ Reflowing a multi-line comment while "tidying" it → preservation rule 1, no exceptions
-- ❌ Deleting a comment that carries a why → rephrase in place instead
-- ❌ Reporting without inspecting every diff hunk → the comments-only claim is the whole contract
+- Fixing a code bug the agent surfaced → comments-only boundary; route it to `/fix`
+- Reflowing a multi-line comment while "tidying" it → preservation rule 1, no exceptions
+- Deleting a comment that carries a why → rephrase in place instead
+- Reporting without inspecting every diff hunk → the comments-only claim is the whole contract

@@ -5,8 +5,6 @@ description: >
   security, and compliance quality — unreliable triggering, bloated body, description that doesn't match its
   triggers — and the issues fixed in place. Not for writing skills from scratch — use write-skill.
 argument-hint: "[skill dir or SKILL.md path]"
-# Quality floor for the slash path: adjudicating checklist findings and rewriting frontmatter is
-# where cheaper tiers misread field semantics.
 model: opus
 effort: high
 ---
@@ -41,9 +39,6 @@ Review a SKILL.md with the `vet-skill` agent, then apply the fixes here. The age
 
    A description rewrite changes when the skill triggers. After rewriting one, re-read it against
    the skill's actual body and confirm it still describes what the skill does.
-
-   Done when the fix queue is empty — every `confirmed` finding applied, the last no less carefully
-   than the first.
 
 5. **Verify.**
    - The fix queue is empty, and each applied fix named its checklist item.
@@ -80,10 +75,8 @@ reference links resolved]
 
 ## Common mistakes
 
-- ❌ Fixing `false-positive` findings → the agent already classified them as false positives
-- ❌ Rewriting a description without re-reading the body → the new triggers stop matching the skill
-- ❌ Editing frontmatter without `references/frontmatter.md` open → field semantics are easy to get
-  backwards
-- ❌ Silently dropping `suspected` or unsubstantiated findings → they belong in the report
-- ❌ Treating `polish` or `compliance` as skippable → impact orders the queue; only the verdict
-  gates it. Every `confirmed` finding gets fixed, last no less than first
+- Fixing `false-positive` findings
+- Rewriting a description without re-reading the body
+- Editing frontmatter without `references/frontmatter.md` open
+- Treating `polish` or `compliance` as skippable — the verdict gates the queue; impact only orders
+  it
