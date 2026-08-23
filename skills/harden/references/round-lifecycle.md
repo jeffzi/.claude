@@ -3,6 +3,10 @@
 The five steps in orchestration detail. SKILL.md states the sequence and the non-negotiables; this
 file carries the per-step mechanics.
 
+In standalone mode (SKILL.md **Standalone Mode**), that section's table substitutes every
+harness-supplied input referenced below — scan areas, skill dispatch, ledger, `hardening-wip.md`,
+the `claim-reviewer` pass — while the step sequence and its gates are unchanged.
+
 ## 1. Audit fan-out
 
 Full scan by default: dispatch parallel read-only finder agents across every area in the harness's

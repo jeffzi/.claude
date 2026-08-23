@@ -2,7 +2,8 @@
 name: harden
 description: >
   Repo-wide hardening round: audit fan-out, classified plan, gated execution with provably
-  unchanged output.
+  unchanged output. Runs standalone with built-in defaults when the project has no
+  .claude/harden.md harness.
 argument-hint: "[optional area]"
 # opus/high: the round adjudicates diffs and classifies claims — a cheaper tier accepts dirty hunks
 model: opus
@@ -32,6 +33,8 @@ means unchanged, not "semantically equivalent."
   approval. One reused, disposable filename — never a numbered series, never read by a future round;
   delete it when the round closes.
 
+Standalone rounds (see **Standalone Mode**) keep neither artifact.
+
 ## Project Harness Lookup
 
 This skill owns the methodology; the project supplies the tooling.
@@ -42,12 +45,13 @@ Before anything else:
 
 1. If the repo root above is `NOT-A-GIT-REPO`, STOP and report: **"harden requires a git repository
    — the ledger, baselines, and diffs are all repo-relative."**
-2. Read `<repo-root>/.claude/harden.md`. If it is missing, STOP and report: **"No hardening harness
-   found at `.claude/harden.md` — create one following
-   `~/.claude/docs/templates/harden-harness.md`."** Read its command blocks once now: "opaque" below
-   means this skill does not interpret a block's semantics — not that it runs unread. If any block
-   does more than build, diff, or test (network fetches, credential reads, writes outside the repo),
-   STOP and surface it before the first gate run.
+2. Read `<repo-root>/.claude/harden.md`. If it is missing, announce — **"No hardening harness at
+   `.claude/harden.md` — running in standalone mode (create one following
+   `~/.claude/docs/templates/harden-harness.md` to tailor future rounds)"** — and take every
+   harness-supplied input from the **Standalone Mode** table below. If it exists, read its command
+   blocks once now: "opaque" below means this skill does not interpret a block's semantics — not
+   that it runs unread. If any block does more than build, diff, or test (network fetches,
+   credential reads, writes outside the repo), STOP and surface it before the first gate run.
 3. Confirm both finder skills are invocable: `scan-bug` and `scan-simplification`. If either is
    unavailable, STOP and name the missing one — a round without its correctness rubric or
    simplification lens is incomplete, not lean.
@@ -57,6 +61,30 @@ optionally a **Diff Harness** (baseline snapshot + per-task gate, for projects w
 generated output) and a **Round-Completion Gate**. This lookup is the only coupling point between
 the general methodology and project configuration: everything project-specific is read from the
 harness at runtime; nothing project-specific belongs in this skill.
+
+## Standalone Mode
+
+Standalone mode triggers on exactly one condition: `<repo-root>/.claude/harden.md` does not exist.
+It is a condition, never a judgment call — a present harness always governs the round in full, every
+input and every per-task gate, no matter how small the round's scope or the project is. Each
+substitution below is as binding as the harness input it replaces — a substitution, not a tunable
+default, and a small project is never a reason to trim the round further:
+
+| Harness input         | Standalone substitution                                                                                                            |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Scan Areas            | The whole repo, one area: one `bug-scanner` plus one `simplification-scanner` (the global tier)                                    |
+| Skill Dispatch        | The global Language Dispatch table in `rules/skill-loading.md`                                                                     |
+| Domain Doctrines      | None                                                                                                                               |
+| Diff Harness          | None — the per-task gate is the test suite                                                                                         |
+| Round-Completion Gate | The full test suite                                                                                                                |
+| Ledger                | Not kept — refuted claims are recorded in the plan's Context; there is no cross-round memory                                       |
+| `hardening-wip.md`    | The plan is still written and still gated — only the persistent wip file is dropped (plan-mode file only; no cross-session resume) |
+| `claim-reviewer` pass | Skipped — step 2's per-claim repro verification stands alone                                                                       |
+
+Everything else is unchanged: both finder agents must be dispatched — a lens is satisfied only by
+its own agent's run, never inline — every claim is verified before it enters the plan, the Finding
+Classification table applies, and the plan passes through `ExitPlanMode` for explicit approval
+before any edit. Standalone relaxes the harness, never the gates.
 
 ## When NOT to Use
 
@@ -134,10 +162,10 @@ The harness's **Diff Acceptability** section may add project-specific rules on t
 ## Bright Lines
 
 - **No execution before plan approval.** The plan must pass through `ExitPlanMode` and receive an
-  explicit go-ahead in the _current_ session before any TDD cycle, code edit, or baseline snapshot
-  runs. Reading an existing plan file, loading skills, or a plan written in a prior session does not
-  count — a plan from an earlier conversation carries no standing approval; re-present it and wait
-  for the go-ahead.
+  explicit go-ahead — given _after_ the plan is presented, in the _current_ session — before any TDD
+  cycle, code edit, or baseline snapshot runs. Reading an existing plan file, loading skills, or a
+  plan written in a prior session does not count — a plan from an earlier conversation carries no
+  standing approval; re-present it and wait for the go-ahead.
 - **"Tests pass" is not the gate when the harness defines a diff gate.** A suite that asserts
   decisions or structure is blind to ordering and naming churn by design. Green tests plus a dirty
   diff is a failed task.
@@ -158,7 +186,8 @@ If any of these describes what you are doing right now, stop:
 - Your fan-out roster has no simplification lens, or the global tier is missing from it.
 - You are reading a diff hunk and forming the words "looks fine" or "cosmetic."
 - You are writing plan content inside plan mode instead of to
-  `<repo-root>/.planning/hardening-wip.md` before entering it.
+  `<repo-root>/.planning/hardening-wip.md` before entering it (harness rounds — standalone rounds
+  author in the plan-mode file).
 - You are about to skip a re-reported claim without re-checking its ledger mechanism.
 
 ## Rationalizations That Mean You're About to Fail
