@@ -8,7 +8,6 @@ allowed-tools: >
   Bash(npx oxlint:*), Bash(npx oxfmt:*), Bash(npx vitest:*)
 model: sonnet
 effort: medium
-disable-model-invocation: true
 ---
 
 # Upgrade All TypeScript Dependencies
