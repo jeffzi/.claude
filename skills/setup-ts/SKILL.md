@@ -24,30 +24,39 @@ package. `init`/`update` run from the target project's cwd, so always read the s
 `${CLAUDE_SKILL_DIR}/references/<template>`, never a bare relative `references/` path. Each maps to
 a fixed destination in the project root:
 
-| Template (in `${CLAUDE_SKILL_DIR}/references/`) | Destination                |
-| ----------------------------------------------- | -------------------------- |
-| `.oxlintrc.json`                                | `.oxlintrc.json`           |
-| `.oxfmtrc.json`                                 | `.oxfmtrc.json`            |
-| `.markdownlint-cli2.jsonc`                      | `.markdownlint-cli2.jsonc` |
-| `cspell.json`                                   | `cspell.json`              |
-| `fallow.json`                                   | `.fallowrc.json`           |
-| `tsconfig.json`                                 | `tsconfig.json`            |
-| `tsconfig.build.json`                           | `tsconfig.build.json`      |
-| `vitest.config.ts`                              | `vitest.config.ts`         |
-| `lefthook.yml`                                  | `lefthook.yml`             |
-| `commitlintrc.json`                             | `.commitlintrc.json`       |
-| `ci.yml`                                        | `.github/workflows/ci.yml` |
-| `editorconfig`                                  | `.editorconfig`            |
-| `gitignore`                                     | `.gitignore`               |
-| `npmrc`                                         | `.npmrc`                   |
-| `agents-md`                                     | `AGENTS.md`                |
-| `package.json`                                  | `package.json`             |
+| Template (in `${CLAUDE_SKILL_DIR}/references/`) | Destination                          |
+| ----------------------------------------------- | ------------------------------------ |
+| `.oxlintrc.json`                                | `.oxlintrc.json`                     |
+| `.oxfmtrc.json`                                 | `.oxfmtrc.json`                      |
+| `.markdownlint-cli2.jsonc`                      | `.markdownlint-cli2.jsonc`           |
+| `cspell.json`                                   | `cspell.json`                        |
+| `fallow.json`                                   | `.fallowrc.json`                     |
+| `tsconfig.json`                                 | `tsconfig.json`                      |
+| `tsconfig.build.json`                           | `tsconfig.build.json`                |
+| `vitest.config.ts`                              | `vitest.config.ts`                   |
+| `lefthook.yml`                                  | `lefthook.yml`                       |
+| `commitlintrc.json`                             | `.commitlintrc.json`                 |
+| `ci.yml`                                        | `.github/workflows/ci.yml`           |
+| `audit.yml`                                     | `.github/workflows/audit.yml`        |
+| `publish.yml`                                   | `.github/workflows/publish.yml`      |
+| `update-tools.yml`                              | `.github/workflows/update-tools.yml` |
+| `dependabot.yml`                                | `.github/dependabot.yml`             |
+| `editorconfig`                                  | `.editorconfig`                      |
+| `gitignore`                                     | `.gitignore`                         |
+| `npmrc`                                         | `.npmrc`                             |
+| `agents-md`                                     | `AGENTS.md`                          |
+| `agents-local-md`                               | `AGENTS.local.md`                    |
+| `mcp.json`                                      | `.mcp.json`                          |
+| `package.json`                                  | `package.json`                       |
 
 Copy to the **Destination** column name, not the template name; create missing destination
 directories (`.github/workflows/`) before copying. `editorconfig`, `gitignore`, and `npmrc` are
-stored dot-less, and `agents-md` under a neutralized name, because the real names would take effect
-on this skills repo itself (an `AGENTS.md` in `references/` would be auto-loaded as agent
-instructions when editing templates here).
+stored dot-less, and `agents-md` and `agents-local-md` under neutralized names, because the real
+names would take effect on this skills repo itself (an `AGENTS.md` in `references/` would be
+auto-loaded as agent instructions when editing templates here).
+
+`AGENTS.local.md` and `.mcp.json` are per-developer files (gitignored). `init` seeds them if
+missing; `update` never reconciles them — they are personal overrides.
 
 `AGENTS.md` ships with a companion symlink: in both `init` and `update`, after the copy, ensure
 `CLAUDE.md` exists as a symlink to it (`ln -s AGENTS.md CLAUDE.md`). If `CLAUDE.md` already exists
@@ -115,11 +124,9 @@ question per file that has changes, options like:
 - **Review individually** (walk each key)
 - **Skip this file**
 
-Apply the chosen edits with `Edit`/`Write`, preserving comments and key order. `.editorconfig` has
-no keys to merge — if it differs, offer replace-or-keep. `.gitignore` is line-based and additive:
-ensure the template's lines exist, and keep project-added lines without surfacing them as drift.
-`package.json` scope rules live in `${CLAUDE_SKILL_DIR}/references/project-owned-keys.md`; within
-`scripts`, reconcile both keys and values (same leaf-path rules as config files).
+Apply the chosen edits with `Edit`/`Write`, preserving comments and key order. The per-file
+comparison detail — how each config file is compared and merged — lives in
+`${CLAUDE_SKILL_DIR}/references/reconcile-rules.md`; consult it during the per-file pass.
 
 After configs are reconciled, bump the dependencies by invoking `Skill(upgrade-ts)` — do not
 reimplement its pinning strategy here.

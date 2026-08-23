@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Lets publish.yml run the full matrix as its release gate.
+  workflow_call:
 
 concurrency:
   group: ci-${{ github.ref }}

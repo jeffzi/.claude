@@ -1,0 +1,36 @@
+name: Update tools
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  autoupdate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "lts/*"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Upgrade dependencies within declared ranges
+        run: npm update --save
+      - name: Auto-fix formatting and lint
+        run: npm run fix || true
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          commit-message: "chore: update dependencies and dev tools"
+          branch: autoupdate-tools
+          title: "chore: update dependencies and dev tools"
+          body: Automated in-range update of npm dependencies.
+          delete-branch: true

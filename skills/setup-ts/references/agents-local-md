@@ -1,0 +1,7 @@
+# AGENTS.local.md
+
+## ttsc-graph MCP
+
+When navigating unfamiliar code or answering structural questions (what calls X, what implements Y,
+how does A reach B), prefer `inspect_typescript_graph` over grep/read. Use file reads for logic and
+implementation details the graph doesn't carry.

@@ -1,5 +1,10 @@
 # AGENTS.md
 
+## Local overrides
+
+If `AGENTS.local.md` exists at the repo root, read it and let its instructions take precedence over
+this file. It is gitignored for personal, machine-specific preferences and never committed.
+
 ## Commands
 
 - `npm run build` — compile with `tsc -p tsconfig.build.json`
@@ -9,3 +14,28 @@
 - `npm run fix:quality` — remove unused exports, dependencies, and enum members (`fallow fix`). Deletes code — review the diff before committing.
 - `npm run check:security` — surface security candidates (`fallow security`). Candidates need verification; they are not confirmed vulnerabilities. Not part of `check`.
 - `npm run check:package` — publish hygiene (`publint` + `@arethetypeswrong/cli`) for packages that ship to npm. Not part of `check`.
+
+## Git hygiene
+
+- Never run `git commit --no-verify`, `git commit -n`, or anything else that skips the lefthook
+  hooks — the hooks are the gate, not an obstacle.
+- Fix a failing check at its source. Never edit a test to make it pass; never widen a lint ignore to
+  silence a real finding.
+
+## Linter and type-checker configuration
+
+Treat lint and type-check config as fixed. Never add to an ignore list, disable a rule, lower a
+severity, or exclude a file to get a check passing — fix the code instead. A suppression is
+warranted only when the finding is a genuine false positive or the rule cannot apply (e.g. a
+generated file, a documented upstream bug); then suppress at the narrowest scope — an inline
+directive with a reason — not in the shared config. When the same inline directive keeps recurring
+for the same rule, that is a signal the rule may deserve a config-level ignore — propose it to the
+user and wait for explicit approval; never promote a suppression into config on your own.
+
+## Spelling (cspell)
+
+Treat a cspell failure as a prompt to reword, not to grow the dictionary. Prefer plain words in
+prose and identifiers. A word earns a `cspell.json` entry only when it comes from outside the
+project and cannot be renamed — command names, API identifiers, file formats, proper nouns, domain
+vocabulary (e.g. `taskkill`, `unref`, `tsbuildinfo`). Deliberate gibberish in test fixtures gets
+`// cspell:disable-line` on that line, never a dictionary entry.

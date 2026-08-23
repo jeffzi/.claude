@@ -1,1 +1,3 @@
 engine-strict=true
+# Supply-chain cooldown: refuse package versions younger than 7 days (npm >= 11.6).
+minimum-release-age=10080
