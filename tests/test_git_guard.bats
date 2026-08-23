@@ -15,6 +15,16 @@ setup_file() {
 	printf 'plan content\n' >"$PLAN_REPO/.claude/plans/phase.md"
 	git -C "$PLAN_REPO" add -f .claude/plans/phase.md
 
+	export WT_REPO
+	WT_REPO=$(setup_repo wt_repo)
+
+	export CLEAN_WT
+	CLEAN_WT=$(add_worktree "$WT_REPO" clean)
+
+	export DIRTY_WT
+	DIRTY_WT=$(add_worktree "$WT_REPO" dirty)
+	printf 'uncommitted\n' >>"$DIRTY_WT/README"
+
 	export FIXCI_REPO
 	FIXCI_REPO=$(setup_fix_ci_repo fixci_repo feature/ci)
 
@@ -214,6 +224,76 @@ teardown_file() {
 
 @test "branch: git branch new-branch is allowed" {
 	run_guard "$REPO" "git branch new-branch"
+	assert_allowed
+}
+
+# ── Worktree ─────────────────────────────────────────────────────────────────
+
+@test "worktree: remove of a clean worktree is allowed" {
+	run_guard "$WT_REPO" "git worktree remove $CLEAN_WT"
+	assert_allowed
+}
+
+@test "worktree: remove of a dirty worktree is blocked" {
+	run_guard "$WT_REPO" "git worktree remove $DIRTY_WT"
+	assert_blocked
+}
+
+@test "worktree: remove --force of a clean worktree is blocked" {
+	run_guard "$WT_REPO" "git worktree remove --force $CLEAN_WT"
+	assert_blocked
+}
+
+@test "worktree: remove -f of a clean worktree is blocked" {
+	run_guard "$WT_REPO" "git worktree remove -f $CLEAN_WT"
+	assert_blocked
+}
+
+@test "worktree: remove with a bundled short force flag is blocked" {
+	run_guard "$WT_REPO" "git worktree remove -fv $CLEAN_WT"
+	assert_blocked
+}
+
+@test "worktree: remove of a quoted path the guard cannot resolve is blocked" {
+	# shellcheck disable=SC2016
+	run_guard "$WT_REPO" 'git worktree remove "$wt"'
+	assert_blocked
+}
+
+@test "worktree: remove with no path is blocked" {
+	run_guard "$WT_REPO" "git worktree remove"
+	assert_blocked
+}
+
+@test "worktree: remove of a nonexistent path is blocked" {
+	run_guard "$WT_REPO" "git worktree remove $TMPDIR_ROOT/absent"
+	assert_blocked
+}
+
+@test "worktree: remove --force in a for loop over quoted paths is blocked" {
+	# shellcheck disable=SC2016
+	run_guard "$WT_REPO" 'for wt in .claude/worktrees/a .claude/worktrees/b; do git worktree unlock "$wt" 2>/dev/null; git worktree remove --force "$wt"; done'
+	assert_blocked
+}
+
+@test "worktree: git worktree list is allowed" {
+	run_guard "$WT_REPO" "git worktree list"
+	assert_allowed
+}
+
+@test "worktree: git worktree add is allowed" {
+	run_guard "$WT_REPO" "git worktree add $TMPDIR_ROOT/added-wt"
+	assert_allowed
+}
+
+@test "worktree: git worktree unlock with a quoted path is allowed" {
+	# shellcheck disable=SC2016
+	run_guard "$WT_REPO" 'git worktree unlock "$wt"'
+	assert_allowed
+}
+
+@test "worktree: git worktree prune is allowed" {
+	run_guard "$WT_REPO" "git worktree prune"
 	assert_allowed
 }
 
@@ -633,6 +713,32 @@ CMD
 	)
 	run_guard "$REPO" "$cmd"
 	assert_allowed
+}
+
+# ── Quoted option values (subcommand must stay visible) ──────────────────────
+
+@test "quoted value: checkout with a quoted -C path is blocked" {
+	# shellcheck disable=SC2016
+	run_guard "$REPO" 'git -C "$wt" checkout .'
+	assert_blocked
+}
+
+@test "quoted value: checkout in a for loop over quoted worktree paths is blocked" {
+	# shellcheck disable=SC2016
+	run_guard "$REPO" 'for wt in .claude/worktrees/a .claude/worktrees/b; do echo "=== $wt ==="; git -C "$wt" checkout . 2>&1; done'
+	assert_blocked
+}
+
+@test "quoted value: reset --hard with a quoted -C path is blocked" {
+	# shellcheck disable=SC2016
+	run_guard "$REPO" 'git -C "$path" reset --hard'
+	assert_blocked
+}
+
+@test "quoted value: stash with a quoted --git-dir path is blocked" {
+	# shellcheck disable=SC2016
+	run_guard "$REPO" 'git --git-dir "$d" stash'
+	assert_blocked
 }
 
 # ── Safe commands (never block) ──────────────────────────────────────────────

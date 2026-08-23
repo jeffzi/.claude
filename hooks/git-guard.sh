@@ -456,21 +456,39 @@ check_single_command() {
 	fi
 
 	if is_git_subcmd "worktree" && [[ "$command" =~ [[:space:]]remove([[:space:]]|$) ]]; then
+		# --force exists to override git's own refusal to remove a dirty worktree,
+		# so it is banned outright like `git branch -D`, whatever the path is.
+		# The [[:alnum:]]* run never crosses a second dash, so long options and
+		# path-like words cannot false-match the short-option cluster check.
+		if [[ "$command" =~ [[:space:]]--force([[:space:]]|$) ]] ||
+			[[ "$command" =~ [[:space:]]-[[:alnum:]]*f ]]; then
+			block_destructive "git worktree remove --force" \
+				"Force-removal deletes a worktree that still holds uncommitted work."
+		fi
+
 		# Extract worktree path: last non-flag argument after 'remove'
-		local wt_path="" found_remove=false
+		local wt_path="" found_remove=false word
 		for word in $command; do
 			if $found_remove && [[ "$word" != -* ]]; then
 				wt_path="$word"
 			fi
 			[[ "$word" == "remove" ]] && found_remove=true
 		done
-		if [[ -n "$wt_path" && -d "$wt_path" ]]; then
-			if ! git --no-optional-locks -C "$wt_path" diff --quiet 2>/dev/null ||
-				! git --no-optional-locks -C "$wt_path" diff --cached --quiet 2>/dev/null ||
-				[[ -n "$(git --no-optional-locks -C "$wt_path" ls-files --others --exclude-standard 2>/dev/null)" ]]; then
-				block_destructive "git worktree remove (dirty)" \
-					"Worktree at '$wt_path' has uncommitted changes. Commit work before removing."
-			fi
+
+		# A missing path, a path that arrived quoted (collapsed to the
+		# placeholder, as in a loop over "$wt"), or one that does not resolve
+		# all leave the worktree unverifiable — fail closed rather than wave
+		# the removal through.
+		if [[ -z "$wt_path" || "$wt_path" == "$QUOTED_PLACEHOLDER" || ! -d "$wt_path" ]]; then
+			block_destructive "git worktree remove (unverifiable path)" \
+				"The guard cannot confirm the worktree is clean. Re-run with a literal, unquoted path."
+		fi
+
+		if ! git --no-optional-locks -C "$wt_path" diff --quiet 2>/dev/null ||
+			! git --no-optional-locks -C "$wt_path" diff --cached --quiet 2>/dev/null ||
+			[[ -n "$(git --no-optional-locks -C "$wt_path" ls-files --others --exclude-standard 2>/dev/null)" ]]; then
+			block_destructive "git worktree remove (dirty)" \
+				"Worktree at '$wt_path' has uncommitted changes. Commit work before removing."
 		fi
 	fi
 
@@ -482,17 +500,27 @@ check_single_command() {
 # first git subcommand would otherwise be checked.
 #
 # Quoted text is data, not commands: backslash escapes and quoted regions are
-# collapsed to a space before splitting, so a commit message that merely names
-# a banned command is not an invocation. A double-quoted region is opaque all
-# the way to its closing quote, heredocs nested in `-m "$(cat <<'EOF' …)"`
-# included. Trade-off, accepted for simplicity: arguments inside quotes escape
-# the path and flag checks.
-sanitized=$(printf '%s' "$full_command" | awk -v q="'" '
+# neutralized before splitting, so a commit message that merely names a banned
+# command is not an invocation. A double-quoted region is opaque all the way to
+# its closing quote, heredocs nested in `-m "$(cat <<'EOF' …)"` included.
+# Trade-off, accepted for simplicity: arguments inside quotes escape the path
+# and flag checks.
+#
+# A quoted region collapses to a placeholder word rather than to whitespace:
+# erasing it would vacate the value slot of a preceding option, letting the next
+# word be consumed as that value. `git -C "$wt" checkout .` would then parse as
+# subcommand '.' and walk straight past the checkout ban.
+#
+# The placeholder must never look like a git subcommand, an option, a redirect,
+# or a path, so that occupying a slot cannot itself trigger a rule.
+readonly QUOTED_PLACEHOLDER=__QUOTED__
+
+sanitized=$(printf '%s' "$full_command" | awk -v q="'" -v ph="$QUOTED_PLACEHOLDER" '
 	{ buf = buf $0 "\n" }
 	END {
 		gsub(/\\./, " ", buf)
-		gsub(/"[^"]*"/, " ", buf)
-		gsub(q "[^" q "]*" q, " ", buf)
+		gsub(/"[^"]*"/, ph, buf)
+		gsub(q "[^" q "]*" q, ph, buf)
 		gsub(/&&|\|\||[|;]/, "\n", buf)
 		printf "%s", buf
 	}')

@@ -167,6 +167,14 @@ setup_repo() {
 	printf '%s' "$dir"
 }
 
+# Add worktree $2 under $1/.claude/worktrees; prints the worktree path.
+add_worktree() {
+	local repo="$1" name="$2"
+	local path="$repo/.claude/worktrees/$name"
+	git -C "$repo" worktree add -q -b "wt-$name" "$path"
+	printf '%s' "$path"
+}
+
 setup_fix_ci_repo() {
 	local dir
 	dir=$(setup_repo "$1")
