@@ -47,6 +47,12 @@ Never dispatch `tdd-cycle` directly.
 TypeScript projects use `lefthook`. All other projects use `prek`. Never assume
 `.pre-commit-config.yaml` means the `pre-commit` command exists.
 
+### Lint suppressions: fix the code, not the config
+
+Never add to an ignore list, disable a rule, or exclude a file to get a check passing — fix the
+code. Suppress only genuine false positives, inline and with a reason. Config-level ignores require
+explicit user approval. Full rule: `rules/lint-suppressions.md`.
+
 ### No internal tooling leaks in user-facing output
 
 Never expose internal tooling details (skill/agent names, `.planning/` paths, orchestrator
