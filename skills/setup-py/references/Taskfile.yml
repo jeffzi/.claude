@@ -21,25 +21,30 @@ tasks:
       - sh: command -v dprint
         msg: "dprint is required — install: https://dprint.dev/install/"
 
-  install:
-    desc: Sync the project and dev dependencies from the lockfile
+  _sync:
+    internal: true
     deps: [_require-uv]
     cmds:
       - uv sync --locked
+
+  install:
+    desc: Sync the project and dev dependencies from the lockfile
+    deps: [_sync]
+    cmds:
       - uv run prek install
 
   test:
     desc: "Run the test suite on the default interpreter (pass extra args after --)"
-    deps: [install]
+    deps: [_sync]
     cmds:
-      - uv run pytest {{.CLI_ARGS}}
+      - uv run pytest {{if .CLI_ARGS}}--no-cov {{end}}{{.CLI_ARGS}}
 
   test:matrix:
     desc: Run the test suite on every supported Python version
     deps: [_require-uv]
     cmds:
       - for: { var: PYTHONS, split: " " }
-        cmd: uv run --python {{.ITEM}} --locked pytest
+        cmd: UV_PROJECT_ENVIRONMENT=.venv-{{.ITEM}} uv run --python {{.ITEM}} --locked pytest
 
   check:
     desc: Run every pre-commit hook across the repo (lint, format, type, spelling, actions, ...)
@@ -49,7 +54,7 @@ tasks:
 
   check:fix:
     desc: Auto-fix everything that supports it (ruff lint, ruff format, dprint, markdownlint)
-    deps: [install, _require-dprint]
+    deps: [_sync, _require-dprint]
     cmds:
       - uv run ruff check --fix
       - uv run ruff format
@@ -59,4 +64,4 @@ tasks:
   clean:
     desc: Remove build artifacts, caches, and virtualenvs
     cmds:
-      - rm -rf .venv .venv-* dist *.egg-info .pytest_cache
+      - rm -rf .venv .venv-* dist *.egg-info .pytest_cache .ruff_cache .hypothesis .coverage .coverage.* coverage.xml

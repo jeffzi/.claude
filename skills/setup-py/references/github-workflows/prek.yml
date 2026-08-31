@@ -25,5 +25,6 @@ jobs:
           python-version: "3.14"
       - run: uv sync --locked
       - name: Install dprint
+        shell: bash
         run: curl -fsSL https://dprint.dev/install.sh | sh && echo "$HOME/.dprint/bin" >> "$GITHUB_PATH"
       - run: uv run prek run -a --show-diff-on-failure

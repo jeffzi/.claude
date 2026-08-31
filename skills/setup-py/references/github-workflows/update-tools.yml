@@ -5,31 +5,51 @@ on:
     - cron: "0 7 * * 1"
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   autoupdate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.14"
       - name: Upgrade dependencies
         run: |
           uv lock --upgrade
           uv sync
       - name: Install dprint
+        shell: bash
+        env:
+          # Bump manually — this workflow cannot update its own pin, and Dependabot
+          # does not track env vars. Checksum from the release's SHASUMS256.txt.
+          DPRINT_VERSION: 0.55.2
+          DPRINT_SHA256: d7ccde62d789dfb048717252d259e21253e32feffe4cbf2dab9954eeab492219
         run: |
-          curl -fsSL https://dprint.dev/install.sh | sh
+          curl -fsSL -o dprint.zip "https://github.com/dprint/dprint/releases/download/${DPRINT_VERSION}/dprint-x86_64-unknown-linux-gnu.zip"
+          echo "${DPRINT_SHA256}  dprint.zip" | sha256sum -c -
+          mkdir -p "$HOME/.dprint/bin"
+          unzip -o -d "$HOME/.dprint/bin" dprint.zip
+          rm dprint.zip
           echo "$HOME/.dprint/bin" >> "$GITHUB_PATH"
       - name: Bump hook revs and dprint plugins
         run: |
-          uv run prek autoupdate || true
-          dprint config update || true
-          uv run prek run -a || true
+          uv run prek autoupdate
+          dprint config update
+      - name: Auto-fix and verify
+        run: |
+          if ! uv run prek run -a; then
+            uv run prek run -a --show-diff-on-failure
+          fi
+      - name: Run tests
+        run: uv run pytest --no-cov -x -q
       - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           commit-message: "chore: update dependencies and dev tools"

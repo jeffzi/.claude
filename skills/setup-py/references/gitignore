@@ -23,12 +23,20 @@ coverage.xml
 .env
 .envrc
 .venv
+.venv-*
+
+# macOS
+.DS_Store
 
 # Ruff
 .ruff_cache/
 
 # PyPI configuration file
 .pypirc
+
+# Planning and research (local-only)
+.planning/
+.research/
 
 # Agents
 .agents/settings.local.json

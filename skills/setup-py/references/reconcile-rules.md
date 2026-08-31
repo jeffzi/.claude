@@ -19,6 +19,8 @@ Apply the chosen edits with `Edit`/`Write`, preserving comments and key order.
   ensure the template's tasks/jobs/steps are present, and keep project-added tasks, jobs, matrix
   entries, and steps without surfacing them as drift. If a template task/job differs, offer
   replace-or-keep for that entry.
+- `scripts/check_max_lines.py` is house-owned code, not config — if it differs from the template,
+  offer replace-or-keep for the whole file; never merge line-by-line.
 - `.editorconfig` has no keys to merge — if it differs, offer replace-or-keep.
 - `.gitignore` is line-based and additive: ensure the template's lines exist, and keep project-added
   lines without surfacing them as drift.

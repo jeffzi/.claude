@@ -12,7 +12,8 @@ preferred entrypoints; each shells out to the underlying `uv` command shown afte
 
 - `task install` — sync the project and dev dependencies from the lockfile (`uv sync --locked`),
   then install the prek hooks.
-- `task test` — `uv run pytest` (append args after `--`, e.g. `task test -- -k name`).
+- `task test` — `uv run pytest` (append args after `--`, e.g. `task test -- -k name`; passing args
+  disables coverage, since a subset run would fail the global coverage threshold).
 - `task test:matrix` — run the suite on every supported Python version.
 - `task check` — `uv run prek run -a` (all hooks). Run before committing.
 - `task check:fix` — auto-fix everything that supports it: `uv run ruff check --fix`,
@@ -41,5 +42,7 @@ user and wait for explicit approval; never promote a suppression into config on 
 Treat a cspell failure as a prompt to reword, not to grow the dictionary. Prefer plain words in
 prose and identifiers. A word earns a `cspell.json` entry only when it comes from outside the
 project and cannot be renamed — command names, API identifiers, file formats, proper nouns, domain
-vocabulary (e.g. `taskkill`, `killpg`, `pytestmark`). Deliberate gibberish in test fixtures gets
-`# cspell:disable-line` on that line, never a dictionary entry.
+vocabulary (e.g. `taskkill`, `killpg`, `pytestmark`). In tests, never invent gibberish that needs a
+suppression — any real word works for an unknown command, a bogus flag, or filler data, so pick one
+(`banana`, not an invented pseudo-word). `# cspell:disable-line` is reserved for fixtures where the gibberish
+itself is the behavior under test, never a dictionary entry.

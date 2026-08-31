@@ -35,6 +35,7 @@ never a bare relative `references/` path. Each maps to a fixed destination in th
 | `python-version`                                | `.python-version`                    |
 | `agents-md`                                     | `AGENTS.md`                          |
 | `Taskfile.yml`                                  | `Taskfile.yml`                       |
+| `scripts/check_max_lines.py`                    | `scripts/check_max_lines.py`         |
 | `dependabot.yml`                                | `.github/dependabot.yml`             |
 | `github-workflows/prek.yml`                     | `.github/workflows/prek.yml`         |
 | `github-workflows/pytest.yml`                   | `.github/workflows/pytest.yml`       |
@@ -43,8 +44,8 @@ never a bare relative `references/` path. Each maps to a fixed destination in th
 | `github-workflows/update-tools.yml`             | `.github/workflows/update-tools.yml` |
 
 Copy to the **Destination** column name, not the template name; create missing destination
-directories (`.github/workflows/`) before copying. Several templates are stored under neutralized
-names because their real names would take effect on this skills repo itself:
+directories (`.github/workflows/`, `scripts/`) before copying. Several templates are stored under
+neutralized names because their real names would take effect on this skills repo itself:
 
 - `editorconfig`, `gitignore`, `python-version` — dot-less; a real
   `.editorconfig`/`.gitignore`/`.python-version` in `references/` would cascade over the repo.

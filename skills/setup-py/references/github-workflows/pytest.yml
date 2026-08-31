@@ -2,7 +2,7 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix-ci/**]
   pull_request:
     branches: [main]
 
@@ -23,12 +23,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: ${{ github.event_name == 'push' && fromJSON('["ubuntu-latest", "macos-latest", "windows-latest"]') || fromJSON('["ubuntu-latest"]') }}
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.12", "3.13", "3.14"]
+        include:
+          - os: ubuntu-latest
+            python-version: "3.14"
+            diff-cover: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0 # Full history for diff-cover
+          # Full history only where diff-cover compares against main
+          fetch-depth: ${{ matrix.diff-cover && '0' || '1' }}
           persist-credentials: false
 
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
@@ -40,10 +45,10 @@ jobs:
         run: uv sync --locked --group dev
 
       - name: Run tests
-        run: uv run pytest --cov
+        run: uv run pytest
 
       - name: Check diff coverage
-        if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.14'
+        if: github.event_name == 'pull_request' && matrix.diff-cover
         run: |
           uv run coverage xml
           uv run diff-cover coverage.xml --compare-branch=origin/main --fail-under=90

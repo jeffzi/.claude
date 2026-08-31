@@ -1,4 +1,4 @@
-default_install_hook_types: [pre-commit, commit-msg]
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
 
 repos:
   # Built-in hooks (fast, native Rust)
@@ -24,7 +24,6 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-ast
-      - id: check-docstring-first
       - id: check-vcs-permalinks
       - id: debug-statements
       - id: detect-aws-credentials
@@ -43,24 +42,39 @@ repos:
         entry: uv run ruff format
         language: system
         types_or: [python, pyi]
+      - id: max-lines
+        name: max lines per file
+        entry: uv run python scripts/check_max_lines.py
+        language: system
+        types_or: [python, pyi]
 
   # Python type checking
   - repo: local
     hooks:
       - id: pyrefly
-        name: Pyrefly
+        name: pyrefly
         entry: uv run pyrefly check
         language: system
-        types: [python]
+        always_run: true
         pass_filenames: false
         require_serial: true
+
+  # Lockfile consistency
+  - repo: local
+    hooks:
+      - id: uv-lock-check
+        name: uv lock --check
+        entry: uv lock --check
+        language: system
+        files: ^(pyproject\.toml|uv\.lock)$
+        pass_filenames: false
 
   # JSON, YAML, Markdown, TOML formatting
   - repo: local
     hooks:
       - id: dprint
         name: dprint
-        entry: dprint fmt
+        entry: dprint fmt --allow-no-files
         language: system
         types_or: [json, yaml, markdown, toml]
 
@@ -95,3 +109,14 @@ repos:
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
+
+  # Tests on push
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: uv run pytest
+        language: system
+        always_run: true
+        pass_filenames: false
+        stages: [pre-push]

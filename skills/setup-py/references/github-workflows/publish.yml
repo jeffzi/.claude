@@ -20,6 +20,15 @@ jobs:
         with:
           enable-cache: false
           python-version: "3.14"
+      - name: Verify tag matches project version
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(python3 -c "import tomllib, pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")"
+          if [[ "$tag" != "$version" ]]; then
+            printf "Tag %s does not match project version %s\n" "$tag" "$version" >&2
+            exit 1
+          fi
       - name: Build distributions
         run: uv build
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
