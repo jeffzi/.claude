@@ -154,9 +154,11 @@ Will Claude follow this skill effectively?
 
 - [ ] SKILL.md within write-skill's line ceiling, including code blocks and tables (write-skill,
       "Conciseness")
-- [ ] Instructional prose within write-skill's word ceiling, excluding code blocks and tables —
-      except contract skills (`user-invocable: false`, subagent-loaded), which write-skill bounds by
-      the no-op test and per-sentence traceability instead
+- [ ] Instructional prose past write-skill's word trigger (excluding code blocks and tables) has
+      heavy content relocated to reference files or condensed — report as "relocate/condense", never
+      "delete"; only the no-op test licenses deletion — except contract skills
+      (`user-invocable: false`, subagent-loaded), which write-skill exempts from the word trigger
+      and bounds by the no-op test and per-sentence traceability instead
 - [ ] No content Claude already knows (standard library usage, common patterns)
 - [ ] No multi-language dilution (one excellent example, not many mediocre ones)
 - [ ] No redundant sections covering the same ground

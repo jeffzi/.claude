@@ -82,16 +82,17 @@ zoning.
 
 ## Conciseness
 
-SKILL.md ceiling: 500 lines; prose under 500 words (excluding code blocks and tables). Move heavy
-content to reference files; cross-reference, don't repeat. Loaded content stays in context all
-session — standing instructions only.
+SKILL.md ceiling: 500 lines. Past ~500 prose words (excluding code blocks and tables), relocate
+heavy content to reference files or condense — cross-reference, don't repeat. The word figure is a
+relocation trigger, not a deletion license: deleting a behavior-changing sentence to hit a number is
+never a valid fix. Loaded content stays in context all session — standing instructions only.
 
 Hunt no-ops — a sentence that doesn't change behavior versus the default is deleted whole, settled
-by running, not debate.
+by running, not debate. The no-op test is the only license to delete.
 
 A **contract skill** — `user-invocable: false`, loaded only by subagents as their operating contract
-— is bounded by the no-op test above instead of the word count: every sentence must change behavior
-and trace to a documented failure (RED transcript, review finding). Two bounds survive the
+— is exempt from the word trigger and bounded by the no-op test above: every sentence must change
+behavior and trace to a documented failure (RED transcript, review finding). Two bounds survive the
 exemption: the 500-line ceiling, and duplicate-hunting — restatement is still cut. Do not relocate a
 contract's enforcement text to reference files: enforcement text the agent may never read is not in
 context when pressure hits. "Agents depend on it" does not qualify a main-session skill; a hub the
