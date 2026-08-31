@@ -110,8 +110,8 @@ dispatch in this sequence):
          changed files (distillation rewrites the code its comments describe);
          it is read-only and returns ### Finding N blocks
       c. Triage the findings -- no skill loads, no file reads:
-         confirmed -> fix queue; suspected or unconfirmed -> report to the user
-         at task close, never silently dropped
+         confirmed -> fix queue; suspected or unconfirmed -> OPEN_ITEMS (surfaced
+         at the SURFACE gate below, never silently dropped)
       d. Fix queue non-empty -> group findings into transitive file groups
          (findings sharing any target file share a group); dispatch one
          code-mender per group in a single parallel message, passing per finding:
@@ -125,6 +125,20 @@ dispatch in this sequence):
          the full gate, never a subset
          - green -> go to COMMIT
          - red -> surface the failing output; do not commit
+
+SURFACE (gate between REFACTOR and COMMIT -- runs even when REFACTOR was skipped):
+  OPEN_ITEMS = every unresolved thing the user has not yet seen: unconfirmed or
+  suspected review findings, a test that failed once and passed on re-run (flaky
+  is a finding, not a pass), anything you were about to label "unrelated",
+  "deferred", "pre-existing", or "worth a look later".
+  - OPEN_ITEMS empty -> go to COMMIT.
+  - OPEN_ITEMS non-empty -> output them now as one-line findings (file:line --
+    what's wrong), state that nothing is committed yet, and END THE TURN. Commit
+    on the next turn, after the user answers. This gate is NOT the approval gate
+    in step 14: a plan task or autocommit grant answers "may I commit verified
+    work", not "may I commit past findings the user has never seen". "Report at
+    task close" means at this gate -- a finding first shown after the commit
+    hash is a finding the user could not act on.
 
 COMMIT (last phase -- refactor edits are already in the files, so every commit
 contains the cleaned-up code; there is no separate refactor commit):
