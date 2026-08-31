@@ -115,7 +115,8 @@ These fill the slots `vet-core` declares:
 ## When NOT to use
 
 Single-file review, AAA structure, weak assertions, casts, per-file rule coverage — `vet-test`.
-Production-code duplication — `distill-scanner`.
+Cross-file production-code review — `vet-codebase`; expression-level duplication within given files
+— `distill-scanner`.
 
 ## Rationalization guard
 
