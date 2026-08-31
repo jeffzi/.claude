@@ -9,7 +9,8 @@
   readability
 - [Accessibility and inclusivity](#accessibility-and-inclusivity) — content accessibility,
   screenshots, reducing bias
-- [Structure and formatting](#structure-and-formatting) — headings, code examples, admonitions
+- [Structure and formatting](#structure-and-formatting) — headings, visual devices, code examples,
+  admonitions
 
 ---
 
@@ -123,6 +124,15 @@ technical terms (kill, canary deployment, monkey-patching) have precise meanings
 
 Use headings to create a scannable outline. A reader should understand the page's structure from
 headings alone. Don't nest deeper than H4 — if you need H5, the page is too long or needs splitting.
+
+Give any document with 6 or more sections a table of contents at the top, linking to each section.
+
+### One meaning per visual device
+
+Give each visual device — bold, italics, code formatting, blockquotes — one meaning per document and
+apply it consistently. Bold that marks defined terms in one section and emphasis in the next teaches
+the reader nothing; they stop trusting the signal. Pick the meaning, then either express emphasis in
+the sentence itself or leave it out.
 
 ### Code examples
 
