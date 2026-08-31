@@ -23,9 +23,10 @@ annotations.
 When reviewing or writing test files, check imports for domain-specific libraries. If detected, load
 the corresponding skill for library-specific testing patterns:
 
-| Import pattern                                 | Skill to load |
-| ---------------------------------------------- | ------------- |
-| `import polars` / `from polars.testing import` | `test-polars` |
+| Import pattern                                 | Skill to load  |
+| ---------------------------------------------- | -------------- |
+| `import polars` / `from polars.testing import` | `test-polars`  |
+| `from rich.` / `import rich` / `import pyte`   | `test-py-rich` |
 
 Only load skills that are actually installed. If a skill fails to load, continue without it.
 
