@@ -17,14 +17,17 @@ the code as it was then.
 Every finder loads its methodology **as a skill, never a paraphrase** — a pasted gloss forks the
 skill and goes stale the next time it changes. Each lens has its own agent, and they are not
 interchangeable: correctness finders are `subagent_type: bug-scanner`; simplification finders are
-`subagent_type: simplification-scanner`. Each agent loads its own skill as sole rubric and will
-override a prompt that tries to substitute the other lens.
+`subagent_type: simplification-scanner`; the cross-file lens is `subagent_type: vet-codebase`
+(self-contained — its rubric lives in the agent, with no separate scan skill). Each agent loads its
+own skill as sole rubric and will override a prompt that tries to substitute the other lens.
 
 The simplification lens is mandatory — it runs whether or not the harness mentions it, and a harness
 may refine how its findings map to tasks but can never opt the round out of it. Roster shape: one
 per-area finder per Scan Area (its own finder, or folded into that area's correctness finder), plus
-**exactly one** global finder, always its own dispatch. What each tier may claim is defined by
-`scan-simplification` itself, not here.
+**exactly one** global finder, always its own dispatch, plus **exactly one** cross-file finder
+(`vet-codebase`) on the round's whole target — never one per area, because cross-area duplication is
+what it exists to see. What each tier may claim is defined by `scan-simplification` itself, not
+here.
 
 Finders only _list_ — one line per claim, no edits. Every claim enters the same verify → classify →
 plan → approval pipeline; a per-area candidate that a repo-wide grep later refutes at Verify is the
@@ -35,6 +38,16 @@ designed reconciliation, not wasted work.
 A finder reports a _claim_, not a finding. Before it enters the plan: re-read the mechanism at the
 line level and build a repro. Classify per the Finding Classification table in SKILL.md. False
 claims are appended to the ledger, never silently dropped.
+
+Claims are independent, so verification parallelizes. Group the claims by the module or file their
+mechanism targets — claims on one mechanism verify together and share the reading. One group →
+verify inline. Multiple groups → dispatch one **Agent** call per group, `subagent_type: "fork"`, all
+in one parallel message. Each fork's prompt names its group's claims; the fork re-reads each
+mechanism at the line level, builds the repro, and returns one line per claim —
+`CLASS: <classification from the table> — <mechanism confirmed or disproof>`. Forks never write the
+ledger, the plan, or any project file — repro scratch goes to a temp directory, and the parent alone
+records the results: refuted claims to the ledger, the rest into the plan's classification.
+Sequential verification of a multi-group claim set is the bottleneck this step exists to avoid.
 
 ## 3. Write plan
 

@@ -72,7 +72,7 @@ default, and a small project is never a reason to trim the round further:
 
 | Harness input         | Standalone substitution                                                                                                            |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Scan Areas            | The whole repo, one area: one `bug-scanner` plus one `simplification-scanner` (the global tier)                                    |
+| Scan Areas            | The whole repo, one area: one `bug-scanner`, one `simplification-scanner` (the global tier), one `vet-codebase`                    |
 | Skill Dispatch        | The global Language Dispatch table in `rules/skill-loading.md`                                                                     |
 | Domain Doctrines      | None                                                                                                                               |
 | Diff Harness          | None — the per-task gate is the test suite                                                                                         |
@@ -100,10 +100,15 @@ per-step mechanics before running a round.
 
 1. **Audit fan-out.** Parallel read-only finders (correctness on `subagent_type: bug-scanner`,
    simplification on `subagent_type: simplification-scanner`) across every Scan Area — narrow only
-   to the area named in the invocation argument, if any. Finders only _list_ claims; no edits.
+   to the area named in the invocation argument, if any — plus **exactly one** cross-file finder
+   (`subagent_type: vet-codebase`) on the round's whole target (the repo, or the named area): it
+   produces the cross-file duplication and drift claims the per-area lenses cannot see, and is the
+   primary source of **DRY** classifications. Finders only _list_ claims; no edits.
 
 2. **Verify claim.** A finder reports a _claim_, not a finding — re-read the mechanism, build a
-   repro, classify per the table below. False claims are appended to the ledger.
+   repro, classify per the table below. Claims are independent: verify them in parallel via forks,
+   grouped by target module (`references/round-lifecycle.md` § 2), never one by one when more than
+   one group exists. False claims are appended to the ledger.
 
 3. **Write plan.** Load `Skill(write-plan)`; author the plan **once**, directly to
    `<repo-root>/.planning/hardening-wip.md`, **before entering plan mode**; verify it with
@@ -183,7 +188,8 @@ If any of these describes what you are doing right now, stop:
   this session.
 - A finder dispatch you are drafting carries rubric text, a `model:`, or an `effort:` — the agents
   define their own.
-- Your fan-out roster has no simplification lens, or the global tier is missing from it.
+- Your fan-out roster has no simplification lens, no cross-file lens (`vet-codebase`), or the global
+  tier is missing from it.
 - You are reading a diff hunk and forming the words "looks fine" or "cosmetic."
 - You are writing plan content inside plan mode instead of to
   `<repo-root>/.planning/hardening-wip.md` before entering it (harness rounds — standalone rounds
