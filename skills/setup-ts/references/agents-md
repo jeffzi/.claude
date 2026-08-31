@@ -37,5 +37,7 @@ user and wait for explicit approval; never promote a suppression into config on 
 Treat a cspell failure as a prompt to reword, not to grow the dictionary. Prefer plain words in
 prose and identifiers. A word earns a `cspell.json` entry only when it comes from outside the
 project and cannot be renamed — command names, API identifiers, file formats, proper nouns, domain
-vocabulary (e.g. `taskkill`, `unref`, `tsbuildinfo`). Deliberate gibberish in test fixtures gets
-`// cspell:disable-line` on that line, never a dictionary entry.
+vocabulary (e.g. `taskkill`, `unref`, `tsbuildinfo`). In tests, never invent gibberish that needs a
+suppression — any real word works for an unknown command, a bogus flag, or filler data, so pick one
+(`banana`, not an invented pseudo-word). `// cspell:disable-line` is reserved for fixtures where the gibberish
+itself is the behavior under test, never a dictionary entry.
