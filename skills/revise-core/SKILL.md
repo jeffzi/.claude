@@ -64,15 +64,29 @@ requires every bucket merged and triage complete, so a reviewer still running me
 keep the agent's order. A finding with no Impact line takes the top tier — never demoted for missing
 metadata.
 
-**Step 4 — Apply the fixes.** Load the leaf's step-4 skills before editing. The checkpoint file is
-the queue — read `pending` findings from it, never from conversation memory, and update each
-finding's `Status:` (`fixed`, or `report-only: <reason>`) as it lands, so an interrupted run resumes
-from the file. Fix one finding at a time. Done when the fix queue is empty — every `confirmed`
-finding applied, each naming the rule it satisfies. Exactly two things move a queued finding to the
-report-only queue, reason attached, never dropped: a leaf-declared surfacing rule routes it out, or
-its applied fix fails the leaf's verify checks and is reverted. Effort is not a third: file count,
-breadth, "requires a shared fixture", or "deserves its own dedicated pass" never route a finding out
-— a `confirmed` finding that is laborious is applied in this run, however many files it touches.
+**Step 4 — Apply the fixes.** The checkpoint file is the queue — read `pending` findings from it,
+never from conversation memory. Group the queue into **transitive file groups**: findings sharing
+any target file share a group, so a cross-file finding merges every group it touches and groups are
+disjoint by construction.
+
+- **One group** → apply inline: load the leaf's step-4 skills before editing, fix one finding at a
+  time in the leaf's declared order, and update each finding's `Status:` (`fixed`, or
+  `report-only: <reason>`) as it lands, so an interrupted run resumes from the file.
+- **Multiple groups** → dispatch one **Agent** call per group, `subagent_type: "fork"`, all in one
+  parallel message — never fix sequentially what disjoint groups can fix in parallel. Each fork's
+  prompt names its group's finding numbers; the fork reads their blocks from the checkpoint, loads
+  the leaf's step-4 skills before editing, applies its findings one at a time in the leaf's declared
+  order (cross-file findings first where the leaf says so), and returns one line per finding —
+  `FIXED: <finding N — rule satisfied>` or `FAILED: <finding N — reason>`. Forks never write the
+  checkpoint and never run repo-wide verification — the parent updates each finding's `Status:` from
+  the returns as forks land, then verifies once in step 5.
+
+Done when the fix queue is empty — every `confirmed` finding applied, each naming the rule it
+satisfies. Exactly two things move a queued finding to the report-only queue, reason attached, never
+dropped: a leaf-declared surfacing rule routes it out, or its applied fix fails the leaf's verify
+checks (or its fork returns `FAILED`) and is reverted. Effort is not a third: file count, breadth,
+"requires a shared fixture", or "deserves its own dedicated pass" never route a finding out — a
+`confirmed` finding that is laborious is applied in this run, however many files it touches.
 
 **Step 5 — Verify** with the leaf's checks.
 
@@ -102,4 +116,5 @@ with its verdict and the reason it was not fixed — no finding leaves the pipel
 | "The user said review-only but clearly wants the fix" | Review-only is a legitimate request; stop after step 3.                |
 | "This finding is too broad — it needs its own pass"   | Breadth is effort, not a verdict. The fix queue drains this run.       |
 | "Early buckets are back — I can start fixing those"   | Step 4 is gated on the checkpoint; no file, no fixes.                  |
+| "48 findings — I'll just work through them in order"  | Sequential fixing wastes disjoint groups. Multiple groups → forks.     |
 | "The leaf's process starts at step 1"                 | Step 0 runs first, every invocation. Glob before anything else.        |
