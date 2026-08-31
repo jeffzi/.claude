@@ -68,3 +68,6 @@ skills/fallow/
 .DS_Store
 **/*-docs/
 **/node_modules/
+__pycache__/
+*.py[codz]
+*$py.class
