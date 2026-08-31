@@ -23,6 +23,13 @@ they need no checklist.
 3. **Use definite, specific, concrete language**
 4. **Omit needless words**
 5. **Place emphatic words at end of sentence**
+6. **Cap sentence length** — never exceed 30 words; aim for a document average of 15–20. One main
+   idea per sentence; vary length — short sentences give relief.
+7. **Keep subject and verb together** — never bury the verb under an inserted clause; move the aside
+   to its own sentence.
+8. **One term per concept** — repeat the term rather than switching to a synonym for variety.
+   Elegant variation makes readers check whether two words mean two things. Normalize synonyms
+   inherited from source material.
 
 ## Before/After Examples
 
@@ -53,6 +60,27 @@ they need no checklist.
 
 - Before: "Manual failover is error-prone, in most cases."
 - After: "In most cases, manual failover is error-prone."
+
+**Sentence cap (Rule 6):**
+
+- Before: "Requests that fail the primary health check are retried against the secondary region
+  after a backoff interval that grows exponentially, unless the circuit breaker has already opened,
+  in which case they fail fast."
+- After: "Requests that fail the primary health check retry against the secondary region with
+  exponential backoff. If the circuit breaker is already open, they fail fast instead."
+
+**Subject and verb together (Rule 7):**
+
+- Before: "The scheduler, after checking every worker's heartbeat and pruning any that missed the
+  timeout, assigns the next batch."
+- After: "The scheduler checks every worker's heartbeat and prunes any that missed the timeout. Then
+  it assigns the next batch."
+
+**One term per concept (Rule 8):**
+
+- Before: "The worker catches the exception. If the executor has attempts left, the agent re-runs
+  the job."
+- After: "The worker catches the exception. If it has attempts left, the worker re-runs the job."
 
 ## Anti-patterns
 
