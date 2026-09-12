@@ -5,7 +5,15 @@
     "perf": "error",
     "suspicious": "error"
   },
-  "ignorePatterns": [".agents", ".claude", ".planning", ".research", "coverage", "dist", "node_modules"],
+  "ignorePatterns": [
+    ".agents",
+    ".claude",
+    ".planning",
+    ".research",
+    "coverage",
+    "dist",
+    "node_modules"
+  ],
   "overrides": [
     {
       "files": ["scripts/**", "src/cli.ts", "src/cli/**"],
@@ -17,13 +25,15 @@
       "files": ["tests/**", "**/*.test.ts", "**/*.spec.ts"],
       "rules": {
         "max-lines": ["error", { "max": 800, "skipBlankLines": true, "skipComments": true }],
+        "jsdoc/require-param": "off",
+        "jsdoc/require-returns": "off",
         "max-lines-per-function": "off",
         "no-control-regex": "off",
         "unicorn/consistent-function-scoping": "off"
       }
     }
   ],
-  "plugins": ["typescript", "unicorn", "oxc", "import", "promise", "vitest"],
+  "plugins": ["typescript", "unicorn", "oxc", "import", "promise", "vitest", "jsdoc"],
   "rules": {
     "array-callback-return": "error",
     "complexity": ["error", 15],
@@ -33,9 +43,20 @@
     "import/no-duplicates": "error",
     "import/no-namespace": "error",
     "import/no-self-import": "error",
+    "jsdoc/check-tag-names": "error",
+    "jsdoc/empty-tags": "error",
+    "jsdoc/implements-on-classes": "error",
+    "jsdoc/no-defaults": "error",
+    "jsdoc/require-param": "error",
+    "jsdoc/require-param-description": "error",
+    "jsdoc/require-returns": ["error", { "checkGetters": false }],
+    "jsdoc/require-returns-description": "error",
     "max-depth": ["error", 3],
     "max-lines": ["error", { "max": 400, "skipBlankLines": true, "skipComments": true }],
-    "max-lines-per-function": ["error", { "max": 60, "skipBlankLines": true, "skipComments": true }],
+    "max-lines-per-function": [
+      "error",
+      { "max": 60, "skipBlankLines": true, "skipComments": true }
+    ],
     "max-params": ["error", 4],
     "no-await-in-loop": "off",
     "no-console": "error",
@@ -72,26 +93,37 @@
     "typescript/no-misused-spread": "error",
     "typescript/no-non-null-assertion": "error",
     "typescript/no-redundant-type-constituents": "error",
+    "typescript/no-unnecessary-boolean-literal-compare": "error",
     "typescript/no-unnecessary-condition": "error",
+    "typescript/no-unnecessary-template-expression": "error",
     "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unnecessary-type-parameters": "error",
     "typescript/no-unsafe-argument": "error",
     "typescript/no-unsafe-assignment": "error",
     "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-enum-comparison": "error",
     "typescript/no-unsafe-member-access": "error",
     "typescript/no-unsafe-return": "error",
     "typescript/no-unsafe-type-assertion": "error",
     "typescript/only-throw-error": "error",
     "typescript/prefer-nullish-coalescing": "error",
+    "typescript/prefer-optional-chain": "error",
     "typescript/prefer-promise-reject-errors": "error",
+    "typescript/prefer-readonly": "error",
     "typescript/require-await": "error",
     "typescript/restrict-plus-operands": "error",
     "typescript/restrict-template-expressions": "error",
     "typescript/return-await": ["error", "error-handling-correctness-only"],
+    "typescript/strict-boolean-expressions": [
+      "error",
+      { "allowString": false, "allowNumber": false, "allowNullableObject": false }
+    ],
     "typescript/switch-exhaustiveness-check": [
       "error",
       { "considerDefaultExhaustiveForUnions": true }
     ],
     "typescript/unbound-method": "error",
+    "typescript/use-unknown-in-catch-callback-variable": "error",
     "unicorn/no-abusive-eslint-disable": "error",
     "unicorn/no-unnecessary-await": "error",
     "unicorn/no-useless-promise-resolve-reject": "error",

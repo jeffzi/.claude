@@ -36,7 +36,7 @@ pre-commit:
     actions:
       priority: 3
       glob: ".github/workflows/*.yml"
-      run: actionlint {staged_files} && zizmor {staged_files}
+      run: actionlint {staged_files} && zizmor --persona=pedantic {staged_files}
 
 commit-msg:
   commands:

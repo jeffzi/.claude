@@ -7,11 +7,11 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "check:actions": "actionlint && zizmor .github/workflows",
+    "check:actions": "actionlint && zizmor --persona=pedantic .github/workflows",
     "check:fmt": "oxfmt --check",
     "check:lint": "oxlint",
     "check:md": "markdownlint-cli2 \"**/*.md\"",
-    "check:package": "run-s build && publint && attw --pack . --profile esm-only",
+    "check:package": "run-s build && publint --strict && attw --pack . --profile esm-only",
     "check:quality": "fallow --fail-on-issues --quiet",
     "check:security": "fallow security",
     "check:spelling": "cspell --no-progress --no-must-find-files \"**/*.{ts,tsx,mts,cts,md}\"",
@@ -28,20 +28,20 @@
     "test": "vitest run --coverage"
   },
   "devDependencies": {
-    "@arethetypeswrong/cli": "^0.18.5",
+    "@arethetypeswrong/cli": "^0.18.0",
     "@commitlint/cli": "^21.2.0",
     "@commitlint/config-conventional": "^21.2.0",
-    "@types/node": "^26.1.0",
+    "@types/node": "^26.4.0",
     "@vitest/coverage-istanbul": "^4.1.0",
-    "cspell": "^10.0.0",
-    "fallow": "^3.6.0",
+    "cspell": "^10.2.0",
+    "fallow": "^3.21.0",
     "lefthook": "^2.1.0",
     "markdownlint-cli2": "^0.23.0",
-    "oxfmt": "^0.59.0",
-    "oxlint": "^1.74.0",
-    "oxlint-tsgolint": "^0.25.0",
-    "publint": "^0.3.22",
     "npm-run-all2": "^9.0.0",
+    "oxfmt": "^0.65.0",
+    "oxlint": "^1.80.0",
+    "oxlint-tsgolint": "^7.0.0",
+    "publint": "^0.3.0",
     "typescript": "^7.0.0",
     "vitest": "^4.1.0"
   },
@@ -50,5 +50,7 @@
       "js-yaml": "^5.2.2"
     }
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  }
 }

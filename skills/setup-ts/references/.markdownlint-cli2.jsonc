@@ -12,11 +12,5 @@
     },
     "MD060": false,
   },
-  "ignores": [
-    ".planning/**",
-    ".research/**",
-    ".stryker-tmp/**",
-    "LICENSE",
-    "node_modules/**",
-  ],
+  "ignores": [".planning/**", ".research/**", ".stryker-tmp/**", "LICENSE", "node_modules/**"],
 }
