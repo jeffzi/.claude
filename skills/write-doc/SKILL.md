@@ -7,7 +7,8 @@ description: |
   user asks to "write docs" or "document this", or asks about documentation structure, information
   architecture, or doc best practices. Does not cover inline code docstrings — those belong to
   language-specific skills like code-py, code-ts. Not for CHANGELOG.md files — use write-changelog.
-  Not for reviewing an existing doc and fixing what the review finds — use revise-doc. For
+  Not for reviewing an existing doc and fixing what the review finds — use revise-doc. Not for
+  vision, philosophy, design-principles, or non-goals documents — use write-vision. For
   sentence-level prose clarity, use write-prose instead.
 argument-hint: "[doc type or target file]"
 ---
