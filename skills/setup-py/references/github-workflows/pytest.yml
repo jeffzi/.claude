@@ -5,12 +5,17 @@ on:
     branches: [main, fix-ci/**]
   pull_request:
     branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
+  _TYPER_FORCE_DISABLE_TERMINAL: "1"
   PYTEST_ADDOPTS: "--color=yes"
 
 jobs:
@@ -18,8 +23,6 @@ jobs:
     name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
-    permissions:
-      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -29,6 +32,8 @@ jobs:
           - os: ubuntu-latest
             python-version: "3.14"
             diff-cover: true
+          - os: windows-latest
+            pytest-extra: "--no-cov"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,7 +50,11 @@ jobs:
         run: uv sync --locked --group dev
 
       - name: Run tests
-        run: uv run pytest
+        env:
+          PYTEST_EXTRA: ${{ matrix.pytest-extra || '' }}
+        run: |
+          # shellcheck disable=SC2086
+          uv run pytest $PYTEST_EXTRA
 
       - name: Check diff coverage
         if: github.event_name == 'pull_request' && matrix.diff-cover

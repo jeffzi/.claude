@@ -1,7 +1,17 @@
 version: "3"
 
 vars:
-  PYTHONS: "3.12 3.13 3.14"
+  CLEAN_PATHS:
+    - .coverage
+    - .coverage.*
+    - .hypothesis
+    - .pytest_cache
+    - .ruff_cache
+    - .venv
+    - .venv-*
+    - "*.egg-info"
+    - coverage.xml
+    - dist
 
 tasks:
   default:
@@ -25,7 +35,7 @@ tasks:
     internal: true
     deps: [_require-uv]
     cmds:
-      - uv sync --locked
+      - uv sync --locked --all-extras
 
   install:
     desc: Sync the project and dev dependencies from the lockfile
@@ -42,26 +52,31 @@ tasks:
   test:matrix:
     desc: Run the test suite on every supported Python version
     deps: [_require-uv]
+    vars:
+      PYTHONS: [3.12, 3.13, 3.14]
     cmds:
-      - for: { var: PYTHONS, split: " " }
-        cmd: UV_PROJECT_ENVIRONMENT=.venv-{{.ITEM}} uv run --python {{.ITEM}} --locked pytest
+      - for: { var: PYTHONS }
+        cmd: >-
+          UV_PROJECT_ENVIRONMENT=.venv-{{.ITEM}}
+          uv run --python {{.ITEM}} --locked --all-extras pytest
 
   check:
-    desc: Run every pre-commit hook across the repo (lint, format, type, spelling, actions, ...)
-    deps: [_require-uv, _require-dprint]
-    cmds:
-      - uv run prek run -a
-
-  check:fix:
-    desc: Auto-fix everything that supports it (ruff lint, ruff format, dprint, markdownlint)
+    desc: Run every pre-commit hook across the repo (fixing hooks rewrite files in place)
     deps: [_sync, _require-dprint]
+    vars:
+      GIT_FILES:
+        sh: git ls-files --cached --others --exclude-standard
+      PREK_FILES: "{{range $f := .GIT_FILES | splitLines}}{{$f | shellQuote}} {{end}}"
     cmds:
-      - uv run ruff check --fix
-      - uv run ruff format
-      - dprint fmt
-      - uv run prek run -a markdownlint-cli2
+      - uv run prek run --files {{.PREK_FILES}}
 
   clean:
     desc: Remove build artifacts, caches, and virtualenvs
     cmds:
-      - rm -rf .venv .venv-* dist *.egg-info .pytest_cache .ruff_cache .hypothesis .coverage .coverage.* coverage.xml
+      - cmd: rm -rf {{.CLEAN_PATHS | join " "}}
+        platforms: [darwin, linux]
+      - cmd: >-
+          powershell -NoProfile -Command
+          "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+          -Path {{.CLEAN_PATHS | join ","}}"
+        platforms: [windows]

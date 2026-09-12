@@ -13,14 +13,14 @@ dependencies = []
 dev = [
   "diff-cover>=10.5,<11",
   "hypothesis>=6.165,<7",
-  "prek>=0.4.14,<0.5",
+  "prek>=0.5,<0.5",
   "pyrefly>=1.2,<2",
   "pytest>=9.1,<10",
   "pytest-cov>=7.1,<8",
   "pytest-randomly>=4.1,<5",
   "pytest-sugar>=1.1,<2",
   "pytest-xdist>=3.8,<4",
-  "ruff>=0.16.4,<0.17",
+  "ruff>=0.16,<0.17",
 ]
 
 [build-system]
@@ -37,16 +37,19 @@ malware-check = true
 
 [tool.pyrefly]
 preset = "strict"
-project-includes = ["src", "tests", "scripts"]
+min-severity = "warn"
+project-includes = ["src", "tests"]
 python-version = "3.12"
-search-path = ["src"]
+search-path = ["src", "tests"]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["ALL"]
+preview = true
+explicit-preview-rules = true
+select = ["ALL", "DOC102", "DOC201", "DOC202", "DOC402", "DOC403", "DOC501"]
 ignore = [
   # --- Docstrings (relaxed for practicality) ---
   "D100", # missing docstring in public module
@@ -72,6 +75,7 @@ ignore = [
   "ANN401",  # dynamically typed expression (Any) — mock/fixture returns
   "ARG001",  # unused function argument (injected fixtures)
   "ARG002",  # unused method argument
+  "DOC",     # docstring section checks (fixtures and helpers)
   "FBT001",  # boolean positional arg (parametrize values)
   "INP001",  # implicit namespace package (tests have no __init__.py)
   "PERF401", # manual list comprehension (perf irrelevant in tests)
@@ -95,20 +99,22 @@ allow-star-arg-any = true
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.ruff.lint.pydoclint]
+ignore-one-line-docstrings = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-n auto --cov --cov-report=term-missing"
 filterwarnings = ["error"]
-xfail_strict = true
+strict = true
 
 [tool.coverage.run]
+source = ["src"]
 branch = true
 parallel = true
-omit = ["tests/**/conftest.py"]
 
 [tool.coverage.report]
-exclude_lines = [
-  "pragma: no cover",
+exclude_also = [
   "if TYPE_CHECKING:",
   "if __name__ == .__main__.",
   "raise NotImplementedError",

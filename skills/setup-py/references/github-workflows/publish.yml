@@ -6,8 +6,23 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
 jobs:
+  lint:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/prek.yml # zizmor: ignore[self-repository] — actionlint rejects $/
+
+  test:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/pytest.yml # zizmor: ignore[self-repository] — actionlint rejects $/
+
   build:
+    name: Build distributions
+    needs: [lint, test]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -40,12 +55,13 @@ jobs:
   # `uv build` above runs a third-party build backend that should never hold it.
   # Configure the PyPI trusted publisher for this repo + the `pypi` environment first.
   publish:
+    name: Publish to PyPI
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: pypi
     permissions:
-      id-token: write
+      id-token: write # OIDC token for PyPI trusted publishing
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:

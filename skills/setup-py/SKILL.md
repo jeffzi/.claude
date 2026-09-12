@@ -23,29 +23,30 @@ them without clobbering deliberate local changes.
 target project's cwd, so always read the source from `${CLAUDE_SKILL_DIR}/references/<template>`,
 never a bare relative `references/` path. Each maps to a fixed destination in the project root:
 
-| Template (in `${CLAUDE_SKILL_DIR}/references/`) | Destination                          |
-| ----------------------------------------------- | ------------------------------------ |
-| `pyproject.toml`                                | `pyproject.toml`                     |
-| `pre-commit-config.yaml`                        | `.pre-commit-config.yaml`            |
-| `dprint-json`                                   | `dprint.json`                        |
-| `.markdownlint-cli2.jsonc`                      | `.markdownlint-cli2.jsonc`           |
-| `cspell.json`                                   | `cspell.json`                        |
-| `editorconfig`                                  | `.editorconfig`                      |
-| `gitignore`                                     | `.gitignore`                         |
-| `python-version`                                | `.python-version`                    |
-| `agents-md`                                     | `AGENTS.md`                          |
-| `Taskfile.yml`                                  | `Taskfile.yml`                       |
-| `scripts/check_max_lines.py`                    | `scripts/check_max_lines.py`         |
-| `dependabot.yml`                                | `.github/dependabot.yml`             |
-| `github-workflows/prek.yml`                     | `.github/workflows/prek.yml`         |
-| `github-workflows/pytest.yml`                   | `.github/workflows/pytest.yml`       |
-| `github-workflows/audit.yml`                    | `.github/workflows/audit.yml`        |
-| `github-workflows/publish.yml`                  | `.github/workflows/publish.yml`      |
-| `github-workflows/update-tools.yml`             | `.github/workflows/update-tools.yml` |
+| Template (in `${CLAUDE_SKILL_DIR}/references/`)    | Destination                               |
+| -------------------------------------------------- | ----------------------------------------- |
+| `pyproject.toml`                                   | `pyproject.toml`                          |
+| `pre-commit-config.yaml`                           | `.pre-commit-config.yaml`                 |
+| `dprint-json`                                      | `dprint.json`                             |
+| `.markdownlint-cli2.jsonc`                         | `.markdownlint-cli2.jsonc`                |
+| `cspell.json`                                      | `cspell.json`                             |
+| `editorconfig`                                     | `.editorconfig`                           |
+| `gitignore`                                        | `.gitignore`                              |
+| `python-version`                                   | `.python-version`                         |
+| `agents-md`                                        | `AGENTS.md`                               |
+| `Taskfile.yml`                                     | `Taskfile.yml`                            |
+| `dependabot.yml`                                   | `.github/dependabot.yml`                  |
+| `github-workflows/actions/setup-dprint/action.yml` | `.github/actions/setup-dprint/action.yml` |
+| `github-workflows/prek.yml`                        | `.github/workflows/prek.yml`              |
+| `github-workflows/pytest.yml`                      | `.github/workflows/pytest.yml`            |
+| `github-workflows/audit.yml`                       | `.github/workflows/audit.yml`             |
+| `github-workflows/publish.yml`                     | `.github/workflows/publish.yml`           |
+| `github-workflows/update-tools.yml`                | `.github/workflows/update-tools.yml`      |
 
 Copy to the **Destination** column name, not the template name; create missing destination
-directories (`.github/workflows/`, `scripts/`) before copying. Several templates are stored under
-neutralized names because their real names would take effect on this skills repo itself:
+directories (`.github/actions/setup-dprint/`, `.github/workflows/`) before copying. Several
+templates are stored under neutralized names because their real names would take effect on this
+skills repo itself:
 
 - `editorconfig`, `gitignore`, `python-version` — dot-less; a real
   `.editorconfig`/`.gitignore`/`.python-version` in `references/` would cascade over the repo.
