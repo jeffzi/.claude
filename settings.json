@@ -8,6 +8,7 @@
     "sessionUrl": false
   },
   "includeCoAuthoredBy": false,
+  "includeGitInstructions": false,
   "permissions": {
     "allow": [
       "Glob",
@@ -56,14 +57,7 @@
       "Bash(git reset)",
       "Bash(git stash *)",
       "Bash(git stash)",
-      "NotebookEdit",
-      "Read(.env.*)",
-      "Read(.env)",
-      "Read(**/*.key)",
-      "Read(**/*.pem)",
-      "Read(**/*.secret)",
-      "Read(**/*credential*)",
-      "Read(**/secrets/*)"
+      "NotebookEdit"
     ],
     "defaultMode": "auto"
   },
@@ -72,7 +66,6 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
@@ -213,6 +206,7 @@
     }
   },
   "outputStyle": "Terse",
+  "feedbackDrafts": "off",
   "effortLevel": "medium",
   "modelSettings": {
     "fable": {
@@ -224,13 +218,13 @@
     "sonnet": {
       "effortLevel": "medium"
     },
-    "claude-opus-4-8": {
+    "claude-opus-4-6": {
       "effortLevel": "medium"
     },
-    "claude-opus-4-6": {
+    "claude-fable-5-1": {
       "effortLevel": "high"
     },
-    "claude-fable-5": {
+    "claude-opus-5": {
       "effortLevel": "medium"
     }
   },
@@ -239,7 +233,9 @@
   "tui": "fullscreen",
   "autoMemoryEnabled": false,
   "skipDangerousModePermissionPrompt": true,
+  "preferredNotifChannel": "terminal_bell",
   "autoCompactEnabled": true,
+  "autoContinueAtUsageLimit": true,
   "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
   "autoMode": {
