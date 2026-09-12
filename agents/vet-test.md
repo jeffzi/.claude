@@ -106,5 +106,6 @@ behavior-vs-implementation from `test-core`, before concluding.
 | "I scanned the file and found no issues" | Scanning ≠ rule-by-rule. Walk the skill's checklist again.                                     |
 | "The tests pass, so they're fine"        | Passing ≠ well-designed. A test bound to implementation passes right up until a safe refactor. |
 | "Two similar tests both add coverage"    | Check the merge/redundancy rules before assuming they differ.                                  |
+| "It's a regression test for a removal"   | A test that a feature stays removed pins nothing. Flag it `cost`, fix is delete — not rename.  |
 | "The skill's rules are obvious"          | Obvious ≠ applied. Cite the rule section for each check.                                       |
 | "Another fix would clean this up anyway" | Then say so in Reasoning — as `confirmed`. See the vet-core corollaries.                       |

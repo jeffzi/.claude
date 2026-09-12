@@ -38,7 +38,8 @@ Every test function has three distinct phases, in order:
 No logic between phases. No assertions in Arrange. One Act per test. "And" in the test name? Split
 it. Name the behavior the test proves, never an ordinal (`test1`). Separate phases with a blank
 line, not comments — `// Arrange`, `// Act`, `// Assert` labels restate what the structure already
-shows. Remove bare labels; strip the prefix from comments that carry a real explanation.
+shows. Remove bare labels; strip the prefix from comments that carry a real explanation. No
+docstrings on test functions — the name carries the intent. Every fixture gets a one-line docstring.
 
 ### 2. Test Behavior, Not Implementation
 
@@ -74,6 +75,12 @@ assert checkout.total == 85.00  # 15% discount applied to $100
 
 Mocking a collaborator and asserting the mock's own return value exercises zero real logic. **If
 removing the production code wouldn't fail the test, the test covers nothing.**
+
+**A removed feature gets removed tests — never a test that it stays removed.** A test asserting a
+dropped parameter is rejected, a deleted function no longer exists, an old kwarg raises `TypeError`,
+or a signature lacks a name pins an absence, not a behavior. There is no production code for it to
+cover, and it breaks the moment any legitimate parameter is added. When a feature is dropped, delete
+its tests. When you find such a test, delete it — it is never renamed, kept, or "tightened".
 
 ### 5. Minimum Tests, Maximum Coverage
 
@@ -127,6 +134,7 @@ test.
 | "I need to verify the mock was called"   | Assert the outcome, not the wiring. See behavior-vs-impl table. |
 | "Testing _func directly boosts coverage" | Coverage via private imports is fake. Drive through public API. |
 | "The mock returns the right value"       | That tests the mock, not the code. See false coverage note.     |
+| "It guards against re-adding the param"  | Code review guards that. An absence has no behavior. Delete it. |
 | "The linter would have caught this"      | Linters miss redundancy, naming, philosophy, structure.         |
 | "Loop is cleaner than parametrize"       | Parametrize shows all cases; loop stops at first failure.       |
 | "I scanned the file and found no issues" | Scanning ≠ rule-by-rule. Walk the checklist rule-by-rule.       |
@@ -142,4 +150,6 @@ STOP and re-check if:
 - You cannot explain, in one sentence, what behavior the test proves
 - A loop inside the test body performs the same assertion with different inputs
 - A test imports from `_internals` / `_private` / other private modules
+- A test asserts a name is **absent** — `not in signature`, `hasattr(...) is False`, `TypeError` on
+  a kwarg that was removed
 - A test has `// Arrange`, `// Act`, or `// Assert` phase-label comments
