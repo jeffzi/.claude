@@ -6,7 +6,7 @@ description: >
   auditing existing changelogs against the Keep a Changelog
   standard. Not for release notes in documentation — use write-doc for that.
 argument-hint: "[version or date range]"
-allowed-tools: Read, Glob, Edit(CHANGELOG.md), Edit(**/CHANGELOG.md), Write(CHANGELOG.md), Write(**/CHANGELOG.md), Bash(git log:*), Bash(git tag:*), Bash(git describe:*)
+allowed-tools: Read, Glob, Edit(CHANGELOG.md), Edit(**/CHANGELOG.md), Write(CHANGELOG.md), Write(**/CHANGELOG.md), Bash(git log *), Bash(git tag *), Bash(git describe *)
 ---
 
 # Changelog
@@ -46,15 +46,18 @@ git log "$(git describe --tags --abbrev=0 2>/dev/null)..HEAD" --oneline 2>/dev/n
 | T2 | Every entry under a `### Type` heading — no bare bullets under version                |
 | T3 | Entries under the correct type (bug fix → `Fixed`, not `Changed`)                     |
 
-### Entry Quality (Q1–Q5)
+### Entry Quality (Q1–Q7)
 
-| #  | Rule                                                                                                                         |
-| -- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Q1 | Curated for humans — no jargon, commit hashes, or slang                                                                      |
-| Q2 | Consistent sentence-case capitalization                                                                                      |
-| Q3 | Notable changes only — not every commit.                                                                                     |
-| Q4 | Describe what changed for users, not implementation ("Add dark mode" not "Refactor CSS")                                     |
-| Q5 | Drop entries that only affect contributors, not consumers (CI, test infra, dev scripts, internal benchmarks, doc reshuffles) |
+| #  | Rule                                                                                                                                                                                                       |
+| -- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1 | Curated for humans — no jargon, commit hashes, or slang                                                                                                                                                    |
+| Q2 | Consistent sentence-case capitalization                                                                                                                                                                    |
+| Q3 | Notable = the user must act, or behavior differs. Cosmetic rendering (colors, dim text, labels, spacing, wrapping, stray or garbled output) is not notable — drop it. "Users would see it" is not the test |
+| Q4 | Describe what changed for users, not implementation ("Add dark mode", not "Refactor CSS")                                                                                                                  |
+| Q5 | Drop entries that only affect contributors, not consumers (CI, test infra, dev scripts, internal benchmarks, doc reshuffles)                                                                               |
+| Q6 | One sentence per entry. Only `**Breaking:**` and migration entries may add the required steps. No layout, states, thresholds, timings, example strings, or sub-feature lists — that is documentation       |
+| Q7 | Sibling entries about one surface or fix merge into one line (three color fixes → one `Fixed` entry)                                                                                                       |
+| Q8 | Imperative mood — "Add dark mode", not "Added dark mode". Matches git commit convention                                                                                                                    |
 
 ## Process
 
@@ -62,7 +65,7 @@ git log "$(git describe --tags --abbrev=0 2>/dev/null)..HEAD" --oneline 2>/dev/n
    when supplied, otherwise the full file:
    - **(a)** S1–S8 top to bottom
    - **(b)** T1–T3 for every version section
-   - **(c)** Q1–Q5 for every bullet point
+   - **(c)** Q1–Q8 for every bullet point
 2. **Report or fix, per caller mode** — every violation carries a line ref, rule ID, and fix. Edit
    in place only when the invocation requested changes; a read-only caller gets the report alone.
 
@@ -75,6 +78,10 @@ git log "$(git describe --tags --abbrev=0 2>/dev/null)..HEAD" --oneline 2>/dev/n
 | "Entries are fine"            | Fine for devs ≠ fine for users. Check Q1 and Q4.     |
 | "Missing links don't matter"  | Links are required by the spec. Check S8.            |
 | "Zero violations"             | Re-check S3, S8, T1, Q1 before concluding clean.     |
+| "Users would notice this"     | Noticing ≠ acting. Cosmetic → drop (Q3).             |
+| "The detail helps them"       | Then it belongs in docs. One sentence (Q6).          |
+| "Each fix is a real symptom"  | Same surface → one line (Q7).                        |
+| "Past tense reads naturally"  | Imperative is the convention. Check Q8.              |
 
 ## Output
 
