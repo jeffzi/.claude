@@ -5,9 +5,6 @@ description: >
   unchanged output. Runs standalone with built-in defaults when the project has no
   .claude/harden.md harness.
 argument-hint: "[optional area]"
-# opus/high: the round adjudicates diffs and classifies claims — a cheaper tier accepts dirty hunks
-model: opus
-effort: high
 disable-model-invocation: true
 ---
 
