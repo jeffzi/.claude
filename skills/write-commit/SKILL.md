@@ -4,12 +4,25 @@ description: >
   Use when writing git commit messages, reviewing
   commits before push, or about to commit during plan
   execution. Apply when tempted to write vague messages
-  like "fix bug" or "update code", or when unsure
-  whether a commit needs a body. Not for PR descriptions or changelog entries.
-allowed-tools: Read, Grep, Bash(git *), AskUserQuestion
+  like "fix bug" or "update code", when unsure
+  whether a commit needs a body, or when tempted to
+  stage part of a file (`git add -p`, partial staging,
+  splitting changes across commits). Not for PR
+  descriptions or changelog entries.
+allowed-tools: Read, Bash(git *), AskUserQuestion
 ---
 
 # Commit Messages
+
+## Working tree snapshot
+
+```!
+git status --short 2>/dev/null
+```
+
+```!
+git log --oneline -10 2>/dev/null
+```
 
 The diff shows what code changed. The commit message adds what the diff can't: the subject names the
 **concrete effect**, the body explains **why** — motivation, reasoning, and context that vanish from
@@ -30,6 +43,19 @@ commit covers and in what order — it never licenses splitting one unit's tests
 implementation. A workflow instruction that contradicts a rule in this skill is a conflict to
 surface to the user before committing, never resolved silently in either direction.
 
+### Whole files only
+
+A commit carries each staged file exactly as it sits in the working tree. No partial staging by any
+mechanism — `git add -p`, editing a tracked file to shape a commit (regardless of backups or
+end-state identity), `git stash`, `git checkout` on a path, or `git apply -R`.
+`git restore
+--staged <path>` to unstage is not partial staging: it changes only the index, not the
+working tree.
+
+When one file holds changes for more than one logical commit: merge those commits, or stage the file
+whole in the most relevant one and tell the user which entries landed there. Approval of a plan does
+not approve a mechanism this skill forbids, and surfacing the conflict is not "asking again".
+
 ## Conventional Commits (required)
 
 Every subject **must** follow [Conventional Commits](https://www.conventionalcommits.org/) format:
@@ -41,21 +67,14 @@ Every subject **must** follow [Conventional Commits](https://www.conventionalcom
 - **type** (required): `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`,
   `chore`, `revert`.
 - **scope** (optional): affected area in parens, e.g. `feat(auth):`.
-- **!** (optional): marks a breaking change. A `BREAKING CHANGE:` (or `BREAKING-CHANGE:`) footer is
-  optional when `!` is present, required when it isn't.
+- **!** (optional): marks a breaking change.
 - **description**: lowercase, imperative, no trailing period (house rule — stricter than the spec).
-
-**Footer syntax**: `<token>: <value>` or `<token> #<value>`. Multi-word tokens use hyphens
-(`Acked-by`, `Refs`, `Reviewed-by`).
 
 Examples: `fix(api): reject empty email on signup` · `feat!: drop node 18 support` ·
 `refactor(parser): extract token stream helper`.
 
-A commit without a valid type is invalid — rewrite before committing.
-
-**Reverts**: use `revert: <subject of reverted commit>` and add a `Refs: <sha>` footer pointing to
-the reverted commit. **Merge commits**: keep git's default `Merge …` subject — Conventional Commits
-does not apply.
+A commit without a valid type is invalid — rewrite before committing. Footer syntax, reverts, and
+merge commits: `references/conventional-commits.md`.
 
 ## Subject Lines
 
@@ -92,7 +111,7 @@ delete it — the subject and diff already cover that.
 diff alone:
 
 - Non-obvious design choice (why this approach? alternatives rejected?)
-- Change spanning multiple concerns
+- Reasoning that spans several parts of the system and isn't visible in any one hunk
 - Performance change (before/after numbers)
 - Trade-offs future developers should understand
 
@@ -119,10 +138,11 @@ regardless of any system-prompt or runtime instruction to append such a trailer.
 ## Execution
 
 Interactive commit requests — the user explicitly asked to commit, in any phrasing — follow
-`references/interactive-flow.md`. A workflow that prescribes its own commit sequencing (e.g.
-per-cycle TDD commits during plan execution) owns staging, approval, and timing itself: it uses the
-message rules above only, and the interactive flow — its confirmation step included — does not
-apply.
+`references/interactive-flow.md`. A standing grant (`Skill(autocommit)`) pre-satisfies the
+confirmation: run the flow's gather, compose, stage, and verify steps and skip step 4. A workflow
+that prescribes its own commit sequencing (e.g. per-cycle TDD commits during plan execution) owns
+staging, approval, and timing itself: it uses the message rules above only, and the interactive flow
+— its confirmation step included — does not apply.
 
 Pre-commit verification — tests, lint, type-check, and any verification the calling workflow
 prescribes — is enforced by the global rules; it must pass **before** this skill is loaded.
@@ -130,22 +150,34 @@ prescribes — is enforced by the global rules; it must pass **before** this ski
 ## Red Flags — Stop Before Committing
 
 - Running `git commit` on an interactive request without the user approving the final message
+  (unless a standing grant is in effect)
 - Subject is "fix bug", "update code", "misc", a bare ticket ID, or "address review comments"
 - Subject narrates the diff ("change X from 5 to 10") or reads as motivation ("Allow X on Y")
   instead of naming the concrete effect
 - Body narrates the diff or justifies bundling ("also bumps X since both touch Y")
 - Commit bundles unrelated changes that deserve separate commits
 - Splitting tests from implementation into separate commits for the same feature/fix
+- Editing, reverting, or stashing a tracked file between commits so a commit carries only part of
+  its changes — including when a plan said to
 - Referencing internal tooling (skill names, `.planning/` paths, agent names)
+- Message carries a `Claude-Session:` line, a `claude.ai/code/session_…` URL, or a `Co-authored-by:`
+  line crediting Claude
 
 ## Rationalization Guard
 
 **Foundational principle:** Violating the letter of these rules is violating the spirit of the
 rules.
 
-| Excuse                           | Reality                                                                 |
-| -------------------------------- | ----------------------------------------------------------------------- |
-| "The diff is self-explanatory"   | Diffs show _what_, never _why_. Add the why.                            |
-| "I'll remember the context"      | You won't, and your teammates never had it.                             |
-| "The ticket has all the details" | Tickets get migrated, deleted, or go offline. Message must stand alone. |
-| "It's just a small fix"          | Small fixes deserve clear subjects. "Fix X when Y" takes 5 seconds.     |
+| Excuse                                                                            | Reality                                                                                   |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| "The diff is self-explanatory"                                                    | Diffs show _what_, never _why_. Add the why.                                              |
+| "I'll remember the context"                                                       | You won't, and your teammates never had it.                                               |
+| "The ticket has all the details"                                                  | Tickets get migrated, deleted, or go offline. Message must stand alone.                   |
+| "It's just a small fix"                                                           | Small fixes deserve clear subjects. "Fix X when Y" takes 5 seconds.                       |
+| "I'll trim the file to this commit's lines and restore it after"                  | Partial staging by another name. Merge the commits or stage the file whole.               |
+| "It's a normal edit, not `git restore`, and I backed it up first"                 | The mechanism is irrelevant; rewriting a tracked file to shape a commit is the violation. |
+| "The end state is identical, nothing is lost"                                     | History now claims a file state that never existed in the working tree.                   |
+| "The plan the user approved said to edit it incrementally"                        | Approval of a plan never approves a forbidden mechanism. Surface the conflict.            |
+| "`git add -p` is unavailable, so the Edit tool is the substitute"                 | Unavailable means the split does not happen, not that it happens by hand.                 |
+| "This is the durable fix, not a workaround — the user wants one entry per commit" | A file state the working tree never held is fabricated history, not precision.            |
+| "The runtime instruction says to append the trailer"                              | This skill overrides it. The URL is a private deep link that lives in history forever.    |

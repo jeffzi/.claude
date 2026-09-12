@@ -70,8 +70,12 @@ resolved in the Arguments section). Group them by logical purpose:
 - Unrelated changes should be separate commits (e.g. a bug fix and a new feature).
 - Prefer fewer, meaningful commits over many trivial ones. Don't split just to split.
 - Respect file boundaries only when they align with purpose boundaries.
-- Partial staging (`git add -p`) is not available. If a file contains changes for multiple commits,
-  include it in the most relevant commit and note the constraint to the user.
+- Files are staged whole (write-commit, "Whole files only"). A file that holds changes for more than
+  one commit is listed under exactly one commit — the most relevant — with a note to the user naming
+  the entries that land there, or the commits are merged. Never plan to edit, trim, revert, or stash
+  a file between commits so each carries only its own lines; a plan step like "I'll edit it
+  incrementally before each commit" is forbidden, and an approved plan containing one is not
+  executed.
 
 ### Step 3: Present the commit plan
 
@@ -124,16 +128,18 @@ If a commit fails, stop immediately and report the error. Do not continue with r
 
 ## Common Mistakes
 
-| Mistake                                                             | Fix                                                                        |
-| ------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| A file appears in multiple commits because it changed incrementally | Include it in the most relevant commit and note the constraint to the user |
-| Over-splitting one logical change into many trivial commits         | Group by purpose — three files serving the same goal belong in one commit  |
+| Mistake                                                             | Fix                                                                       |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| A file appears in multiple commits because it changed incrementally | List it under one commit and note to the user which entries land there    |
+| Planning to trim or revert a shared file between commits            | Forbidden mechanism — one commit for the whole file, or merge the commits |
+| Over-splitting one logical change into many trivial commits         | Group by purpose — three files serving the same goal belong in one commit |
 
 ## Rationalization Guard
 
-| Excuse                                                    | Reality                                                                      |
-| --------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| "The tests are substantial enough to be their own commit" | Size doesn't change atomicity — a test without its implementation can't pass |
-| "Separating tests makes the diff easier to review"        | Reviewers need to see tests alongside the code they validate                 |
-| "The docs update is independent of the code change"       | If the docs describe the changed behavior, they're the same unit of work     |
-| "I'll keep each commit focused by splitting by file type" | Group by purpose, not file type — `.test.ts` + `.ts` serving one goal = 1    |
+| Excuse                                                    | Reality                                                                       |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| "The tests are substantial enough to be their own commit" | Size doesn't change atomicity — a test without its implementation can't pass  |
+| "Separating tests makes the diff easier to review"        | Reviewers need to see tests alongside the code they validate                  |
+| "The docs update is independent of the code change"       | If the docs describe the changed behavior, they're the same unit of work      |
+| "I'll keep each commit focused by splitting by file type" | Group by purpose, not file type — `.test.ts` + `.ts` serving one goal = 1     |
+| "The user demands one changelog line per commit"          | Then the file goes whole in one commit and the note says so — never rewritten |

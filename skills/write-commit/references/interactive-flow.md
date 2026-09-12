@@ -4,12 +4,11 @@
 "commit this"). Workflows that prescribe their own commit sequencing skip this flow entirely — they
 use SKILL.md's message rules only.
 
-1. **Gather context** — run and review:
+1. **Gather context** — `git status --short` and `git log --oneline -10` are already injected at
+   load time (see SKILL.md § Working tree snapshot). Run the diff:
 
    ```bash
-   git status --short
    git diff HEAD
-   git log --oneline -10   # anchor message style to the repo's history
    ```
 
    If the status shows no changes, stop and report that there is nothing to commit.
