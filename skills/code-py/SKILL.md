@@ -40,6 +40,15 @@ blocks (except `if TYPE_CHECKING:`).
 **Internal functions:** Types + clear names suffice. Add docstrings only for non-obvious logic, side
 effects, or public API.
 
+**Shape:** Google style. A one-line docstring is complete when the signature says the rest, and none
+is required on private functions. Otherwise, public functions with parameters or a non-None return
+use sections: `Args:` listing every parameter, however obvious its name, `Returns:`, and `Raises:`
+for every exception raised or propagated. When the name leaves something non-obvious, such as a side
+effect, an invariant, a precondition, or what None means, say it in the docstring, not a comment.
+Parameters, return values, and exceptions are described only in their sections, never in prose. A
+function you edit gets its docstring brought to this shape even if you did not write it; deadlines
+and reviewer preference do not change that.
+
 ### Use Modern Python Features
 
 **Python 3.10+ syntax:**

@@ -53,8 +53,10 @@ const config = ConfigSchema.parse(parsed);  // Zod throws structured errors
 
 **Acceptable `as` uses:** `as const` (compile-time only), and after a manual narrowing guard where
 TS can't narrow automatically (e.g., `typeof x === "object"` doesn't narrow to
-`Record<string, unknown>` — casting after the guard is fine). Never use `as` to skip validation.
-Double casts (`as unknown as T`) are always a red flag.
+`Record<string,
+unknown>` — casting after the guard is fine). Never use `as` to skip validation.
+Double casts (`as
+unknown as T`) are always a red flag.
 
 **Type predicate tip:** Use `Set<string>.has()` instead of `Array.includes()` to avoid `as` inside
 predicates:
@@ -140,6 +142,17 @@ import * as fs from "node:fs";
 import { readFile } from "node:fs/promises";
 ```
 
+### Doc Comments
+
+TSDoc. A doc comment is not required on private functions, parameterless void functions, or
+non-function symbols. Otherwise, public symbols with parameters or a non-void return document them
+with `@param` for every parameter, however obvious its name, `@returns`, and `@throws` for every
+error thrown or propagated. When the name leaves something non-obvious, such as a side effect, an
+invariant, a precondition, or what `undefined` means, say it in a doc comment, not a line comment.
+On a function with parameters or a return, a summary alone is a lint error: add the tags. A function
+you edit gets its doc comment brought to this shape even if you did not write it; deadlines and
+reviewer preference do not change that.
+
 ## Quick Reference
 
 ### Compile-Time vs Runtime
@@ -197,7 +210,8 @@ function area(shape: Shape): number {
 ## House tsconfig
 
 House tsconfig lives in `setup-ts/references/tsconfig.json` — run `/setup-ts init` or
-`/setup-ts update` to install or reconcile it; never hand-write one here.
+`/setup-ts
+update` to install or reconcile it; never hand-write one here.
 
 ## Rationalizations That Mean You're About to Fail
 

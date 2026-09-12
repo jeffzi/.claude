@@ -14,9 +14,9 @@ Apply the chosen edits with `Edit`/`Write`, preserving comments and key order.
   is an _add_; a project-dropped hook is a _removal candidate_; project-added hooks are kept without
   surfacing as drift.
 - `AGENTS.md` reconciles at the section level, not by leaf path: reconcile only the house sections
-  `## Commands`, `## Git hygiene`, `## Linter and type-checker configuration`, and
-  `## Spelling (cspell)` against the template; leave every other section untouched and never surface
-  it as drift (see project-owned-keys.md).
+  `## Commands`, `## Git hygiene`, `## Linter and type-checker configuration`, `## Doc comments`,
+  and `## Spelling (cspell)` against the template; leave every other section untouched and never
+  surface it as drift (see project-owned-keys.md).
 - The `.github/workflows/*.yml` files and `.github/dependabot.yml` are house-owned but routinely
   extended: ensure the template's jobs/steps are present, and keep project-added jobs, steps, and
   matrix entries without surfacing them as drift. If a template job differs, offer replace-or-keep

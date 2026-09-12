@@ -88,6 +88,9 @@ Load all three, then walk the five standards.
      not exemptions.
    - **Doc comment present?** → does its summary say more than the symbol name and parameter names?
      If not, S1 finding, `confirmed`.
+   - **Doc comment present and the symbol has parameters or a non-void return?** → does it use the
+     language's structured form (S4 shape table) and cover every parameter? If not, S4 finding,
+     `confirmed`.
 
    Every symbol gets both questions, and every symbol gets a row in the export ledger you emit under
    **Output format** — including the ones you clear. A symbol you looked at and cleared is a
@@ -120,7 +123,8 @@ code is the label.
 
 **AAA phase labels** — `Arrange`, `Act`, `Assert` — always restate the test structure; blank lines
 already separate phases. Judge the label separately from what follows the dash. A bare label
-(`// Arrange`) is removed. A label prefixing a real why
+(`//
+Arrange`) is removed. A label prefixing a real why
 (`// Assert — factory failure surfaced once;
 latching skips the append`) is still an S1 finding on
 the prefix — the fix strips the prefix and keeps the why:
@@ -195,6 +199,21 @@ Exported and public symbols need a doc comment in the language's conventional st
 
 Flag omissions. An exported symbol with no doc comment is `confirmed`, whatever the symbol's size. A
 one-line type alias gets the same verdict as a 40-line class.
+
+**Shape.** A public symbol with parameters or a non-void return documents them in the language's
+structured form, not in prose:
+
+| Language              | Parameters / return / errors                   |
+| --------------------- | ---------------------------------------------- |
+| TypeScript/JavaScript | `@param`, `@returns`, `@throws`                |
+| Python                | Google sections `Args:`, `Returns:`, `Raises:` |
+| Lua                   | `---@param`, `---@return`                      |
+| Swift                 | `- Parameters:`, `- Returns:`, `- Throws:`     |
+
+A one-line summary is enough for private symbols and for public ones whose signature says it all. A
+doc comment that grows past one line uses the structured form, never prose. A public symbol with
+parameters or a return whose doc block is prose-only, or carries the tags but omits a parameter, is
+an S4 finding, `confirmed`.
 
 **"Do not restyle" is about form, not content.** The no-restyle clause protects a well-formed block
 from being reshaped — retagged, rewrapped, converted between comment syntaxes, reordered. It says
@@ -348,11 +367,12 @@ Emit all three parts, in this order, every time. Copy the shape below literally.
 ```text
 Skills: code-ts (.ts) — house banner shape: dashed `// ---`
 
-Exports: 4
+Exports: 5
 - StyleSpec    — no doc comment            → S4, Finding 1
 - colorize     — doc states the contract   → clean
 - resolveWidth — doc narrates the past     → S5, Finding 2
 - formatRow    — doc restates the name     → S1, Finding 3
+- parseArgs    — prose doc, no @param      → S4, Finding 4
 
 ### Finding 1
 Issue: S4 — exported symbol has no doc comment
@@ -375,10 +395,12 @@ whole point: a symbol you cleared and a symbol you never checked look identical 
 A report whose findings mention a symbol absent from the ledger is malformed.
 
 If a file has no exported symbols, write `Exports: none`. If `CODE_SKILL` is `none`, write
-`Exports: n/a (S4 skipped)`. Never omit the line.
+`Exports:
+n/a (S4 skipped)`. Never omit the line.
 
 When no violation survives, emit the Skills and Exports blocks and then `No findings.` — never
-`No findings.` alone.
+`No
+findings.` alone.
 
 ## Rules
 
@@ -408,6 +430,7 @@ When no violation survives, emit the Skills and Exports blocks and then `No find
 | "It's only one trailing sentence"            | Judge the sentence on its own merit, not diluted by the block.         |
 | "It's a nit next to the other findings"      | Findings are judged alone. Comparison is not confidence.               |
 | "The type is inspectable in an editor"       | Tooling is not a doc comment. S4 omission, `confirmed`.                |
+| "The prose already explains the return"      | Tools and readers find `@returns`/`Returns:`, not sentences. S4.       |
 | "It's well-formed TSDoc, S4 says no restyle" | No-restyle is about form. Restating content is S1, `confirmed`.        |
 | "I'd have noticed a missing doc comment"     | You didn't, in past runs. Enumerate first, then decide.                |
 | "The ledger is busywork on a small file"     | Small files are where the misses hid. Emit it.                         |

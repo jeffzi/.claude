@@ -12,15 +12,13 @@ Apply the chosen edits with `Edit`/`Write`, preserving comments and key order.
   in the project is an _add_; a project-dropped hook is a _removal candidate_; `rev` values are
   never a conflict — they belong to `/upgrade-py`.
 - `AGENTS.md` reconciles at the section level, not by leaf path: reconcile only the house sections
-  `## Commands`, `## Git hygiene`, `## Linter and type-checker configuration`, and
+  `## Commands`, `## Git hygiene`, `## Linter and type-checker configuration`, `## Docstrings`, and
   `## Spelling (cspell)` against the template; leave every other section untouched and never surface
   it as drift (see project-owned-keys.md).
 - `Taskfile.yml` and the `.github/workflows/*.yml` files are house-owned but routinely extended:
   ensure the template's tasks/jobs/steps are present, and keep project-added tasks, jobs, matrix
   entries, and steps without surfacing them as drift. If a template task/job differs, offer
   replace-or-keep for that entry.
-- `scripts/check_max_lines.py` is house-owned code, not config — if it differs from the template,
-  offer replace-or-keep for the whole file; never merge line-by-line.
 - `.editorconfig` has no keys to merge — if it differs, offer replace-or-keep.
 - `.gitignore` is line-based and additive: ensure the template's lines exist, and keep project-added
   lines without surfacing them as drift.
