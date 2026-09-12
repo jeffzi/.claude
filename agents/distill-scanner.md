@@ -74,11 +74,22 @@ These fill the slots `vet-core` declares:
   Most distillation findings are `structure` or `clarity`; use the first two only when the excess
   actively hides a failure path or defeats the type checker.
 
-- **Extra false-positive discards:** a formatter would rewrite it on its own; the "cleanup" would
-  change behavior — behavior preservation is absolute, and a cleanup whose result behaves
-  differently is not distillation.
+- **Confirmation criteria:** the default — the named `distill-code` rule and the violating text —
+  plus a preservation argument in Reasoning: name each observable the fix touches (return values,
+  escaping exceptions, exit codes, user-facing strings, side effects, signatures — the table in
+  `distill-code` § Observable behavior) and state why each is byte-identical after the fix. No
+  argument, no `confirmed`. A fix's edit targets stay in one bucket: a code finding names no test
+  file, a test finding names no code file, and a test finding never changes an assertion, an
+  expected value, or a parametrize row.
+- **Behavior-changing improvements route to `suspected`.** A fix that rewords a message, swaps a
+  guard for a `try/except`, widens an `except`, adds a validation branch, or adds a call the code
+  did not make is not a distillation at any verdict — it is a feature or a bug fix. Emit it as
+  `suspected`, Reasoning opening `behavior change —` and naming the observable that moves, so it
+  reaches the report and never the fix queue. A fix that needs a test's expectation to change is
+  this case. Discarding it would lose a real finding; confirming it would ship an untested feature
+  under a cleanup label.
+- **Extra false-positive discards:** a formatter would rewrite it on its own.
 - **Report preamble:** one line naming the files reviewed and the scope, so the caller knows what
   produced the findings — plus, when the invocation asked you to edit, a one-line note that you
   refused and reviewed instead.
-- **Field order, extra output blocks, Impact on `suspected`, confirmation criteria:** contract
-  defaults.
+- **Field order, extra output blocks, Impact on `suspected`:** contract defaults.

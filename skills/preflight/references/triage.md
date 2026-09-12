@@ -12,6 +12,13 @@ only here — reviewers report everything.
   is built from it.
 - Discard `false-positive` findings (list below).
 - Partition: `confirmed` → fix queue; `suspected` → report-only queue; `unconfirmed` → adjudication.
+- **Behavior changes are report-only at any verdict.** A finding whose fix text alters a string a
+  user sees, a public signature, a return value, an exit code, or the set of exceptions that escape
+  — or whose edit targets include both a code file and a test file — leaves the fix queue for the
+  report-only queue, `Reason Not Fixed: behavior change — not auto-fixed`. Preflight fixes what a
+  cleanup or a rule settles; a change a user can observe is the user's commit. `bug-scanner`
+  findings are exempt: a bug fix changes behavior by definition, and the mender receives them as
+  `Behavior: may-change`.
 
 **False positives (`false-positive`, discard):**
 
@@ -70,3 +77,5 @@ re-derives evidence from the files, unrestricted by the step 1 target list. Rout
   promotes
 - ❌ Checking the empty-fix-queue before adjudication → the check runs after; a promoted finding can
   populate an empty queue
+- ❌ Fixing a `confirmed` finding whose fix rewords a message or widens an `except` → the verdict is
+  confidence, not license; from every lens but `bug-scanner` a behavior change is report-only

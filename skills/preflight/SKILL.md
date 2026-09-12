@@ -45,7 +45,8 @@ context stolen from triage and the report — the steps only you can do.
 - Argument: $ARGUMENTS
 - Uncommitted changes: !`git status --porcelain`
 - Commits since last push:
-  !`git log @{u}..HEAD --oneline 2>/dev/null || echo "(no upstream or up to date)"`
+  !`git log @{u}..HEAD --oneline 2>/dev/null || echo "(no upstream or up to
+  date)"`
 
 > **Note:** Context above is orientation only. Step 1's file collection is the authoritative source
 > of target files.
@@ -55,8 +56,7 @@ context stolen from triage and the report — the steps only you can do.
 **Status budget:** After the start announcement, at most ONE short status line per step transition —
 fixed shape, `Step 3/7: review lenses dispatched.` — and nothing else until Step 7's Summary Report.
 Never findings, issue counts, gate verdicts, or any results content: those exist only in the report
-— and the transition lines themselves carry none of it: `Step 4/7: menders
-dispatched.` is complete;
+— and the transition lines themselves carry none of it: `Step 4/7: menders dispatched.` is complete;
 never append what was found, promoted, scored, or adjudicated. A task notification or wakeup is NOT
 a demand for output — on a wakeup with nothing new to transition to, end the turn with no text at
 all; the empty turn IS the correct output, not a failure to respond. `Step N/7 in progress.` exists
@@ -205,8 +205,8 @@ convention violation arrives as an ordinary `vet-*` finding.
 - `subagent_type: vet-test` on the test files
 - `subagent_type: vet-doc` on the doc files
 - Prompt each:
-  `"Review these files.\n\nFiles: [bucket file list]\n\nDiff:\n[review diff]\n\nScope: [full if
-  path-argument mode, changed otherwise]"`
+  `"Review these files.\n\nFiles: [bucket file list]\n\nDiff:\n[review diff]\n\nScope:
+  [full if path-argument mode, changed otherwise]"`
 - Each loads its own hub and language leaves and returns `### Finding N` blocks. Do not name a skill
   in the prompt. `vet-doc` routes CHANGELOG.md to `write-changelog` rules on its own.
 - `vet-skill` is not part of preflight — no bucket feeds it.
@@ -215,8 +215,8 @@ convention violation arrives as an ordinary `vet-*` finding.
 
 - `subagent_type: vet-comments`
 - Prompt:
-  `"Review these files.\n\nFiles: [code + test file list]\n\nDiff:\n[review diff]\n\nScope: [full
-  if path-argument mode, changed otherwise]"`
+  `"Review these files.\n\nFiles: [code + test file list]\n\nDiff:\n[review diff]\n\nScope:
+  [full if path-argument mode, changed otherwise]"`
 - It resolves its own language skills per file and emits `### Finding N` blocks with Impact tags
   like every other lens. Its Skills/Exports preamble is its completeness proof — read past it;
   triage collects only the finding blocks.
@@ -225,8 +225,8 @@ convention violation arrives as an ordinary `vet-*` finding.
 
 - `subagent_type: bug-scanner`
 - Prompt:
-  `"Review these files for runtime correctness bugs.\n\nFiles: [code file list]\n\nDiff:\n[review
-  diff]\n\nScope: [full if path-argument mode, changed otherwise]"`
+  `"Review these files for runtime correctness bugs.\n\nFiles: [code file
+  list]\n\nDiff:\n[review diff]\n\nScope: [full if path-argument mode, changed otherwise]"`
 
 **Distill lens** (when code or test files exist) — read-only; it emits findings, it does not edit.
 Silent unrecorded edits become countable, scoreable, gated findings instead.
@@ -282,6 +282,13 @@ node ${CLAUDE_SKILL_DIR}/scripts/snapshot.ts save <scratchpad>/preflight-snap-1 
 never per finding — concurrent menders sharing a file race each other, and `code-mender` takes a
 list by contract. A finding's edit targets are the files its Location line and fix text name.
 
+**Cross-bucket findings are not fixed.** A finding whose edit targets include both a code file and a
+test file leaves the fix queue for Issues Reported,
+`Reason Not Fixed: cross-bucket fix — behavior
+change`. A cleanup that needs a test to move changed
+behavior; grouping never welds a code file to a test file. A test finding naming `conftest.py` and
+two test files is one bucket.
+
 **Group together** (one mender): findings sharing any edit-target file, merged transitively — a
 shared-helper extraction naming three files welds all three, plus every other finding on any of
 them, into one group. **Keep separate** (parallel menders): findings whose file sets are disjoint.
@@ -298,6 +305,7 @@ dispatches in a single parallel message. Per group, pass every finding for its f
 Issue: [description from finding]
 Location: [file_path:line_number from finding]
 Severity: [high if the Impact tag ranks 1 or 2 in the enum table in references/triage.md, medium if it ranks 3 or 4]
+Behavior: [may-change if the finding came from bug-scanner; preserve for every other lens — vet-code, vet-test, vet-comments, distill-scanner — and for adjudication-promoted findings of those lenses]
 Suggested fix: [reasoning from finding]
 
 Issue: [next finding for this file]
@@ -306,8 +314,20 @@ Issue: [next finding for this file]
 
 Record the set of edited files for step 5.
 
+**Read every mender report before the gate.** The `Behavior notes:` section is a gate input, not
+decoration. Two lines disqualify a fix: a Behavior note on a `preserve` finding that appears under
+Fixed Issues, and a Fixed Issue naming a test file for a finding whose Location was a code file.
+Either means the mender broke contract: restore that group's files from the snapshot
+(`node
+${CLAUDE_SKILL_DIR}/scripts/snapshot.ts restore <scratchpad>/preflight-snap-1 --only <group files>
+--edited <edited files>`),
+drop them from the edited set, and move the group's findings to Issues Reported
+(`mender reported behavior change` / `mender edited a test for a code finding`). A fix the mender
+skipped with reason `behavior change` moves its finding to Issues Reported with that reason.
+
 **Gate** —
-`node ${CLAUDE_SKILL_DIR}/scripts/gate.ts <scratchpad> fix "<checker command>" "<test command>"`.
+`node ${CLAUDE_SKILL_DIR}/scripts/gate.ts <scratchpad> fix "<checker command>" "<test
+command>"`.
 
 Classification is the script's `FAILING:` line — it names the red sub-checks; the captures hold the
 detail. The line parses npm-run-s output; on `FAILING: (unparsed — see captures)`, classify by
@@ -331,17 +351,20 @@ sees the post-fix code. Style re-violations from a mender are not worth re-runni
 fan-out for, so this is `bug-scanner` only.
 
 - `subagent_type: bug-scanner`, scoped to the files step 4 edited, with a fresh diff:
-  `git diff -- <edited files>`. An untracked edited file has no diff — pass its name and let the
+  `git diff --
+  <edited files>`. An untracked edited file has no diff — pass its name and let the
   scanner read it in full; never `cat` it into your own context.
 - Prompt as in step 3, scope `changed`.
 
 **If it returns `confirmed` findings:** one corrective round, then stop fixing regardless.
 
 1. Snapshot the edited files:
-   `node ${CLAUDE_SKILL_DIR}/scripts/snapshot.ts save <scratchpad>/preflight-snap-2 <edited files>`
+   `node ${CLAUDE_SKILL_DIR}/scripts/snapshot.ts save
+   <scratchpad>/preflight-snap-2 <edited files>`
 2. One `code-mender` per file group (step 4's grouping rule), in parallel, same format as step 4
 3. Gate:
-   `node ${CLAUDE_SKILL_DIR}/scripts/gate.ts <scratchpad> corrective "<checker command>" "<test command>"`
+   `node ${CLAUDE_SKILL_DIR}/scripts/gate.ts <scratchpad> corrective "<checker command>"
+   "<test command>"`
    — on red, `references/red-gate.md` again, with `preflight-snap-2` as the snapshot. The gate's
    single repair attempt is gate machinery, not a round — the round cap counts scan-driven fix
    rounds.
