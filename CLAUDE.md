@@ -10,7 +10,17 @@ surface before anything else; never switch files or approaches to avoid one. Nev
 ("pre-existing", "not from this PR") — just diagnose and offer to fix. Never run a baseline to
 establish origin: do not create worktrees, stash changes, or run any command whose sole purpose is
 to prove a failure existed before your edits. Surface as a one-line finding — never escalate an
-out-of-scope issue into a decision point or plan (`rules/decision-policy.md`).
+out-of-scope issue into a decision point or plan (`rules/decision-policy.md`). During unattended
+plan execution (the injected user policy says "an approved plan is executing unattended"), "stop"
+means append to the plan's Findings list and continue — the findings lead the final report.
+
+### Approved plans execute to completion — never ask whether to continue
+
+Approval of a plan is the request for every task in it. Execution runs to the Final Task with
+one-line progress notes, never "should I continue?", "want me to launch the next task?", or a
+progress summary that ends the turn. Only three things halt a plan: verification red after two
+attempts, an unplanned behavior change something depends on, or a destructive/cross-repo boundary.
+Protocol and flags: `Skill(execute-plan)`.
 
 ### No destructive operations without explicit permission
 

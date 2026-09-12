@@ -23,18 +23,18 @@ as "reference", no adapting while writing tests, no commit-and-fix-forward; star
 failing test. Exceptions exist, but the user grants them — ask before skipping for throwaway
 prototypes, generated code, or configuration files.
 
-| Excuse                                                         | Reality                                                                                                   |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| "I'll orchestrate RED-GREEN-REFACTOR myself"                   | Context isolation is the entire point. Invoke `/tdd`.                                                     |
-| "Plan already has RED/GREEN steps" / "Plan shows inline code"  | Plans describe behaviors, not test/impl details. Use `/tdd` for implementation.                           |
-| "Each test needs its own cycle" / "I'll batch later"           | Cohesive batches belong in one cycle. Different modules = separate cycles. See Batching.                  |
-| "Let me read the source first" / "I'll write test inline"      | RED agent reads what it needs. Context isolation exists for a reason.                                     |
-| "Just one quick cycle, no plan needed"                         | Multi-behavior tasks need a plan. Plans describe behaviors; agents figure out how.                        |
-| "I'll dispatch `tdd-cycle` directly, skip the orchestrator"    | No phase verification, no circuit breaker, no data contracts. Always go through `/tdd`.                   |
-| "The workflow prescribes committing, so it's pre-approved"     | The skill prescribes _when_; the user authorizes _that_. Ad hoc → ask first.                              |
-| "I'll present the message and commit in the same turn"         | Present-and-proceed is committing without approval. Stop the turn; wait for the user.                     |
-| "write-commit handles approval, so the TDD gate is redundant"  | The TDD gate is the orchestrator's own rule. Loading write-commit does not replace it.                    |
-| "Plan task → proceed, so I commit and list the findings after" | The grant covers verified work, not unseen findings. SURFACE gate first: findings, end turn, then commit. |
+| Excuse                                                         | Reality                                                                                                                                                                                                                                                          |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "I'll orchestrate RED-GREEN-REFACTOR myself"                   | Context isolation is the entire point. Invoke `/tdd`.                                                                                                                                                                                                            |
+| "Plan already has RED/GREEN steps" / "Plan shows inline code"  | Plans describe behaviors, not test/impl details. Use `/tdd` for implementation.                                                                                                                                                                                  |
+| "Each test needs its own cycle" / "I'll batch later"           | Cohesive batches belong in one cycle. Different modules = separate cycles. See Batching.                                                                                                                                                                         |
+| "Let me read the source first" / "I'll write test inline"      | RED agent reads what it needs. Context isolation exists for a reason.                                                                                                                                                                                            |
+| "Just one quick cycle, no plan needed"                         | Multi-behavior tasks need a plan. Plans describe behaviors; agents figure out how.                                                                                                                                                                               |
+| "I'll dispatch `tdd-cycle` directly, skip the orchestrator"    | No phase verification, no circuit breaker, no data contracts. Always go through `/tdd`.                                                                                                                                                                          |
+| "The workflow prescribes committing, so it's pre-approved"     | The skill prescribes _when_; the user authorizes _that_. Ad hoc → ask first.                                                                                                                                                                                     |
+| "I'll present the message and commit in the same turn"         | Present-and-proceed is committing without approval. Stop the turn; wait for the user.                                                                                                                                                                            |
+| "write-commit handles approval, so the TDD gate is redundant"  | The TDD gate is the orchestrator's own rule. Loading write-commit does not replace it.                                                                                                                                                                           |
+| "Plan task → proceed, so I commit and list the findings after" | The grant covers verified work, not unseen findings. SURFACE gate first: findings, end turn, then commit. Only an unattended plan execution (the injected policy line says so) lifts this — then findings go to the plan's Findings list and the loop continues. |
 
 | Red flag — STOP, delete the code, start over with TDD                          |
 | ------------------------------------------------------------------------------ |
@@ -105,10 +105,13 @@ Run the loop per `references/orchestration-flow.md`. Non-negotiables:
 - **REFACTOR once**, after all cycles, before any commit: < 50 insertions → skip; ≥ 50 →
   distill-and-mend (steps 10–12).
 - **Surface before commit.** Any open item — unconfirmed finding, flaky test, "unrelated" issue — is
-  shown to the user and the turn ends before any commit (orchestration-flow § SURFACE).
-- **Commit last.** Plan task or autocommit → proceed; ad hoc → list each cycle's files and stop for
-  explicit approval. Then `Skill(write-commit)` — one commit per cycle, tests and implementation
-  together; agents never commit.
+  shown to the user and the turn ends before any commit (orchestration-flow § SURFACE). Under
+  unattended plan execution (the injected policy line says so) the items go to the plan's Findings
+  list and the turn continues.
+- **Commit last.** Plan task or autocommit → proceed; plan task invoked with "no-commit plan
+  execution" → skip, report file lists; ad hoc → list each cycle's files and stop for explicit
+  approval. Then `Skill(write-commit)` — one commit per cycle, tests and implementation together;
+  agents never commit.
 
 ## When Stuck
 

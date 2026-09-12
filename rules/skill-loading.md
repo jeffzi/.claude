@@ -8,6 +8,7 @@ loaded". When a skill, command, or rule prescribes an agent instead of a load, d
 | Action                                    | Skill to load first                                                                                           |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | EnterPlanMode or writing a plan           | `Skill(write-plan)`                                                                                           |
+| Executing an approved plan                | `Skill(execute-plan)` — runs to the Final Task; never asks whether to continue                                |
 | Writing code                              | `Skill(code-core)` (hub — loads the language skill via Language Dispatch below)                               |
 | Writing tests                             | `Skill(test-core)` (hub — loads the language skill via Language Dispatch below)                               |
 | Running TDD cycle                         | `Skill(tdd)` (hub load + RED-GREEN orchestration)                                                             |

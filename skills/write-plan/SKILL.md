@@ -166,7 +166,8 @@ Create the plan at `.planning/plan-<slug>.md` **as the working file from the fir
 review, and revise there (`<slug>` kebab-cased from the feature). When ready, present it in
 conversation and wait for explicit approval before implementation. Approval happens in conversation,
 not via `ExitPlanMode`: ask explicitly ("Approve this plan?") and wait — silence, a tangent, or a
-question is not approval.
+question is not approval. On approval, load `Skill(execute-plan)` — approval covers every task, and
+that skill runs them to the Final Task without further check-ins.
 
 ## Red Flags
 

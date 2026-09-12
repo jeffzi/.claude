@@ -84,6 +84,7 @@ finds. Dispatch the agent directly when you want findings without edits.
 | ---------------------------------------------- | ------------------------------------------------------------------------------ |
 | [`autocommit`](skills/autocommit/SKILL.md)     | Standing commit approval — auto-commit verified work, no pushes                |
 | [`build`](skills/build/SKILL.md)               | Feature design pipeline: discuss → plan; produces an approved plan file        |
+| [`execute-plan`](skills/execute-plan/SKILL.md) | Run an approved plan to completion — no check-ins, no stalls                   |
 | [`fix`](skills/fix/SKILL.md)                   | Root cause investigation then TDD-driven fix                                   |
 | [`fix-ci`](skills/fix-ci/SKILL.md)             | Diagnose and fix failing GitHub Actions CI                                     |
 | [`harden`](skills/harden/SKILL.md)             | Bug-hunting audit + Don't Repeat Yourself (DRY) pass with diff-gated execution |
