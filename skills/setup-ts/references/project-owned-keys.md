@@ -13,6 +13,7 @@ Never surface as drift.
 | `tsconfig.build.json`            | `outDir`, `rootDir`, `include`                                                                                                              |
 | `tsconfig.json`                  | `paths`                                                                                                                                     |
 | `vitest.config.ts`               | `coverage.thresholds` values                                                                                                                |
+| `lefthook.yml`                   | project-added hooks and commands                                                                                                            |
 | `AGENTS.md`                      | Every section except `## Commands`, `## Git hygiene`, `## Linter and type-checker configuration`, `## Doc comments`, `## Spelling (cspell)` |
 | `package.json`                   | Every top-level key except `scripts` and `devDependencies`                                                                                  |
 | `.github/workflows/*.yml`        | project-added jobs, steps, and matrix entries                                                                                               |

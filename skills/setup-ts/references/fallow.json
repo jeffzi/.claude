@@ -12,5 +12,16 @@
     "oxlint-tsgolint"
   ],
   "duplicates": { "ignore": ["tests/**"] },
-  "rules": { "duplicate-exports": "off" }
+  "rules": { "duplicate-exports": "off" },
+  "health": {
+    "thresholdOverrides": [
+      {
+        "files": ["tests/**/*.test.ts"],
+        "functions": ["<arrow>"],
+        "maxUnitSize": 800,
+        "reason": "describe/it callbacks are suite containers; file length is capped by oxlint max-lines"
+      }
+    ],
+    "coverage": "coverage/coverage-final.json"
+  }
 }

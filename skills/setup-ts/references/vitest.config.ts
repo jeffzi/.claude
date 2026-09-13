@@ -7,6 +7,7 @@ export default defineConfig({
     restoreMocks: true,
     unstubEnvs: true,
     unstubGlobals: true,
+    typecheck: { enabled: true, include: ["tests/**/*.test-d.ts"] },
     sequence: {
       shuffle: {
         files: true,

@@ -22,13 +22,20 @@
       }
     },
     {
-      "files": ["tests/**", "**/*.test.ts", "**/*.spec.ts"],
+      "files": ["tests/**", "**/*.test.ts", "**/*.test-d.ts", "**/*.spec.ts"],
       "rules": {
         "max-lines": ["error", { "max": 800, "skipBlankLines": true, "skipComments": true }],
         "jsdoc/require-param": "off",
         "jsdoc/require-returns": "off",
         "max-lines-per-function": "off",
         "no-control-regex": "off",
+        "typescript/no-unsafe-argument": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-call": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "typescript/no-unsafe-return": "off",
+        "typescript/no-unsafe-type-assertion": "off",
+        "typescript/require-await": "off",
         "unicorn/consistent-function-scoping": "off"
       }
     }
@@ -43,7 +50,7 @@
     "import/no-duplicates": "error",
     "import/no-namespace": "error",
     "import/no-self-import": "error",
-    "jsdoc/check-tag-names": "error",
+    "jsdoc/check-tag-names": ["error", { "definedTags": ["typeParam"] }],
     "jsdoc/empty-tags": "error",
     "jsdoc/implements-on-classes": "error",
     "jsdoc/no-defaults": "error",
