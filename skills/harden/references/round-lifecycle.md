@@ -43,11 +43,11 @@ Claims are independent, so verification parallelizes. Group the claims by the mo
 mechanism targets — claims on one mechanism verify together and share the reading. One group →
 verify inline. Multiple groups → dispatch one **Agent** call per group, `subagent_type: "fork"`, all
 in one parallel message. Each fork's prompt names its group's claims; the fork re-reads each
-mechanism at the line level, builds the repro, and returns one line per claim —
-`CLASS: <classification from the table> — <mechanism confirmed or disproof>`. Forks never write the
-ledger, the plan, or any project file — repro scratch goes to a temp directory, and the parent alone
-records the results: refuted claims to the ledger, the rest into the plan's classification.
-Sequential verification of a multi-group claim set is the bottleneck this step exists to avoid.
+mechanism at the line level, builds the repro, and returns one line per claim — `CLASS:
+<classification from the table> — <mechanism confirmed or disproof>`. Forks never write the ledger,
+the plan, or any project file — repro scratch goes to a temp directory, and the parent alone records
+the results: refuted claims to the ledger, the rest into the plan's classification. Sequential
+verification of a multi-group claim set is the bottleneck this step exists to avoid.
 
 ## 3. Write plan
 

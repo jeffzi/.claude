@@ -63,6 +63,11 @@ Never add to an ignore list, disable a rule, or exclude a file to get a check pa
 code. Suppress only genuine false positives, inline and with a reason. Config-level ignores require
 explicit user approval. Full rule: `rules/lint-suppressions.md`.
 
+### Scratchpad file references
+
+When writing analysis or long output to a scratchpad file, run `open /path/to/file` via Bash
+immediately after writing it — don't just print the command, execute it.
+
 ### No internal tooling leaks in user-facing output
 
 Never expose internal tooling details (skill/agent names, `.planning/` paths, orchestrator

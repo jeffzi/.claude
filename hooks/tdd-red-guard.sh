@@ -34,8 +34,8 @@ marker="$git_dir/tdd-red-phase${agent_id:+.$agent_id}"
 # Allowed during RED: test files, stubs, interfaces, public API surface, anything
 # under a test directory. Everything else with a source extension is impl source.
 is_impl_source() {
-	local path="$1" base
-	base=$(basename "$path")
+	local path="$1"
+	local base="${path##*/}"
 
 	[[ "$path" =~ (^|/)(tests?|__tests__|spec)(/|$) ]] && return 1
 
@@ -79,7 +79,10 @@ read_cmds="cat|head|tail|less|more|sed|awk|grep|rg|bat|nl|tac|cut|strings|python
 while IFS= read -r subcmd; do
 	subcmd="${subcmd#"${subcmd%%[![:space:]]*}"}"
 	[[ -z "$subcmd" ]] && continue
-	first_word=$(basename "${subcmd%% *}")
+	# Strip the directory with an expansion, never basename: words here can start with
+	# a dash (`--cov`, `-k`), which basename parses as a flag and dies on.
+	first_word="${subcmd%% *}"
+	first_word="${first_word##*/}"
 	if [[ "$subcmd" == *tdd-red-phase* ]]; then
 		case "$first_word" in
 		touch)

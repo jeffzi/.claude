@@ -32,8 +32,8 @@ rule) is not green — it is a hidden red.
 ## Current branch CI state
 
 - PR checks: !`gh pr checks 2>/dev/null || true`
-- Head: !`git rev-parse --short HEAD 2>/dev/null || true` on branch:
-  !`git branch --show-current 2>/dev/null || true`
+- Head: !`git rev-parse --short HEAD 2>/dev/null || true` on branch: !`git branch --show-current
+  2>/dev/null || true`
 
 Ignore this block when `\$0` names a different PR, run, or SHA — the entry-point table governs.
 
@@ -98,12 +98,15 @@ failed.
 
 Attempts are plain commits; the squash erases them, so retries never amend or force. If pushing the
 branch triggers no workflow, open the PR early (`gh pr create --fill --base <original>`) to fire
-`pull_request` workflows.
+`pull_request` workflows — except for a `plan/*` target, which never gets a PR (see the hard stop
+below).
 
 **No CI coverage on the branch → hard stop.** Check `.github/workflows/*` triggers on the
-checked-out PR branch, before `git switch -c fix-ci/*`: nothing fires on branch pushes or
+checked-out target branch, before `git switch -c fix-ci/*`: nothing fires on branch pushes or
 `pull_request` → investigate and report only, noting `workflow_dispatch` when offered. Never use the
-target branch itself as the CI test bed.
+target branch itself as the CI test bed. A `plan/*` target with no run for its pushed tip is this
+stop with a known diagnosis: the workflow's `on.push.branches` lacks `plan/**` — report that line as
+the fix, never push `main` to get a run.
 
 **Squash back when the branch's run is green** — procedure in `references/push-protocol.md`.
 
@@ -118,12 +121,13 @@ gh run list --commit <sha> --json databaseId,workflowName,event,status,conclusio
 Always key runs off the head SHA, never "latest run" — every push rotates the SHA, and older runs
 are stale. The `event` field distinguishes `push`- from `pull_request`-triggered runs.
 
-| Given (\$0 or context)       | Entry point                                           |
-| ---------------------------- | ----------------------------------------------------- |
-| PR number                    | `gh pr checks $0` / `gh pr view $0 --json headRefOid` |
-| Run id                       | `gh run view $0`                                      |
-| Commit SHA                   | `gh run list --commit $0`                             |
-| Nothing, no PR (bare branch) | `gh run list --commit $(git rev-parse HEAD)`          |
+| Given (\$0 or context)       | Entry point                                            |
+| ---------------------------- | ------------------------------------------------------ |
+| PR number                    | `gh pr checks $0` / `gh pr view $0 --json headRefOid`  |
+| Run id                       | `gh run view $0`                                       |
+| Commit SHA                   | `gh run list --commit $0`                              |
+| Nothing, no PR (bare branch) | `gh run list --commit $(git rev-parse HEAD)`           |
+| A `plan/<slug>` branch       | Bare-branch path: no PR exists; key off the branch tip |
 
 Run still in progress → never analyze the previous run's failures as current. Wait:
 

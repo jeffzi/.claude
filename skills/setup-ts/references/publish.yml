@@ -13,11 +13,12 @@ permissions: {}
 jobs:
   # The same matrix pull requests run — no hand-copied subset that drifts.
   ci:
-    uses: ./.github/workflows/ci.yml
+    uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository] -- actionlint 1.7.12 rejects the $/ form
     permissions:
       contents: read
 
   build:
+    name: Build and verify package
     needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -58,6 +59,7 @@ jobs:
   # workflow on npmjs.com first; publishing stays inert while package.json has
   # "private": true.
   publish:
+    name: Publish to npm
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10

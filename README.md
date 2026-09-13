@@ -84,7 +84,8 @@ finds. Dispatch the agent directly when you want findings without edits.
 | ---------------------------------------------- | ------------------------------------------------------------------------------ |
 | [`autocommit`](skills/autocommit/SKILL.md)     | Standing commit approval — auto-commit verified work, no pushes                |
 | [`build`](skills/build/SKILL.md)               | Feature design pipeline: discuss → plan; produces an approved plan file        |
-| [`execute-plan`](skills/execute-plan/SKILL.md) | Run an approved plan to completion — no check-ins, no stalls                   |
+| [`execute-plan`](skills/execute-plan/SKILL.md) | Run an approved plan on a `plan/*` branch, push it, watch CI — no check-ins    |
+| [`merge-plan`](skills/merge-plan/SKILL.md)     | Squash a green plan branch onto its base as one commit (user-invoked only)     |
 | [`fix`](skills/fix/SKILL.md)                   | Root cause investigation then TDD-driven fix                                   |
 | [`fix-ci`](skills/fix-ci/SKILL.md)             | Diagnose and fix failing GitHub Actions CI                                     |
 | [`harden`](skills/harden/SKILL.md)             | Bug-hunting audit + Don't Repeat Yourself (DRY) pass with diff-gated execution |
@@ -170,6 +171,32 @@ The two most common entry points:
 See the [Process](#process) skills table for additional workflows (`/harden`, `/preflight`,
 `/distill-code`, and others).
 
+### Plan Flow
+
+One plan is one commit on the branch it started from, `main` by default. The assistant never commits
+on that base; every plan runs on its own branch and lands as a single squash.
+
+1. `/write-plan` writes the plan; you approve it.
+2. `/execute-plan` creates `plan/<slug>` from the clean branch you are on, records that base,
+   commits once per task, fixes confirmed findings, pushes the branch once, watches CI (dispatching
+   `/fix-ci` on red), and writes the squash commit message. Its report ends with the one command
+   left for you.
+3. Optionally, `/preflight` on the branch.
+4. `/merge-plan` squash-merges the branch onto its base with that message, pushes, and deletes the
+   branch.
+
+What enforces it:
+
+- `git config claude.protectMain true` (set per repo by `/setup-ts` and `/setup-py`) makes
+  [`git-guard.sh`](hooks/git-guard.sh) block every commit-creating command on `main`. A feature
+  branch used as a base has no guard of its own; the skill's rule that all work goes on `plan/*` is
+  what protects it.
+- [`merge-plan.sh`](scripts/merge-plan.sh) runs only while the marker `/merge-plan` raises exists,
+  both at the guard and inside the script, so the squash happens only when you invoke the skill.
+- Branch pushes go through [`fix-ci-push.sh`](scripts/fix-ci-push.sh): append-only, no force, and
+  only `fix-ci/*` and `plan/*` branches may be deleted.
+- CI templates trigger on `plan/**` pushes, so the branch is green before it reaches its base.
+
 ## Tooling
 
 ### Status Line
@@ -237,29 +264,31 @@ bats tests/
 
 ### Scripts
 
-| Script                                               | Description                                                      |
-| ---------------------------------------------------- | ---------------------------------------------------------------- |
-| [`cleanup-sessions.sh`](scripts/cleanup-sessions.sh) | Remove stale session data older than a configurable age          |
-| [`fix-ci-policy.sh`](scripts/fix-ci-policy.sh)       | Push-gate policy shared by `fix-ci` loop and `git-guard` hook    |
-| [`fix-ci-push.sh`](scripts/fix-ci-push.sh)           | Sanctioned push wrapper for the `fix-ci` loop                    |
-| [`statusline.sh`](scripts/statusline.sh)             | Custom status line: model, context gauge, rate limit pacing      |
-| [`sync-skills.sh`](scripts/sync-skills.sh)           | Sync selected skills from external repositories via `npx skills` |
+| Script                                               | Description                                                             |
+| ---------------------------------------------------- | ----------------------------------------------------------------------- |
+| [`cleanup-sessions.sh`](scripts/cleanup-sessions.sh) | Remove stale session data older than a configurable age                 |
+| [`branch-policy.sh`](scripts/branch-policy.sh)       | Marker and branch policy shared by `fix-ci`, `merge-plan`, `git-guard`  |
+| [`fix-ci-push.sh`](scripts/fix-ci-push.sh)           | Sanctioned push wrapper for the `fix-ci` loop and plan branches         |
+| [`merge-plan.sh`](scripts/merge-plan.sh)             | Squash a green `plan/*` branch onto its base; run by `/merge-plan`      |
+| [`sh-common.sh`](scripts/sh-common.sh)               | Sourced helpers shared by the scripts and hooks: `die`, portable `stat` |
+| [`statusline.sh`](scripts/statusline.sh)             | Custom status line: model, context gauge, rate limit pacing             |
+| [`sync-skills.sh`](scripts/sync-skills.sh)           | Sync selected skills from external repositories via `npx skills`        |
 
 ### Hooks
 
-| Hook                                               | Description                                                                     |
-| -------------------------------------------------- | ------------------------------------------------------------------------------- |
-| [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh)   | Blocks proceeding when a Bash command fails                                     |
-| [`git-commit-guard.sh`](hooks/git-commit-guard.sh) | Blocks commit messages containing internal tooling references                   |
-| [`git-guard.sh`](hooks/git-guard.sh)               | Blocks auto-push, plan file commits, destructive ops, commits during TDD cycles |
-| [`git-lock-guard.sh`](hooks/git-lock-guard.sh)     | Absorbs `.git/index.lock` races from parallel agents/sessions                   |
-| [`marimo-check.sh`](hooks/marimo-check.sh)         | Validates marimo notebooks on edit                                              |
-| [`plan-claim-guard.sh`](hooks/plan-claim-guard.sh) | Reminds to verify plan claims before exiting plan mode                          |
-| [`plan-skill-guard.sh`](hooks/plan-skill-guard.sh) | Enforces skill loading before plan mode                                         |
-| [`shiny-check.sh`](hooks/shiny-check.sh)           | Smoke-tests staged Shiny apps before commit                                     |
-| [`tdd-red-guard.sh`](hooks/tdd-red-guard.sh)       | Blocks reading implementation source during TDD RED phase                       |
-| [`worktree-guard.sh`](hooks/worktree-guard.sh)     | Blocks exiting worktrees with uncommitted changes                               |
-| [`collab-reminder.sh`](hooks/collab-reminder.sh)   | Re-injects propose-decisions / answer-first policy on every prompt              |
+| Hook                                               | Description                                                                           |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh)   | Blocks proceeding when a Bash command fails                                           |
+| [`git-commit-guard.sh`](hooks/git-commit-guard.sh) | Blocks commit messages containing internal tooling references                         |
+| [`git-guard.sh`](hooks/git-guard.sh)               | Blocks auto-push, destructive ops, commits on a protected `main`, unsanctioned merges |
+| [`git-lock-guard.sh`](hooks/git-lock-guard.sh)     | Absorbs `.git/index.lock` races from parallel agents/sessions                         |
+| [`marimo-check.sh`](hooks/marimo-check.sh)         | Validates marimo notebooks on edit                                                    |
+| [`plan-claim-guard.sh`](hooks/plan-claim-guard.sh) | Reminds to verify plan claims before exiting plan mode                                |
+| [`plan-skill-guard.sh`](hooks/plan-skill-guard.sh) | Enforces skill loading before plan mode                                               |
+| [`shiny-check.sh`](hooks/shiny-check.sh)           | Smoke-tests staged Shiny apps before commit                                           |
+| [`tdd-red-guard.sh`](hooks/tdd-red-guard.sh)       | Blocks reading implementation source during TDD RED phase                             |
+| [`worktree-guard.sh`](hooks/worktree-guard.sh)     | Blocks exiting worktrees with uncommitted changes                                     |
+| [`collab-reminder.sh`](hooks/collab-reminder.sh)   | Re-injects propose-decisions / answer-first policy on every prompt                    |
 
 ## Configuration Notes
 

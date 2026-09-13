@@ -13,34 +13,34 @@ get_git_subcmd() {
 	local cmd="$1"
 	local in_git=false
 	local skip_next=false
+	local word
+	local -a words=()
 
-	for word in $cmd; do
+	# read -ra splits on whitespace without letting a word glob; -d '' keeps
+	# the split spanning newlines, as a raw multi-line command line needs.
+	read -d '' -ra words <<<"$cmd" || true
+	for word in ${words[@]+"${words[@]}"}; do
 		if $skip_next; then
 			skip_next=false
 			continue
 		fi
 
-		# Wait for 'git'
 		if ! $in_git; then
 			[[ "$word" == "git" ]] && in_git=true
 			continue
 		fi
 
 		case "$word" in
+		# Only these global options take their value as a separate word; every
+		# other option, attached-value forms included, is a single word.
 		-C | -c | --git-dir | --work-tree | --namespace)
 			skip_next=true
 			continue
 			;;
-		-C* | -c*)
-			# -C and -c can have value attached (-Cpath)
-			continue
-			;;
-		--*=* | -*)
-			# Long option with value or other short option
+		-*)
 			continue
 			;;
 		*)
-			# First non-option word is the subcommand
 			printf '%s' "$word"
 			return 0
 			;;

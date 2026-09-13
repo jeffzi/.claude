@@ -29,10 +29,9 @@ the project dropped is a removal candidate; a tool the project added is owned.
 
 `[tool.ruff]`, `[tool.pyrefly]`, `[tool.pytest.ini_options]`, `[tool.coverage]`, `[tool.uv]` bodies
 (other than the owned keys above), `[build-system]`, and the whole `.pre-commit-config.yaml` hook
-set are house rules — reconcile with the normal add/conflict/removal logic.
-`[tool.uv]
-exclude-newer` is a house supply-chain control: treat it as a house rule so projects
-seeded before it existed receive it on `update`.
+set are house rules — reconcile with the normal add/conflict/removal logic. `[tool.uv]
+exclude-newer` is a house supply-chain control: treat it as a house rule so projects seeded before
+it existed receive it on `update`.
 
 `Taskfile.yml` and the `.github/workflows/*.yml` files are house-owned but additive: the template's
 tasks/jobs/steps are house rules (ensure they are present), while tasks, jobs, matrix entries, and

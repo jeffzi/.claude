@@ -3,7 +3,7 @@ name: prek
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, fix-ci/**, plan/**]
   workflow_call:
 
 permissions:

@@ -2,10 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [main, fix-ci/**]
+    branches: [main, fix-ci/**, plan/**]
+    paths-ignore:
+      - "**.md"
+      - LICENSE
+      - .fallowrc.json
+      - .gitignore
   pull_request:
     branches: [main]
-  # Lets publish.yml run the full matrix as its release gate.
   workflow_call:
 
 concurrency:
@@ -16,6 +20,7 @@ permissions: {}
 
 jobs:
   ci:
+    name: CI
     permissions:
       contents: read
     timeout-minutes: 15
@@ -58,4 +63,4 @@ jobs:
 
       - name: Check
         if: runner.os == 'Linux'
-        run: npm run check
+        run: npm run check && git diff --exit-code

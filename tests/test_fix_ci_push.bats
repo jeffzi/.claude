@@ -10,60 +10,35 @@ setup_file() {
 	NO_MARKER=$(setup_pair no_marker)
 
 	export STALE
-	STALE=$(setup_pair stale)
-	raise_marker "$STALE"
+	STALE=$(setup_marked_pair stale)
 	backdate_marker "$STALE" "$STALE_OFFSET_MINUTES"
 
 	export FUTURE
-	FUTURE=$(setup_pair future)
-	raise_marker "$FUTURE"
+	FUTURE=$(setup_marked_pair future)
 	backdate_marker "$FUTURE" "$FUTURE_OFFSET_MINUTES"
 
 	export PLAIN
-	PLAIN=$(setup_pair plain)
-	raise_marker "$PLAIN"
+	PLAIN=$(setup_marked_pair plain)
 
 	export UPSTREAM
-	UPSTREAM=$(setup_pair upstream)
-	raise_marker "$UPSTREAM"
+	UPSTREAM=$(setup_marked_pair upstream)
+
+	export OUTSIDE
+	OUTSIDE=$(setup_marked_pair outside)
 
 	export REFUSE
-	REFUSE=$(setup_pair refuse)
-	raise_marker "$REFUSE"
+	REFUSE=$(setup_marked_pair refuse)
 	seed_origin "$REFUSE" main
 
 	export DELETE_FLAG
-	DELETE_FLAG=$(setup_pair delete_flag)
-	raise_marker "$DELETE_FLAG"
-	seed_origin "$DELETE_FLAG" main fix-ci/lint
+	DELETE_FLAG=$(setup_marked_pair delete_flag)
+	add_branch "$DELETE_FLAG" plan/x
+	seed_origin "$DELETE_FLAG" main fix-ci/lint plan/x
 
 	export DELETE_COLON
-	DELETE_COLON=$(setup_pair delete_colon)
-	raise_marker "$DELETE_COLON"
-	seed_origin "$DELETE_COLON" main fix-ci/lint
-
-	# Origin whose main has moved on independently, plus a repo-local push refspec
-	# that would force-update every branch.
-	export FORCE_CONFIG
-	FORCE_CONFIG=$(setup_pair force_config)
-	raise_marker "$FORCE_CONFIG"
-	seed_origin "$FORCE_CONFIG" main
-	export FORCE_CONFIG_BARE
-	FORCE_CONFIG_BARE=$(bare_of "$FORCE_CONFIG")
-	local other="$TMPDIR_ROOT/force_config/other"
-	git clone -q "$FORCE_CONFIG_BARE" "$other"
-	git -C "$other" config user.email "other@test.com"
-	git -C "$other" config user.name "Other"
-	touch "$other/THEIRS"
-	git -C "$other" add THEIRS
-	git -C "$other" -c commit.gpgsign=false commit -q -m "theirs"
-	git -C "$other" push -q origin main
-	export FORCE_CONFIG_HEAD
-	FORCE_CONFIG_HEAD=$(git -C "$FORCE_CONFIG_BARE" rev-parse refs/heads/main)
-	touch "$FORCE_CONFIG/MINE"
-	git -C "$FORCE_CONFIG" add MINE
-	git -C "$FORCE_CONFIG" -c commit.gpgsign=false commit -q -m "mine"
-	git -C "$FORCE_CONFIG" config remote.origin.push '+refs/heads/*:refs/heads/*'
+	DELETE_COLON=$(setup_marked_pair delete_colon)
+	add_branch "$DELETE_COLON" plan/x
+	seed_origin "$DELETE_COLON" main fix-ci/lint plan/x
 
 	export NOT_A_REPO
 	NOT_A_REPO="$TMPDIR_ROOT/not_a_repo"
@@ -76,107 +51,144 @@ teardown_file() {
 
 # ── Marker gate ──────────────────────────────────────────────────────────────
 
-@test "marker gate: push without a marker is refused" {
+@test "marker gate: push without a marker is refused as no active loop" {
 	run_wrapper "$NO_MARKER" origin fix-ci/lint
+
 	assert_refused
+	assert_reason "is absent"
 	assert_ref_absent "$(bare_of "$NO_MARKER")" fix-ci/lint
 }
 
-@test "marker gate: push under a stale marker is refused" {
+@test "marker gate: push under a stale marker is refused as an ended loop" {
 	run_wrapper "$STALE" origin fix-ci/lint
+
 	assert_refused
+	assert_reason "not from the last"
 	assert_ref_absent "$(bare_of "$STALE")" fix-ci/lint
 }
 
-@test "marker gate: push under a future-dated marker is refused" {
+@test "marker gate: push under a future-dated marker is refused as an ended loop" {
 	run_wrapper "$FUTURE" origin fix-ci/lint
+
 	assert_refused
+	assert_reason "not from the last"
 	assert_ref_absent "$(bare_of "$FUTURE")" fix-ci/lint
+}
+
+@test "marker gate: a stat that answers neither dialect is named instead of reading as an ended loop" {
+	local work bin
+	work=$(setup_marked_pair nostat)
+	bin=$(failing_stat_bin "$TMPDIR_ROOT/nostat")
+
+	run_script_on_path "$work" "$bin:$PATH" "$FIX_CI_PUSH_WRAPPER" origin fix-ci/lint
+
+	assert_run_failed 1
+	assert_reason "marker age cannot be read"
+	assert_ref_absent "$(bare_of "$work")" fix-ci/lint
 }
 
 # ── Pass-through under a fresh marker ────────────────────────────────────────
 
-@test "pass-through: push of a fix-ci branch succeeds and lands in origin" {
+@test "pass-through: push of a fix-ci branch lands in origin" {
 	run_wrapper "$PLAIN" origin fix-ci/lint
-	assert_pushed
+
+	assert_run_ok
 	assert_ref_present "$(bare_of "$PLAIN")" fix-ci/lint
 }
 
-@test "pass-through: push -u of a fix-ci branch succeeds and lands in origin" {
+@test "pass-through: push -u of a fix-ci branch lands in origin" {
 	run_wrapper "$UPSTREAM" -u origin fix-ci/lint
-	assert_pushed
+
+	assert_run_ok
 	assert_ref_present "$(bare_of "$UPSTREAM")" fix-ci/lint
 }
 
-# ── Flag whitelist (every force form) ────────────────────────────────────────
+@test "pass-through: push of a branch outside both namespaces lands in origin" {
+	run_wrapper "$OUTSIDE" origin main
 
-@test "force flag: push -f is refused" {
-	run_wrapper "$REFUSE" -f origin fix-ci/lint
-	assert_refused
+	assert_run_ok
+	assert_ref_present "$(bare_of "$OUTSIDE")" main
+}
+
+# ── Flag whitelist ───────────────────────────────────────────────────────────
+
+@test "flag whitelist: every unlisted flag is refused naming the whitelist" {
+	local flag
+	for flag in -f --force-with-lease -fu --mirror; do
+		run_wrapper "$REFUSE" "$flag" origin fix-ci/lint
+
+		assert_refused || {
+			printf 'flag: %s\n' "$flag" >&2
+			return 1
+		}
+		assert_reason "is not allowed" || {
+			printf 'flag: %s\n' "$flag" >&2
+			return 1
+		}
+	done
 	assert_ref_absent "$(bare_of "$REFUSE")" fix-ci/lint
 }
 
-@test "force flag: push --force-with-lease is refused" {
-	run_wrapper "$REFUSE" --force-with-lease origin fix-ci/lint
-	assert_refused
-}
-
-@test "force flag: push -fu (bundled force) is refused" {
-	run_wrapper "$REFUSE" -fu origin fix-ci/lint
-	assert_refused
-}
-
-@test "force flag: push --mirror is refused" {
-	run_wrapper "$REFUSE" --mirror origin
-	assert_refused
-}
-
-@test "force flag: push +main:main (force refspec) is refused" {
+@test "flag whitelist: a force refspec is refused as a history rewrite" {
 	run_wrapper "$REFUSE" origin +main:main
+
 	assert_refused
+	assert_reason "forces the update"
+}
+
+@test "flag whitelist: a push naming no refspec is refused" {
+	run_wrapper "$REFUSE" origin
+
+	assert_refused
+	assert_reason "no refspec named"
 }
 
 # ── Delete scoping ───────────────────────────────────────────────────────────
 
-@test "delete scope: push --delete main is refused" {
+@test "delete scope: push --delete main is refused naming both allowed namespaces" {
 	run_wrapper "$REFUSE" origin --delete main
-	assert_refused
-}
 
-@test "delete scope: push :main (delete refspec) is refused" {
-	run_wrapper "$REFUSE" origin :main
 	assert_refused
+	assert_reason "fix-ci/*"
+	assert_reason "plan/*"
 	assert_ref_present "$(bare_of "$REFUSE")" main
 }
 
-@test "delete scope: push --delete fix-ci/lint succeeds" {
-	run_wrapper "$DELETE_FLAG" origin --delete fix-ci/lint
-	assert_pushed
+@test "delete scope: push :main (delete refspec) is refused naming both allowed namespaces" {
+	run_wrapper "$REFUSE" origin :main
+
+	assert_refused
+	assert_reason "fix-ci/*"
+	assert_reason "plan/*"
+	assert_ref_present "$(bare_of "$REFUSE")" main
+}
+
+@test "delete scope: push --delete of a fix-ci and a plan branch removes both from origin" {
+	run_wrapper "$DELETE_FLAG" origin --delete fix-ci/lint plan/x
+
+	assert_run_ok
 	assert_ref_absent "$(bare_of "$DELETE_FLAG")" fix-ci/lint
+	assert_ref_absent "$(bare_of "$DELETE_FLAG")" plan/x
 }
 
-@test "delete scope: push :fix-ci/lint (delete refspec) succeeds" {
-	run_wrapper "$DELETE_COLON" origin :fix-ci/lint
-	assert_pushed
+@test "delete scope: delete refspecs for a fix-ci and a plan branch remove both from origin" {
+	run_wrapper "$DELETE_COLON" origin :fix-ci/lint :plan/x
+
+	assert_run_ok
 	assert_ref_absent "$(bare_of "$DELETE_COLON")" fix-ci/lint
-}
-
-# ── Repo config cannot inject a force ────────────────────────────────────────
-
-@test "force config: push under a force-everything push refspec fails" {
-	run_wrapper "$FORCE_CONFIG" origin
-	assert_failed
-	assert_ref_at "$FORCE_CONFIG_BARE" main "$FORCE_CONFIG_HEAD"
+	assert_ref_absent "$(bare_of "$DELETE_COLON")" plan/x
 }
 
 # ── Diagnostics ──────────────────────────────────────────────────────────────
 
 @test "diagnostics: git's own reason for an unusable repo" {
 	run_wrapper "$NOT_A_REPO" origin fix-ci/lint
+
 	assert_reason "not a git repository"
 }
 
 @test "diagnostics: missing git named as the cause" {
-	run_wrapper_without_git origin fix-ci/lint
+	run_wrapper_without_git "$NO_MARKER" origin fix-ci/lint
+
 	assert_reason "git is not installed"
 }

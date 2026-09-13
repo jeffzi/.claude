@@ -47,10 +47,8 @@ surface to the user before committing, never resolved silently in either directi
 
 A commit carries each staged file exactly as it sits in the working tree. No partial staging by any
 mechanism — `git add -p`, editing a tracked file to shape a commit (regardless of backups or
-end-state identity), `git stash`, `git checkout` on a path, or `git apply -R`.
-`git restore
---staged <path>` to unstage is not partial staging: it changes only the index, not the
-working tree.
+end-state identity), `git stash`, `git checkout` on a path, or `git apply -R`. `git restore --staged
+<path>` to unstage is not partial staging: it changes only the index, not the working tree.
 
 When one file holds changes for more than one logical commit: merge those commits, or stage the file
 whole in the most relevant one and tell the user which entries landed there. Approval of a plan does

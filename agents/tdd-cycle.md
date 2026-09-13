@@ -41,8 +41,8 @@ The TDD orchestrator gives you:
 
 Load `Skill(test-core)` at the start of Phase 1 and `Skill(code-core)` at the start of Phase 2. Each
 hub dispatches the matching language leaf itself (via the Language Dispatch table in
-`rules/skill-loading.md`), and the leaf's Domain Skill Detection auto-loads overlays (e.g.
-`import polars` → `Skill(test-polars)`). Do not resolve leaves manually — the hubs own dispatch.
+`rules/skill-loading.md`), and the leaf's Domain Skill Detection auto-loads overlays (e.g. `import
+polars` → `Skill(test-polars)`). Do not resolve leaves manually — the hubs own dispatch.
 
 ## Phase 1: RED — Write Failing Tests
 
@@ -86,14 +86,13 @@ different spelling.
 
 ### Phase 1: Process
 
-0. **Raise the guards**: run
-   `touch "$(git rev-parse --git-dir)/tdd-red-phase" "$(git rev-parse --git-dir)/tdd-cycle-active"`.
-   While `tdd-red-phase` exists, a PreToolUse hook blocks reads of implementation source files,
-   mechanically enforcing the access rules above; you remove it at the start of Phase 2. While
-   `tdd-cycle-active` exists, a hook blocks `git add` and `git commit` — the orchestrator owns all
-   commits. You NEVER remove `tdd-cycle-active`; it must outlive you, and the orchestrator removes
-   it after you return. If the project is not a git repo, skip this step — the access rules still
-   apply.
+0. **Raise the guards**: run `touch "$(git rev-parse --git-dir)/tdd-red-phase" "$(git rev-parse
+   --git-dir)/tdd-cycle-active"`. While `tdd-red-phase` exists, a PreToolUse hook blocks reads of
+   implementation source files, mechanically enforcing the access rules above; you remove it at the
+   start of Phase 2. While `tdd-cycle-active` exists, a hook blocks `git add` and `git commit` — the
+   orchestrator owns all commits. You NEVER remove `tdd-cycle-active`; it must outlive you, and the
+   orchestrator removes it after you return. If the project is not a git repo, skip this step — the
+   access rules still apply.
 1. **Load testing principles**: load `Skill(test-core)` — the hub dispatches the matching
    `Skill(test-{lang})` leaf itself, and the leaf's Domain Skill Detection auto-loads overlays (e.g.
    `import polars` → `Skill(test-polars)`). If the extension has no dispatch row, note "no matching
@@ -195,9 +194,8 @@ another agent's mid-edit file, a smell you passed by — goes in NOTES as one li
 investigated, read, or fixed. Omit the field when there is nothing to report.
 
 **SKILL_MISSING** is not a STATUS value. When the Language Dispatch table resolves to a test or code
-skill that does not exist in the session, prefix the `FAILURE_OUTPUT` field with
-`SKILL_MISSING: <name>` on its own line, then continue using `test-core` principles and project
-conventions.
+skill that does not exist in the session, prefix the `FAILURE_OUTPUT` field with `SKILL_MISSING:
+<name>` on its own line, then continue using `test-core` principles and project conventions.
 
 ### STATUS: PASSED
 

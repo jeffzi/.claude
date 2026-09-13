@@ -67,9 +67,9 @@ LOOP (one wave per iteration; a wave = one or more independent behavior groups):
        yours; the tdd-red-phase.<agent_id> files are per-agent read guards)
     3. Handle non-PASSED statuses, per agent:
        - PASSED_UNEXPECTEDLY -> behavior already exists; report to user;
-         ask: skip (next behavior) or revise test scope? Under unattended plan
-         execution (the injected policy line says so): record it as a plan
-         finding, skip the behavior, continue -- no question.
+         ask: skip (next behavior) or revise test scope? Under an unattended
+         enclosing workflow (the injected policy line says so): record it on
+         the caller's open-items list, skip the behavior, continue -- no question.
        - STUCK + PHASE: RED -> test writing failed; report diagnostics to user
        - STUCK + PHASE: GREEN -> implementation failed; report diagnostics to user;
          ask: adjust test, try manually, or skip?
@@ -141,12 +141,15 @@ SURFACE (gate between REFACTOR and COMMIT -- runs even when REFACTOR was skipped
     work", not "may I commit past findings the user has never seen". "Report at
     task close" means at this gate -- a finding first shown after the commit
     hash is a finding the user could not act on.
-  - Unattended plan execution -- the turn's injected user policy says "an approved
-    plan is executing unattended" -> the user opted out of this gate for the whole
-    plan: hand OPEN_ITEMS to execute-plan's Findings list (they lead its final
-    report) and go to COMMIT without ending the turn. The flag is the user's
-    answer; "they should see this first" re-asks a question they already answered
-    by typing --unattended.
+  - Unattended enclosing workflow -- the turn's injected user policy says an
+    approved workflow is executing unattended (a plan, a hardening round, any
+    caller that names its own open-items list) -> the user opted out of this
+    gate for the whole run: hand OPEN_ITEMS to the list the caller named (a
+    plan's Findings section; they lead its final report) and go to COMMIT
+    without ending the turn. The policy line is the user's answer; "they should
+    see this first" and "the line says round, not plan" both re-ask a question
+    they already answered by stepping away. A caller that declares unattended
+    but names no list gets OPEN_ITEMS in its return, never a turn end.
 
 COMMIT (last phase -- refactor edits are already in the files, so every commit
 contains the cleaned-up code; there is no separate refactor commit):

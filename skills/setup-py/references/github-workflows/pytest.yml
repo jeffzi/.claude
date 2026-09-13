@@ -2,7 +2,7 @@ name: Tests
 
 on:
   push:
-    branches: [main, fix-ci/**]
+    branches: [main, fix-ci/**, plan/**]
   pull_request:
     branches: [main]
   workflow_call:

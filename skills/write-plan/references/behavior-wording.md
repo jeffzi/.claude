@@ -17,5 +17,10 @@ For a behavior gated on a flag or mode (color, output format, verbosity, TTY), s
 **both branches** and spec test coverage for both — a fixture or assertion per branch. A behavior
 whose tests exercise only one branch is unverified on the other.
 
+For a behavior that reads external state — a file, a socket, a subprocess, an environment variable —
+state the outcome when the read **fails**, not only when the source is missing: "a missing log reads
+as size zero" leaves a permission error unspecified, and the implementer's default becomes the
+behavior. A behavior whose failure branch is unstated is unverified on that branch.
+
 Under length pressure, compress by dropping the mechanism, never the outcome. "Stay consistent with
 the plan's concise style" is not a reason to word a behavior as a helper call.

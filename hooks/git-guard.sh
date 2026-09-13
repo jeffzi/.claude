@@ -16,8 +16,8 @@ command -v jq >/dev/null || {
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # fix-ci policy, shared with the wrapper that fronts the loop's pushes.
-# shellcheck source=SCRIPTDIR/../scripts/fix-ci-policy.sh
-. "$HOOK_DIR/../scripts/fix-ci-policy.sh"
+# shellcheck source=SCRIPTDIR/../scripts/branch-policy.sh
+. "$HOOK_DIR/../scripts/branch-policy.sh"
 
 # git subcommand parsing, shared with hooks/git-lock-guard.sh.
 # shellcheck source=SCRIPTDIR/../scripts/git-parse.sh
@@ -48,14 +48,26 @@ is_git_subcmd() {
 
 PLAN_PATTERNS_GREP=('\.claude/plans/' 'docs/plans/')
 
-check_plan_files() {
-	local files="$1"
-	[[ -z "$files" ]] && return 0
+# Returns (via stdout) the first PLAN_PATTERNS_GREP entry found in $1, or fails
+# when none match. Shared by check_plan_files (a file list) and check_add_safety
+# (the raw command text).
+find_plan_pattern() {
+	local text="$1" pattern
 	for pattern in "${PLAN_PATTERNS_GREP[@]}"; do
-		printf '%s' "$files" | grep -q "$pattern" || continue
-		printf "Error: Cannot stage/commit plan files matching '%s'. These are temporary analysis files.\n" "$pattern" >&2
-		return 1
+		if printf '%s' "$text" | grep -q "$pattern"; then
+			printf '%s' "$pattern"
+			return 0
+		fi
 	done
+	return 1
+}
+
+check_plan_files() {
+	local files="$1" pattern
+	[[ -z "$files" ]] && return 0
+	pattern=$(find_plan_pattern "$files") || return 0
+	printf "Error: Cannot stage/commit plan files matching '%s'. These are temporary analysis files.\n" "$pattern" >&2
+	return 1
 }
 
 # ╭────────────────────────────────────────────────────────────╮
@@ -79,16 +91,19 @@ check_tdd_cycle_marker() {
 # │                  fix-ci Marker Relaxation                  │
 # ╰────────────────────────────────────────────────────────────╯
 
-# While `$GIT_DIR/fix-ci-active` exists, a CI-fix loop is running on throwaway
-# `fix-ci/*` branches whose plain commits get squash-merged back. Two relaxations
-# follow from that shape:
+# While `$GIT_DIR/fix-ci-active` exists, the marker sanctions branch work the
+# assistant drives itself: a fix-ci loop on throwaway `fix-ci/*` branches, and an
+# execute-plan run shipping its `plan/*` branch to CI. Both shapes are the same —
+# plain commits on a branch that is squash-merged back and then deleted — so two
+# relaxations follow:
 #
 #   - The loop only ever appends commits, so a plain push is allowed on any
 #     branch. Which branch HEAD points at (or whether it points at one at all)
 #     is irrelevant. Append-only is enforced here, not assumed: force in every
-#     form, `--mirror`, and any deletion outside `fix-ci/*` stay blocked.
+#     form, `--mirror`, and any deletion outside `fix-ci/*` and `plan/*` stay
+#     blocked.
 #   - A squash-merged branch has no ancestry in its target, so `git branch -d`
-#     refuses it and `-D` is the only way to clean up the loop's own branches.
+#     refuses it and `-D` is the only way to clean up those own branches.
 #
 # Both relaxations are scoped to the repo that raised the marker: the effective
 # git dir comes from the command's own `-C` / `--git-dir`, so a marker in one
@@ -100,9 +115,8 @@ check_tdd_cycle_marker() {
 #
 # The marker expires so an interrupted session cannot leave a repo relaxed
 # forever. Outside the freshness window the marker counts as absent and gets
-# swept; the window itself is defined in scripts/fix-ci-policy.sh, alongside the
-# `fix-ci/*` namespace rule, and shared with the wrapper that fronts the loop's
-# pushes.
+# swept; the window itself is defined in scripts/branch-policy.sh, alongside the
+# namespace rule, and shared with the wrapper that fronts both loops' pushes.
 
 # Git dir the command actually targets, honouring its global `-C` / `--git-dir`
 # options. Falls back to the hook's cwd when the command names no repo.
@@ -153,21 +167,23 @@ git_target_dir() {
 
 # Uses global $command (set per sub-command in the main loop).
 fix_ci_active() {
-	local git_dir marker
+	local git_dir marker status=0
 	git_dir=$(git_target_dir) || return 1
 	[[ -n "$git_dir" ]] || return 1
-	marker="$git_dir/fix-ci-active"
+	marker="$git_dir/$FIX_CI_MARKER"
 	[[ -f "$marker" ]] || return 1
 
-	if fix_ci_marker_fresh "$marker"; then
-		return 0
-	fi
+	marker_fresh "$marker" || status=$?
+	((status == 0)) && return 0
+	# A stat that cannot answer says nothing about the marker's age: fail closed
+	# without sweeping a marker a live loop may still own.
+	((status == SH_STAT_UNUSABLE)) && return 1
 	rm -f "$marker" 2>/dev/null || true
 	return 1
 }
 
-# True when the push deletes nothing, or deletes only `fix-ci/*` refs — the
-# same namespace rule local branch deletion follows. `--delete` / `-d` deletes
+# True when the push deletes nothing, or deletes only refs in a sanctioned
+# namespace — the same rule local branch deletion follows. `--delete` / `-d` deletes
 # every refspec it is given; without it, a leading-colon refspec such as
 # ':main' deletes on its own.
 # Uses global $command (set per sub-command in the main loop).
@@ -201,9 +217,17 @@ fix_ci_push_deletes_only_own() {
 	fi
 
 	while IFS= read -r ref; do
-		fix_ci_ref_in_namespace "$ref" || return 1
-	done < <(fix_ci_deleted_refs "$delete_mode" ${refs[@]+"${refs[@]}"})
+		ref_in_own_namespace "$ref" || return 1
+	done < <(push_deleted_refs "$delete_mode" ${refs[@]+"${refs[@]}"})
 	return 0
+}
+
+# True when $1 contains a short-option cluster with 'f' in it: -f, -fu, -uf,
+# etc. The [[:alnum:]]* run never crosses a second dash, so long options and
+# words such as 'feature/fix-flaky' cannot match. Shared by fix_ci_allows_push
+# (force-push) and check_worktree_remove (force-remove).
+command_has_short_force_flag() {
+	[[ "$1" =~ [[:space:]]-[[:alnum:]]*f ]]
 }
 
 # Set by fix_ci_allows_push when the marker is up but the push form is banned.
@@ -217,12 +241,9 @@ fix_ci_allows_push() {
 	fix_ci_active || return 1
 
 	# Force in any long form: --force, --force-with-lease, --force-if-includes.
-	# Short-option cluster containing f: -f, -fu, -uf. The [[:alnum:]]* run
-	# never crosses a second dash, so long options and words such as
-	# 'feature/fix-flaky' cannot match.
 	# Force refspec: a token starting with '+', as in 'origin +main:main'.
 	if [[ "$command" =~ [[:space:]]--force ]] ||
-		[[ "$command" =~ [[:space:]]-[[:alnum:]]*f ]] ||
+		command_has_short_force_flag "$command" ||
 		[[ "$command" =~ [[:space:]][+][^[:space:]] ]]; then
 		fix_ci_push_denial_op="git push --force"
 		fix_ci_push_denial_reason="The fix-ci loop squash-merges; it never rewrites history."
@@ -233,7 +254,7 @@ fix_ci_allows_push() {
 	# never in namespace no matter what the refspecs say.
 	if [[ "$command" =~ [[:space:]]--mirror([[:space:]]|$) ]] || ! fix_ci_push_deletes_only_own; then
 		fix_ci_push_denial_op="git push (delete)"
-		fix_ci_push_denial_reason="The fix-ci loop deletes only its own fix-ci/* branches, never other history."
+		fix_ci_push_denial_reason="Only the assistant's own fix-ci/* and plan/* branches may be deleted, never other history."
 		return 1
 	fi
 
@@ -241,7 +262,7 @@ fix_ci_allows_push() {
 }
 
 # Uses global $command (set per sub-command in the main loop). True only when
-# every branch named for deletion belongs to the loop's own `fix-ci/*` namespace.
+# every branch named for deletion belongs to a sanctioned namespace.
 fix_ci_allows_branch_delete() {
 	fix_ci_active || return 1
 
@@ -258,9 +279,145 @@ fix_ci_allows_branch_delete() {
 
 	[[ ${#names[@]} -gt 0 ]] || return 1
 	for word in "${names[@]}"; do
-		fix_ci_ref_in_namespace "$word" || return 1
+		ref_in_own_namespace "$word" || return 1
 	done
 	return 0
+}
+
+# ╭────────────────────────────────────────────────────────────╮
+# │                   Protected main Branch                    │
+# ╰────────────────────────────────────────────────────────────╯
+
+# `git config claude.protectMain true` marks a repo whose trunk the assistant
+# never writes to: work happens on a `plan/*` branch, and it reaches main as one
+# squash commit the user makes through /merge-plan. Every subcommand that
+# can add a commit to the checked-out branch is therefore blocked while HEAD is
+# main or master — a fast-forward `pull` is the exception, since it only moves
+# the branch to commits the remote already has.
+#
+# The key is read from the repo the command targets, resolved through
+# git_target_dir exactly as the fix-ci marker is, so `git -C <other-repo> commit`
+# is judged by that repo's config and not by the hook's cwd.
+PROTECTED_MAIN_SUBCMDS='commit|merge|cherry-pick|revert|am|rebase|pull'
+
+# Uses global $command (set per sub-command in the main loop).
+main_is_protected() {
+	local git_dir branch
+	git_dir=$(git_target_dir) || return 1
+	[[ -n "$git_dir" ]] || return 1
+	[[ $(git --no-optional-locks --git-dir="$git_dir" config --bool claude.protectMain 2>/dev/null) == true ]] || return 1
+	branch=$(git --no-optional-locks --git-dir="$git_dir" symbolic-ref --quiet --short HEAD 2>/dev/null) || return 1
+	[[ "$branch" == main || "$branch" == master ]]
+}
+
+# Uses global $command (set per sub-command in the main loop).
+check_protected_main() {
+	local subcmd
+	subcmd=$(get_git_subcmd "$command") || return 0
+	[[ "$subcmd" =~ ^($PROTECTED_MAIN_SUBCMDS)$ ]] || return 0
+	[[ "$subcmd" == pull && "$command" =~ [[:space:]]--ff-only([[:space:]]|$) ]] && return 0
+	main_is_protected || return 0
+	block_destructive "git $subcmd" \
+		"main is protected in this repo (claude.protectMain). Commit on a plan/* branch; plan work lands on main through /merge-plan, which the user runs."
+}
+
+# scripts/merge-plan.sh squash-merges a plan branch into main and pushes it. It
+# is the user's step, and its inner git commands run where no subcommand parser
+# can see them — so the invocation is blocked here, whatever path spells it and
+# whether or not the fragment names a git subcommand at all. The one door is the
+# `/merge-plan` skill, which raises a `$GIT_DIR/merge-plan-active` marker for the
+# run; while that marker is fresh the invocation goes through.
+#
+# This rule reads the raw command itself rather than the sanitized fragments the
+# other rules parse: a quoted path (`bash "scripts/merge-plan.sh"`) collapses to
+# the placeholder there and would hide the invocation. Only the command-position
+# word counts, so a commit message that merely names the script parses as `git`.
+
+# Words that may stand between the fragment's start and the script without
+# hiding it: interpreters, and the wrappers that run a command under a modified
+# environment or process. Matched on basename, so `/bin/bash` and
+# `/usr/bin/env bash` are prefixes too.
+merge_plan_prefix_word() {
+	case "${1##*/}" in
+	bash | sh | zsh | dash | ksh | env | command | exec | time | nohup | nice | sudo | source | .) return 0 ;;
+	esac
+	return 1
+}
+
+# True when the command-position word of fragment $1 is the merge script.
+merge_plan_fragment_invokes() {
+	local word prefix_seen=false
+	local -a words=()
+	# read -ra splits on whitespace without letting a word glob.
+	read -ra words <<<"$1"
+	for word in ${words[@]+"${words[@]}"}; do
+		if merge_plan_prefix_word "$word"; then
+			prefix_seen=true
+			continue
+		fi
+		# Assignments run ahead of the command word, as `FOO=1 cmd` and as
+		# `env FOO=1 cmd`; options belong to a prefix already seen.
+		if [[ "$word" == [[:alpha:]_]*=* ]]; then
+			continue
+		fi
+		if $prefix_seen && [[ "$word" == -* ]]; then
+			continue
+		fi
+		[[ "${word##*/}" == merge-plan.sh ]] && return 0
+		return 1
+	done
+	return 1
+}
+
+# True when /merge-plan sanctions a run in the repo the fragment targets. The
+# marker shares the fix-ci freshness window, so one left behind by an interrupted
+# skill ages out instead of standing the door open.
+# Uses global $command (set per fragment by check_merge_plan_invocation).
+merge_plan_active() {
+	local git_dir marker
+	git_dir=$(git_target_dir) || return 1
+	[[ -n "$git_dir" ]] || return 1
+	marker_fresh "$git_dir/$MERGE_PLAN_MARKER"
+}
+
+# Uses global $full_command.
+check_merge_plan_invocation() {
+	local reading fragment
+	# One pass walks the quoted regions, so a newline means what the shell
+	# means by it: inside a region it is data and folds to a space, keeping a
+	# commit message that names the script at the start of a line out of
+	# command position; outside one it separates fragments like `;`, so an
+	# invocation on its own line is seen.
+	#
+	# Quote characters and backslashes are deleted outright rather than
+	# collapsed, so the script stays visible however its path is spelled. That
+	# merges quoted text into the surrounding words and splits on separators
+	# that were really data — harmless, since a stray split only yields one
+	# more fragment whose command-position word gets checked.
+	reading=$(printf '%s' "$full_command" | awk -v q="'" '
+		{ buf = buf $0 "\n" }
+		END {
+			gsub(/\\/, "", buf)
+			region_re = "\"[^\"]*\"|" q "[^" q "]*" q
+			while (match(buf, region_re)) {
+				region = substr(buf, RSTART + 1, RLENGTH - 2)
+				gsub(/\n/, " ", region)
+				out = out substr(buf, 1, RSTART - 1) region
+				buf = substr(buf, RSTART + RLENGTH)
+			}
+			out = out buf
+			gsub(/&&|\|\||[|;]/, "\n", out)
+			printf "%s", out
+		}')
+	while IFS= read -r fragment; do
+		merge_plan_fragment_invokes "$fragment" || continue
+		# git_target_dir reads the fragment's own -C / --git-dir, the same way
+		# the fix-ci marker is scoped to the repo a command aims at.
+		command="$fragment"
+		merge_plan_active && continue
+		block_destructive "merge-plan.sh" \
+			"This script runs only through /merge-plan, which raises the marker it needs. Report the branch as ready to squash instead."
+	done <<<"$reading"
 }
 
 # ╭────────────────────────────────────────────────────────────╮
@@ -362,7 +519,7 @@ check_destructive_operations() {
 	# ── Rebase ───────────────────────────────────────────────────
 	# git rebase with uncommitted changes
 	if is_git_subcmd "rebase"; then
-		git --no-optional-locks diff --quiet 2>/dev/null && git --no-optional-locks diff --cached --quiet 2>/dev/null && return 0
+		sh_git_dirty . >/dev/null || return 0
 		block_destructive "git rebase (dirty)" "Rebasing with uncommitted changes risks losing work."
 	fi
 }
@@ -372,12 +529,11 @@ check_destructive_operations() {
 # ╰────────────────────────────────────────────────────────────╯
 
 check_add_safety() {
-	for pattern in "${PLAN_PATTERNS_GREP[@]}"; do
-		if printf '%s' "$command" | grep -q "$pattern"; then
-			printf "Error: Cannot stage plan files matching '%s'. These are temporary analysis files.\n" "$pattern" >&2
-			exit 2
-		fi
-	done
+	local pattern
+	if pattern=$(find_plan_pattern "$command"); then
+		printf "Error: Cannot stage plan files matching '%s'. These are temporary analysis files.\n" "$pattern" >&2
+		exit 2
+	fi
 
 	if [[ "$command" =~ [[:space:]](\.|-[aA]|--all)([[:space:]]|$) ]]; then
 		local root
@@ -423,10 +579,47 @@ check_add_safety() {
 	done
 }
 
-# Check a single (sub-)command against all safety rules.
+# Uses global $command (set per sub-command in the main loop).
+check_worktree_remove() {
+	is_git_subcmd "worktree" && [[ "$command" =~ [[:space:]]remove([[:space:]]|$) ]] || return 0
+
+	# --force exists to override git's own refusal to remove a dirty worktree,
+	# so it is banned outright like `git branch -D`, whatever the path is.
+	if [[ "$command" =~ [[:space:]]--force([[:space:]]|$) ]] ||
+		command_has_short_force_flag "$command"; then
+		block_destructive "git worktree remove --force" \
+			"Force-removal deletes a worktree that still holds uncommitted work."
+	fi
+
+	# Extract worktree path: last non-flag argument after 'remove'
+	local wt_path="" found_remove=false word
+	for word in $command; do
+		if $found_remove && [[ "$word" != -* ]]; then
+			wt_path="$word"
+		fi
+		[[ "$word" == "remove" ]] && found_remove=true
+	done
+
+	# A missing path, a path that arrived quoted (collapsed to the
+	# placeholder, as in a loop over "$wt"), or one that does not resolve
+	# all leave the worktree unverifiable — fail closed rather than wave
+	# the removal through.
+	if [[ -z "$wt_path" || "$wt_path" == "$QUOTED_PLACEHOLDER" || ! -d "$wt_path" ]]; then
+		block_destructive "git worktree remove (unverifiable path)" \
+			"The guard cannot confirm the worktree is clean. Re-run with a literal, unquoted path."
+	fi
+
+	if sh_git_dirty "$wt_path" --untracked >/dev/null; then
+		block_destructive "git worktree remove (dirty)" \
+			"Worktree at '$wt_path' has uncommitted changes. Commit work before removing."
+	fi
+}
+
 # Sets global $command so is_git_subcmd and regex checks work.
 check_single_command() {
 	command="$1"
+
+	check_protected_main
 
 	# Block staging and commits while a tdd-cycle agent is running
 	if is_git_subcmd "add" || is_git_subcmd "commit"; then
@@ -455,43 +648,7 @@ check_single_command() {
 		check_plan_files "$staged_files" || exit 2
 	fi
 
-	if is_git_subcmd "worktree" && [[ "$command" =~ [[:space:]]remove([[:space:]]|$) ]]; then
-		# --force exists to override git's own refusal to remove a dirty worktree,
-		# so it is banned outright like `git branch -D`, whatever the path is.
-		# The [[:alnum:]]* run never crosses a second dash, so long options and
-		# path-like words cannot false-match the short-option cluster check.
-		if [[ "$command" =~ [[:space:]]--force([[:space:]]|$) ]] ||
-			[[ "$command" =~ [[:space:]]-[[:alnum:]]*f ]]; then
-			block_destructive "git worktree remove --force" \
-				"Force-removal deletes a worktree that still holds uncommitted work."
-		fi
-
-		# Extract worktree path: last non-flag argument after 'remove'
-		local wt_path="" found_remove=false word
-		for word in $command; do
-			if $found_remove && [[ "$word" != -* ]]; then
-				wt_path="$word"
-			fi
-			[[ "$word" == "remove" ]] && found_remove=true
-		done
-
-		# A missing path, a path that arrived quoted (collapsed to the
-		# placeholder, as in a loop over "$wt"), or one that does not resolve
-		# all leave the worktree unverifiable — fail closed rather than wave
-		# the removal through.
-		if [[ -z "$wt_path" || "$wt_path" == "$QUOTED_PLACEHOLDER" || ! -d "$wt_path" ]]; then
-			block_destructive "git worktree remove (unverifiable path)" \
-				"The guard cannot confirm the worktree is clean. Re-run with a literal, unquoted path."
-		fi
-
-		if ! git --no-optional-locks -C "$wt_path" diff --quiet 2>/dev/null ||
-			! git --no-optional-locks -C "$wt_path" diff --cached --quiet 2>/dev/null ||
-			[[ -n "$(git --no-optional-locks -C "$wt_path" ls-files --others --exclude-standard 2>/dev/null)" ]]; then
-			block_destructive "git worktree remove (dirty)" \
-				"Worktree at '$wt_path' has uncommitted changes. Commit work before removing."
-		fi
-	fi
-
+	check_worktree_remove
 	check_destructive_operations
 }
 
@@ -524,6 +681,8 @@ sanitized=$(printf '%s' "$full_command" | awk -v q="'" -v ph="$QUOTED_PLACEHOLDE
 		gsub(/&&|\|\||[|;]/, "\n", buf)
 		printf "%s", buf
 	}')
+
+check_merge_plan_invocation
 
 while IFS= read -r fragment; do
 	fragment="${fragment#"${fragment%%[![:space:]]*}"}"

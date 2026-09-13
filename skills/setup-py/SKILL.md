@@ -3,7 +3,7 @@ name: setup-py
 description: Scaffolds or reconciles the house Python tooling config (init | update), then chains upgrade-py.
 argument-hint: init | update
 disable-model-invocation: true
-allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion, Bash(cp:*), Bash(ls:*), Bash(mkdir:*), Bash(ln:*), Bash(diff:*), Skill
+allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion, Bash(cp:*), Bash(ls:*), Bash(mkdir:*), Bash(ln:*), Bash(diff:*), Bash(git config claude.protectMain *), Skill
 # Quality floor: the update reconcile is a key-by-key judgment pass (stale default vs deliberate override); the cheap tier batch-accepts.
 model: sonnet
 effort: medium
@@ -90,8 +90,11 @@ Seed templates into a project that has none (or is missing some).
 2. For each tooling template, check if the destination exists.
    - **Missing** → copy it verbatim from `${CLAUDE_SKILL_DIR}/references/<template>`.
    - **Exists** → skip it, note it. Never overwrite in `init`; that is `update`'s job.
-3. Report what was created vs skipped.
-4. Bump the seeded dependencies to current and install them by invoking `Skill(upgrade-py)` — the
+3. Protect `main`: run `git config claude.protectMain true` in the project. Idempotent; the git
+   guard then blocks the assistant from committing on `main`, so plan work lands through plan
+   branches. Report it like a template copy (`set` or `already set`).
+4. Report what was created vs skipped.
+5. Bump the seeded dependencies to current and install them by invoking `Skill(upgrade-py)` — the
    same step `update` ends with. The template's pinned ranges are floors; `upgrade-py` refreshes
    them, syncs the prek hook pins, and runs the install, so `init` leaves the project on current
    versions rather than the template's snapshot.
@@ -102,9 +105,9 @@ Bring an existing project's config in line with the current templates, then bump
 **Additive, never a silent clobber.**
 
 **Mechanical comparison required.** Never eyeball two Read outputs side by side — visual scanning
-across batched tool output misses single-line differences. For every file pair, run
-`diff "${CLAUDE_SKILL_DIR}/references/<template>" "<project>/<destination>"` first. Only then
-inspect the reported differences key-by-key.
+across batched tool output misses single-line differences. For every file pair, run `diff
+"${CLAUDE_SKILL_DIR}/references/<template>" "<project>/<destination>"` first. Only then inspect the
+reported differences key-by-key.
 
 For each config file, recurse to **leaf paths** — a container present in both (e.g. ruff's
 `lint.ignore`, or a `[tool.*]` table) with a child missing on one side is a difference at that
@@ -135,7 +138,8 @@ Apply the chosen edits with `Edit`/`Write`, preserving comments and key order. T
 comparison detail — which tables, sections, and lines to merge for each config file — lives in
 `${CLAUDE_SKILL_DIR}/references/reconcile-rules.md`; consult it during the per-file pass.
 
-After configs are reconciled, bump the dependencies by invoking `Skill(upgrade-py)` — do not
+After configs are reconciled, run `git config claude.protectMain true` (idempotent, reported as
+`set` or `already set`), then bump the dependencies by invoking `Skill(upgrade-py)` — do not
 reimplement its pinning strategy here.
 
 Finish by reporting: files changed, keys added/updated/removed, and that `Skill(upgrade-py)` ran.

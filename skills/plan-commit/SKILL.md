@@ -61,6 +61,13 @@ Read the diffs and untracked files. **Only consider in-scope files** (per the IN
 resolved in the Arguments section). Group them by logical purpose:
 
 - Changes that serve the same goal belong together (e.g. a function + its test + its import).
+- The goal is the change's, not each hunk's. A refactor that prepares a feature, a review fix on the
+  code it added, a comment cleanup in a file it rewrote, and the docs that describe it all serve the
+  feature's goal and ship in its commit. Ask "what is this hunk for?" — never "what does this hunk
+  do?".
+- Unrelated means a different goal, not a different session: a change in a subsystem the goal never
+  references, a dependency bump, a config change nothing else in the tree consumes. Those are
+  separate commits however they were produced.
 - **Never create a `test:` commit separate from its implementation — no exceptions.** Tests ship in
   their feature's commit: `feat(X): add Y` with both production code and its tests (rationale in
   write-commit, loaded in Step 1).
@@ -128,18 +135,25 @@ If a commit fails, stop immediately and report the error. Do not continue with r
 
 ## Common Mistakes
 
-| Mistake                                                             | Fix                                                                       |
-| ------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| A file appears in multiple commits because it changed incrementally | List it under one commit and note to the user which entries land there    |
-| Planning to trim or revert a shared file between commits            | Forbidden mechanism — one commit for the whole file, or merge the commits |
-| Over-splitting one logical change into many trivial commits         | Group by purpose — three files serving the same goal belong in one commit |
+| Mistake                                                                     | Fix                                                                       |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| A file appears in multiple commits because it changed incrementally         | List it under one commit and note to the user which entries land there    |
+| Planning to trim or revert a shared file between commits                    | Forbidden mechanism — one commit for the whole file, or merge the commits |
+| Over-splitting one logical change into many trivial commits                 | Group by purpose — three files serving the same goal belong in one commit |
+| A `docs:` or `refactor:` commit next to the change it prepares or describes | Fold it in — it serves that change's goal                                 |
+| One commit for the whole tree because it came from one session              | A session is not a goal — split off what the main goal never references   |
 
 ## Rationalization Guard
 
-| Excuse                                                    | Reality                                                                       |
-| --------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| "The tests are substantial enough to be their own commit" | Size doesn't change atomicity — a test without its implementation can't pass  |
-| "Separating tests makes the diff easier to review"        | Reviewers need to see tests alongside the code they validate                  |
-| "The docs update is independent of the code change"       | If the docs describe the changed behavior, they're the same unit of work      |
-| "I'll keep each commit focused by splitting by file type" | Group by purpose, not file type — `.test.ts` + `.ts` serving one goal = 1     |
-| "The user demands one changelog line per commit"          | Then the file goes whole in one commit and the note says so — never rewritten |
+| Excuse                                                    | Reality                                                                        |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| "The tests are substantial enough to be their own commit" | Size doesn't change atomicity — a test without its implementation can't pass   |
+| "Separating tests makes the diff easier to review"        | Reviewers need to see tests alongside the code they validate                   |
+| "The docs update is independent of the code change"       | If the docs describe the changed behavior, they're the same unit of work       |
+| "I'll keep each commit focused by splitting by file type" | Group by purpose, not file type — `.test.ts` + `.ts` serving one goal = 1      |
+| "The user demands one changelog line per commit"          | Then the file goes whole in one commit and the note says so — never rewritten  |
+| "This is the one behavior change, isolate it"             | The refactors around it exist for it — same goal, same commit                  |
+| "The doc line doesn't accompany a behavior change"        | It describes the change; a one-sentence `docs:` commit is the failure mode     |
+| "These are three independent mechanical cleanups"         | Cleanups made for one change serve one goal — one commit                       |
+| "Each task in the plan was a separate step"               | Steps are how it was built, not what it is for                                 |
+| "It was all done in the same pass, so one commit"         | A pass is not a goal — a subsystem the goal never references is its own commit |

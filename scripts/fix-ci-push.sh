@@ -12,7 +12,8 @@ set -euo pipefail
 #     `--delete` get through, so every force spelling — `-f`, `--force`,
 #     `--force-with-lease`, the `-fu`/`-uf` clusters, `--mirror` — is refused by
 #     construction rather than by enumeration.
-#   - Deletions stay inside the loop's own `fix-ci/*` namespace.
+#   - Deletions stay inside the assistant's own branch namespaces, `fix-ci/*`
+#     (a CI-fix loop's throwaway branches) and `plan/*` (a plan run's branch).
 #   - Every ref it touches is named in the argv. A push that names no refspec
 #     lets git fall back to `remote.<name>.push` and `push.default` — repo
 #     config the wrapper never vetted, which can carry a '+' force prefix or a
@@ -27,31 +28,27 @@ set -euo pipefail
 # the same way the invocation did. Trimmed with an expansion rather than
 # `dirname` so that a PATH without git in it still reaches the check below and
 # gets told what is missing, instead of dying on a missing `dirname`.
-# shellcheck source=SCRIPTDIR/fix-ci-policy.sh
-. "${BASH_SOURCE[0]%/*}/fix-ci-policy.sh"
-
-die() {
-	printf "fix-ci-push: %s\n" "$1" >&2
-	exit 2
-}
+# shellcheck source=SCRIPTDIR/branch-policy.sh
+. "${BASH_SOURCE[0]%/*}/branch-policy.sh"
+PROG=fix-ci-push
 
 # Refuse unless the current repo has a marker touched within the TTL
 require_active_marker() {
-	local git_dir marker
-	# git's own stderr is the diagnosis here: a safe.directory refusal and a
-	# corrupt repo both surface as this failure and need telling apart.
-	git_dir=$(git rev-parse --absolute-git-dir) ||
-		die "not inside a usable git repository."
-	marker="$git_dir/fix-ci-active"
+	local git_dir marker status=0
+	git_dir=$(policy_git_dir) || exit $?
+	marker="$git_dir/$FIX_CI_MARKER"
 	[[ -f "$marker" ]] ||
 		die "no fix-ci loop is active in this repo ($marker is absent)."
-	fix_ci_marker_fresh "$marker" ||
-		die "the fix-ci marker is not from the last ${FIX_CI_MARKER_TTL_SECONDS}s; the loop is over."
+	marker_fresh "$marker" || status=$?
+	die_if_stat_unusable "$status"
+	((status == 0)) ||
+		die "the fix-ci marker is not from the last ${MARKER_TTL_SECONDS}s; the loop is over."
 }
 
 # Refuse any argument outside the whitelist, and any deletion that reaches
-# beyond `fix-ci/*`. `--delete` deletes every refspec it is given; without it,
-# a leading-colon refspec such as ':main' deletes on its own.
+# beyond the assistant's own namespaces, `fix-ci/*` and `plan/*`. `--delete`
+# deletes every refspec it is given; without it, a leading-colon refspec such as
+# ':main' deletes on its own.
 require_allowed_args() {
 	local -a refs=()
 	local arg ref delete_mode=false seen_remote=false
@@ -81,13 +78,12 @@ require_allowed_args() {
 		die "no refspec named; push the ref explicitly, as in 'origin fix-ci/lint'."
 
 	while IFS= read -r ref; do
-		fix_ci_ref_in_namespace "$ref" ||
-			die "'$ref' is outside fix-ci/*; the loop deletes only its own branches."
-	done < <(fix_ci_deleted_refs "$delete_mode" "${refs[@]}")
+		ref_in_own_namespace "$ref" ||
+			die "'$ref' is outside fix-ci/* and plan/*; only the assistant's own branches may be deleted."
+	done < <(push_deleted_refs "$delete_mode" "${refs[@]}")
 }
 
 main() {
-	command -v git >/dev/null || die "git is not installed."
 	require_active_marker
 	require_allowed_args "$@"
 	exec git push "$@"

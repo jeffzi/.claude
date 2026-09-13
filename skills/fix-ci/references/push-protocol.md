@@ -7,8 +7,10 @@ Read this before the first push of a fix request. Read-only asks never reach thi
 Raw `git push` is permission-denied everywhere and never used. **The loop's only push path is the
 wrapper** `~/.claude/scripts/fix-ci-push.sh`, which itself refuses to run without a fresh marker,
 accepts only `-u`/`--set-upstream`/`--delete`, and rejects every force form and any deletion outside
-`fix-ci/*`. The guard additionally allows `git branch -D` scoped to `fix-ci/*` while the marker
-exists, and still blocks `--amend` and `--no-verify`.
+the assistant's own namespaces, `fix-ci/*` and `plan/*`. The guard additionally allows `git branch
+-D` in those two namespaces while the marker exists, and still blocks `--amend` and `--no-verify`.
+This loop still deletes only its own `fix-ci/*` branches — `plan/*` is in the namespace for
+`execute-plan`'s ship phase, never for this loop to delete.
 
 ## Marker TTL
 
@@ -29,9 +31,12 @@ git tag -s fix-ci-warmup -m warmup && git tag -d fix-ci-warmup
 
 Message per `Skill(write-commit)`:
 
-| Target branch    | How                                                                                                                                                                                                                         |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| main/master      | `gh pr merge --squash --delete-branch` — server-side, no local push of main needed                                                                                                                                          |
-| a feature branch | `git switch <branch>` → `git merge --squash fix-ci/<slug>` → commit → `~/.claude/scripts/fix-ci-push.sh origin <branch>` → `git branch -D fix-ci/<slug>` → `~/.claude/scripts/fix-ci-push.sh origin --delete fix-ci/<slug>` |
+| Target branch    | How                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| main/master      | `gh pr merge --squash --delete-branch` — server-side, no local push of main needed                                                                                                                                                                                                                                                                                         |
+| a feature branch | `git switch <branch>` → `git merge --squash fix-ci/<slug>` → commit → `~/.claude/scripts/fix-ci-push.sh origin <branch>` → `git branch -D fix-ci/<slug>` → `~/.claude/scripts/fix-ci-push.sh origin --delete fix-ci/<slug>`                                                                                                                                                |
+| `plan/<slug>`    | Same as a feature branch: `git switch plan/<slug>` → `git merge --squash fix-ci/<slug>` → commit → `~/.claude/scripts/fix-ci-push.sh origin plan/<slug>` → `git branch -D fix-ci/<slug>` → `~/.claude/scripts/fix-ci-push.sh origin --delete fix-ci/<slug>`. Never its base: the plan branch reaches the branch it was created from only through the user's `/merge-plan`. |
 
-Then confirm the target branch's own new run goes green.
+Then confirm the target branch's own new run goes green — this loop's exit condition. When
+`execute-plan` dispatched the loop, its ship phase re-checks the run for the branch tip itself as
+the gate; report the final tip and its conclusion so it can.

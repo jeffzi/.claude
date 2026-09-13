@@ -10,12 +10,15 @@ Removing the marker is cleanup of a file this workflow created, not a destructiv
 
 ## Commands
 
-Capture `git_dir` first so a failed `rev-parse` is loud, not silent:
+Capture `git_dir` first so a failed `rev-parse` is loud, not silent. The session id comes from the
+shell environment as `CLAUDE_CODE_SESSION_ID` — the `${CLAUDE_SESSION_ID}` substitution only runs
+over a SKILL.md body, never over this reference file — and the `:?` expansion fails the raise when
+that variable is unset instead of writing a blank marker the hook would silently ignore:
 
 ```bash
 git_dir=$(git rev-parse --absolute-git-dir)
 # Raise (before Task 1):
-printf '%s\n' "${CLAUDE_SESSION_ID}" >"$git_dir/execute-plan-unattended"
+printf '%s\n' "${CLAUDE_CODE_SESSION_ID:?session id not exported}" >"$git_dir/execute-plan-unattended"
 # Remove (final or halt report):
 rm "$git_dir/execute-plan-unattended"
 ```
