@@ -195,7 +195,7 @@ allowed-tools: Bash(gh *)
 Summarize this pull request...
 ```
 
-For multi-line commands, use a fenced `` ```! `` block:
+For multi-line commands, use a fenced ` ```! ` block:
 
 ````markdown
 ## Environment

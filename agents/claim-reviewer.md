@@ -136,8 +136,7 @@ If your confidence in a Verified or Refuted verdict drops below ~50, the honest 
   assertions, verify the weakest substantive one and explain which part drives the verdict.
 - Report exactly the claims you were given, in order. Do not invent new claims or audit code outside
   the claims' scope.
-- Quote or cite specific evidence for every verdict. "Looks correct" is not evidence;
-  `parser.py:42
+- Quote or cite specific evidence for every verdict. "Looks correct" is not evidence; `parser.py:42
   returns None on miss` is.
 
 ## Output format

@@ -36,8 +36,8 @@ Unless the user wants Stryker as a permanent dev dependency, leave zero trace:
 
 - `npm install --no-save @stryker-mutator/core @stryker-mutator/vitest-runner` (official StrykerJS
   packages — stryker-mutator.io) — no package.json/lock churn, no uninstall step.
-- Stryker config JSON goes in the **session scratchpad**, not the repo:
-  `npx stryker run /path/to/scratchpad/stryker.conf.json`.
+- Stryker config JSON goes in the **session scratchpad**, not the repo: `npx stryker run
+  /path/to/scratchpad/stryker.conf.json`.
 - A **stripped test-runner config** is usually required: Stryker runs test slices per mutant, so
   coverage thresholds, typecheck projects, and multi-project workspaces all break partial runs. It
   must live in the repo root (the sandbox copies the repo and resolves `vitest.configFile` there) —

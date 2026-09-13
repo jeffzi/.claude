@@ -87,6 +87,6 @@ default. Twenty-two findings and four verification commands collapse into the cl
 > markdownlint-cli2-scoped override there?
 >
 > I finished and verified everything else: 9 review findings, 10 test-strength findings, 3 design
-> findings fixed; `npm run check` → 0; `npm test` → 0 (28 tests, 100% coverage);
-> `npm run check:package` → 0; `npm audit` → 0 vulnerabilities. Changelog entries are under
-> [Unreleased]. I haven't committed anything yet.
+> findings fixed; `npm run check` → 0; `npm test` → 0 (28 tests, 100% coverage); `npm run
+> check:package` → 0; `npm audit` → 0 vulnerabilities. Changelog entries are under [Unreleased]. I
+> haven't committed anything yet.

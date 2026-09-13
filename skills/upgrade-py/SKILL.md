@@ -16,8 +16,8 @@ Upgrade all project dependencies while keeping pyproject.toml constraints in syn
 
 ## Context
 
-- Outdated packages:
-  !`uv pip list --outdated 2>/dev/null || echo "(uv not available or no outdated packages)"`
+- Outdated packages: !`uv pip list --outdated 2>/dev/null || echo "(uv not available or no outdated
+  packages)"`
 
 ## Task Tracking
 
@@ -44,10 +44,10 @@ allows to break compatibility, floor one granularity finer.
   minor; floor at the installed `0.minor.patch`, keeping the patch: installed `0.16.4` →
   `>=0.16.4,<0.17`.
 
-The lockfile pins exact versions, so these ranges only bound how far an automated
-`uv sync --upgrade` may move on its own. Crossing a boundary — a new major, or a new minor on a 0.x
-tool — means widening the constraint by hand: a deliberate checkpoint to read the changelog. Tools
-whose output gates CI (ruff, prek) get that review for free.
+The lockfile pins exact versions, so these ranges only bound how far an automated `uv sync
+--upgrade` may move on its own. Crossing a boundary — a new major, or a new minor on a 0.x tool —
+means widening the constraint by hand: a deliberate checkpoint to read the changelog. Tools whose
+output gates CI (ruff, prek) get that review for free.
 
 Dual-use tools — run both directly and as a prek hook — carry no separate version anywhere else.
 They are `local` prek hooks invoking `uv run <tool>`, so the pyproject.toml constraint is their one

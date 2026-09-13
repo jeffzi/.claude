@@ -45,8 +45,8 @@ Tags:
 
 ✅ `L4: native: moment.js imported for one format call. Intl.DateTimeFormat, 0 deps.`
 
-✅
-`repo.py:L88: yagni: AbstractRepository with one implementation. Inline it until a second one exists.`
+✅ `repo.py:L88: yagni: AbstractRepository with one implementation. Inline it until a second one
+exists.`
 
 ✅ `L52-71: delete: retry wrapper around an idempotent local call. Nothing replaces it.`
 

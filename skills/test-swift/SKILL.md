@@ -300,8 +300,7 @@ extension XCTestCase {
 }
 ```
 
-`addTeardownBlock` runs after the test method returns — local variables are released, so
-`weak
+`addTeardownBlock` runs after the test method returns — local variables are released, so `weak
 instance` is nil only if no retain cycle exists.
 
 ## Rationalizations

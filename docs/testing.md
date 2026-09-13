@@ -126,9 +126,9 @@ Same row, different cells. One source of truth for every language.
 
 ### Domain Skill Detection
 
-Each base language skill (`test-py`, `test-ts`, `test-lua`, `test-swift`) has a
-`## Domain Skill Detection` section. When the base skill loads, it scans the file's imports and
-automatically loads any overlay skills for libraries that need their own testing patterns.
+Each base language skill (`test-py`, `test-ts`, `test-lua`, `test-swift`) has a `## Domain Skill
+Detection` section. When the base skill loads, it scans the file's imports and automatically loads
+any overlay skills for libraries that need their own testing patterns.
 
 ```text
 test-py loads

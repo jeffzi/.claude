@@ -158,9 +158,9 @@ Same row, different cells. One source of truth for every language.
 
 ### Domain Skill Detection
 
-Each base language skill (`code-py`, `code-ts`, `code-lua`, `code-swift`) has a
-`## Domain Skill Detection` section. When the base skill loads, it scans the file's imports and
-automatically loads any overlay skills for libraries that need their own code patterns.
+Each base language skill (`code-py`, `code-ts`, `code-lua`, `code-swift`) has a `## Domain Skill
+Detection` section. When the base skill loads, it scans the file's imports and automatically loads
+any overlay skills for libraries that need their own code patterns.
 
 ```text
 code-py loads

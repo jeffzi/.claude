@@ -17,9 +17,8 @@ one commit.
 ## Context
 
 - Last tag: !`git describe --tags --abbrev=0 2>/dev/null || echo "(no tags)"`
-- Commits since last tag:
-  !`git log $(git describe --tags --abbrev=0 2>/dev/null)..HEAD --oneline 2>/dev/null \
-  || git log --oneline -20`
+- Commits since last tag: !`git log $(git describe --tags --abbrev=0 2>/dev/null)..HEAD --oneline
+  2>/dev/null \ || git log --oneline -20`
 - Existing tag format: !`git tag --sort=-creatordate 2>/dev/null | head -5`
 
 ## Version Resolution

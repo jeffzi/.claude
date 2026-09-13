@@ -22,9 +22,10 @@ Review a SKILL.md with the `vet-skill` agent, then apply the fixes here. The age
 
 1. **Resolve targets and scope.**
    - Path argument → that skill directory or SKILL.md.
-   - No argument → SKILL.md files appearing in `git diff --name-only`,
-     `git diff --cached
-     --name-only`, or `git ls-files --others --exclude-standard`.
+   - No argument → SKILL.md files appearing in any of:
+     - `git diff --name-only`
+     - `git diff --cached --name-only`
+     - `git ls-files --others --exclude-standard`
 
 2. **Dispatch the reviewer:** `subagent_type: vet-skill`. Pass the target; which checklists the
    agent walks is its own business.

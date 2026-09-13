@@ -66,8 +66,8 @@ def test_frame_when_one_task_failed_and_one_running_does_match(snapshot):
 - Pin `width` (and `height` if it selects a layout) — a golden is stable only at one width.
 - Update with `pytest --snapshot-update` only after reading the diff; a golden that accepts a
   regression is worse than no golden.
-- Plain-mode milestone lines: `assert output == "[00:00:05] step one done (5s)\n"` — not
-  `"[" in output`.
+- Plain-mode milestone lines: `assert output == "[00:00:05] step one done (5s)\n"` — not `"[" in
+  output`.
 - Goldens need the `syrupy` dev dependency, added through the project's dependency manager.
 
 ### 3. Rich-owned live effects are wiring; screen state is for code that bypasses rich
@@ -109,11 +109,11 @@ Two or three such tests per project is the ceiling; content belongs in Rule 2.
 `"5" in output` and `"[" in output` both match inside `\x1b[35m`. A digit-or-bracket substring is
 not an assertion; neither is `a in out or b in out`, a conditional `if output.count(...)`, or a scan
 like `any(x in line for line in lines)` or `sum(1 for n in names if n in text)`. A frame or screen
-is asserted as a whole — a golden, or
-`screen_lines(raw) == ["run https://x.y", "├── ✔ build", "└── ○ test"]` — never by probing rows for
-a word. When the renderer exposes the state (`Progress.tasks[n].completed`, a node's status, the ETA
-value) assert on the object instead. The one legitimate escape-code assertion is the styling row
-above: `"\x1b["` present or absent in a one-line print.
+is asserted as a whole — a golden, or `screen_lines(raw) == ["run https://x.y", "├── ✔ build", "└──
+○ test"]` — never by probing rows for a word. When the renderer exposes the state
+(`Progress.tasks[n].completed`, a node's status, the ETA value) assert on the object instead. The
+one legitimate escape-code assertion is the styling row above: `"\x1b["` present or absent in a
+one-line print.
 
 ### 5. Deterministic frames
 
@@ -133,10 +133,9 @@ above: `"\x1b["` present or absent in a one-line print.
 ### 6. Test your content, not rich
 
 Bar glyphs, column spacing, and tree guides are rich's contract; a golden or a whole-screen `pyte`
-row list pins them incidentally. A standalone assertion whose subject _is_ the glyph —
-`"━━━╺" in
-out`, `"├──" in line` — tests the library; delete it. Test _your_ label, count, glyph,
-ETA text, and ordering.
+row list pins them incidentally. A standalone assertion whose subject _is_ the glyph — `"━━━╺" in
+out`, `"├──" in line` — tests the library; delete it. Test _your_ label, count, glyph, ETA text, and
+ordering.
 
 ## Verification
 

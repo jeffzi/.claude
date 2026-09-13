@@ -161,8 +161,8 @@ file extension. See `skills/code-shiny/SKILL.md` (code overlay) and `skills/test
 
 ### Step 3 — Add a DSD row to the base language skill
 
-Open the base language skill (e.g., `skills/code-py/SKILL.md`) and add a row to its
-`## Domain Skill Detection` table:
+Open the base language skill (e.g., `skills/code-py/SKILL.md`). Under its `## Domain Skill
+Detection` heading, add a row to the table:
 
 ```markdown
 | Import pattern                           | Skill to load  |
@@ -228,9 +228,9 @@ See `skills/code-tstl/SKILL.md` for the canonical example.
 After adding a language, run through this list before declaring it supported:
 
 - [ ] Dispatch row exists in `rules/skill-loading.md` Language Dispatch table
-- [ ] `skills/code-{lang}/SKILL.md` exists with `**This skill extends \`Skill(code-core)\`.**`
+- [ ] ``skills/code-{lang}/SKILL.md`` exists with ``**This skill extends \``Skill(code-core)\`.**`
       header
-- [ ] `skills/test-{lang}/SKILL.md` exists with `**This skill extends \`Skill(test-core)\`.**`
+- [ ] ``skills/test-{lang}/SKILL.md`` exists with ``**This skill extends \``Skill(test-core)\`.**`
       header
 - [ ] Both leaves have a `## Domain Skill Detection` section (empty stub is acceptable)
 - [ ] Both leaves have a `## Verification` section with concrete commands

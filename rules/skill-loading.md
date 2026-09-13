@@ -72,10 +72,10 @@ before counting prescribed dispatches.
 | .sh, .bash            | none (test-core only) | code-shell | `test_*.sh`                |
 | .sql                  | none (test-core only) | code-sql   | —                          |
 
-Overlays load automatically via base-skill Domain Skill Detection (e.g. `test-py` detects
-`import polars` → `Skill(test-polars)`; `code-py` detects `import polars` → `Skill(polars)`). The
-hubs `test-core` and `code-core` do not own overlay dispatch — overlays load from the base leaf. Do
-not pre-compute overlays.
+Overlays load automatically via base-skill Domain Skill Detection (e.g. `test-py` detects `import
+polars` → `Skill(test-polars)`; `code-py` detects `import polars` → `Skill(polars)`). The hubs
+`test-core` and `code-core` do not own overlay dispatch — overlays load from the base leaf. Do not
+pre-compute overlays.
 
 If a file's extension is not in the table, check `Skill(test-*)` and `Skill(code-*)` via Glob; if no
 match exists, note "no matching skill" rather than guessing.

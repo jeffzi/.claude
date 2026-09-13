@@ -156,9 +156,9 @@ Will Claude follow this skill effectively?
       "Conciseness")
 - [ ] Instructional prose past write-skill's word trigger (excluding code blocks and tables) has
       heavy content relocated to reference files or condensed — report as "relocate/condense", never
-      "delete"; only the no-op test licenses deletion — except contract skills
-      (`user-invocable: false`, subagent-loaded), which write-skill exempts from the word trigger
-      and bounds by the no-op test and per-sentence traceability instead
+      "delete"; only the no-op test licenses deletion — except contract skills (`user-invocable:
+      false`, subagent-loaded), which write-skill exempts from the word trigger and bounds by the
+      no-op test and per-sentence traceability instead
 - [ ] No content Claude already knows (standard library usage, common patterns)
 - [ ] No multi-language dilution (one excellent example, not many mediocre ones)
 - [ ] No redundant sections covering the same ground

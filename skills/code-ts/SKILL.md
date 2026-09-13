@@ -52,10 +52,8 @@ const config = ConfigSchema.parse(parsed);  // Zod throws structured errors
 ```
 
 **Acceptable `as` uses:** `as const` (compile-time only), and after a manual narrowing guard where
-TS can't narrow automatically (e.g., `typeof x === "object"` doesn't narrow to
-`Record<string,
-unknown>` — casting after the guard is fine). Never use `as` to skip validation.
-Double casts (`as
+TS can't narrow automatically (e.g., `typeof x === "object"` doesn't narrow to `Record<string,
+unknown>` — casting after the guard is fine). Never use `as` to skip validation. Double casts (`as
 unknown as T`) are always a red flag.
 
 **Type predicate tip:** Use `Set<string>.has()` instead of `Array.includes()` to avoid `as` inside
@@ -209,8 +207,7 @@ function area(shape: Shape): number {
 
 ## House tsconfig
 
-House tsconfig lives in `setup-ts/references/tsconfig.json` — run `/setup-ts init` or
-`/setup-ts
+House tsconfig lives in `setup-ts/references/tsconfig.json` — run `/setup-ts init` or `/setup-ts
 update` to install or reconcile it; never hand-write one here.
 
 ## Rationalizations That Mean You're About to Fail

@@ -34,9 +34,9 @@
 | Exit       | [cmd]    | [cmd] | ✅/🔴  |
 
 (one row per gate actually run, named after its capture files — `gate-entry-*`, `gate-fix-*`,
-`gate-corrective-*`, `gate-exit-*`; a gate that went red and self-recovered records
-`🔴→✅ (formatter re-run)` or `🔴→✅ (gate repair)`, never a plain ✅; note here if a half was
-absent — "no test suite: gates ran checkers only")
+`gate-corrective-*`, `gate-exit-*`; a gate that went red and self-recovered records `🔴→✅
+(formatter re-run)` or `🔴→✅ (gate repair)`, never a plain ✅; note here if a half was absent — "no
+test suite: gates ran checkers only")
 
 ## Review Agents
 
@@ -45,8 +45,8 @@ absent — "no test suite: gates ran checkers only")
 
 (one row per lens dispatched in step 3 — vet-code, vet-test, vet-doc, vet-comments, bug-scanner,
 distill-scanner — including lenses that returned "No findings."; plus a `claim-reviewer` row when
-adjudication or fix verification ran, mapped as Found = claims sent, Fixed = `Verified`, Report-only
-= `Refuted` + `Unsubstantiated`)
+adjudication or fix verification ran, mapped as Found = claims sent, Fixed = `Verified`,
+Report-only = `Refuted` + `Unsubstantiated`)
 
 ## Issues Fixed (confirmed)
 

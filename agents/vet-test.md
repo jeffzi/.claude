@@ -90,9 +90,8 @@ These fill the slots `vet-core` declares:
   is `cost` if your reasoning is the merge table, and `clarity` if it is the name.
 
 - **Extra false-positive discards:** an ignore/suppress comment covers it.
-- **Report preamble:** one line naming the resolved skills per language
-  (`python → test-core + test-py + test-polars + code-py`), so the caller knows which checklist
-  produced the findings.
+- **Report preamble:** one line naming the resolved skills per language (`python → test-core +
+  test-py + test-polars + code-py`), so the caller knows which checklist produced the findings.
 - **Extra output blocks:** none.
 
 ## Rationalization guard

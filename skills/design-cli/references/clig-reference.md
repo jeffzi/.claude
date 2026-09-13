@@ -117,8 +117,8 @@ Use `FORCE_COLOR` to enable color and skip detection logic.
 
 ## Error Design
 
-1. Catch errors and rewrite them for humans: "Can't write to file.txt. You might need to run
-   `chmod +w file.txt`."
+1. Catch errors and rewrite them for humans: "Can't write to file.txt. You might need to run `chmod
+   +w file.txt`."
 2. Put the most important information last (where the eye goes).
 3. Use red sparingly and intentionally.
 4. Hide stack traces by default; show with `--debug` / `--verbose`.

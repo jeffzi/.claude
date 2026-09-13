@@ -107,9 +107,8 @@ These fill the slots `vet-core` declares:
 - **Extra false-positive discards:** the files share setup through an existing fixture module
   already (imports, not copies); the duplication is between a unit test and an integration test that
   intentionally traverses the full stack.
-- **Report preamble:** two lines — resolved skills per language
-  (`typescript → test-core + test-ts + code-ts`), then the inventory:
-  `N test files, M candidate groups, K files read fully`.
+- **Report preamble:** two lines — resolved skills per language (`typescript → test-core + test-ts +
+  code-ts`), then the inventory: `N test files, M candidate groups, K files read fully`.
 - **Extra output blocks:** none.
 
 ## When NOT to use

@@ -122,14 +122,11 @@ If the step genuinely needs a label and there is nothing non-obvious to say, the
 code is the label.
 
 **AAA phase labels** — `Arrange`, `Act`, `Assert` — always restate the test structure; blank lines
-already separate phases. Judge the label separately from what follows the dash. A bare label
-(`//
-Arrange`) is removed. A label prefixing a real why
-(`// Assert — factory failure surfaced once;
-latching skips the append`) is still an S1 finding on
-the prefix — the fix strips the prefix and keeps the why:
-`// factory failure surfaced once; latching skips the append`. The content after the dash being
-valuable does not clear the label before it.
+already separate phases. Judge the label separately from what follows the dash. A bare label (`//
+Arrange`) is removed. A label prefixing a real why (`// Assert — factory failure surfaced once;
+latching skips the append`) is still an S1 finding on the prefix — the fix strips the prefix and
+keeps the why: `// factory failure surfaced once; latching skips the append`. The content after the
+dash being valuable does not clear the label before it.
 
 A confirmed restatement is `confirmed`, whether it sits inside a function or in a doc block. Do not
 demote to `unconfirmed` because the comment is short, the block is otherwise well-formed, or the fix
@@ -394,12 +391,10 @@ preamble you may drop. Every exported symbol gets a row — including the clean 
 whole point: a symbol you cleared and a symbol you never checked look identical unless you list it.
 A report whose findings mention a symbol absent from the ledger is malformed.
 
-If a file has no exported symbols, write `Exports: none`. If `CODE_SKILL` is `none`, write
-`Exports:
+If a file has no exported symbols, write `Exports: none`. If `CODE_SKILL` is `none`, write `Exports:
 n/a (S4 skipped)`. Never omit the line.
 
-When no violation survives, emit the Skills and Exports blocks and then `No findings.` — never
-`No
+When no violation survives, emit the Skills and Exports blocks and then `No findings.` — never `No
 findings.` alone.
 
 ## Rules

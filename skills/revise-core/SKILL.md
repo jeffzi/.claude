@@ -19,8 +19,8 @@ an **Agent** call — each agent defines its own. Violating the letter of this p
 its spirit — there are no technicalities.
 
 **Step 0 — Check for a checkpoint.** Before any leaf step, Glob `.planning/revise-<leaf>-*.md`. This
-step is never skipped — the leaf's numbered steps start after it. Found a checkpoint with
-`status: in-progress` and `pending` findings?
+step is never skipped — the leaf's numbered steps start after it. Found a checkpoint with `status:
+in-progress` and `pending` findings?
 
 - Same target → skip steps 1–3b and enter step 4 with its queue: the reviews are already paid for.
 - Different target, or no argument given → ask the user: resume the checkpoint or start fresh on the
@@ -56,9 +56,9 @@ finding, stating it as an implemented fact. Route the results:
 **Step 3b — Checkpoint the queue.** Write `.planning/revise-<leaf>-<slug>.md` — `<leaf>` is the
 invoked command (`test`, `code`, …), `<slug>` kebab-cased from the path argument or `changed` for
 the no-argument scope. Header: leaf, target, scope, `status: in-progress`. Body: every finding's
-full `### Finding N` block with a `Status:` line — `pending` for the fix queue,
-`report-only: <reason>`, or `discarded`. Step 4 never starts before this file exists: writing it
-requires every bucket merged and triage complete, so a reviewer still running means no fixing yet.
+full `### Finding N` block with a `Status:` line — `pending` for the fix queue, `report-only:
+<reason>`, or `discarded`. Step 4 never starts before this file exists: writing it requires every
+bucket merged and triage complete, so a reviewer still running means no fixing yet.
 
 **When the leaf declares an impact enum:** order the fix queue by its tier chain; within a tier,
 keep the agent's order. A finding with no Impact line takes the top tier — never demoted for missing
@@ -70,8 +70,8 @@ any target file share a group, so a cross-file finding merges every group it tou
 disjoint by construction.
 
 - **One group** → apply inline: load the leaf's step-4 skills before editing, fix one finding at a
-  time in the leaf's declared order, and update each finding's `Status:` (`fixed`, or
-  `report-only: <reason>`) as it lands, so an interrupted run resumes from the file.
+  time in the leaf's declared order, and update each finding's `Status:` (`fixed`, or `report-only:
+  <reason>`) as it lands, so an interrupted run resumes from the file.
 - **Multiple groups** → dispatch one **Agent** call per group, `subagent_type: "fork"`, all in one
   parallel message — never fix sequentially what disjoint groups can fix in parallel. Each fork's
   prompt names its group's finding numbers; the fork reads their blocks from the checkpoint, loads

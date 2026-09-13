@@ -149,8 +149,8 @@ duplication or conflicts across them.
 - [ ] `TODO` items never completed
 - [ ] Duplicate information across multiple CLAUDE.md files in the same repo
 
-For CLAUDE.md reviews, add a quality-score line to your summary:
-`Quality score: XX/100 (Grade: A/B/C/D/F)`, scored against the point weights in
+For CLAUDE.md reviews, add a quality-score line to your summary: `Quality score: XX/100 (Grade:
+A/B/C/D/F)`, scored against the point weights in
 `~/.claude/skills/revise-doc/references/claude-md-quality.md`, and name the CLAUDE.md type (root,
 package, local, global).
 

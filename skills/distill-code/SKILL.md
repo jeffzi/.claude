@@ -41,8 +41,7 @@ behavior is every row of this table:
 | New code paths      | A branch, guard, validation, or call that did not exist is new behavior, even when the old path was an unhandled exception  |
 
 A change to any row is a feature or a bug fix — even one that makes the program better. It gets its
-own commit and its own test, from the feature lane. Here it is reported under
-`Out of scope —
+own commit and its own test, from the feature lane. Here it is reported under `Out of scope —
 behavior change:` and the code stays as it was.
 
 **Tests are the oracle.** A distillation never changes an assertion, an expected value, a

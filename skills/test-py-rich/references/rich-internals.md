@@ -111,9 +111,9 @@ does the same in production (`App.__init__` passes `_environ=` and eight pinned 
 
 - **Rich** asserts the raw escape stream verbatim (`begin_capture()` → one large `==`), because the
   stream _is_ its contract. No snapshot plugin, no emulator, no pty. `test_live.py` pins transient
-  erase as the tail of an exact string; `test_status.py` skips live output entirely
-  (`# TODO: Testing output is tricky with threads`); `test_live.py` leaves the auto-refresh thread
-  untested (`# no way to truly test w/ multithreading`).
+  erase as the tail of an exact string; `test_status.py` skips live output entirely (`# TODO:
+  Testing output is tricky with threads`); `test_live.py` leaves the auto-refresh thread untested
+  (`# no way to truly test w/ multithreading`).
 - **Textual** never emits cursor codes in tests: `HeadlessDriver.write()` is a no-op and the screen
   is reconstructed from the compositor into an SVG (`Console(record=True).export_svg`) snapshotted
   with syrupy — 345 snapshot tests of ~2,000, reserved for "visual elements". Below the app it uses
