@@ -8,13 +8,15 @@ PLAN_MSG="feat(widget): add the widget
 Also fixes: the sprocket.
 "
 
+USAGE_LINE="usage: merge-plan.sh [plan/<slug>] [--skip-ci]"
+
 setup() {
 	export TMPDIR_ROOT
 	TMPDIR_ROOT=$(mktemp -d)
 }
 
 teardown() {
-	[[ -n "$TMPDIR_ROOT" ]] && rm -rf "$TMPDIR_ROOT"
+	cleanup_tmpdir_root
 }
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -153,6 +155,33 @@ assert_commit_message() {
 	}
 }
 
+# The run printed exactly the usage line on stdout, nothing on stderr, and exited 0.
+assert_help_printed() {
+	((RUN_EXIT == 0)) && [[ "$RUN_STDOUT" == "$USAGE_LINE" && -z "$RUN_STDERR" ]] || {
+		printf 'expected exit 0 with only the usage line on stdout\nexit: %d\nstdout: %s\nstderr: %s\n' \
+			"$RUN_EXIT" "$RUN_STDOUT" "$RUN_STDERR" >&2
+		return 1
+	}
+}
+
+# Snapshot of the repo at $1 a run could change: HEAD, local refs, origin refs, work tree.
+repo_state() {
+	local work="$1"
+	git -C "$work" symbolic-ref HEAD
+	git -C "$work" for-each-ref --format='%(refname) %(objectname)'
+	git -C "$(bare_of "$work")" for-each-ref --format='%(refname) %(objectname)'
+	git -C "$work" status --porcelain --untracked-files=all
+}
+
+assert_repo_state() {
+	local work="$1" want="$2" got
+	got=$(repo_state "$work")
+	[[ "$got" == "$want" ]] || {
+		printf 'repo state changed:\n%s\nexpected:\n%s\n' "$got" "$want" >&2
+		return 1
+	}
+}
+
 assert_on_branch() {
 	local got
 	got=$(git -C "$1" symbolic-ref --short HEAD)
@@ -208,17 +237,39 @@ assert_on_branch() {
 
 # ── Arguments ────────────────────────────────────────────────────────────────
 
-@test "arguments: --help prints the usage line and refuses" {
+@test "arguments: --help prints the usage line on stdout and succeeds" {
 	local work
 	work=$(setup_plan_repo widget)
 
 	run_merge "$work" --help
 
-	assert_refused
-	assert_reason "usage: merge-plan.sh"
+	assert_help_printed
 }
 
-@test "arguments: an unknown option is refused naming it" {
+@test "arguments: -h outside a git repo prints the usage line on stdout and succeeds" {
+	local dir="$TMPDIR_ROOT/nogit"
+	mkdir -p "$dir"
+	export GIT_CEILING_DIRECTORIES="$TMPDIR_ROOT"
+
+	run_merge "$dir" -h
+
+	assert_help_printed
+}
+
+@test "arguments: --help after a branch argument without the marker prints usage and changes nothing" {
+	local work state_before
+	work=$(setup_plan_repo widget)
+	drop_merge_marker "$work"
+	state_before=$(repo_state "$work")
+
+	run_merge "$work" plan/x --help
+
+	assert_help_printed
+	assert_repo_state "$work" "$state_before"
+	assert_absent "$(merge_marker_path "$work")"
+}
+
+@test "arguments: an unknown option is refused naming it with the usage line" {
 	local work
 	work=$(setup_plan_repo widget)
 
@@ -226,6 +277,7 @@ assert_on_branch() {
 
 	assert_refused
 	assert_reason "unknown option '--bogus'"
+	assert_reason "$USAGE_LINE"
 }
 
 @test "arguments: naming two branches is refused" {

@@ -7,6 +7,7 @@ PROJECT_DIR=$(cd "$HELPERS_DIR/../.." && pwd)
 readonly PROJECT_DIR
 
 readonly GIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-guard.sh"
+readonly GIT_LOCK_GUARD_HOOK="$PROJECT_DIR/hooks/git-lock-guard.sh"
 readonly GIT_COMMIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-commit-guard.sh"
 readonly TDD_RED_GUARD_HOOK="$PROJECT_DIR/hooks/tdd-red-guard.sh"
 readonly FIX_CI_PUSH_WRAPPER="$PROJECT_DIR/scripts/fix-ci-push.sh"
@@ -22,17 +23,35 @@ readonly BASH_BIN
 export GIT_CONFIG_GLOBAL=/dev/null
 export GIT_CONFIG_SYSTEM=/dev/null
 
+# ── Suite teardown ───────────────────────────────────────────────────────────
+
+# Removes the suite's TMPDIR_ROOT; the shared body for every file's
+# teardown/teardown_file, which bats requires to keep that exact name locally.
+cleanup_tmpdir_root() {
+	[[ -n "$TMPDIR_ROOT" ]] && rm -rf "$TMPDIR_ROOT"
+}
+
 # ── Hook invocation ──────────────────────────────────────────────────────────
 
 hook_input() {
 	jq -n --arg cmd "$1" '{"tool_name":"Bash","tool_input":{"command":$cmd}}'
 }
 
+# Run hook script $1 in $2 with command $3; sets GUARD_EXIT and GUARD_OUTPUT.
+run_hook_for_command() {
+	local hook="$1" dir="$2" cmd="$3"
+	GUARD_EXIT=0
+	GUARD_OUTPUT=$(cd "$dir" && hook_input "$cmd" | bash "$hook" 2>&1 1>/dev/null) || GUARD_EXIT=$?
+}
+
 # Run git-guard hook in $1 with command $2; sets GUARD_EXIT and GUARD_OUTPUT.
 run_guard() {
-	local dir="$1" cmd="$2"
-	GUARD_EXIT=0
-	GUARD_OUTPUT=$(cd "$dir" && hook_input "$cmd" | bash "$GIT_GUARD_HOOK" 2>&1 1>/dev/null) || GUARD_EXIT=$?
+	run_hook_for_command "$GIT_GUARD_HOOK" "$1" "$2"
+}
+
+# Run git-lock-guard hook in $1 with command $2; sets GUARD_EXIT and GUARD_OUTPUT.
+run_lock_guard() {
+	run_hook_for_command "$GIT_LOCK_GUARD_HOOK" "$1" "$2"
 }
 
 # Run git-commit-guard hook with command $1; sets GUARD_EXIT and GUARD_OUTPUT.

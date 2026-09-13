@@ -23,9 +23,18 @@ PROG=merge-plan
 
 readonly USAGE="usage: merge-plan.sh [plan/<slug>] [--skip-ci]"
 
-usage() {
-	printf '%s\n' "$USAGE" >&2
-	exit 2
+# Help is a successful request, answered before the repo or the marker is
+# consulted, so it works anywhere and whatever else argv holds.
+exit_if_help_requested() {
+	local arg
+	for arg in "$@"; do
+		case "$arg" in
+		-h | --help)
+			printf '%s\n' "$USAGE"
+			exit 0
+			;;
+		esac
+	done
 }
 
 # Sets the caller's `branch` and `skip_ci` from argv; `branch` stays empty for
@@ -37,7 +46,6 @@ parse_args() {
 	for arg in "$@"; do
 		case "$arg" in
 		--skip-ci) skip_ci=true ;;
-		-h | --help) usage ;;
 		-*) die "unknown option '$arg'; $USAGE" ;;
 		*)
 			[[ -z "$branch" ]] || die "only one branch may be named, got '$branch' and '$arg'."
@@ -182,6 +190,7 @@ clean_up_branch() {
 
 main() {
 	local git_dir branch skip_ci base_branch msg_file tip
+	exit_if_help_requested "$@"
 	git_dir=$(policy_git_dir) || exit $?
 	require_merge_marker "$git_dir"
 

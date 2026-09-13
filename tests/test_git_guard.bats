@@ -20,6 +20,14 @@ setup_file() {
 	mkdir -p "$UNSTAGED_PLAN_REPO/.claude/plans"
 	printf 'plan content\n' >"$UNSTAGED_PLAN_REPO/.claude/plans/phase.md"
 
+	export MODIFIED_PLAN_REPO
+	MODIFIED_PLAN_REPO=$(setup_repo modified_plan_repo)
+	mkdir -p "$MODIFIED_PLAN_REPO/.claude/plans"
+	printf 'plan content\n' >"$MODIFIED_PLAN_REPO/.claude/plans/phase.md"
+	git -C "$MODIFIED_PLAN_REPO" add -f .claude/plans/phase.md
+	git -C "$MODIFIED_PLAN_REPO" -c commit.gpgsign=false commit -q -m "track plan"
+	printf 'edited\n' >>"$MODIFIED_PLAN_REPO/.claude/plans/phase.md"
+
 	export IGNORED_REPO
 	IGNORED_REPO=$(setup_repo ignored_repo)
 	printf 'build/\n' >"$IGNORED_REPO/.gitignore"
@@ -77,6 +85,50 @@ setup_file() {
 	export MERGE_STALE_REPO
 	MERGE_STALE_REPO=$(setup_merge_marked_repo merge_stale_repo)
 	backdate_merge_marker "$MERGE_STALE_REPO" "$STALE_OFFSET_MINUTES"
+
+	export NO_REPO_DIR="$TMPDIR_ROOT/no_repo"
+	mkdir -p "$NO_REPO_DIR"
+
+	export ABSENT_REPO="$TMPDIR_ROOT/absent_repo"
+
+	export GLOB_DIR="$TMPDIR_ROOT/glob"
+	setup_tdd_active_repo glob/repo1 >/dev/null
+
+	export ALIGNED_REPO
+	ALIGNED_REPO=$(setup_fix_ci_repo aligned feature/ci)
+	add_branch "$(setup_fix_ci_repo aligned/branch feature/ci)" fix-ci/x
+	add_branch "$(setup_fix_ci_repo aligned/push feature/ci)" fix-ci/x
+	add_untracked_plan "$(setup_repo aligned/add)"
+	setup_repo aligned/remove >/dev/null
+	setup_repo aligned/worktree >/dev/null
+
+	export WT_GLOB_REPO
+	WT_GLOB_REPO=$(setup_repo wt_glob_repo)
+	git -C "$WT_GLOB_REPO" worktree add -q -b wt-glob "$WT_GLOB_REPO/wt1"
+	printf 'uncommitted\n' >>"$WT_GLOB_REPO/wt1/README"
+
+	export WT_NAMED_DIRTY_REPO
+	WT_NAMED_DIRTY_REPO=$(setup_repo wt_named_dirty_repo)
+	git -C "$WT_NAMED_DIRTY_REPO" worktree add -q -b wt-named "$WT_NAMED_DIRTY_REPO/wt1"
+	printf 'uncommitted\n' >>"$WT_NAMED_DIRTY_REPO/wt1/README"
+
+	export WT_NAMED_CLEAN_REPO
+	WT_NAMED_CLEAN_REPO=$(setup_repo wt_named_clean_repo)
+	git -C "$WT_NAMED_CLEAN_REPO" worktree add -q -b wt-named "$WT_NAMED_CLEAN_REPO/wt1"
+}
+
+# Repo with a tdd-cycle marker raised; prints the repo dir.
+setup_tdd_active_repo() {
+	local dir
+	dir=$(setup_repo "$1")
+	touch "$(git -C "$dir" rev-parse --absolute-git-dir)/tdd-cycle-active"
+	printf '%s' "$dir"
+}
+
+# Leave an untracked plan file in the repo at $1.
+add_untracked_plan() {
+	mkdir -p "$1/.claude/plans"
+	printf 'plan content\n' >"$1/.claude/plans/phase.md"
 }
 
 # Repo with a fresh merge-plan marker raised; prints the repo dir.
@@ -88,7 +140,7 @@ setup_merge_marked_repo() {
 }
 
 teardown_file() {
-	[[ -n "$TMPDIR_ROOT" ]] && rm -rf "$TMPDIR_ROOT"
+	cleanup_tmpdir_root
 }
 
 # Every command in the list is blocked in repo $1; a failure names the command.
@@ -98,6 +150,20 @@ each_blocked_in() {
 	for cmd in "$@"; do
 		run_guard "$dir" "$cmd"
 		assert_blocked || {
+			printf 'command: %s\n' "$cmd" >&2
+			return 1
+		}
+	done
+}
+
+# Every command in the list is blocked in repo $2 with output naming reason $1;
+# a failure names the command.
+each_blocked_for_in() {
+	local reason="$1" dir="$2" cmd
+	shift 2
+	for cmd in "$@"; do
+		run_guard "$dir" "$cmd"
+		{ assert_blocked && assert_guard_output_includes "$reason"; } || {
 			printf 'command: %s\n' "$cmd" >&2
 			return 1
 		}
@@ -245,6 +311,47 @@ each_allowed_in() {
 	assert_blocked
 }
 
+@test "worktree: remove -C of a relative path to a dirty worktree in the named repo is blocked as dirty" {
+	run_guard "$REPO" "git -C $WT_NAMED_DIRTY_REPO worktree remove wt1"
+
+	assert_blocked
+	assert_guard_output_includes "worktree remove (dirty)"
+}
+
+@test "worktree: remove -C of a relative path to a clean worktree in the named repo is allowed from a cwd holding a dirty one" {
+	run_guard "$WT_GLOB_REPO" "git -C $WT_NAMED_CLEAN_REPO worktree remove wt1"
+
+	assert_allowed
+}
+
+@test "worktree: remove -C of a relative path absent from the named repo is unverifiable even when the cwd holds it" {
+	run_guard "$WT_NAMED_CLEAN_REPO" "git -C $REPO worktree remove wt1"
+
+	assert_blocked
+	assert_guard_output_includes "unverifiable path"
+}
+
+@test "worktree: remove -C of an absolute path to a clean worktree is allowed" {
+	run_guard "$REPO" "git -C $WT_REPO worktree remove $CLEAN_WT"
+
+	assert_allowed
+}
+
+@test "worktree: remove of a relative path to a clean worktree without -C is allowed" {
+	run_guard "$WT_REPO" "git worktree remove .claude/worktrees/clean"
+
+	assert_allowed
+}
+
+@test "worktree: remove of a relative path behind relative or chained -C values resolves the way git does" {
+	each_blocked_for_in "worktree remove (dirty)" "$TMPDIR_ROOT" \
+		"git -C wt_named_dirty_repo worktree remove wt1"
+	each_blocked_for_in "worktree remove (dirty)" "$REPO" \
+		"git -C $TMPDIR_ROOT -C wt_named_dirty_repo worktree remove wt1" \
+		"git -C wt_named_clean_repo -C $WT_NAMED_DIRTY_REPO worktree remove wt1" \
+		"git -C $TMPDIR_ROOT --git-dir elsewhere/.git -C wt_named_dirty_repo worktree remove wt1"
+}
+
 @test "worktree: list, add, unlock, and prune are allowed" {
 	# shellcheck disable=SC2016
 	each_allowed_in "$WT_REPO" \
@@ -276,6 +383,13 @@ each_allowed_in() {
 		"git restore --staged -W file"
 }
 
+@test "restore: --staged text inside a global option value does not allow the restore" {
+	each_blocked_in "$REPO" \
+		"git -C x--staged restore ." \
+		"git -c a.b=--staged restore ." \
+		"git --namespace --staged restore ."
+}
+
 # ── Rm ───────────────────────────────────────────────────────────────────────
 
 @test "rm: rm that touches the working tree is blocked" {
@@ -291,6 +405,14 @@ each_allowed_in() {
 		"git rm -n file" \
 		"git rm --dry-run file" \
 		"git rm -rn dir/"
+}
+
+@test "rm: --cached or dry-run text inside a global option value does not allow the rm" {
+	each_blocked_in "$REPO" \
+		"git -C --cached rm file" \
+		"git --namespace --cached rm file" \
+		"git -c a.b=--dry-run rm file" \
+		"git -Cn rm file"
 }
 
 # ── Reflog / prune ───────────────────────────────────────────────────────────
@@ -798,4 +920,148 @@ CMD
 		"git merge main" \
 		"git rebase main" \
 		"git add ."
+}
+
+# ── Subcommand detection ─────────────────────────────────────────────────────
+
+@test "subcommand: commit behind every global-option spelling is blocked under a tdd-cycle marker" {
+	each_blocked_in "$TDD_ACTIVE_REPO" \
+		"git commit -m 'msg'" \
+		"git -C $TDD_ACTIVE_REPO commit -m 'msg'" \
+		"git --git-dir=$TDD_ACTIVE_REPO/.git commit -m 'msg'" \
+		"git -c user.name=x commit -m 'msg'" \
+		"git --work-tree $TDD_ACTIVE_REPO commit -m 'msg'"
+}
+
+# git rejects a -C value glued to the flag, so the command names no repo git can
+# resolve: its subcommand is still recognised, but no marker is read in its place.
+@test "subcommand: commit behind an attached -C value is recognised but reads no tdd-cycle marker" {
+	run_guard "$TDD_ACTIVE_REPO" "git -C$TDD_ACTIVE_REPO commit -m 'msg'"
+
+	assert_allowed
+	assert_guard_output_includes "Skill(write-commit)"
+}
+
+@test "subcommand: a command line with no git word is allowed under a tdd-cycle marker" {
+	each_allowed_in "$TDD_ACTIVE_REPO" \
+		"echo commit" \
+		"ls add"
+}
+
+@test "subcommand: a -C value that would glob onto a marked repo is taken literally and allowed" {
+	run_guard "$GLOB_DIR" "git -C repo* commit -m 'msg'"
+
+	assert_allowed
+}
+
+# ── Named repo (checks follow -C / --git-dir) ────────────────────────────────
+
+@test "named repo: commit -C or --git-dir at a tdd-cycle repo from an unmarked cwd is blocked by its marker" {
+	each_blocked_for_in "tdd-cycle-active" "$REPO" \
+		"git -C $TDD_ACTIVE_REPO commit -m 'msg'" \
+		"git --git-dir $TDD_ACTIVE_REPO/.git commit -m 'msg'" \
+		"git --git-dir=$TDD_ACTIVE_REPO/.git commit -m 'msg'"
+}
+
+@test "named repo: commit -C at an unmarked repo from a tdd-cycle cwd is allowed" {
+	run_guard "$TDD_ACTIVE_REPO" "git -C $REPO commit -m 'msg'"
+
+	assert_allowed
+}
+
+@test "named repo: rebase -C at a dirty repo from a clean cwd is blocked as dirty" {
+	run_guard "$REPO" "git -C $DIRTY_REPO rebase main"
+
+	assert_blocked
+	assert_guard_output_includes "dirty"
+}
+
+@test "named repo: rebase -C at a clean repo from a dirty cwd is allowed" {
+	run_guard "$DIRTY_REPO" "git -C $REPO rebase main"
+
+	assert_allowed
+}
+
+@test "named repo: add and commit -C at a repo holding untracked, modified, or staged plan files are blocked" {
+	each_blocked_for_in "plan files matching" "$REPO" \
+		"git -C $UNSTAGED_PLAN_REPO add ." \
+		"git -C $MODIFIED_PLAN_REPO add ." \
+		"git -C $PLAN_REPO commit -m 'msg'"
+}
+
+@test "named repo: add and commit -C at a clean repo from a cwd holding plan files are allowed" {
+	each_allowed_in "$UNSTAGED_PLAN_REPO" "git -C $REPO add ."
+	each_allowed_in "$MODIFIED_PLAN_REPO" "git -C $REPO add ."
+	each_allowed_in "$PLAN_REPO" "git -C $REPO commit -m 'msg'"
+}
+
+@test "named repo: commit -C at a tdd-cycle repo from outside any repo is blocked by its marker" {
+	each_blocked_for_in "tdd-cycle-active" "$NO_REPO_DIR" "git -C $TDD_ACTIVE_REPO commit -m 'msg'"
+}
+
+@test "named repo: commands naming no repo from outside any repo are allowed, even banned ones" {
+	each_allowed_in "$NO_REPO_DIR" \
+		"git commit -m 'msg'" \
+		"git stash"
+}
+
+@test "named repo: a -C or --git-dir that resolves to no repo never reads the cwd's marker, dirt, or plan files" {
+	each_allowed_in "$TDD_ACTIVE_REPO" \
+		"git -C $ABSENT_REPO commit -m 'msg'" \
+		"git --git-dir=$ABSENT_REPO/.git commit -m 'msg'" \
+		"git --git-dir $ABSENT_REPO/.git commit -m 'msg'"
+	each_allowed_in "$DIRTY_REPO" \
+		"git -C $ABSENT_REPO rebase main" \
+		"git --git-dir $ABSENT_REPO/.git rebase main"
+	each_allowed_in "$UNSTAGED_PLAN_REPO" \
+		"git -C $ABSENT_REPO add ." \
+		"git --git-dir=$ABSENT_REPO/.git add ."
+	each_allowed_in "$PLAN_REPO" \
+		"git -C $ABSENT_REPO commit -m 'msg'" \
+		"git --git-dir $ABSENT_REPO/.git commit -m 'msg'"
+}
+
+# ── Argument alignment (arguments read after the real subcommand) ────────────
+
+@test "argument alignment: fix-ci deletes behind a -C value spelled like the subcommand are allowed" {
+	each_allowed_in "$ALIGNED_REPO" \
+		"git -C branch branch -D fix-ci/x" \
+		"git -C push push origin --delete fix-ci/x" \
+		"git --work-tree branch branch -D fix-ci/x" \
+		"git --namespace push push origin --delete fix-ci/x"
+}
+
+@test "argument alignment: guarded arguments behind a -C value spelled like the subcommand are blocked" {
+	each_blocked_in "$ALIGNED_REPO" \
+		"git -C branch branch -D main" \
+		"git -C push push origin --delete main"
+	each_blocked_for_in "plan files matching" "$ALIGNED_REPO" "git -C add add .claude/plans/phase.md"
+}
+
+@test "argument alignment: worktree remove with no path behind -C remove is blocked as unverifiable" {
+	run_guard "$ALIGNED_REPO" "git -C remove worktree remove"
+
+	assert_blocked
+	assert_guard_output_includes "unverifiable path"
+}
+
+@test "argument alignment: a non-worktree command whose -C value is remove is allowed" {
+	run_guard "$ALIGNED_REPO" "git -C remove status"
+
+	assert_allowed
+}
+
+@test "argument alignment: worktree remove of a dirty worktree behind -C worktree is blocked as dirty" {
+	run_guard "$ALIGNED_REPO" "git -C worktree worktree remove $DIRTY_WT"
+
+	assert_blocked
+	assert_guard_output_includes "worktree remove (dirty)"
+}
+
+@test "argument alignment: a worktree path that would glob onto a dirty worktree is unverifiable" {
+	run_guard "$WT_GLOB_REPO" "git worktree remove wt*"
+
+	assert_blocked
+	assert_guard_output_includes "unverifiable path"
+	assert_guard_output_excludes "worktree remove (dirty)"
 }

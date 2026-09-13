@@ -11,8 +11,8 @@ command -v jq >/dev/null || {
 	exit 1
 }
 
-# The hook runs with cwd set to the repo it is guarding, so sourced scripts are
-# resolved from the script's own location — never relative to cwd or $HOME.
+# The hook's cwd may be any directory, so sourced scripts are resolved from the
+# script's own location — never relative to cwd or $HOME.
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # fix-ci policy, shared with the wrapper that fronts the loop's pushes.
@@ -28,8 +28,6 @@ full_command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 
 [[ -z "$full_command" ]] && exit 0
 
-git --no-optional-locks rev-parse --git-dir >/dev/null 2>&1 || exit 0
-
 # ╭────────────────────────────────────────────────────────────╮
 # │                  Git Command Parsing                       │
 # ╰────────────────────────────────────────────────────────────╯
@@ -40,6 +38,17 @@ is_git_subcmd() {
 	local actual
 	actual=$(get_git_subcmd "$command") || return 1
 	[[ "$actual" == "$expected" ]]
+}
+
+# Prints the git dir the current $command targets; fails when it does not
+# resolve. Shared by fix_ci_active, main_is_protected, and merge_plan_active.
+# Uses global $command, set by whichever caller is active — a sub-command in
+# the main loop, or a fragment in check_merge_plan_invocation.
+current_target_git_dir() {
+	local git_dir
+	git_dir=$(git_target_dir "$command") || return 1
+	[[ -n "$git_dir" ]] || return 1
+	printf '%s' "$git_dir"
 }
 
 # ╭────────────────────────────────────────────────────────────╮
@@ -76,10 +85,11 @@ check_plan_files() {
 
 # While a tdd-cycle agent runs (marker created/removed by the agent per
 # agents/tdd-cycle.md), commits and staging are forbidden — the orchestrator
-# owns all commits.
+# owns all commits. The marker is read from the repo the command targets.
+# Uses global $command (set per sub-command in the main loop).
 check_tdd_cycle_marker() {
 	local subcmd="$1" git_dir
-	git_dir=$(git --no-optional-locks rev-parse --git-dir 2>/dev/null) || return 0
+	git_dir=$(git_target_dir "$command") || return 0
 	[[ -f "$git_dir/tdd-cycle-active" ]] || return 0
 	printf "BLOCKED: git %s — a tdd-cycle agent is running and the orchestrator owns all commits.\n" "$subcmd" >&2
 	printf "If you ARE the tdd-cycle agent: do not commit or stage; write your report instead.\n" >&2
@@ -118,58 +128,10 @@ check_tdd_cycle_marker() {
 # swept; the window itself is defined in scripts/branch-policy.sh, alongside the
 # namespace rule, and shared with the wrapper that fronts both loops' pushes.
 
-# Git dir the command actually targets, honouring its global `-C` / `--git-dir`
-# options. Falls back to the hook's cwd when the command names no repo.
-# Uses global $command (set per sub-command in the main loop).
-git_target_dir() {
-	local -a repo_args=()
-	local word in_git=false capture_next=false skip_next=false
-
-	for word in $command; do
-		if $capture_next; then
-			repo_args+=("$word")
-			capture_next=false
-			continue
-		fi
-		if $skip_next; then
-			skip_next=false
-			continue
-		fi
-
-		# Wait for 'git'
-		if ! $in_git; then
-			[[ "$word" == "git" ]] && in_git=true
-			continue
-		fi
-
-		case "$word" in
-		-C | --git-dir)
-			repo_args+=("$word")
-			capture_next=true
-			;;
-		-C* | --git-dir=*)
-			# Value attached, as in -Cpath or --git-dir=path
-			repo_args+=("$word")
-			;;
-		-c | --work-tree | --namespace)
-			skip_next=true
-			;;
-		--*=* | -*) ;;
-		*)
-			# First non-option word is the subcommand: no repo options left
-			break
-			;;
-		esac
-	done
-
-	git --no-optional-locks ${repo_args[@]+"${repo_args[@]}"} rev-parse --absolute-git-dir 2>/dev/null
-}
-
 # Uses global $command (set per sub-command in the main loop).
 fix_ci_active() {
 	local git_dir marker status=0
-	git_dir=$(git_target_dir) || return 1
-	[[ -n "$git_dir" ]] || return 1
+	git_dir=$(current_target_git_dir) || return 1
 	marker="$git_dir/$FIX_CI_MARKER"
 	[[ -f "$marker" ]] || return 1
 
@@ -189,13 +151,10 @@ fix_ci_active() {
 # Uses global $command (set per sub-command in the main loop).
 fix_ci_push_deletes_only_own() {
 	local -a refs=()
-	local word ref seen_push=false seen_remote=false delete_mode=false
+	local word ref seen_remote=false delete_mode=false
 
-	for word in $command; do
-		if ! $seen_push; then
-			[[ "$word" == "push" ]] && seen_push=true
-			continue
-		fi
+	git_parse_command "$command" || return 1
+	for word in ${GIT_SUBCMD_ARGS[@]+"${GIT_SUBCMD_ARGS[@]}"}; do
 		case "$word" in
 		--delete | -d)
 			delete_mode=true
@@ -267,12 +226,9 @@ fix_ci_allows_branch_delete() {
 	fix_ci_active || return 1
 
 	local -a names=()
-	local word seen_branch=false
-	for word in $command; do
-		if ! $seen_branch; then
-			[[ "$word" == "branch" ]] && seen_branch=true
-			continue
-		fi
+	local word
+	git_parse_command "$command" || return 1
+	for word in ${GIT_SUBCMD_ARGS[@]+"${GIT_SUBCMD_ARGS[@]}"}; do
 		[[ "$word" == -* ]] && continue
 		names+=("$word")
 	done
@@ -303,8 +259,7 @@ PROTECTED_MAIN_SUBCMDS='commit|merge|cherry-pick|revert|am|rebase|pull'
 # Uses global $command (set per sub-command in the main loop).
 main_is_protected() {
 	local git_dir branch
-	git_dir=$(git_target_dir) || return 1
-	[[ -n "$git_dir" ]] || return 1
+	git_dir=$(current_target_git_dir) || return 1
 	[[ $(git --no-optional-locks --git-dir="$git_dir" config --bool claude.protectMain 2>/dev/null) == true ]] || return 1
 	branch=$(git --no-optional-locks --git-dir="$git_dir" symbolic-ref --quiet --short HEAD 2>/dev/null) || return 1
 	[[ "$branch" == main || "$branch" == master ]]
@@ -374,9 +329,8 @@ merge_plan_fragment_invokes() {
 # skill ages out instead of standing the door open.
 # Uses global $command (set per fragment by check_merge_plan_invocation).
 merge_plan_active() {
-	local git_dir marker
-	git_dir=$(git_target_dir) || return 1
-	[[ -n "$git_dir" ]] || return 1
+	local git_dir
+	git_dir=$(current_target_git_dir) || return 1
 	marker_fresh "$git_dir/$MERGE_PLAN_MARKER"
 }
 
@@ -414,6 +368,9 @@ check_merge_plan_invocation() {
 		# git_target_dir reads the fragment's own -C / --git-dir, the same way
 		# the fix-ci marker is scoped to the repo a command aims at.
 		command="$fragment"
+		# Outside any repo there is no marker to consult and no plan branch to
+		# land, so the run is left to fail on its own.
+		git_target_dir "$command" >/dev/null || continue
 		merge_plan_active && continue
 		block_destructive "merge-plan.sh" \
 			"This script runs only through /merge-plan, which raises the marker it needs. Report the branch as ready to squash instead."
@@ -438,11 +395,9 @@ check_destructive_operations() {
 		block_destructive "git --no-verify" "Skipping hooks is forbidden."
 
 	# ── Checkout / Switch ────────────────────────────────────────
-	# git checkout is banned entirely — use git switch (branches) or git restore --staged (unstage)
 	is_git_subcmd "checkout" &&
 		block_destructive "git checkout" "Banned. Use 'git switch' for branches, 'git restore --staged' for unstaging."
 
-	# git switch -f / --force / --discard-changes
 	is_git_subcmd "switch" && [[ "$command" =~ [[:space:]](-f|--force|--discard-changes)([[:space:]]|$) ]] &&
 		block_destructive "git switch --force" "Force-switch discards uncommitted changes."
 
@@ -451,7 +406,6 @@ check_destructive_operations() {
 	is_git_subcmd "reset" &&
 		block_destructive "git reset" "Resets HEAD, staging area, or working tree. Use git restore --staged to unstage."
 
-	# git clean -f
 	is_git_subcmd "clean" && [[ "$command" =~ -[fdxn]*f ]] &&
 		block_destructive "git clean -f" "Permanently deletes untracked files."
 
@@ -460,50 +414,50 @@ check_destructive_operations() {
 		block_destructive "git stash" "Stashing risks losing uncommitted work."
 
 	# ── Branch ───────────────────────────────────────────────────
-	# git branch -D
 	is_git_subcmd "branch" && [[ "$command" =~ [[:space:]]-D ]] && ! fix_ci_allows_branch_delete &&
 		block_destructive "git branch -D" "Force-deletes branch, may lose unmerged commits."
 
 	# ── Restore ──────────────────────────────────────────────────
+	# Restore and rm are judged on the subcommand's own arguments: option-shaped
+	# text in a global option value (`git -c a.b=--staged restore .`) must not
+	# unlock them. Leading space so the first argument also follows whitespace.
+	local subcmd_args
 	if is_git_subcmd "restore"; then
+		git_parse_command "$command"
+		subcmd_args=" ${GIT_SUBCMD_ARGS[*]-}"
 		# --worktree / -W discards working tree changes even when combined with --staged
-		[[ "$command" =~ [[:space:]](-W|--worktree)([[:space:]]|$) ]] &&
+		[[ "$subcmd_args" =~ [[:space:]](-W|--worktree)([[:space:]]|$) ]] &&
 			block_destructive "git restore --worktree" "Discards uncommitted changes to files."
 
-		# Without --staged, restore discards working-tree changes
-		[[ ! "$command" =~ --staged ]] &&
+		[[ ! "$subcmd_args" =~ [[:space:]]--staged([[:space:]]|$) ]] &&
 			block_destructive "git restore (discard)" "Discards uncommitted changes to files."
 	fi
 
 	# ── Rm ───────────────────────────────────────────────────────
-	# git rm deletes files from the working tree unless --cached or dry-run (-n/--dry-run)
 	if is_git_subcmd "rm"; then
-		[[ "$command" =~ [[:space:]]--cached([[:space:]]|$) ]] && return 0
-		[[ "$command" =~ [[:space:]]--dry-run([[:space:]]|$) ]] && return 0
+		git_parse_command "$command"
+		subcmd_args=" ${GIT_SUBCMD_ARGS[*]-}"
+		[[ "$subcmd_args" =~ [[:space:]]--cached([[:space:]]|$) ]] && return 0
+		[[ "$subcmd_args" =~ [[:space:]]--dry-run([[:space:]]|$) ]] && return 0
 		# Bundled short flags containing n (dry-run): -n, -rn, -fn, etc.
-		[[ "$command" =~ [[:space:]]-[a-zA-Z]*n ]] && return 0
+		[[ "$subcmd_args" =~ [[:space:]]-[a-zA-Z]*n ]] && return 0
 		block_destructive "git rm" "Deletes files from the working tree. Use --cached to only unstage."
 	fi
 
 	# ── Reflog / prune ──────────────────────────────────────────
-	# git reflog expire/delete
 	is_git_subcmd "reflog" && [[ "$command" =~ [[:space:]](expire|delete)([[:space:]]|$) ]] &&
 		block_destructive "git reflog expire/delete" "Destroys reflog entries, making recovery impossible."
 
-	# git prune
 	is_git_subcmd "prune" &&
 		block_destructive "git prune" "Removes unreachable objects. Let git gc handle pruning safely."
 
-	# git gc --prune=
 	is_git_subcmd "gc" && [[ "$command" =~ [[:space:]]--prune= ]] &&
 		block_destructive "git gc --prune" "Immediate pruning risks losing recoverable objects."
 
 	# ── Commit ───────────────────────────────────────────────────
 
 	# ── History extraction with redirect (overwrite working tree) ─
-	# git show / cat-file with stdout redirect (> but not 2>)
 	if is_git_subcmd "show" || is_git_subcmd "cat-file"; then
-		# Strip fd-specific redirects (2>, 3>, etc.) then check if > remains
 		local _stripped
 		_stripped=$(printf '%s' "$command" | sed 's/[2-9]>//g')
 		[[ "$_stripped" =~ \> ]] &&
@@ -512,14 +466,14 @@ check_destructive_operations() {
 	fi
 
 	# ── Patch reversal ───────────────────────────────────────────
-	# git apply -R / --reverse (undo applied patches)
 	is_git_subcmd "apply" && [[ "$command" =~ [[:space:]](-R|--reverse)([[:space:]]|$) ]] &&
 		block_destructive "git apply --reverse" "Reverse-applying patches can discard changes."
 
 	# ── Rebase ───────────────────────────────────────────────────
-	# git rebase with uncommitted changes
 	if is_git_subcmd "rebase"; then
-		sh_git_dirty . >/dev/null || return 0
+		local top
+		top=$(git_on_target "$command" rev-parse --show-toplevel 2>/dev/null) || return 0
+		sh_git_dirty "$top" >/dev/null || return 0
 		block_destructive "git rebase (dirty)" "Rebasing with uncommitted changes risks losing work."
 	fi
 }
@@ -528,36 +482,40 @@ check_destructive_operations() {
 # │                    Command Checking                        │
 # ╰────────────────────────────────────────────────────────────╯
 
+# Uses global $command (set per sub-command in the main loop). Paths and the
+# plan-file scan are judged in the repo the command targets.
 check_add_safety() {
-	local pattern
-	if pattern=$(find_plan_pattern "$command"); then
+	local pattern args_text
+	git_parse_command "$command" || return 0
+	# Leading space so every argument, the first included, follows whitespace.
+	args_text=" ${GIT_SUBCMD_ARGS[*]-}"
+
+	if pattern=$(find_plan_pattern "$args_text"); then
 		printf "Error: Cannot stage plan files matching '%s'. These are temporary analysis files.\n" "$pattern" >&2
 		exit 2
 	fi
 
-	if [[ "$command" =~ [[:space:]](\.|-[aA]|--all)([[:space:]]|$) ]]; then
+	if [[ "$args_text" =~ [[:space:]](\.|-[aA]|--all)([[:space:]]|$) ]]; then
 		local root
-		root=$(git --no-optional-locks rev-parse --show-toplevel 2>/dev/null) || return 0
-		local pending_files
-		pending_files=$(git --no-optional-locks -C "$root" ls-files --others --modified --exclude-standard 2>/dev/null)
-		check_plan_files "$pending_files" || exit 2
+		root=$(git_on_target "$command" rev-parse --show-toplevel 2>/dev/null) || root=""
+		if [[ -n "$root" ]]; then
+			local pending_files
+			pending_files=$(git --no-optional-locks -C "$root" ls-files --others --modified --exclude-standard 2>/dev/null)
+			check_plan_files "$pending_files" || exit 2
+		fi
 	fi
 
 	# Block all force-adds — -f/--force bypasses gitignore, the only
 	# reason to use it is to track ignored files, which is forbidden.
-	if [[ "$command" =~ [[:space:]](-f|--force)([[:space:]]|$) ]]; then
+	if [[ "$args_text" =~ [[:space:]](-f|--force)([[:space:]]|$) ]]; then
 		block_destructive "git add --force" \
 			"Force-adding bypasses gitignore rules. Never track ignored files."
 	fi
 
 	# Check explicitly named paths against gitignore (local + global + .git/info/exclude)
-	local _found_add=false _past_dashdash=false
+	local _past_dashdash=false _word _path
 	local -a _add_paths=()
-	for _word in $command; do
-		if ! $_found_add; then
-			[[ "$_word" == "add" ]] && _found_add=true
-			continue
-		fi
+	for _word in ${GIT_SUBCMD_ARGS[@]+"${GIT_SUBCMD_ARGS[@]}"}; do
 		if [[ "$_word" == "--" ]]; then
 			_past_dashdash=true
 			continue
@@ -572,7 +530,7 @@ check_add_safety() {
 		esac
 	done
 	for _path in ${_add_paths[@]+"${_add_paths[@]}"}; do
-		if git --no-optional-locks check-ignore -q -- "$_path" 2>/dev/null; then
+		if git_on_target "$command" check-ignore -q -- "$_path" 2>/dev/null; then
 			block_destructive "git add (gitignored)" \
 				"'$_path' matches a gitignore rule (local or global). Do not track ignored files."
 		fi
@@ -581,7 +539,9 @@ check_add_safety() {
 
 # Uses global $command (set per sub-command in the main loop).
 check_worktree_remove() {
-	is_git_subcmd "worktree" && [[ "$command" =~ [[:space:]]remove([[:space:]]|$) ]] || return 0
+	git_parse_command "$command" && [[ "$GIT_SUBCMD" == worktree ]] || return 0
+	local -a wt_args=(${GIT_SUBCMD_ARGS[@]+"${GIT_SUBCMD_ARGS[@]}"})
+	((${#wt_args[@]} > 0)) && [[ "${wt_args[0]}" == remove ]] || return 0
 
 	# --force exists to override git's own refusal to remove a dirty worktree,
 	# so it is banned outright like `git branch -D`, whatever the path is.
@@ -592,19 +552,20 @@ check_worktree_remove() {
 	fi
 
 	# Extract worktree path: last non-flag argument after 'remove'
-	local wt_path="" found_remove=false word
-	for word in $command; do
-		if $found_remove && [[ "$word" != -* ]]; then
-			wt_path="$word"
-		fi
-		[[ "$word" == "remove" ]] && found_remove=true
+	local wt_path="" word
+	for word in "${wt_args[@]:1}"; do
+		[[ "$word" != -* ]] && wt_path="$word"
 	done
 
-	# A missing path, a path that arrived quoted (collapsed to the
-	# placeholder, as in a loop over "$wt"), or one that does not resolve
-	# all leave the worktree unverifiable — fail closed rather than wave
-	# the removal through.
-	if [[ -z "$wt_path" || "$wt_path" == "$QUOTED_PLACEHOLDER" || ! -d "$wt_path" ]]; then
+	# A missing path, a path or -C directory that arrived quoted (collapsed to
+	# the placeholder, as in a loop over "$wt"), or one that does not resolve
+	# all leave the worktree unverifiable — fail closed rather than wave the
+	# removal through. The path is judged where git itself would look: under
+	# the command's -C directory, never the hook's cwd.
+	if [[ -n "$wt_path" ]]; then
+		wt_path=$(git_command_path "$command" "$wt_path")
+	fi
+	if [[ -z "$wt_path" || "$wt_path" == *"$QUOTED_PLACEHOLDER"* || ! -d "$wt_path" ]]; then
 		block_destructive "git worktree remove (unverifiable path)" \
 			"The guard cannot confirm the worktree is clean. Re-run with a literal, unquoted path."
 	fi
@@ -618,6 +579,13 @@ check_worktree_remove() {
 # Sets global $command so is_git_subcmd and regex checks work.
 check_single_command() {
 	command="$1"
+
+	# Run outside any repo, a command that names none has nothing to guard. One
+	# that names a repo is still judged, even when that repo does not resolve:
+	# its syntax-level bans hold, and state checks read nothing in its place.
+	if ! git_target_dir "$command" >/dev/null && ! git_names_repo "$command"; then
+		return 0
+	fi
 
 	check_protected_main
 
@@ -642,7 +610,7 @@ check_single_command() {
 		printf "STOP: You MUST load Skill(write-commit) before committing. If you have not loaded it yet, abort and load it now.\n" >&2
 
 		local root
-		root=$(git --no-optional-locks rev-parse --show-toplevel 2>/dev/null) || return 0
+		root=$(git_on_target "$command" rev-parse --show-toplevel 2>/dev/null) || return 0
 		local staged_files
 		staged_files=$(git --no-optional-locks -C "$root" diff --cached --name-only 2>/dev/null)
 		check_plan_files "$staged_files" || exit 2

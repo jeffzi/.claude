@@ -21,11 +21,9 @@ full_command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 
 [[ "$full_command" =~ ^[[:space:]]*git([[:space:]]|$) ]] || exit 0
 
-git --no-optional-locks rev-parse --git-dir >/dev/null 2>&1 || exit 0
-
-# git subcommand parsing, shared with hooks/git-guard.sh. The hook runs with
-# cwd set to the repo it is guarding, so this is resolved from the script's
-# own location — never relative to cwd or $HOME.
+# git command parsing, shared with hooks/git-guard.sh. The hook's cwd may be any
+# directory, so this is resolved from the script's own location — never
+# relative to cwd or $HOME.
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=SCRIPTDIR/../scripts/git-parse.sh
 . "$HOOK_DIR/../scripts/git-parse.sh"
@@ -114,16 +112,17 @@ print_diagnostic() {
 # │                  Main Logic                                │
 # ╰────────────────────────────────────────────────────────────╯
 
-# Extract git directory path (handles worktrees and bare repos)
-git_dir=$(git --no-optional-locks rev-parse --git-dir)
-lock_path="$git_dir/index.lock"
-
 subcmd=$(get_git_subcmd "$full_command") || exit 0
 
 # If not a mutating command, allow immediately
 if ! is_mutating "$subcmd" "$full_command"; then
 	exit 0
 fi
+
+# The lock that matters is the one in the repo the command names, which need
+# not be the cwd's. A repo that does not resolve has no lock to wait on.
+git_dir=$(git_target_dir "$full_command") || exit 0
+lock_path="$git_dir/index.lock"
 
 # If lock file doesn't exist, allow immediately
 if [[ ! -f "$lock_path" ]]; then
