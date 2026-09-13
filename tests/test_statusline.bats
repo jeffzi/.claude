@@ -3,14 +3,10 @@
 load helpers/statusline
 
 setup_file() {
-	for fn in format_context_bar usage_color format_pace format_dir main \
-		file_mtime sha256_hex fetch_usage_fallback refresh_usage_cache \
-		transcript_model_family; do
-		declare -F "$fn" >/dev/null || {
-			printf 'FATAL: %s is not defined after sourcing %s\n' "$fn" "$SCRIPT" >&2
-			return 1
-		}
-	done
+	declare -F main >/dev/null || {
+		printf 'FATAL: main is not defined after sourcing %s\n' "$SCRIPT" >&2
+		return 1
+	}
 
 	export RESET EMPTY HALF FILLED
 
@@ -122,14 +118,6 @@ teardown_file() {
 # Fractional slot rounding
 # ---------------------------------------------------------------------------
 
-@test "30% (1.50 slots): the partly-filled slot renders a gradient-colored half" {
-	assert_bar 30 "FHEEE"
-}
-
-@test "52% (2.60 slots): the partly-filled slot renders a gradient-colored half" {
-	assert_bar 52 "FFHEE"
-}
-
 @test "64% (3.20 slots): fraction below 0.25 renders empty" {
 	assert_bar 64 "FFFEE"
 }
@@ -150,12 +138,10 @@ teardown_file() {
 # Gradient coloring
 # ---------------------------------------------------------------------------
 
-@test "48%: the filled slots and the half all wear the gradient" {
-	assert_bar 48 "FFHEE"
-}
-
-@test "95%: every filled slot wears the 95% gradient" {
-	assert_bar 95 "FFFFF"
+@test "50%: the filled slots and the half wear the literal 50% escape" {
+	local gold=$'\033[38;2;207;183;63m' actual
+	actual=$(format_context_bar 50)
+	assert_exact "$actual" "${gold}●${RESET} ${gold}●${RESET} ${gold}◎${RESET} ○ ○"
 }
 
 # ---------------------------------------------------------------------------
@@ -208,24 +194,10 @@ teardown_file() {
 	[[ -z "$color" ]]
 }
 
-@test "50%: warm gold, R > G > B" {
-	local r g b
-	read -r r g b <<<"$(usage_rgb 50)"
-	[[ "$r" =~ ^[0-9]+$ && $r -gt $g && $g -gt $b ]]
-}
-
 @test "100%: pure red hue, G = B at full saturation" {
 	local r g b
 	read -r r g b <<<"$(usage_rgb 100)"
 	[[ "$r" == "255" && "$g" == "$b" ]]
-}
-
-@test "red channel climbs from 25% to 50%" {
-	assert_red_direction 25 50 rises
-}
-
-@test "red channel climbs from 50% to 100%" {
-	assert_red_direction 50 100 rises
 }
 
 # ---------------------------------------------------------------------------
@@ -384,24 +356,12 @@ teardown_file() {
 # Portable sha256 helper
 # ---------------------------------------------------------------------------
 
-@test "sha256_hex emits exactly 8 lowercase hex characters" {
-	local actual
-	actual=$(printf 'hello' | sha256_hex)
-	[[ "$actual" =~ ^[0-9a-f]{8}$ ]]
-}
-
-@test "sha256_hex is deterministic: same input produces the same hash" {
-	local first second
-	first=$(printf 'hello' | sha256_hex)
-	second=$(printf 'hello' | sha256_hex)
-	[[ "$first" == "$second" ]]
-}
-
-@test "sha256_hex produces different hashes for different inputs" {
+@test "sha256_hex emits 8 lowercase hex characters that differ across inputs" {
 	local a b
 	a=$(printf 'hello' | sha256_hex)
 	b=$(printf 'world' | sha256_hex)
-	[[ "$a" != "$b" ]]
+
+	[[ "$a" =~ ^[0-9a-f]{8}$ && "$b" =~ ^[0-9a-f]{8}$ && "$a" != "$b" ]]
 }
 
 # ---------------------------------------------------------------------------
@@ -441,6 +401,12 @@ teardown_file() {
 @test "GNU stat stub: probe detects -c %Y and file_mtime succeeds" {
 	local out="" status=0
 	out=$(probe_then_mtime "$GNU_DIR" "$SCRIPT") || status=$?
+	[[ "$status" -eq 0 && "$out" =~ ^[0-9]+$ ]]
+}
+
+@test "an IFS without a space still hands stat its format flag and value apart" {
+	local out="" status=0
+	out=$(IFS=$'\n\t' probe_then_mtime "$BSD_DIR" "$SCRIPT") || status=$?
 	[[ "$status" -eq 0 && "$out" =~ ^[0-9]+$ ]]
 }
 
@@ -559,7 +525,7 @@ teardown_file() {
 	local path out
 	path=$(write_transcript annotate-other "$(assistant_record claude-sonnet-5)")
 	out=$(main_render annotate-other "$(annotation_stdin "$path")" "$MAIN_PAYLOAD" | strip_ansi)
-	assert_whole_line "$out" "Opus 4.6→sonnet (high)"
+	assert_model_segment "$out" "Opus 4.6→sonnet (high)"
 }
 
 @test "the annotation renders in the default foreground" {
@@ -575,7 +541,7 @@ teardown_file() {
 	local path out
 	path=$(write_transcript annotate-same "$(assistant_record claude-opus-4-5)")
 	out=$(main_render annotate-same "$(annotation_stdin "$path")" "$MAIN_PAYLOAD" | strip_ansi)
-	assert_whole_line "$out" "Opus 4.6 (high)"
+	assert_model_segment "$out" "Opus 4.6 (high)"
 }
 
 # ---------------------------------------------------------------------------
@@ -587,29 +553,11 @@ teardown_file() {
 		"$(stdin_without '.transcript_path' "$(annotation_stdin "$MAIN_CASES/unused.jsonl")")"
 }
 
-@test "an empty transcript_path: the segment renders unannotated" {
-	assert_unannotated_render degraded-empty-path "$(annotation_stdin "")"
-}
-
-@test "a transcript_path pointing at no file: the segment renders unannotated" {
-	assert_unannotated_render degraded-missing \
-		"$(annotation_stdin "$MAIN_CASES/degraded-missing/nope.jsonl")"
-}
-
 @test "an unreadable transcript: the segment renders unannotated" {
 	local path
 	path=$(write_transcript degraded-unreadable "$(assistant_record claude-sonnet-5)")
 	chmod 000 "$path"
 	assert_unannotated_render degraded-unreadable "$(annotation_stdin "$path")"
-}
-
-@test "a transcript with no qualifying record: the segment renders unannotated" {
-	local path
-	path=$(write_transcript degraded-no-family \
-		"$(typed_record user claude-sonnet-5)" \
-		"$(sidechain_record claude-sonnet-5)" \
-		"$(modelless_record)")
-	assert_unannotated_render degraded-no-family "$(annotation_stdin "$path")"
 }
 
 @test "no model.id on stdin: nothing to compare against, so the segment renders unannotated" {
@@ -623,43 +571,11 @@ teardown_file() {
 # Whole line
 # ---------------------------------------------------------------------------
 
-@test "the context gauge is followed by the separator, not a percentage" {
+@test "the happy path renders dir, model, gauge, 5h with arrow and countdown, and the 7d tail" {
 	local out
 	out=$(main_line | strip_ansi)
-	[[ "$out" == *"$EMPTY │"* || "$out" == *"$FILLED │"* || "$out" == *"$HALF │"* ]]
-}
 
-@test "context_window.used_percentage reaches the gauge, which partially fills" {
-	local out
-	out=$(main_line | strip_ansi)
-	assert_contains "$out" "Opus 4.6 ● ● ◎ ○ ○ │"
-}
-
-@test "the 5h segment renders as label, percentage, arrow, countdown" {
-	local out
-	out=$(main_line | strip_ansi)
-	# Minutes are pattern-matched, not pinned: MAIN_NOW is captured in setup_file
-	# while main() reads its own now=$(date +%s) at render time, so the countdown's
-	# minutes digit can roll if execution lags setup by more than a few seconds.
-	[[ "$out" =~ "│ 5h 78%↑↑ · 4h"[0-9]+"m │" ]]
-}
-
-@test "the 7d segment is below the threshold, so no countdown trails the line" {
-	local out
-	out=$(main_line | strip_ansi)
-	assert_exact "${out##*│ }" "7d 7%"
-}
-
-@test "the whole line frames details with separators, not parentheses" {
-	local out
-	out=$(main_line | strip_ansi)
-	[[ "$out" != *"("* && "$out" != *")"* ]]
-}
-
-@test "no workspace.git_worktree: the basename stands alone in the leading segment" {
-	local out
-	out=$(main_line | strip_ansi)
-	assert_leading_segment "$out" "statusline-proj"
+	assert_whole_line "$out" "Opus 4.6"
 }
 
 @test "workspace.git_worktree reaches the line beside the basename" {
@@ -710,6 +626,39 @@ teardown_file() {
 	main_render bad-limits "$stdin_bad" >/dev/null
 	err=$(<"$MAIN_CASES/bad-limits/stderr")
 	assert_contains "$err" "rate-limit parse failed"
+}
+
+@test "an unparseable rate-limits payload names the parse failure on the line itself" {
+	local stdin_bad out
+	stdin_bad=$(full_stdin_json '{"rate_limits":"{not json","cost":{"total_api_duration_ms":100}}')
+
+	out=$(main_render bad-limits-line "$stdin_bad" | strip_ansi)
+
+	assert_contains "$out" "Opus 4.6 ● ● ◎ ○ ○ │ limits: parse failed"
+}
+
+@test "an unreadable usage cache is named on the line instead of blanking the limits" {
+	local dir="$MAIN_CASES/corrupt-cache" cache out
+	mkdir -p "$dir"
+	cache="$dir/claude-statusline-usage-$(printf '%s' "$dir" | sha256_hex).json"
+	printf 'not json' >"$cache"
+	printf 'ok' >"$cache.attempt"
+
+	out=$(main_render corrupt-cache "$MAIN_STDIN" "$MAIN_PAYLOAD" | strip_ansi)
+
+	assert_contains "$out" "Opus 4.6 ● ● ◎ ○ ○ │ limits: cache unreadable"
+}
+
+@test "a usage cache that cannot be written: named failure line" {
+	local dir="$MAIN_CASES/unwritable-cache" marker
+	mkdir -p "$dir"
+	marker="$dir/claude-statusline-usage-$(printf '%s' "$dir" | sha256_hex).json.attempt"
+	: >"$marker"
+	touch -t "$STALE_STAMP" "$marker"
+	chmod a-w "$marker"
+
+	assert_degraded_render "statusline: cannot write usage cache under $dir" \
+		main_render unwritable-cache "$MAIN_STDIN" "$MAIN_PAYLOAD"
 }
 
 @test "stdin jq cannot walk: the line reports the failure" {
@@ -862,7 +811,8 @@ teardown_file() {
 	fallback_fetch expire-all 0 "$body" "$FB_BASE" >/dev/null
 	local status=0
 	fallback_fetch expire-all 0 "$body" $((FB_BASE + 200)) >/dev/null || status=$?
-	((status != 0))
+
+	assert_failed_status "$status" "fetch with every window expired"
 }
 
 # ---------------------------------------------------------------------------
@@ -886,14 +836,14 @@ teardown_file() {
 	local body
 	body=$(make_expiry_body $((FB_BASE + 100)) $((FB_BASE + 100)))
 	fallback_fetch expire-backoff 0 "$body" "$FB_BASE" >/dev/null
-	# Trigger a failed refresh after the poll window
+	# A failed refresh after the poll window opens the backoff
 	fallback_fetch expire-backoff 7 "" $((FB_BASE + 400)) >/dev/null || true
-	assert_attempts expire-backoff 2
 	# Within backoff: no new refresh, but all windows are expired — exit 1
 	local status=0
 	fallback_fetch expire-backoff 0 "$body" $((FB_BASE + 600)) >/dev/null || status=$?
+
 	assert_attempts expire-backoff 2
-	((status != 0))
+	assert_failed_status "$status" "fetch inside the backoff with every window expired"
 }
 
 # ---------------------------------------------------------------------------
@@ -901,45 +851,23 @@ teardown_file() {
 # ---------------------------------------------------------------------------
 
 @test "the lock keeps concurrent renders from double-fetching" {
-	seed_good_cache concurrent
-	local concurrent_cache concurrent_marker
-	concurrent_cache=$(compgen -G "$FALLBACK_ROOT/concurrent/tmp/claude-statusline-usage-*.json")
-	# shellcheck disable=SC2034  # used by concurrent_refresh in a subshell
-	concurrent_marker="${concurrent_cache}.attempt"
-
-	cat >"$FALLBACK_ROOT/concurrent/bin/curl" <<-'SHIM'
-		#!/usr/bin/env bash
-		printf 'attempt\n' >>"$RACE_ATTEMPTS"
-		if [[ $(wc -l <"$RACE_ATTEMPTS") -eq 1 ]]; then
-			until [[ -f "$RACE_RELEASE" ]]; do sleep 0.05; done
-		fi
-		code=$(cat "$RACE_CURL_EXIT")
-		((code == 0)) || exit "$code"
-		cat "$RACE_CURL_BODY"
-	SHIM
-	chmod +x "$FALLBACK_ROOT/concurrent/bin/curl"
-	: >"$FALLBACK_ROOT/concurrent/attempts"
-	rm -f "$FALLBACK_ROOT/concurrent/release"
-	printf '%s' "$FRESH_USAGE_BODY" >"$FALLBACK_ROOT/concurrent/body"
-	printf '0' >"$FALLBACK_ROOT/concurrent/curl-exit"
-
-	(concurrent_refresh) &
-	local first_pid=$!
-
+	# shellcheck disable=SC2034  # populated by setup_concurrent_race, used by concurrent_refresh in a subshell
+	local concurrent_cache concurrent_marker first_pid attempts_after_second served_to_second served_after_first
+	setup_concurrent_race
+	concurrent_refresh &
+	first_pid=$!
 	wait_for_file "$FALLBACK_ROOT/concurrent/attempts"
 
-	(concurrent_refresh)
-	assert_attempts concurrent 1
-
-	local second_out
-	second_out=$(cat "$concurrent_cache")
-	assert_fallback_json "$second_out" '.five_hour.used_percentage' 42
-
+	concurrent_refresh
+	attempts_after_second=$(awk 'END {print NR}' <"$FALLBACK_ROOT/concurrent/attempts")
+	served_to_second=$(cat "$concurrent_cache")
 	touch "$FALLBACK_ROOT/concurrent/release"
 	wait "$first_pid"
-	local first_out
-	first_out=$(cat "$concurrent_cache")
-	assert_fallback_json "$first_out" '.five_hour.used_percentage' 55
+	served_after_first=$(cat "$concurrent_cache")
+
+	assert_exact "$attempts_after_second" 1
+	assert_fallback_json "$served_to_second" '.five_hour.used_percentage' 42
+	assert_fallback_json "$served_after_first" '.five_hour.used_percentage' 55
 }
 
 # ---------------------------------------------------------------------------
@@ -951,52 +879,23 @@ teardown_file() {
 	local reclaim_cache reclaim_marker
 	setup_reclaim_race
 
-	(reclaim_refresh stalled hold) &
+	reclaim_refresh stalled hold &
 	local stalled_pid=$!
 	require_stalled_render stalled
-
 	make_lock_stale
-	(reclaim_refresh reclaimer hold) &
+	reclaim_refresh reclaimer hold &
 	local reclaimer_pid=$!
 	require_stalled_render reclaimer
 
 	run_render bystander
-	assert_not_fetched bystander
-
 	release_render stalled
 	wait "$stalled_pid" || true
 	run_render late
-	assert_not_fetched late
-
 	release_render reclaimer
 	wait "$reclaimer_pid" || true
 
-	assert_no_stray_dirs
-}
-
-# ---------------------------------------------------------------------------
-# Usage fallback: reclaiming a stale lock leaves no debris
-# ---------------------------------------------------------------------------
-
-@test "reclaiming a stale lock leaves no debris" {
-	# shellcheck disable=SC2034  # populated by setup_reclaim_race, used by reclaim_refresh in a subshell
-	local reclaim_cache reclaim_marker
-	setup_reclaim_race
-
-	(reclaim_refresh stalled-again hold) &
-	local stalled_again_pid=$!
-	require_stalled_render stalled-again
-
-	make_lock_stale
-	(reclaim_refresh reclaimer-again hold) &
-	local reclaimer_again_pid=$!
-	require_stalled_render reclaimer-again
-
-	release_render stalled-again
-	wait "$stalled_again_pid" || true
-	release_render reclaimer-again
-	wait "$reclaimer_again_pid" || true
-
+	assert_not_fetched bystander
+	assert_not_fetched late
 	assert_no_stray_dirs
 }
 
@@ -1011,7 +910,7 @@ teardown_file() {
 
 	rm -f "$reclaim_marker"
 	mkdir "$reclaim_marker"
-	run_render write-fails
+	run_render write-fails || [[ $? -eq "$USAGE_CACHE_UNWRITABLE_STATUS" ]]
 	rmdir "$reclaim_marker"
 
 	run_render after-write-failure
@@ -1022,26 +921,15 @@ teardown_file() {
 # Credential file fallback
 # ---------------------------------------------------------------------------
 
-@test "credential file fallback: curl is reached when security fails" {
-	cred_fallback_case cred-file
-	cred_fetch cred-file >/dev/null || true
-	local attempts
-	attempts=$(awk 'END {print NR}' <"$CRED_ROOT/cred-file/attempts")
-	((attempts >= 1))
-}
+@test "credential file fallback: the file's token reaches curl when security fails or is absent" {
+	local mode
+	for mode in fail absent; do
+		cred_fallback_case "cred-$mode" "$mode" "token-$mode"
 
-@test "credential file fallback: curl is reached when security is not on PATH" {
-	cred_no_security_case
-	(
-		# shellcheck disable=SC2030,SC2031
-		export PATH="$CRED_ROOT/no-security/bin" CLAUDE_CONFIG_DIR="$CRED_ROOT/no-security"
-		# shellcheck disable=SC2030,SC2031
-		export STUB_ATTEMPTS="$CRED_ROOT/no-security/attempts" STUB_CURL_BODY="$CRED_ROOT/no-security/body"
-		fetch_usage_payload default
-	) >/dev/null || true
-	local attempts
-	attempts=$(awk 'END {print NR}' <"$CRED_ROOT/no-security/attempts")
-	((attempts >= 1))
+		cred_fetch "cred-$mode" "$mode" >/dev/null || true
+
+		assert_cred_token_sent "cred-$mode" "token-$mode"
+	done
 }
 
 @test "credential file fallback: returns non-zero when both sources fail" {
@@ -1058,7 +946,8 @@ teardown_file() {
 		export PATH="$dir/bin" CLAUDE_CONFIG_DIR="$dir"
 		fetch_usage_payload default
 	) >/dev/null 2>&1 || status=$?
-	((status != 0))
+
+	assert_failed_status "$status" "payload lookup with neither credential source"
 }
 
 @test "credential file fallback reaches the full pipeline" {

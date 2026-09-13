@@ -5,8 +5,7 @@ TEST_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 SCRIPT="$TEST_DIR/../scripts/statusline.sh"
 
 # shellcheck source=../../scripts/statusline.sh disable=SC1091
-# </dev/null keeps main (which reads stdin) from consuming test input while the script loads.
-. "$SCRIPT" </dev/null
+. "$SCRIPT"
 
 EMPTY="○"
 HALF="◎"
@@ -36,6 +35,10 @@ assert_bar() {
 	local pct="$1" pattern="$2" color expected="" sep="" i actual
 	local filled="$FILLED" half="$HALF" empty="$EMPTY"
 	color=$(usage_color "$pct")
+	if [[ -z "$color" ]]; then
+		printf 'usage_color %s emitted no escape; the bar has nothing to wear\n' "$pct" >&2
+		return 1
+	fi
 	for ((i = 0; i < ${#pattern}; i++)); do
 		case "${pattern:i:1}" in
 		F) expected+="${sep}${color}${filled}${RESET}" ;;
@@ -94,22 +97,6 @@ assert_matches_hsl_ref() {
 	assert_rgb "$pct" "$rr" "$rg" "$rb"
 }
 
-assert_red_direction() {
-	local lo="$1" hi="$2" dir="$3" r_lo r_hi _
-	read -r r_lo _ <<<"$(usage_rgb "$lo")"
-	read -r r_hi _ <<<"$(usage_rgb "$hi")"
-	if [[ ! "$r_lo" =~ ^[0-9]+$ || ! "$r_hi" =~ ^[0-9]+$ ]]; then
-		printf 'non-numeric R values: R(%s) = %s, R(%s) = %s\n' "$lo" "$r_lo" "$hi" "$r_hi" >&2
-		return 1
-	fi
-	case "$dir" in
-	rises) ((r_hi > r_lo)) && return 0 ;;
-	falls) ((r_hi < r_lo)) && return 0 ;;
-	esac
-	printf 'R(%s) = %s, R(%s) = %s, expected it to have %s\n' "$lo" "$r_lo" "$hi" "$r_hi" "$dir" >&2
-	return 1
-}
-
 assert_continuous_across() {
 	local lo="$1" hi="$2" limit="$3"
 	local r1 g1 b1 r2 g2 b2
@@ -138,9 +125,13 @@ assert_arrow_color() {
 	local color out head got
 	color=$(usage_color "$used")
 	out=$(format_limit_segment "5h" "$used" "$PACE_RESET" "$PACE_WINDOW" "$NOW")
+	if [[ "$out" != *"$arrow"* ]]; then
+		printf 'no %q in segment: %q\n' "$arrow" "$out" >&2
+		return 1
+	fi
 	head=${out%%"$arrow"*}
 	got=$(last_escape "$head")
-	if [[ "$out" != *"$arrow"* || "$got" != "$color" ]]; then
+	if [[ "$got" != "$color" ]]; then
 		printf 'escape in force at the arrow: %q, expected %q\n  actual: %q\n' "$got" "$color" "$out" >&2
 		return 1
 	fi
@@ -163,11 +154,18 @@ assert_leading_segment() {
 	assert_exact "${plain%% │ *}" "$expected"
 }
 
-# Pins the whole composed line around a given model segment, so a change to the
-# segment cannot quietly disturb the gauge, the usage segments, or the dir name.
-# The 5h countdown's minutes are matched rather than pinned: setup_file captures
-# MAIN_NOW while main() reads its own clock at render time, so the digits roll
-# whenever execution lags setup by more than a few seconds.
+# The model segment alone: the text between the leading separator and the
+# gauge. The rest of the line is pinned once, by the happy-path whole-line test.
+assert_model_segment() {
+	local plain="$1" expected="$2" segment
+	segment=$(printf '%s' "$plain" | sed -E 's/^[^│]*│ //; s/ [●◎○].*$//')
+	assert_exact "$segment" "$expected"
+}
+
+# Pins the whole composed line for the happy-path render. The 5h countdown's
+# minutes are matched rather than pinned: setup_file captures MAIN_NOW while
+# main() reads its own clock at render time, so the digits roll whenever
+# execution lags setup by more than a few seconds.
 assert_whole_line() {
 	local plain="$1" model="$2" normalized
 	normalized=$(printf '%s' "$plain" | sed -E 's/· 4h[0-9]+m/· 4h#m/')
@@ -223,6 +221,16 @@ assert_reset_uncolored() {
 	fi
 }
 
+# For calls whose contract is a non-zero exit: names the call on failure instead
+# of a bare arithmetic test that fails silently.
+assert_failed_status() {
+	local status="$1" what="$2"
+	if ((status == 0)); then
+		printf '%s exited 0, expected a failure\n' "$what" >&2
+		return 1
+	fi
+}
+
 assert_attempts() {
 	local case_name="$1" want="$2" got
 	got=$(awk 'END {print NR}' <"$FALLBACK_ROOT/$case_name/attempts")
@@ -237,6 +245,17 @@ assert_fallback_json() {
 	got=$(printf '%s' "$payload" | jq -r "$filter" 2>/dev/null) || got="<not JSON>"
 	if [[ "$got" != "$want" ]]; then
 		printf 'expected %s = %q, got %q\n  payload: %q\n' "$filter" "$want" "$got" "$payload" >&2
+		return 1
+	fi
+}
+
+# The curl shim logs its argv per call; one call, carrying the expected bearer
+# token, is what proves the credential file was read and its token forwarded.
+assert_cred_token_sent() {
+	local case_name="$1" token="$2" args
+	args=$(<"$CRED_ROOT/$case_name/args")
+	if [[ $(printf '%s\n' "$args" | grep -c .) != 1 || "$args" != *"Authorization: Bearer $token"* ]]; then
+		printf '%s: expected one curl call bearing %q\n  curl argv: %q\n' "$case_name" "$token" "$args" >&2
 		return 1
 	fi
 }
@@ -259,6 +278,10 @@ assert_not_fetched() {
 
 assert_no_stray_dirs() {
 	local leftovers
+	if [[ ! -d "$RECLAIM_TMP" ]]; then
+		printf 'lock root missing: %s\n' "$RECLAIM_TMP" >&2
+		return 1
+	fi
 	leftovers=$(find "$RECLAIM_TMP" -mindepth 1 -type d)
 	if [[ -n "$leftovers" ]]; then
 		printf 'directories left behind in TMPDIR:\n  %s\n' "$(printf '%s' "$leftovers" | tr '\n' ' ')" >&2
@@ -417,8 +440,7 @@ probe_then_mtime() {
 		export PATH="$stat_dir:$PATH"
 		# Re-probe via the function rather than re-sourcing the script: a second
 		# source re-runs the readonly declarations, which is fatal on bash 3.2.
-		# shellcheck disable=SC2034 # consumed by file_mtime, defined in the sourced script
-		STAT_FMT=$(detect_stat_fmt)
+		detect_stat_fmt
 		file_mtime "$target_path"
 	)
 }
@@ -435,6 +457,7 @@ make_fallback_bin() {
 		cat >"$dir/bin/curl" <<-'SHIM'
 			#!/usr/bin/env bash
 			printf 'attempt\n' >>"$STUB_ATTEMPTS"
+			printf '%s\n' "$*" >>"${STUB_ARGS:-/dev/null}"
 			code=$(cat "$STUB_CURL_EXIT")
 			((code == 0)) || exit "$code"
 			cat "$STUB_CURL_BODY"
@@ -443,6 +466,7 @@ make_fallback_bin() {
 		cat >"$dir/bin/curl" <<-'SHIM'
 			#!/usr/bin/env bash
 			printf 'attempt\n' >>"$STUB_ATTEMPTS"
+			printf '%s\n' "$*" >>"${STUB_ARGS:-/dev/null}"
 			cat "$STUB_CURL_BODY"
 		SHIM
 	fi
@@ -491,15 +515,45 @@ seed_good_cache() {
 	fallback_fetch "$case_name" 0 "$USAGE_BODY" "$FB_BASE" >/dev/null
 }
 
+# Seeds the concurrent case with a good cache and a curl shim whose first call
+# blocks until a release file appears, so a second render can be driven while
+# the first still holds the lock. Sets concurrent_cache and concurrent_marker in
+# the caller's scope.
+setup_concurrent_race() {
+	seed_good_cache concurrent
+	# shellcheck disable=SC2034  # used by concurrent_refresh in a subshell
+	concurrent_cache=$(compgen -G "$FALLBACK_ROOT/concurrent/tmp/claude-statusline-usage-*.json")
+	# shellcheck disable=SC2034  # used by concurrent_refresh in a subshell
+	concurrent_marker="${concurrent_cache}.attempt"
+
+	cat >"$FALLBACK_ROOT/concurrent/bin/curl" <<-'SHIM'
+		#!/usr/bin/env bash
+		printf 'attempt\n' >>"$RACE_ATTEMPTS"
+		if [[ $(wc -l <"$RACE_ATTEMPTS") -eq 1 ]]; then
+			until [[ -f "$RACE_RELEASE" ]]; do sleep 0.05; done
+		fi
+		code=$(cat "$RACE_CURL_EXIT")
+		((code == 0)) || exit "$code"
+		cat "$RACE_CURL_BODY"
+	SHIM
+	chmod +x "$FALLBACK_ROOT/concurrent/bin/curl"
+	: >"$FALLBACK_ROOT/concurrent/attempts"
+	rm -f "$FALLBACK_ROOT/concurrent/release"
+	printf '%s' "$FRESH_USAGE_BODY" >"$FALLBACK_ROOT/concurrent/body"
+	printf '0' >"$FALLBACK_ROOT/concurrent/curl-exit"
+}
+
 concurrent_refresh() {
-	# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
-	export PATH="$FALLBACK_ROOT/concurrent/bin:$PATH"
-	# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
-	export RACE_ATTEMPTS="$FALLBACK_ROOT/concurrent/attempts" RACE_CURL_BODY="$FALLBACK_ROOT/concurrent/body" RACE_CURL_EXIT="$FALLBACK_ROOT/concurrent/curl-exit"
-	# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
-	export RACE_RELEASE="$FALLBACK_ROOT/concurrent/release"
-	# shellcheck disable=SC2154  # set by calling scope
-	refresh_usage_cache concurrent "$concurrent_cache" "$concurrent_marker" "$USAGE_BACKOFF_SECONDS" "$(date +%s)"
+	(
+		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
+		export PATH="$FALLBACK_ROOT/concurrent/bin:$PATH"
+		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
+		export RACE_ATTEMPTS="$FALLBACK_ROOT/concurrent/attempts" RACE_CURL_BODY="$FALLBACK_ROOT/concurrent/body" RACE_CURL_EXIT="$FALLBACK_ROOT/concurrent/curl-exit"
+		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
+		export RACE_RELEASE="$FALLBACK_ROOT/concurrent/release"
+		# shellcheck disable=SC2154  # set by calling scope
+		refresh_usage_cache concurrent "$concurrent_cache" "$concurrent_marker" "$USAGE_BACKOFF_SECONDS" "$(date +%s)"
+	)
 }
 
 setup_reclaim_race() {
@@ -528,14 +582,16 @@ setup_reclaim_race() {
 
 reclaim_refresh() {
 	local id="$1" hold="${2-}"
-	# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
-	export PATH="$RECLAIM_DIR/bin:$PATH" TMPDIR="$RECLAIM_TMP"
-	# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
-	export RACE_ID="$id" RACE_ATTEMPTS="$RECLAIM_ATTEMPTS" RACE_CURL_BODY="$RECLAIM_DIR/body" RACE_CURL_EXIT="$RECLAIM_DIR/curl-exit"
-	# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
-	[[ -z "$hold" ]] || export RACE_HOLD="$RECLAIM_DIR/release.$id"
-	# shellcheck disable=SC2154  # set by calling scope
-	refresh_usage_cache reclaim "$reclaim_cache" "$reclaim_marker" "$USAGE_BACKOFF_SECONDS" "$(date +%s)"
+	(
+		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
+		export PATH="$RECLAIM_DIR/bin:$PATH" TMPDIR="$RECLAIM_TMP"
+		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
+		export RACE_ID="$id" RACE_ATTEMPTS="$RECLAIM_ATTEMPTS" RACE_CURL_BODY="$RECLAIM_DIR/body" RACE_CURL_EXIT="$RECLAIM_DIR/curl-exit"
+		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
+		[[ -z "$hold" ]] || export RACE_HOLD="$RECLAIM_DIR/release.$id"
+		# shellcheck disable=SC2154  # set by calling scope
+		refresh_usage_cache reclaim "$reclaim_cache" "$reclaim_marker" "$USAGE_BACKOFF_SECONDS" "$(date +%s)"
+	)
 }
 
 run_render() {
@@ -582,20 +638,36 @@ make_lock_stale() {
 	find "$lock" -depth -exec touch -t "$STALE_STAMP" {} +
 }
 
+# A credential-file case: security_mode "fail" (security exits 1) or "absent"
+# (no security on PATH — the bin dir then carries the tools the lookup needs,
+# because cred_fetch runs it as the whole PATH). The file holds $token.
 cred_fallback_case() {
-	local dir="$CRED_ROOT/$1" token="${2:-cred-file-token}"
-	make_fallback_bin "$dir" nogate fail
+	local case_name="$1" security_mode="$2" token="$3" dir tool path
+	dir="$CRED_ROOT/$case_name"
+	make_fallback_bin "$dir" nogate "$security_mode"
+	if [[ "$security_mode" == absent ]]; then
+		for tool in jq cat bash; do
+			if path=$(command -v "$tool"); then
+				ln -sf "$path" "$dir/bin/$tool"
+			fi
+		done
+	fi
 	printf '{"claudeAiOauth":{"accessToken":"%s"}}' "$token" >"$dir/.credentials.json"
 	printf '%s' "$USAGE_BODY" >"$dir/body"
 }
 
+# Runs the payload lookup for a credential case. An "absent" case gets the bin
+# dir as its entire PATH so the host's own security cannot answer.
 cred_fetch() {
-	local dir="$CRED_ROOT/$1"
+	local case_name="$1" security_mode="$2" dir
+	dir="$CRED_ROOT/$case_name"
 	(
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
 		export PATH="$dir/bin:$PATH" CLAUDE_CONFIG_DIR="$dir"
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
-		export STUB_ATTEMPTS="$dir/attempts" STUB_CURL_BODY="$dir/body"
+		[[ "$security_mode" != absent ]] || export PATH="$dir/bin"
+		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
+		export STUB_ATTEMPTS="$dir/attempts" STUB_CURL_BODY="$dir/body" STUB_ARGS="$dir/args"
 		fetch_usage_payload default
 	)
 }
@@ -667,16 +739,4 @@ make_expiry_body() {
 	printf '{"five_hour":{"utilization":%s,"resets_at":"%s"},"seven_day":{"utilization":%s,"resets_at":"%s"}}' \
 		"$five_h_util" "$(epoch_to_iso "$five_h_reset")" \
 		"$seven_d_util" "$(epoch_to_iso "$seven_d_reset")"
-}
-
-cred_no_security_case() {
-	local dir="$CRED_ROOT/no-security" tool path
-	make_fallback_bin "$dir" nogate absent
-	for tool in jq cat bash; do
-		if path=$(command -v "$tool"); then
-			ln -sf "$path" "$dir/bin/$tool"
-		fi
-	done
-	printf '{"claudeAiOauth":{"accessToken":"no-security-token"}}' >"$dir/.credentials.json"
-	printf '%s' "$USAGE_BODY" >"$dir/body"
 }

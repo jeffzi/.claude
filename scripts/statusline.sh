@@ -22,6 +22,11 @@ readonly USAGE_BACKOFF_SECONDS=900
 # file_mtime's exit status for a stat that cannot answer at all, kept distinct from a
 # plain non-zero so callers can tell a broken tool from a file that is simply not there.
 readonly STAT_UNUSABLE_STATUS=3
+# fetch_usage_fallback's exit statuses for a usage cache or attempt marker that cannot be
+# written, and for a cache jq cannot read — each distinct from a plain non-zero ("no
+# data to show"), since both are a broken environment the line has to name.
+readonly USAGE_CACHE_UNWRITABLE_STATUS=4
+readonly USAGE_CACHE_UNREADABLE_STATUS=5
 # How much of the tail of a session transcript transcript_model_family reads. A
 # transcript grows without bound while the newest assistant record sits at its end, and
 # every render pays for whatever jq has to parse. Generous enough that a few large tool
@@ -46,20 +51,24 @@ sha256_hex() {
 }
 
 # Discovers whether stat speaks BSD (-f %m) or GNU (-c %Y), testing against the
-# script itself (guaranteed to exist). Emits the working format on stdout, or
-# nothing when neither form works — file_mtime returns STAT_UNUSABLE_STATUS for
-# every existing file in that case. A function rather than inline probing so
-# tests can re-probe under a stubbed PATH without re-sourcing the script —
-# re-sourcing trips the readonly declarations above (fatal on bash 3.2).
+# script itself (guaranteed to exist), and sets STAT_FMT to the working flag and
+# format as two array elements — empty when neither form works, in which case
+# file_mtime returns STAT_UNUSABLE_STATUS for every existing file. An array, so
+# the flag and its value reach stat apart whatever IFS the caller runs under. A
+# function rather than inline probing so tests can re-probe under a stubbed PATH
+# without re-sourcing the script — re-sourcing trips the readonly declarations
+# above (fatal on bash 3.2).
 detect_stat_fmt() {
 	if stat -f %m "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
-		printf -- '-f %%m'
+		STAT_FMT=(-f %m)
 	elif stat -c %Y "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
-		printf -- '-c %%Y'
+		STAT_FMT=(-c %Y)
+	else
+		STAT_FMT=()
 	fi
 }
 
-STAT_FMT=$(detect_stat_fmt)
+detect_stat_fmt
 
 # ╭────────────────────────────────────────────────────────────╮
 # │                Usage fetch, lock, and cache                │
@@ -100,9 +109,8 @@ fetch_usage_payload() {
 # environment rather than a missing file, and callers report it instead.
 file_mtime() {
 	[[ -e "$1" ]] || return 1
-	if [[ -n "$STAT_FMT" ]]; then
-		# shellcheck disable=SC2086 # STAT_FMT must word-split into two arguments
-		stat $STAT_FMT "$1" 2>/dev/null && return 0
+	if ((${#STAT_FMT[@]})); then
+		stat "${STAT_FMT[@]}" "$1" 2>/dev/null && return 0
 	fi
 	return "$STAT_UNUSABLE_STATUS"
 }
@@ -186,7 +194,9 @@ usage_lock_release() {
 }
 
 # Fetches a payload for account $1 and publishes it into cache $2, recording the
-# attempt's verdict in marker $3.
+# attempt's verdict in marker $3. Exit 1 when the fetch brought nothing back — an
+# ordinary outcome the marker already records — and USAGE_CACHE_UNWRITABLE_STATUS when
+# the marker, staging file, or cache could not be written.
 #
 # Runs between the lock's acquisition and its release, so it reports failure by
 # returning rather than by exiting: every write is checked explicitly, since errexit is
@@ -202,15 +212,15 @@ publish_usage_payload() {
 	local staging="${cache}.staging"
 	# Claim the window pessimistically: a fetch that dies mid-flight must not invite the
 	# next render, a second later, to try again.
-	printf 'failed' >"$marker" || return 1
+	printf 'failed' 2>/dev/null >"$marker" || return "$USAGE_CACHE_UNWRITABLE_STATUS"
 	payload=$(fetch_usage_payload "$suffix") || payload=""
 	[[ -n "$payload" ]] || return 1
-	printf '%s' "$payload" >"$staging" || return 1
-	mv "$staging" "$cache" || return 1
+	printf '%s' "$payload" 2>/dev/null >"$staging" || return "$USAGE_CACHE_UNWRITABLE_STATUS"
+	mv "$staging" "$cache" 2>/dev/null || return "$USAGE_CACHE_UNWRITABLE_STATUS"
 	# The ok verdict is earned only when the payload actually reached the cache — a
 	# failed write must leave the failed claim (and its longer backoff) in place rather
 	# than republish stale data as fresh.
-	printf 'ok' >"$marker" || return 1
+	printf 'ok' 2>/dev/null >"$marker" || return "$USAGE_CACHE_UNWRITABLE_STATUS"
 }
 
 # Reclaims a stale lock if one is present, then fetches a fresh payload and
@@ -235,11 +245,15 @@ refresh_usage_cache() {
 	# stay in scope for the duration of this function.
 	trap 'usage_lock_release "$lock" "$owner"' EXIT
 	trap 'usage_lock_release "$lock" "$owner"; exit' INT TERM
-	# The failed verdict in the marker is the record of a fetch that did not land; the
-	# lock has to come back either way.
-	publish_usage_payload "$suffix" "$cache" "$marker" || true
+	# The failed verdict in the marker is the record of a fetch that did not land, so
+	# that status needs nothing more; a write that failed does. The lock has to come
+	# back either way.
+	local publish_status=0
+	publish_usage_payload "$suffix" "$cache" "$marker" || publish_status=$?
 	usage_lock_release "$lock" "$owner"
 	trap - EXIT INT TERM
+	((publish_status == USAGE_CACHE_UNWRITABLE_STATUS)) && return "$publish_status"
+	return 0
 }
 
 # Emits cache $1's payload on stdout with any window whose resets_at has already
@@ -300,7 +314,7 @@ fetch_usage_fallback() {
 		[[ "$all_expired" == "true" ]] && should_refresh=1
 	fi
 	if ((should_refresh)); then
-		refresh_usage_cache "$suffix" "$cache" "$marker" "$throttle" "$now"
+		refresh_usage_cache "$suffix" "$cache" "$marker" "$throttle" "$now" || return $?
 	fi
 
 	[[ -f "$cache" ]] || return 1
@@ -308,7 +322,7 @@ fetch_usage_fallback() {
 	# Stale rate-limit data from an earlier window would misrepresent current usage.
 	# When every window is filtered, there is nothing to render.
 	local filtered
-	filtered=$(filter_expired_windows "$cache" "$now") || return 1
+	filtered=$(filter_expired_windows "$cache" "$now" 2>/dev/null) || return "$USAGE_CACHE_UNREADABLE_STATUS"
 	[[ -n "$filtered" ]] || return 1
 	printf '%s' "$filtered"
 }
@@ -650,20 +664,36 @@ main() {
 	# call and stdin rate_limits is carried over from the previous session until
 	# then — so a 0 means stale stdin data. The fallback is live server data and
 	# needs no such gate.
+	# A limits source that broke is named in the limits slot, since stderr alone never
+	# reaches the user and blank segments read as "no limits to show".
+	local limits_error=""
 	rate_limits_json=""
 	if ((api_ms > 0)); then
-		rate_limits_json=$(printf '%s' "$input" | jq -c '.rate_limits // empty') || true
+		rate_limits_json=$(printf '%s' "$input" | jq -c '.rate_limits // empty') || {
+			limits_error="parse failed"
+			rate_limits_json=""
+		}
 	fi
 	if [[ -z "$rate_limits_json" ]]; then
 		local fallback_status=0
 		rate_limits_json=$(fetch_usage_fallback "$now") || fallback_status=$?
 		# The fallback's throttle is read off a file's mtime, so a stat that cannot
 		# answer would poll the endpoint on every render — the failure it reports is
-		# worth the line rather than a degraded render that looks healthy.
-		if ((fallback_status == STAT_UNUSABLE_STATUS)); then
+		# worth the line rather than a degraded render that looks healthy. A cache that
+		# cannot be written fails the same way: every render would refetch.
+		case "$fallback_status" in
+		"$STAT_UNUSABLE_STATUS")
 			render_failure "unusable required tool: stat"
 			return 0
-		fi
+			;;
+		"$USAGE_CACHE_UNWRITABLE_STATUS")
+			render_failure "cannot write usage cache under ${TMPDIR:-/tmp}"
+			return 0
+			;;
+		"$USAGE_CACHE_UNREADABLE_STATUS") limits_error="cache unreadable" ;;
+		esac
+		# The fallback's live data outranks a stdin payload that would not parse.
+		[[ -z "$rate_limits_json" ]] || limits_error=""
 	fi
 
 	local five_h="" five_h_reset="" week="" week_reset="" limits_out=""
@@ -678,6 +708,7 @@ main() {
 			(.seven_day.resets_at // "")
 		]') || {
 			printf 'statusline: rate-limit parse failed\n' >&2
+			limits_error="parse failed"
 			limits_out=""
 		}
 		IFS=$'\037' read -r five_h five_h_reset week week_reset <<<"$limits_out"
@@ -685,6 +716,7 @@ main() {
 
 	# Rate limits — absent for non-subscribers or when both sources came up empty
 	local limits=""
+	[[ -n "$limits_error" ]] && limits=" │ limits: ${limits_error}"
 	[[ -n "$five_h" ]] && limits+=$(format_limit_segment "5h" "$five_h" "$five_h_reset" "$FIVE_HOUR_SECONDS" "$now")
 	[[ -n "$week" ]] && limits+=$(format_limit_segment "7d" "$week" "$week_reset" "$SEVEN_DAY_SECONDS" "$now")
 
