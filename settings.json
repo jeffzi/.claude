@@ -61,7 +61,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "claude-opus-4-6[1m]",
+  "model": "opus",
   "disableBundledSkills": true,
   "hooks": {
     "PreToolUse": [
@@ -219,7 +219,7 @@
       "effortLevel": "medium"
     },
     "claude-opus-4-6": {
-      "effortLevel": "medium"
+      "effortLevel": "high"
     },
     "claude-fable-5-1": {
       "effortLevel": "high"
