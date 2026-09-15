@@ -6,9 +6,9 @@ set -euo pipefail
 # Usage: plan-branch.sh create <slug> | base [plan/<slug>]
 #
 # `create` switches to plan/<slug> and records the branch it started from under
-# `branch.plan/<slug>.planBase`; `base` prints that record. merge-plan.sh
-# squashes onto the recorded branch and refuses without it, so a plan branch
-# created by hand cannot be merged until the record is written.
+# `branch.plan/<slug>.planBase`; `base` prints that record. release.sh lands the
+# plan on the recorded branch and refuses without it, so a plan branch created by
+# hand cannot be shipped until the record is written.
 #
 # Every precondition is checked before anything is changed: a refusal (exit 2)
 # leaves the repo exactly as it was found.

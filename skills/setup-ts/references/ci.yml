@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, fix-ci/**, plan/**]
+    branches: [main, fix-ci/**, plan/**, "v[0-9]*"]
     paths-ignore:
       - "**.md"
       - LICENSE

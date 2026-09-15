@@ -11,12 +11,12 @@ readonly GIT_LOCK_GUARD_HOOK="$PROJECT_DIR/hooks/git-lock-guard.sh"
 readonly GIT_COMMIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-commit-guard.sh"
 readonly TDD_RED_GUARD_HOOK="$PROJECT_DIR/hooks/tdd-red-guard.sh"
 readonly FIX_CI_PUSH_WRAPPER="$PROJECT_DIR/scripts/fix-ci-push.sh"
-# shellcheck disable=SC2034 # consumed by test_merge_plan.bats, which loads this file
-readonly MERGE_PLAN_SCRIPT="$PROJECT_DIR/scripts/merge-plan.sh"
 # shellcheck disable=SC2034 # consumed by test_plan_branch.bats, which loads this file
 readonly PLAN_BRANCH_SCRIPT="$PROJECT_DIR/scripts/plan-branch.sh"
 # shellcheck disable=SC2034 # consumed by test_plan_branch.bats, which loads this file
 readonly BRANCH_POLICY_LIB="$PROJECT_DIR/scripts/branch-policy.sh"
+# shellcheck disable=SC2034 # consumed by test_release.bats, which loads this file
+readonly RELEASE_SCRIPT="$PROJECT_DIR/scripts/release.sh"
 BASH_BIN=$(command -v bash)
 readonly BASH_BIN
 
@@ -238,6 +238,22 @@ assert_stdout_includes() {
 	}
 }
 
+assert_stdout_excludes() {
+	local pattern="$1"
+	[[ "$RUN_STDOUT" != *"$pattern"* ]] || {
+		printf 'unexpected "%s" in stdout: %s\n' "$pattern" "$RUN_STDOUT" >&2
+		return 1
+	}
+}
+
+assert_stderr_includes() {
+	local pattern="$1"
+	[[ "$RUN_STDERR" == *"$pattern"* ]] || {
+		printf 'missing "%s" in stderr: %s\n' "$pattern" "$RUN_STDERR" >&2
+		return 1
+	}
+}
+
 assert_stderr_excludes() {
 	local pattern="$1"
 	[[ "$RUN_STDERR" != *"$pattern"* ]] || {
@@ -441,22 +457,18 @@ backdate_marker() {
 	touch -t "$(date_offset_minutes "$2" +%Y%m%d%H%M)" "$(marker_path "$1")"
 }
 
-# The marker /merge-plan raises to sanction a run, in the repo at $1.
-merge_marker_path() {
-	printf '%s/merge-plan-active' "$(git -C "$1" rev-parse --absolute-git-dir)"
+# The marker /release raises to sanction a run, in the repo at $1.
+release_marker_path() {
+	printf '%s/release-active' "$(git -C "$1" rev-parse --absolute-git-dir)"
 }
 
-raise_merge_marker() {
-	touch "$(merge_marker_path "$1")"
+raise_release_marker() {
+	touch "$(release_marker_path "$1")"
 }
 
-drop_merge_marker() {
-	rm -f "$(merge_marker_path "$1")"
-}
-
-# Move the merge marker's mtime by $2 minutes, out of the shared freshness window.
-backdate_merge_marker() {
-	touch -t "$(date_offset_minutes "$2" +%Y%m%d%H%M)" "$(merge_marker_path "$1")"
+# Move the release marker's mtime by $2 minutes, out of the shared freshness window.
+backdate_release_marker() {
+	touch -t "$(date_offset_minutes "$2" +%Y%m%d%H%M)" "$(release_marker_path "$1")"
 }
 
 # setup_pair "$1" with a fresh fix-ci marker raised immediately after; prints

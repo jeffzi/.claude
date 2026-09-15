@@ -110,8 +110,9 @@ below).
 checked-out target branch, before `git switch -c fix-ci/*`: nothing fires on branch pushes or
 `pull_request` → investigate and report only, noting `workflow_dispatch` when offered. Never use the
 target branch itself as the CI test bed. A `plan/*` target with no run for its pushed tip is this
-stop with a known diagnosis: the workflow's `on.push.branches` lacks `plan/**` — report that line as
-the fix, never push `main` to get a run.
+stop with a known diagnosis: the workflow's `on.push.branches` lacks `plan/**` — and a `vX.Y`
+release branch with none lacks `"v[0-9]*"` — report that line as the fix, never push `main` to get a
+run.
 
 **Squash back when the branch's run is green** — procedure in `references/push-protocol.md`.
 

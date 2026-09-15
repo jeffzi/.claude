@@ -48,10 +48,15 @@ plan once.
 Every run works on `plan/<slug>`, never on the branch it started from. The prologue's entry gate
 creates it from any clean branch — `main` by default, a feature branch when you are on one — records
 that base in git config, or halts (condition 4); a run resumed on its own `plan/<slug>` continues
-there. Task commits, finding fixes, and CI fixes all land on the plan branch. The user squashes it
-back onto the recorded base by invoking `/merge-plan` — this skill never commits on the base, never
-merges, and never raises that skill's marker or runs its script. Mechanics:
-`references/branch-flow.md`.
+there. Task commits, finding fixes, and CI fixes all land on the plan branch. The user lands it on
+the recorded base by invoking `/release merge` — this skill never commits on the base, never merges,
+and never raises that skill's marker or runs its script. Mechanics: `references/branch-flow.md`.
+
+A task whose **Folds into** line names a release commit subject is committed as a fixup of that
+commit (`git commit --fixup=<sha>`, sha resolved per `references/branch-flow.md` § Fold target), so
+the plan branch itself carries the mapping `/release merge` folds by; a `none` task commits with a
+composed message as before. The plan's `## Folds` section says whether the run ends in a rewriting
+merge; the Ship line says so too.
 
 ## The Loop
 
@@ -67,14 +72,16 @@ Two `/tdd` invocations never run concurrently.
    another plan's → `git switch -c plan/<slug>` and record the base; already on `plan/<slug>` →
    resume; anything else → halt 4. Then, unless `--attended`: write the marker (see
    `references/unattended.md`). Unless `--no-commit`: load `Skill(autocommit)` once. Then Task 1.
-1. **Implement** per the task's **Implementation** line: `/tdd` for TDD tasks; `Skill(test-core)`
-   for test-only tasks; `Skill(code-core)` for tasks the plan implements directly. Final Task: no
-   implementation — dispatch the plan's `claim-reviewer` call as written (do not set `model`), with
-   every `unverified` entry from the running Findings list appended as claims; `Confirmed` → the
-   entry loses its mark, anything else → it keeps it. Then read `references/branch-flow.md` again —
-   the prologue's read is hours and compactions old — and run, in order: the **findings-fix phase**,
-   the **ship phase**, the **squash message**, then the Final Report. Steps 2–3 do not apply to the
-   Final Task.
+1. **Implement** per the task's **Implementation** line: `/tdd` for TDD tasks — the invocation
+   carries `fixup target: <sha>` when the task's **Folds into** is a subject, resolved first per
+   `references/branch-flow.md` § Fold target; `Skill(test-core)` for test-only tasks;
+   `Skill(code-core)` for tasks the plan implements directly. Final Task: no implementation —
+   dispatch the plan's `claim-reviewer` call as written (do not set `model`), with every
+   `unverified` entry from the running Findings list appended as claims; `Confirmed` → the entry
+   loses its mark, anything else → it keeps it. Then read `references/branch-flow.md` again — the
+   prologue's read is hours and compactions old — and run, in order: the **findings-fix phase**
+   (each finding's fold target derived and recorded on its ledger entry), the **ship phase**, the
+   **squash message**, then the Final Report. Steps 2–3 do not apply to the Final Task.
 2. **Verify** per the task's **Verify** block. Directly implemented tasks: run the task's mechanical
    checks (suite, build, lint as the Verify block names them) — red → halt 1; then dispatch
    `claim-reviewer` with the task's behavioral claims. `/tdd` tasks: `/tdd` dispatched the reviewer
@@ -85,8 +92,9 @@ Two `/tdd` invocations never run concurrently.
    fix is never the last step; the re-verify is. A claim closes on a reviewer verdict — never on a
    green suite, never by marking it `unverified` for the Final Task, never by a Deviations line.
 3. **Commit** — unless `--no-commit`. `/tdd` tasks: take the hashes `/tdd` returned (already
-   committed). Directly implemented tasks: load `Skill(write-commit)`, stage by explicit path — the
-   task's files only; the autocommit grant pre-satisfies approval.
+   committed). Directly implemented tasks: stage by explicit path — the task's files only — then,
+   for a task with a fold target, `git commit --fixup=<sha>` and no composed message; for a `none`
+   task, load `Skill(write-commit)` and compose one. The autocommit grant pre-satisfies approval.
 4. **Progress note** — one line, then the next tool call: `Task N done — <hashes>` or `Task N done —
    uncommitted: <files>`.
 
@@ -152,8 +160,9 @@ the findings or the cycle, never about whether to continue.
 3. An unchanged boundary: cross-repo edit, a push other than the ship phase's push of `plan/<slug>`
    through the wrapper, or a destructive op the plan did not prescribe. File deletions the plan
    explicitly names are covered by approval — no halt, no ask.
-4. The entry gate fails: on another plan's `plan/*` branch, or the index or working tree is dirty.
-   Name the branch or the files.
+4. The entry gate fails: on another plan's `plan/*` branch, the index or working tree is dirty, or
+   the plan's `## Folds` section names a release branch other than the one you are on. Name the
+   branch or the files, and the release the plan expects.
 
 A halt is a report — tasks done, the blocked task and why, findings so far, marker removed — then
 the turn ends. It names the condition from this list. It is never a question.
@@ -169,8 +178,10 @@ nothing else:
 2. **Deviations** — every entry, `Task N — plan said — did — why`. None → no heading.
 3. **State** — the hashes, one line (`--no-commit` → `Nothing committed`). Each verification command
    as `command → result`, one line.
-4. **Ship** — the branch, the CI result, the one merge command, and the optional `/preflight` line,
-   in the shape `references/branch-flow.md` gives.
+4. **Ship** — the branch, the CI result, the one merge command (`/release merge [--force]`), whether
+   a squash message was written, the folds — each target subject with the tasks and findings that
+   fold into it, since the findings' folds were not on the plan the user approved — and the optional
+   `/preflight` line, in the shape `references/branch-flow.md` gives.
 
 Never in the report: per-task file lists, what each task built, which skill ran which step, how you
 found a finding, what you fixed on the way (a deviation or nothing), a plan choice you followed. A
@@ -209,7 +220,8 @@ already removed when the ship phase ended; a halt report removes both.
 | "The branch is ceremony for a one-task plan"                        | The branch is what keeps the base one commit per plan. The gate is not optional.                                          |
 | "The tree is only dirty with unrelated files — carry on"            | Unrelated dirt is exactly what ends up in the wrong commit. Halt 4; the user decides.                                     |
 | "CI takes minutes — push and let the user watch it"                 | The ship phase watches. A red run fixed after the report is a second commit on the base.                                  |
-| "The squash is trivial, I'll merge it myself"                       | Never on the base. The user invokes `/merge-plan`; the report says so.                                                    |
+| "The squash is trivial, I'll merge it myself"                       | Never on the base. The user invokes `/release merge`; the report says so.                                                 |
+| "The target sha is right there in the plan"                         | The plan names a subject. The sha is looked up when the task is about to commit, after any fold that happened since.      |
 | "The verdict is Verified; the note is only Reasoning"               | A gap the reviewer names is a refutation with the wrong label. Fix, re-dispatch that claim.                               |
 | "Writing a test the plan never named is unrequested work"           | Every plan behavior comes with its test. One with no test is the cycle unfinished, not new scope.                         |
 | "`/tdd` tasks: take its verdicts, never re-dispatch"                | Its Verified verdicts. A claim it refuted and you fixed is open until the reviewer closes it.                             |
@@ -229,16 +241,17 @@ already removed when the ship phase ended; a halt report removes both.
   present after the ship phase
 - A Findings entry fixed before the findings-fix phase, or a `needs decision` entry fixed before the
   user approves that fix
-- A commit or merge on the base branch, a `merge-plan.sh` invocation or `merge-plan-active` marker
-  raised by this loop, or a push by this loop of anything but `plan/<slug>` (the dispatched `fix-ci`
-  agent pushes its own `fix-ci/*` branch under its own rules)
+- A commit or merge on the base branch, a `release.sh` invocation or `release-active` marker raised
+  by this loop, or a push by this loop of anything but `plan/<slug>` (the dispatched `fix-ci` agent
+  pushes its own `fix-ci/*` branch under its own rules)
+- A task with a fold target committed with a composed message, or a `none` task committed as a fixup
 - A report with no Ship section, or a Ship section that names a push instead of the merge command
 - A Ship line saying `CI green` without `gh run view … conclusion: success` for the pushed tip in
   context, or one written from a watch's exit code
 - A ship phase skipped without `--no-push` on the invocation, or a merge line whose `--force` does
   not match the CI result (`CI green` → none; anything else → `--force`)
 - A Ship section with raw git commands (`git switch`, `git merge --squash`) instead of `Merge:
-  /merge-plan [--force]`
+  /release merge [--force]`, or one silent about a finding that folds into a release commit
 - A report entry with no `what it costs`, or one that begins with "I" (I fixed, I deleted, I left)
 - A per-task file list, or a task described by what it built
 - A confirmed finding gone from a reply after a "too long" complaint

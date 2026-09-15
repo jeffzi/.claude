@@ -2,8 +2,8 @@
 #
 # Policy for the branches the assistant owns, shared by the fix-ci push wrapper
 # (scripts/fix-ci-push.sh), the plan branch scripts (scripts/plan-branch.sh and
-# scripts/merge-plan.sh), and the git guard hook (hooks/git-guard.sh). They gate
-# on the same facts — is a fix-ci loop or a /merge-plan run live in this repo,
+# scripts/release.sh), and the git guard hook (hooks/git-guard.sh). They gate
+# on the same facts — is a fix-ci loop or a /release run live in this repo,
 # is the worktree clean enough to move a branch, and does this push delete
 # anything outside the assistant's own branches — so the answers are defined
 # once, here.
@@ -21,12 +21,22 @@
 # shellcheck source=SCRIPTDIR/sh-common.sh
 . "${BASH_SOURCE[0]%/*}/sh-common.sh"
 
-# Marker files in the git dir. The fix-ci and merge-plan skills raise and drop
-# them by these same names.
+# Marker files in the git dir. The fix-ci and release skills raise and drop them
+# by these same names.
 # shellcheck disable=SC2034 # read by the sourcing scripts and hook, not here
-readonly FIX_CI_MARKER=fix-ci-active MERGE_PLAN_MARKER=merge-plan-active
+readonly FIX_CI_MARKER=fix-ci-active
 
-# A live loop refreshes its marker's mtime each iteration, and /merge-plan raises
+# The release flow is named once: `release` is the branch config key that marks
+# a release branch (`branch.<name>.release <version>`), `/release` the command
+# the user runs, and `release-active` the marker that command raises in the git
+# dir for the length of a run. Keep the marker spelled from the key so the two
+# can never drift apart.
+# shellcheck disable=SC2034 # read by the sourcing scripts and hook, not here
+readonly RELEASE_KEY=release
+# shellcheck disable=SC2034 # read by the sourcing scripts and hook, not here
+readonly RELEASE_MARKER="$RELEASE_KEY-active"
+
+# A live loop refreshes its marker's mtime each iteration, and /release raises
 # its marker right before the run, so only a marker abandoned by an interrupted
 # session ages out. Both markers share the window.
 readonly MARKER_TTL_SECONDS=1800

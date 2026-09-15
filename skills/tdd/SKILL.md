@@ -76,11 +76,11 @@ RED; the orchestrator loads no testing or coding skills.
 Each cycle covers a **behavior group** — behaviors sharing one implementation area; under-batching
 is the expensive failure: every dispatch re-pays fixed startup cost.
 
-| Batch together (one cycle)                                                                                     | Keep separate (distinct cycles)                    |
-| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| Behaviors landing in the same module or file set — even when their tests fail for different structural reasons | Behaviors touching different modules or subsystems |
-| Edge cases and variants of the same behavior                                                                   | A GREEN diff too large to reason about as one      |
-| Validation rules for the same field or data type                                                               |                                                    |
+| Batch together (one cycle)                                                                                     | Keep separate (distinct cycles)                         |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Behaviors landing in the same module or file set — even when their tests fail for different structural reasons | Behaviors touching different modules or subsystems      |
+| Edge cases and variants of the same behavior                                                                   | A GREEN diff too large to reason about as one           |
+| Validation rules for the same field or data type                                                               | Behaviors with different fold targets (see Commit last) |
 
 **Rule of thumb:** group by where the implementation lands, not by why the tests fail. "Different
 failure modes" or "could ship independently" are never reasons to split behaviors that live in the
@@ -110,8 +110,12 @@ Run the loop per `references/orchestration-flow.md`. Non-negotiables:
   caller named — a plan's Findings section — and the turn continues.
 - **Commit last.** Plan task or autocommit → proceed; plan task invoked with "no-commit plan
   execution" → skip, report file lists; ad hoc → list each cycle's files and stop for explicit
-  approval. Then `Skill(write-commit)` — one commit per cycle, tests and implementation together;
-  agents never commit.
+  approval. Then one commit per cycle, tests and implementation together; agents never commit. A
+  behavior group whose invocation carries `fixup target: <sha>` for it (one target per group when
+  the invocation batches several tasks or findings) commits each of its cycles with `git commit
+  --fixup=<sha>` — no `Skill(write-commit)` message; the generated `fixup! <subject>` subject passes
+  the commit-message guard and the conventional-commit hook. A group without a target gets a
+  `Skill(write-commit)` message. Cycles with different targets never share a commit.
 
 ## When Stuck
 

@@ -79,12 +79,20 @@ setup_file() {
 	PROTECT_FALSE_REPO=$(setup_repo protect_false_repo)
 	git -C "$PROTECT_FALSE_REPO" config claude.protectMain false
 
-	export MERGE_MARKED_REPO
-	MERGE_MARKED_REPO=$(setup_merge_marked_repo merge_marked_repo)
+	export RELEASE_MARKED_REPO
+	RELEASE_MARKED_REPO=$(setup_release_marked_repo release_marked_repo)
 
-	export MERGE_STALE_REPO
-	MERGE_STALE_REPO=$(setup_merge_marked_repo merge_stale_repo)
-	backdate_merge_marker "$MERGE_STALE_REPO" "$STALE_OFFSET_MINUTES"
+	export RELEASE_STALE_REPO
+	RELEASE_STALE_REPO=$(setup_release_marked_repo release_stale_repo)
+	backdate_release_marker "$RELEASE_STALE_REPO" "$STALE_OFFSET_MINUTES"
+
+	export RELEASE_FUTURE_REPO
+	RELEASE_FUTURE_REPO=$(setup_release_marked_repo release_future_repo)
+	backdate_release_marker "$RELEASE_FUTURE_REPO" "$FUTURE_OFFSET_MINUTES"
+
+	export RELEASE_FIXCI_REPO
+	RELEASE_FIXCI_REPO=$(setup_fix_ci_repo release_fixci_repo feature/ci)
+	raise_release_marker "$RELEASE_FIXCI_REPO"
 
 	export NO_REPO_DIR="$TMPDIR_ROOT/no_repo"
 	mkdir -p "$NO_REPO_DIR"
@@ -131,11 +139,11 @@ add_untracked_plan() {
 	printf 'plan content\n' >"$1/.claude/plans/phase.md"
 }
 
-# Repo with a fresh merge-plan marker raised; prints the repo dir.
-setup_merge_marked_repo() {
+# Repo with a fresh release marker raised; prints the repo dir.
+setup_release_marked_repo() {
 	local dir
 	dir=$(setup_repo "$1")
-	raise_merge_marker "$dir"
+	raise_release_marker "$dir"
 	printf '%s' "$dir"
 }
 
@@ -603,7 +611,7 @@ each_allowed_in() {
 
 # ── Protected main (claude.protectMain) ──────────────────────────────────────
 
-@test "protect main: every commit-creating subcommand on main is blocked naming the protection and /merge-plan" {
+@test "protect main: every commit-creating subcommand on main is blocked naming the protection and /release" {
 	local cmd
 	for cmd in \
 		"git commit -m 'msg'" \
@@ -615,7 +623,7 @@ each_allowed_in() {
 		"git pull"; do
 		run_guard "$PROTECTED_MAIN_REPO" "$cmd"
 
-		if ! assert_blocked || ! assert_guard_output_includes "protected" || ! assert_guard_output_includes "/merge-plan"; then
+		if ! assert_blocked || ! assert_guard_output_includes "protected" || ! assert_guard_output_includes "/release"; then
 			printf 'command: %s\n' "$cmd" >&2
 			return 1
 		fi
@@ -671,85 +679,157 @@ each_allowed_in() {
 	assert_allowed
 }
 
-# ── merge-plan.sh (user-run) ─────────────────────────────────────────────────
+# ── release.sh (user-run) ────────────────────────────────────────────────────
 
-@test "merge-plan: invoking the script without a marker is blocked as user-run" {
+@test "release: invoking the script without a marker is blocked as user-run" {
 	# shellcheck disable=SC2088 # the literal tilde is the command under test, not a path this file expands
-	run_guard "$REPO" "~/.claude/scripts/merge-plan.sh"
+	run_guard "$REPO" "~/.claude/scripts/release.sh merge"
 
 	assert_blocked
-	assert_guard_output_includes "merge-plan.sh"
-	assert_guard_output_includes "only through /merge-plan"
+	assert_guard_output_includes "release.sh"
+	assert_guard_output_includes "only through /release"
 }
 
-@test "merge-plan: every quoting and interpreter spelling of the invocation is blocked" {
+@test "release: every quoting, path, and interpreter spelling of the invocation is blocked" {
 	# shellcheck disable=SC2088
 	each_blocked_in "$REPO" \
-		"bash scripts/merge-plan.sh --skip-ci" \
-		'bash "scripts/merge-plan.sh"' \
-		'"~/.claude/scripts/merge-plan.sh" --skip-ci' \
-		"/bin/bash scripts/merge-plan.sh" \
-		"/usr/bin/env bash scripts/merge-plan.sh" \
-		"command bash scripts/merge-plan.sh" \
-		"exec scripts/merge-plan.sh" \
-		"FOO=1 scripts/merge-plan.sh"
+		"release.sh merge" \
+		"./scripts/release.sh merge" \
+		"bash scripts/release.sh merge" \
+		'bash "scripts/release.sh"' \
+		'"~/.claude/scripts/release.sh" merge' \
+		"/bin/bash scripts/release.sh" \
+		"/usr/bin/env bash scripts/release.sh" \
+		"env release.sh merge" \
+		"command bash scripts/release.sh" \
+		"exec scripts/release.sh" \
+		"FOO=1 scripts/release.sh"
 }
 
-@test "merge-plan: the invocation is found behind every fragment boundary" {
+@test "release: the invocation is found behind every fragment boundary" {
 	local heredoc
 	heredoc=$(
 		cat <<'CMD'
 git commit -m "$(cat <<'EOF'
 docs: describe how the plan branch lands
 EOF
-)" && "scripts/merge-plan.sh"
+)" && "scripts/release.sh"
 CMD
 	)
 	# shellcheck disable=SC2088
 	each_blocked_in "$REPO" \
 		'git commit -m "line one
-line two" && bash ~/.claude/scripts/merge-plan.sh' \
+line two" && bash ~/.claude/scripts/release.sh' \
 		'cd /tmp
-~/.claude/scripts/merge-plan.sh' \
+~/.claude/scripts/release.sh' \
 		'git status
-bash scripts/merge-plan.sh --skip-ci' \
-		'echo a&"&b" ; bash scripts/merge-plan.sh' \
-		'git status && "scripts/merge-plan.sh"' \
+bash scripts/release.sh merge' \
+		'echo a&"&b" ; bash scripts/release.sh' \
+		'git status && "scripts/release.sh"' \
 		"$heredoc"
 }
 
-@test "merge-plan: a message that merely names the script is allowed in every quoting" {
+@test "release: a message that merely names the script is allowed in every quoting" {
 	each_allowed_in "$REPO" \
-		'git commit -m "document merge-plan.sh"' \
-		"git commit -m 'document merge-plan.sh'" \
+		'git commit -m "document release.sh"' \
+		"git commit -m 'document release.sh'" \
 		'git commit -m "notes
-merge-plan.sh is user-run" && git status' \
+release.sh is user-run" && git status' \
 		"git commit -m 'notes
-merge-plan.sh is user-run' && git status"
+release.sh is user-run' && git status"
 }
 
-@test "merge-plan: reading, linting, formatting, chmod, and bats on the script are allowed" {
+@test "release: reading, linting, formatting, chmod, and bats on the script are allowed" {
 	each_allowed_in "$REPO" \
-		"cat scripts/merge-plan.sh" \
-		"shellcheck -x scripts/merge-plan.sh" \
-		"shfmt -d scripts/merge-plan.sh" \
-		"chmod +x scripts/merge-plan.sh" \
-		"bats tests/test_merge_plan.bats"
+		"cat scripts/release.sh" \
+		"shellcheck -x scripts/release.sh" \
+		"shfmt -d scripts/release.sh" \
+		"chmod +x scripts/release.sh" \
+		"bats tests/test_release.bats"
 }
 
-@test "merge-plan: every invocation spelling is allowed under a fresh marker" {
+@test "release: the status subcommand needs no marker" {
 	# shellcheck disable=SC2088
-	each_allowed_in "$MERGE_MARKED_REPO" \
-		"~/.claude/scripts/merge-plan.sh" \
-		"bash scripts/merge-plan.sh --skip-ci" \
-		'"~/.claude/scripts/merge-plan.sh" --skip-ci'
+	each_allowed_in "$REPO" \
+		"~/.claude/scripts/release.sh status" \
+		"bash scripts/release.sh status" \
+		"release.sh status"
 }
 
-@test "merge-plan: invoking the script under a stale marker is blocked" {
-	run_guard "$MERGE_STALE_REPO" "bash scripts/merge-plan.sh"
+@test "release: status past the first argument does not exempt the invocation" {
+	each_blocked_in "$REPO" \
+		"release.sh merge status" \
+		"bash scripts/release.sh --skip-ci status"
+}
+
+@test "release: a subcommand makes it an invocation whatever words precede it" {
+	# shellcheck disable=SC2088
+	each_blocked_for_in "only through /release" "$REPO" \
+		"timeout 5 scripts/release.sh merge" \
+		"xargs release.sh merge" \
+		"uv run ~/.claude/scripts/release.sh finish --check" \
+		"nice -n 5 release.sh start 1.2.0"
+}
+
+@test "release: status behind a preceding word still needs no marker" {
+	each_allowed_in "$REPO" \
+		"timeout 5 release.sh status" \
+		"uv run scripts/release.sh status"
+}
+
+@test "release: an invocation behind a preceding word is allowed under a fresh marker" {
+	# shellcheck disable=SC2088
+	each_allowed_in "$RELEASE_MARKED_REPO" \
+		"timeout 5 scripts/release.sh merge" \
+		"uv run ~/.claude/scripts/release.sh finish --check" \
+		"nice -n 5 release.sh start 1.2.0"
+}
+
+@test "release: every invocation spelling is allowed under a fresh marker" {
+	# shellcheck disable=SC2088
+	each_allowed_in "$RELEASE_MARKED_REPO" \
+		"~/.claude/scripts/release.sh" \
+		"bash scripts/release.sh merge" \
+		'"~/.claude/scripts/release.sh" merge'
+}
+
+@test "release: invoking the script under a stale or future-dated marker is blocked" {
+	local dir
+	for dir in "$RELEASE_STALE_REPO" "$RELEASE_FUTURE_REPO"; do
+		run_guard "$dir" "bash scripts/release.sh merge"
+
+		if ! assert_blocked || ! assert_guard_output_includes "only through /release"; then
+			printf 'repo: %s\n' "$dir" >&2
+			return 1
+		fi
+	done
+}
+
+@test "release: force-with-lease under the release marker alone is blocked as an unsanctioned push" {
+	run_guard "$RELEASE_MARKED_REPO" "git push --force-with-lease"
 
 	assert_blocked
-	assert_guard_output_includes "only through /merge-plan"
+	assert_guard_output_includes "Automatic git push is not allowed"
+}
+
+@test "release: force-with-lease under both markers is blocked as a history rewrite" {
+	run_guard "$RELEASE_FIXCI_REPO" "git push --force-with-lease"
+
+	assert_blocked
+	assert_guard_output_includes "never rewrites history"
+}
+
+# ── Shared constants ─────────────────────────────────────────────────────────
+
+@test "shared constant: branch-policy.sh exposes the release marker file and config key" {
+	local want="release-active release" got
+
+	got=$(bash -c '. "$1"; printf "%s %s" "$RELEASE_MARKER" "$RELEASE_KEY"' _ "$BRANCH_POLICY_LIB")
+
+	[[ "$got" == "$want" ]] || {
+		printf 'RELEASE_MARKER/RELEASE_KEY are "%s", expected "%s"\n' "$got" "$want" >&2
+		return 1
+	}
 }
 
 # ── fix-ci marker (freshness window fails closed) ────────────────────────────
@@ -895,6 +975,62 @@ CMD
 	run_guard "$REPO" "$cmd"
 
 	assert_allowed
+}
+
+@test "heredoc: a body fed to a consumer that only reads it is not scanned" {
+	each_allowed_in "$REPO" \
+		"git commit -F - <<'EOF'
+release.sh merge lands the branch
+EOF" \
+		"git commit -F - <<EOF
+then git reset --hard is forbidden
+EOF" \
+		"cat <<EOF > notes.txt
+git push --force
+EOF" \
+		"gh pr create --body-file - <<\"EOF\"
+git push --force is never run here
+EOF" \
+		"tee notes.txt <<-EOF
+release.sh merge
+EOF"
+}
+
+@test "heredoc: a body fed to a consumer that could execute it is scanned" {
+	each_blocked_in "$REPO" \
+		"bash <<'EOF'
+git push --force
+EOF" \
+		"sh <<EOF
+release.sh merge
+EOF" \
+		"myrunner <<EOF
+git push --force
+EOF"
+}
+
+@test "heredoc: the fragment carrying the operator is scanned" {
+	run_guard "$REPO" "git push --force <<EOF
+release notes
+EOF"
+
+	assert_blocked
+}
+
+@test "heredoc: fragments after the terminator are scanned" {
+	run_guard "$REPO" "git commit -F - <<'EOF'
+release.sh merge lands the branch
+EOF
+git reset --hard"
+
+	assert_blocked
+}
+
+@test "heredoc: an operator with no terminator line drops nothing" {
+	run_guard "$REPO" "git commit -m 'see <<EOF for the shape'
+git reset --hard"
+
+	assert_blocked
 }
 
 # ── Quoted option values (subcommand must stay visible) ──────────────────────

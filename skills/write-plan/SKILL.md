@@ -37,6 +37,29 @@ Multiple independent subsystems → suggest one plan per subsystem. Before defin
 created/modified files and each file's single responsibility — files that change together live
 together. Done when every touched file sits in exactly one task's **Files** list.
 
+### Fold targets
+
+Every task carries a **Folds into** line: the subject of the release commit the task corrects, or
+`none`. Fill it for every task on every plan:
+
+1. Resolve the release branch the plan will land on. `execute-plan` cuts the plan branch from the
+   branch you are on and records it as the base, and a fold is looked up over that base at commit
+   time — so the release is the current branch when the first line of `~/.claude/scripts/release.sh
+   status` (`release: <branch> <version>`) names it, or the recorded base
+   (`~/.claude/scripts/plan-branch.sh base`) when already on a `plan/*` branch and that base is the
+   named release. Anything else — `release: none`, or a plan written on `main` or a feature branch
+   while a release is open elsewhere — makes every task `none`, and the rest of this rule is
+   skipped.
+2. For each task, run `git log $(git merge-base main <release>)..<release> --format=%s -- <the
+   task's files>`. One subject answers → that subject. None → `none`. More than one → split the task
+   along the file boundary until each part has one answer; a single file touched by several release
+   commits takes the newest of them, so the fixup replays after every change to that file and
+   applies cleanly.
+
+A target is a subject, never a hash: autosquash matches by subject, and a hash changes after the
+first fold. Each task stays self-contained — a fixup replays right after the commit it names, before
+any of the plan's own commits, so a task that depends on another task's work cannot fold.
+
 ## Tasks and Behaviors
 
 Each task is a **behavior group** — behaviors sharing one implementation area; tasks say **what** to
@@ -70,6 +93,15 @@ type: plan
 load before implementation. Tasks routed through `/tdd` omit this line; the agents resolve language
 skills themselves.]
 
+## Folds
+
+[Every non-`none` target once, with the tasks that fold into it and the release branch the subject
+was found on:
+
+- `feat(auth): add login form` on `v1.2` ← Task 2, Task 4
+
+or the single line `No folds: every task is new work`.]
+
 ---
 ```
 
@@ -83,6 +115,8 @@ skills themselves.]
 - Create: `exact/path/to/file.py`
 - Modify: `exact/path/to/existing.py`
 - Test: `tests/exact/path/to/test.py`
+
+**Folds into:** [the release commit subject from Scope and Files › Fold targets, or `none`]
 
 **Behaviors:**
 
@@ -166,6 +200,13 @@ Run both passes per `references/plan-review.md` in one parallel message: the adv
 `claim-reviewer` (no model set), one claim per checkable assertion about existing code;
 `Refuted`/`Unsubstantiated` → re-check once, correct or cite evidence.
 
+Then check the fold targets yourself — the claim reviewer has no shell and is not asked to check
+git. Every task has a **Folds into** line, or the plan is refused. For every non-`none` target, list
+`git log $(git merge-base main <release>)..<release> --format=%s` and require exactly one line equal
+to the subject — a substring match would pass a subject buried in another message and then fail the
+exact sha lookup at commit time. A miss or a duplicate refuses the plan the way `/release merge`
+refuses the fixup: fix the target or split the task before presenting.
+
 ## Checkpoint
 
 Create the plan at `.planning/plan-<slug>.md` **as the working file from the first draft**; draft,
@@ -174,6 +215,15 @@ conversation and wait for explicit approval before implementation. Approval happ
 not via `ExitPlanMode`: ask explicitly ("Approve this plan?") and wait — silence, a tangent, or a
 question is not approval. On approval, load `Skill(execute-plan)` — approval covers every task, and
 that skill runs them to the Final Task without further check-ins.
+
+The fold is disclosed at approval, never left to be read off the tasks. The Checkpoint message
+quotes the plan's `## Folds` section verbatim, ahead of the question; a plan with folds opens with
+"This plan rewrites `<release>`: N task(s) fold into existing commits." A Checkpoint that asks for
+approval without the section is a rule violation.
+
+| Excuse                                                            | Reality                                                                                                  |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| "The targets are visible on each task, so the user has seen them" | A rewrite of the release branch is approved in one place: the Folds section, quoted before the question. |
 
 ## Red Flags
 
@@ -184,6 +234,8 @@ that skill runs them to the Final Task without further check-ins.
 | Drafting plan content in conversation instead of in `.planning/plan-<slug>.md` |
 | Removing a **Verify** block to shorten the plan                                |
 | Treating a question, tangent, or silence as approval                           |
+| Asking "Approve this plan?" without the `## Folds` section quoted above it     |
+| A task with no **Folds into** line, or a target checked by substring           |
 | Putting test assertions, implementation code, or RED/GREEN steps into a task   |
 
 ## Common Mistakes

@@ -2,7 +2,7 @@ name: Tests
 
 on:
   push:
-    branches: [main, fix-ci/**, plan/**]
+    branches: [main, fix-ci/**, plan/**, "v[0-9]*"]
   pull_request:
     branches: [main]
   workflow_call:
