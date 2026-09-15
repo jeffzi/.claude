@@ -191,6 +191,14 @@ each_allowed_in() {
 	done
 }
 
+# run_guard on the command read from stdin — for commands that embed their own
+# nested heredoc, which a bats argument cannot spell directly.
+run_guard_heredoc() {
+	local cmd
+	cmd=$(cat)
+	run_guard "$REPO" "$cmd"
+}
+
 # ── Push ─────────────────────────────────────────────────────────────────────
 
 @test "push: every push form is blocked without a marker" {
@@ -739,6 +747,23 @@ release.sh is user-run" && git status' \
 release.sh is user-run' && git status"
 }
 
+@test "release: a message naming the script with a subcommand is allowed" {
+	each_allowed_in "$REPO" \
+		'git commit -m "docs: explain release.sh merge"' \
+		"git commit -m 'docs: explain release.sh finish'"
+}
+
+@test "release: a heredoc-fed commit message naming the script with a subcommand is allowed" {
+	run_guard_heredoc <<'CMD'
+git commit -m "$(cat <<'EOF'
+docs: explain how release.sh finish tags the release
+EOF
+)"
+CMD
+
+	assert_allowed
+}
+
 @test "release: reading, linting, formatting, chmod, and bats on the script are allowed" {
 	each_allowed_in "$REPO" \
 		"cat scripts/release.sh" \
@@ -767,6 +792,7 @@ release.sh is user-run' && git status"
 	each_blocked_for_in "only through /release" "$REPO" \
 		"timeout 5 scripts/release.sh merge" \
 		"xargs release.sh merge" \
+		"uv run release.sh merge" \
 		"uv run ~/.claude/scripts/release.sh finish --check" \
 		"nice -n 5 release.sh start 1.2.0"
 }
@@ -1031,6 +1057,26 @@ git reset --hard"
 git reset --hard"
 
 	assert_blocked
+}
+
+@test "heredoc: a body piped from its reader into an interpreter is scanned" {
+	run_guard "$REPO" "cat <<'EOF' | bash
+git push --force origin main
+EOF"
+
+	assert_blocked
+}
+
+@test "heredoc: a body read inside a substitution an interpreter runs is scanned" {
+	run_guard_heredoc <<'CMD'
+bash -c "$(cat <<'EOF'
+scripts/release.sh merge
+EOF
+)"
+CMD
+
+	assert_blocked
+	assert_guard_output_includes "only through /release"
 }
 
 # ── Quoted option values (subcommand must stay visible) ──────────────────────

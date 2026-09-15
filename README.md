@@ -197,10 +197,11 @@ What enforces it:
   [`git-guard.sh`](hooks/git-guard.sh) block every commit-creating command on `main`. A feature
   branch used as a base has no guard of its own; the skill's rule that all work goes on `plan/*` is
   what protects it.
-- [`release.sh`](scripts/release.sh) runs only while the marker `/release` raises exists, both at
-  the guard and inside the script, so every release write — the cut, the squash or fold, the
-  fast-forward of `main` — happens only when you invoke the skill. Its force-push is confined to
-  release branches, under a lease, and only when a fold rewrote one.
+- [`release.sh`](scripts/release.sh) runs only while a fresh marker `/release` raises exists, one
+  raised in the last thirty minutes; an older marker, or one dated ahead by a skewed clock, reads as
+  absent and the script refuses. Both the guard and the script check it, so every release write —
+  the cut, the squash or fold, the fast-forward of `main` — happens only when you invoke the skill.
+  Its force-push is confined to release branches, under a lease, and only when a fold rewrote one.
 - Branch pushes go through [`fix-ci-push.sh`](scripts/fix-ci-push.sh): append-only, no force, and
   only `fix-ci/*` and `plan/*` branches may be deleted.
 - CI templates trigger on pushes to `main`, `fix-ci/**`, `plan/**`, and `v[0-9]*`, so a plan branch
@@ -274,15 +275,15 @@ bats tests/
 
 ### Scripts
 
-| Script                                               | Description                                                                 |
-| ---------------------------------------------------- | --------------------------------------------------------------------------- |
-| [`cleanup-sessions.sh`](scripts/cleanup-sessions.sh) | Remove stale session data older than a configurable age                     |
-| [`branch-policy.sh`](scripts/branch-policy.sh)       | Marker and branch policy shared by `fix-ci`, `release`, `git-guard`         |
-| [`fix-ci-push.sh`](scripts/fix-ci-push.sh)           | Sanctioned push wrapper for the `fix-ci` loop and plan branches             |
-| [`release.sh`](scripts/release.sh)                   | Cut, inspect, land plans on, and finish a release branch; run by `/release` |
-| [`sh-common.sh`](scripts/sh-common.sh)               | Sourced helpers shared by the scripts and hooks: `die`, portable `stat`     |
-| [`statusline.sh`](scripts/statusline.sh)             | Custom status line: model, context gauge, rate limit pacing                 |
-| [`sync-skills.sh`](scripts/sync-skills.sh)           | Sync selected skills from external repositories via `npx skills`            |
+| Script                                               | Description                                                                        |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [`cleanup-sessions.sh`](scripts/cleanup-sessions.sh) | Remove stale session data older than a configurable age                            |
+| [`branch-policy.sh`](scripts/branch-policy.sh)       | Marker and branch policy shared by `fix-ci`, `plan-branch`, `release`, `git-guard` |
+| [`fix-ci-push.sh`](scripts/fix-ci-push.sh)           | Sanctioned push wrapper for the `fix-ci` loop and plan branches                    |
+| [`release.sh`](scripts/release.sh)                   | Cut, inspect, land plans on, and finish a release branch; run by `/release`        |
+| [`sh-common.sh`](scripts/sh-common.sh)               | Sourced helpers shared by the scripts and hooks: `die`, portable `stat`            |
+| [`statusline.sh`](scripts/statusline.sh)             | Custom status line: model, context gauge, rate limit pacing                        |
+| [`sync-skills.sh`](scripts/sync-skills.sh)           | Sync selected skills from external repositories via `npx skills`                   |
 
 ### Hooks
 

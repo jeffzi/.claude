@@ -309,31 +309,24 @@ release_acting_subcommand() {
 }
 
 # True when fragment $1 invokes the release script in a way that needs the
-# marker. Two shapes count:
+# marker. The word the fragment runs decides:
 #
-#   - the script followed by a subcommand that acts on the repo, whatever words
-#     precede it, so a runner no prefix list knows (`timeout 5 …`, `uv run …`,
-#     `xargs …`) cannot hide the invocation;
-#   - the script in command position with a first argument other than `status`,
-#     which covers a run that names no subcommand at all. `status` is exempt in
-#     that one position only — the one the script itself reads a subcommand
-#     from — never further down the argument list.
+#   - the script itself in that slot is an invocation unless its first argument
+#     is `status`, which covers a run that names no subcommand at all. `status`
+#     is exempt in that one position only — the one the script itself reads a
+#     subcommand from — never further down the argument list;
+#   - any other word there may still be a runner no prefix list knows
+#     (`timeout 5 …`, `uv run …`, `xargs …`), so the script followed by a
+#     subcommand that acts on the repo counts wherever it sits in the fragment.
 #
-# Text that merely names the script (`cat scripts/release.sh`, a commit message)
-# matches neither: nothing it can act on follows, and it is not the command.
+# Unless that word only reads what follows it: `git commit -m "docs: explain
+# release.sh merge"` hands the script name to git as text, as do `cat`, `grep`,
+# and the rest of only_reads_input. There the script is an argument, never a run.
 release_fragment_invokes() {
-	local word prefix_seen=false next=0
+	local word prefix_seen=false next=0 cmd="" after=""
 	local -a words=()
 	# read -ra splits on whitespace without letting a word glob.
 	read -ra words <<<"$1"
-	for word in ${words[@]+"${words[@]}"}; do
-		next=$((next + 1))
-		if [[ "${word##*/}" == release.sh ]] && release_acting_subcommand "${words[next]-}"; then
-			return 0
-		fi
-	done
-
-	next=0
 	for word in ${words[@]+"${words[@]}"}; do
 		next=$((next + 1))
 		if release_prefix_word "$word"; then
@@ -348,9 +341,23 @@ release_fragment_invokes() {
 		if $prefix_seen && [[ "$word" == -* ]]; then
 			continue
 		fi
-		[[ "${word##*/}" == release.sh ]] || return 1
-		[[ "${words[next]-}" == status ]] && return 1
+		cmd="$word"
+		after="${words[next]-}"
+		break
+	done
+
+	if [[ "${cmd##*/}" == release.sh ]]; then
+		[[ "$after" == status ]] && return 1
 		return 0
+	fi
+	only_reads_input "$cmd" && return 1
+
+	next=0
+	for word in ${words[@]+"${words[@]}"}; do
+		next=$((next + 1))
+		if [[ "${word##*/}" == release.sh ]] && release_acting_subcommand "${words[next]-}"; then
+			return 0
+		fi
 	done
 	return 1
 }
@@ -657,32 +664,50 @@ check_single_command() {
 # A heredoc body is an argument, not a script: `git commit -F - <<'EOF'` hands
 # its lines to git, which only reads them. Both splitters would otherwise take
 # each body line for a fragment and block a commit message that names a guarded
-# command or the release script. So the body is dropped for the consumers that
-# can only read their input, and kept — scanned line by line, as any other
-# fragment is — for anything that could run it (`bash`, `eval`, a word this list
-# does not know), which is the closed side of the door.
+# command or the release script. So the body is dropped when the reader's output
+# goes nowhere that could run it, and kept — scanned line by line, as any other
+# fragment is — for everything else (`bash`, `eval`, a word this list does not
+# know, a reader piped into one of them), which is the closed side of the door.
 #
 # The line carrying the operator is always scanned: `git push --force <<EOF` is
 # a push whatever it is fed.
 readonly HEREDOC_READERS=" git cat tee head tail grep sort wc gh jq "
 
+# True when command $1 only reads what it is handed. Shared with the release
+# scan, which draws the same line between a script named in a commit message and
+# one the fragment runs.
+only_reads_input() {
+	[[ "$HEREDOC_READERS" == *" ${1##*/} "* ]]
+}
+
 # Dropping runs to the terminator line, and only when that line is really there:
 # without one the `<<` is prose inside a message far more often than a heredoc,
 # and swallowing the rest of the command would hide whatever follows it.
+#
+# A kept body is printed after the lines of the command that opened it, not in
+# place: in `bash -c "$(cat <<'EOF'` the body sits between the quotes of the
+# fragment that runs it, and both splitters read a quoted region as one opaque
+# word. Past the closing quote its lines are fragments of their own. Order costs
+# nothing — every fragment is judged alone.
 scannable=$(printf '%s' "$full_command" | awk -v q="'" -v readers="$HEREDOC_READERS" '
 	# The delimiter of the first heredoc opened on the line, or "" for none;
-	# sets hd_prefix to the text before the operator. Blanking `<<<` keeps the
-	# offsets while taking herestrings, which read one word, out of the running.
+	# sets hd_prefix and hd_suffix to the text on either side of the operator.
+	# Blanking `<<<` keeps the offsets while taking herestrings, which read one
+	# word, out of the running.
 	function delimiter(line,   probe, word) {
 		probe = line
 		gsub(/<<</, "   ", probe)
 		if (!match(probe, "<<-?[[:space:]]*(\"[^\"]*\"|" q "[^" q "]*" q "|[[:alnum:]_]+)")) return ""
 		hd_prefix = substr(probe, 1, RSTART - 1)
+		hd_suffix = substr(probe, RSTART + RLENGTH)
 		word = substr(probe, RSTART, RLENGTH)
 		sub(/^<<-?[[:space:]]*/, "", word)
 		gsub("\"", "", word)
 		gsub(q, "", word)
 		return word
+	}
+	function reader(word) {
+		return index(readers, " " word " ") > 0
 	}
 	# The command the heredoc feeds: the first word of the last fragment before
 	# the operator, so a substitution such as `-m "$(cat <<EOF` answers `cat`.
@@ -698,6 +723,39 @@ scannable=$(printf '%s' "$full_command" | awk -v q="'" -v readers="$HEREDOC_READ
 		gsub(q, "", w)
 		sub(/.*\//, "", w)
 		return w
+	}
+	# The command word of the fragment around a `$(` still open where the
+	# operator sits — whatever runs what the substitution prints — or "" when no
+	# substitution encloses the reader. Parentheses that close before it are
+	# stepped over, so the answer is the fragment that really holds the reader.
+	function enclosing(prefix,   i, depth, c) {
+		depth = 0
+		for (i = length(prefix); i > 1; i--) {
+			c = substr(prefix, i, 1)
+			if (c == ")") { depth++; continue }
+			if (c != "(") continue
+			if (depth > 0) { depth--; continue }
+			if (substr(prefix, i - 1, 1) == "$") return consumer(substr(prefix, 1, i - 2))
+		}
+		return ""
+	}
+	# True when a pipe on the operator line hands what the reader prints to the
+	# next command, which makes the body a script: `cat <<EOF | bash`. `||`
+	# chains a command instead of consuming output, so it is blanked first.
+	function piped(suffix,   rest) {
+		rest = suffix
+		gsub(/\|\|/, "  ", rest)
+		return index(rest, "|") > 0
+	}
+	# True when the body is only ever read: a reader takes it, nothing consumes
+	# what that reader prints, and the substitution it sits in — if any — is
+	# held by a fragment that reads too. `git commit -m "$(cat <<EOF` reads its
+	# body; `bash -c "$(cat <<EOF` runs it.
+	function inert(   outer) {
+		if (!reader(consumer(hd_prefix))) return 0
+		if (piped(hd_suffix)) return 0
+		outer = enclosing(hd_prefix)
+		return outer == "" || reader(outer)
 	}
 	# The line closing delimiter $2, from line $1 on, or 0 when none does. A
 	# `<<-` terminator may be indented, so both ends are trimmed.
@@ -716,10 +774,13 @@ scannable=$(printf '%s' "$full_command" | awk -v q="'" -v readers="$HEREDOC_READ
 			print lines[i]
 			word = delimiter(lines[i])
 			if (word == "") continue
-			if (index(readers, " " consumer(hd_prefix) " ") == 0) continue
 			closing = terminator(i + 1, word)
-			if (closing > 0) i = closing
+			if (closing == 0) continue
+			if (!inert())
+				for (j = i + 1; j < closing; j++) kept = kept lines[j] "\n"
+			i = closing
 		}
+		printf "%s", kept
 	}')
 
 # Split chained commands (&&, ||, ;, |) and check each fragment independently.

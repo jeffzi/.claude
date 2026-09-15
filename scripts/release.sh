@@ -135,12 +135,20 @@ adopt_current_branch() {
 	printf 'release: %s adopted as the release branch for %s.\n' "$branch" "$version"
 }
 
+# Pushes $1 to origin with upstream tracking, or dies naming what a rejected
+# push keeps: the branch and its RELEASE_KEY key, already written by both
+# cut_release_branch and resume_cut before this runs.
+push_release_branch() {
+	local release_branch="$1"
+	git push --quiet --set-upstream origin "$release_branch" ||
+		die "pushing $release_branch to origin failed; the branch and its $RELEASE_KEY key are kept, so re-run once the remote is reachable." 1
+}
+
 # Cuts vX.Y from the trunk and pushes it. The branch is created before the push,
 # so a rejected push keeps it and its key rather than unwinding a branch the
 # user may already be working on.
 cut_release_branch() {
-	local branch="$1" version="$2" local_trunk remote_trunk
-	local release_branch="v${version%.*}"
+	local branch="$1" version="$2" release_branch="$3" local_trunk remote_trunk
 	[[ "$branch" == "$TRUNK" ]] ||
 		die "release start cuts the branch from $TRUNK; you are on '$branch'."
 	require_clean_worktree
@@ -155,21 +163,45 @@ cut_release_branch() {
 
 	git switch --quiet -c "$release_branch" "$TRUNK"
 	git config "branch.$release_branch.$RELEASE_KEY" "$version"
-	git push --quiet --set-upstream origin "$release_branch" ||
-		die "pushing $release_branch to origin failed; the branch and its $RELEASE_KEY key are kept, so re-run once the remote is reachable." 1
+	push_release_branch "$release_branch"
 	printf 'release: %s cut from %s for %s and pushed.\n' "$release_branch" "$TRUNK" "$version"
 }
 
+# Finishes a cut whose push failed: the branch and its key are already there, so
+# the push is all that is left. Origin having the branch already means the cut
+# went through and this is a second start, not a resume, and is refused as one.
+resume_cut() {
+	local release_branch="$1" version="$2" status=0
+	require_clean_worktree
+	git ls-remote --exit-code --heads origin "$release_branch" >/dev/null || status=$?
+	case "$status" in
+	2) ;;
+	0) die "'$release_branch' already carries the $RELEASE_KEY key ($version) and origin has it; the cut is done, so plan onto it or finish it." ;;
+	*) die "'git ls-remote origin $release_branch' failed; fix the remote, then re-run." ;;
+	esac
+
+	switch_or_die "$release_branch"
+	push_release_branch "$release_branch"
+	printf 'release: %s was already cut for %s and is now pushed.\n' "$release_branch" "$version"
+}
+
 cmd_start() {
-	local version adopt branch
+	local version adopt branch open release_branch
 	parse_start_args "$@"
 	branch=$(current_branch)
-	require_no_open_release "$(open_release)"
+	open=$(open_release)
+	release_branch="v${version%.*}"
+
+	if ! $adopt && [[ "$open" == "$release_branch $version" ]]; then
+		resume_cut "$release_branch" "$version"
+		return
+	fi
+	require_no_open_release "$open"
 
 	if $adopt; then
 		adopt_current_branch "$branch" "$version"
 	else
-		cut_release_branch "$branch" "$version"
+		cut_release_branch "$branch" "$version" "$release_branch"
 	fi
 }
 
@@ -357,6 +389,49 @@ require_ci_success() {
 # that tells a fixup from a plain commit.
 readonly FIXUP_PREFIX='fixup! '
 
+# The other two subjects autosquash acts on, from `git commit --squash` and
+# `--fixup=amend:`. Both stop an interactive rebase for an editor, which the
+# scripted replay answers with `:` — it would take the message git offers,
+# silently, so the fold refuses them instead of guessing.
+readonly SQUASH_PREFIX='squash! '
+readonly AMEND_PREFIX='amend! '
+
+# Refuses while $1..$2 holds a commit the replay cannot carry: a merge commit,
+# whose second parent a rebase drops, or a squash!/amend! commit. Runs before
+# anything is written, so either is the ordinary "nothing changed" refusal.
+require_replayable_history() {
+	local base_branch="$1" branch="$2" merge sha subject
+	merge=$(git rev-list --merges --max-count=1 "$base_branch..$branch")
+	[[ -z "$merge" ]] ||
+		die "'$branch' holds the merge commit $(git log -1 --format='%h %s' "$merge"); a fold replays only linear fixup! and ordinary commits, so rebase '$branch' onto $base_branch, then re-run."
+	while read -r sha subject; do
+		case "$subject" in
+		"$SQUASH_PREFIX"* | "$AMEND_PREFIX"*)
+			die "'$branch' holds $sha $subject; a fold replays only linear fixup! and ordinary commits, so reword it or apply it by hand, then re-run."
+			;;
+		esac
+	done < <(git log --format='%h %s' "$base_branch..$branch")
+}
+
+# Where HEAD points, in the form return_to_head_position puts it back: a branch
+# name, or the sha HEAD is detached at.
+head_position() {
+	git symbolic-ref --quiet --short HEAD || git rev-parse HEAD
+}
+
+# Puts HEAD back on the position head_position printed, detaching again when
+# that position is a sha. $2 names what a failed switch leaves behind and $3 is
+# the exit status it reports.
+return_to_head_position() {
+	local position="$1" kept="${2:-nothing changed}" status="${3:-}"
+	if git show-ref --quiet --verify "refs/heads/$position"; then
+		switch_or_die "$position" "$status" "$kept"
+	else
+		git switch --detach --quiet "$position" ||
+			die "could not put HEAD back on $position; $kept." "$status"
+	fi
+}
+
 # Subjects of the fixup commits $2 carries beyond $1, one per line.
 fixup_subjects() {
 	local subject
@@ -367,8 +442,10 @@ fixup_subjects() {
 	done < <(git log --format=%s "$1..$2")
 }
 
-# How many commits $2 carries beyond $1 are not fixups. This is the count the
-# fold rewinds the base by, so it counts the plan branch's own commits only.
+# How many commits $2 carries beyond $1 are not fixups. This decides whether the
+# fold needs a squash commit — and so a message file — at all; where the base
+# ends after the replay is counted on the rewritten branch instead, since the
+# replay may drop a commit it finds empty.
 plain_commit_count() {
 	local subject count=0
 	while IFS= read -r subject; do
@@ -414,54 +491,164 @@ require_foldable() {
 	done < <(git for-each-ref --format='%(refname:short)' "refs/heads/$PLAN_BRANCH_PREFIX*")
 }
 
+# Whether branch $1 points at $2.
+branch_at() {
+	local sha
+	sha=$(git rev-parse --verify --quiet "refs/heads/$1") || return 1
+	[[ "$sha" == "$2" ]]
+}
+
+# Forces branch $1 back to $2, writing nothing when it is already there: what
+# failed may be the very write that would have moved it, and that write can have
+# failed because this ref is one git cannot update at all.
+restore_branch() {
+	local branch="$1" want="$2"
+	branch_at "$branch" "$want" || git branch --force "$branch" "$want"
+}
+
+# Drops what the run staged and wrote, leaving HEAD's commit as the tree again.
+# A failed commit keeps the squash in the index, where the next run reads it as
+# the user's own work and refuses; discarding it is safe because the run gates on
+# a clean worktree before it writes anything, so all there is to drop is its own.
+discard_uncommitted() {
+	git reset --quiet --hard
+}
+
+# How a restore of $1 (pre-fold $2) and $3 (pre-fold $4) describes itself: only
+# the branches the fold actually moved are named, and the tree, which comes back
+# with them. Read before the restore runs, since after it every branch is back at
+# its sha.
+restored_phrase() {
+	local base_branch="$1" base_before="$2" branch="$3" plan_before="$4" moved=()
+	branch_at "$base_branch" "$base_before" || moved+=("$base_branch")
+	branch_at "$branch" "$plan_before" || moved+=("$branch")
+	case "${#moved[@]}" in
+	0) printf '%s and %s are as the run found them' "$base_branch" "$branch" ;;
+	1) printf '%s was restored to its pre-fold tip, and the tree with it' "${moved[0]}" ;;
+	*) printf '%s, %s and the tree were restored to their pre-fold tips' "${moved[0]}" "${moved[1]}" ;;
+	esac
+}
+
+# Puts $1 back at $2 — and $3 back at $4, when a plan branch was rewritten too;
+# pass an empty $3 when it was not — then returns HEAD to the position $5. The
+# tree goes first, since a squash left in the index would otherwise ride the
+# switch across; HEAD is detached next because a checked-out branch cannot be
+# force-updated at all. Answers non-zero when a step fails, leaving the caller
+# with only the shas to offer the user.
+restore_branches() {
+	local base_branch="$1" base_before="$2" branch="$3" plan_before="$4" start="$5"
+	discard_uncommitted || return 1
+	git switch --detach --quiet "$base_before" || return 1
+	[[ -z "$branch" ]] || restore_branch "$branch" "$plan_before" || return 1
+	restore_branch "$base_branch" "$base_before" || return 1
+	return_to_head_position "$start" "the branches are back where the run found them" 1
+}
+
+# Puts the fold back where it found the two branches and then fails with $1,
+# naming the restore. A restore that fails itself leaves the two shas as the
+# only way back, so they are printed with the commands that use them. $2 is the
+# exit status of the ordinary path: a refusal before the base moved, 1 once
+# something was written.
+#
+# The shas come from the caller, captured before the rebase ran: the replay
+# rewrites ORIG_HEAD as it goes, so by the time a push is rejected it no longer
+# points at the branch the run started with.
+restore_fold_or_die() {
+	local reason="$1" status="$2" branch="$3" base_branch="$4" plan_before="$5" base_before="$6" start="$7"
+	local restored
+	restored=$(restored_phrase "$base_branch" "$base_before" "$branch" "$plan_before")
+	restore_branches "$base_branch" "$base_before" "$branch" "$plan_before" "$start" ||
+		die "$reason, and restoring the branches failed; recover with 'git branch -f $base_branch $base_before' and 'git branch -f $branch $plan_before'." 1
+	die "$reason; $restored." "$status"
+}
+
 # Replays the plan branch from the release branch's fork point with autosquash,
 # so each fixup lands in the commit it names, then moves the base onto the
-# replayed release commits. Leaves HEAD on the plan branch.
+# replayed release commits and sets the caller's `fold_remaining` to how many
+# commits the plan branch keeps above them.
+#
+# The base ends where the release commits end, counted: the replay may drop a
+# commit whose change the fold already put in the base, and two release commits
+# may share a subject, so neither the plan branch's own commit count nor any
+# subject locates it. Leaves HEAD on the plan branch.
 fold_fixups() {
-	local branch="$1" base_branch="$2" fork="$3" plain_count="$4" culprit aborted=true start
-	# The refusal below leaves everything as it was found, HEAD included, and the
-	# run may have been started from somewhere other than the plan branch.
-	start=$(git symbolic-ref --quiet --short HEAD) || start="$branch"
+	local branch="$1" base_branch="$2" fork="$3" release_count="$4" plan_before="$5" base_before="$6" start="$7"
+	local culprit aborted=true total
 	switch_or_die "$branch"
-	if ! GIT_SEQUENCE_EDITOR=: git rebase --interactive --autosquash "$fork" >/dev/null 2>&1; then
+	if ! GIT_SEQUENCE_EDITOR=: git rebase --interactive --autosquash --empty=drop "$fork" >/dev/null 2>&1; then
 		culprit=$(git log -1 --format='%h %s' REBASE_HEAD 2>/dev/null) || culprit="an unknown commit"
 		git rebase --abort >/dev/null 2>&1 || aborted=false
 		$aborted ||
 			die "replaying $branch over $base_branch stopped on $culprit, and 'git rebase --abort' failed too; the repo is mid-rebase." 1
-		[[ "$start" == "$branch" ]] || switch_or_die "$start"
+		return_to_head_position "$start"
 		die "replaying $branch over $base_branch stopped on $culprit; the rebase was aborted, so $branch and $base_branch are as they were. Resolve that conflict on $branch, then re-run."
 	fi
-	git branch --force "$base_branch" "$branch~$plain_count" ||
-		die "moving $base_branch onto the folded commits failed; the fold is on $branch and $base_branch is untouched." 1
+	total=$(git rev-list --count "$fork..$branch")
+	((total >= release_count)) ||
+		restore_fold_or_die "the fold left $total commits above the fork point, fewer than the $release_count $base_branch carried, so a fixup cancels a release commit out and the fold would drop it" \
+			2 "$branch" "$base_branch" "$plan_before" "$base_before" "$start"
+	fold_remaining=$((total - release_count))
+	git branch --force "$base_branch" "$branch~$fold_remaining" ||
+		restore_fold_or_die "moving $base_branch onto the folded commits failed" 1 \
+			"$branch" "$base_branch" "$plan_before" "$base_before" "$start"
 }
 
 # Leaves the squash commit on the base; every later step is cleanup that keeps
-# it. $4 names what a failure here keeps and $5 is the exit status a failed
-# switch reports, which differ between the two callers: the fold has already
-# moved the base by the time it squashes, so its switch failure is a failure
-# after a write, while the plain squash has written nothing yet.
+# it. Answers with the reason to fail with on stdout and a status telling the
+# two kinds of failure apart — 2 while nothing is written yet, 1 once the squash
+# has touched the index — because what a failure leaves behind differs between
+# the callers: the fold has a rewritten base and plan branch to put back, the
+# plain squash has written nothing of its own.
 squash_onto_base() {
-	local branch="$1" base_branch="$2" msg_file="$3" kept="$4" switch_status="${5:-}"
-	switch_or_die "$base_branch" "$switch_status" "$kept"
-	git merge --squash "$branch" >/dev/null ||
-		die "squash-merging $branch into $base_branch failed; $kept." 1
-	git commit --quiet --file "$msg_file" ||
-		die "committing the squash of $branch onto $base_branch failed; $kept." 1
+	local branch="$1" base_branch="$2" msg_file="$3"
+	git switch --quiet "$base_branch" || {
+		printf 'could not switch to %s' "$base_branch"
+		return 2
+	}
+	git merge --squash "$branch" >/dev/null || {
+		printf 'squash-merging %s into %s failed' "$branch" "$base_branch"
+		return 1
+	}
+	git commit --quiet --file "$msg_file" || {
+		printf 'committing the squash of %s onto %s failed' "$branch" "$base_branch"
+		return 1
+	}
 }
 
 # Pushes the rewritten base under a lease on the sha origin answered the opening
 # fetch with, so a base someone else moved in between is rejected rather than
-# overwritten. A rejection is the one push failure the user fixes by fetching.
+# overwritten.
+#
+# Whether that is what happened is read from origin itself rather than from
+# git's rejection text: a lease refused against the stale remote-tracking ref
+# reads "stale info", one refused by the receiving end reads "incorrect old
+# value provided", and only origin's current sha separates either from a remote
+# that is simply unreachable.
+#
+# A moved origin is not fixed by a fetch alone: the restore puts $1 back at its
+# pre-fold tip, which a bare re-run then refuses as differing from origin, so
+# the reason names the update and the replay that make a re-run land. $3 is the
+# plan branch and $4 the base's pre-fold tip, which is where $3 forks from once
+# the restore has run.
+#
+# Answers non-zero with git's own output on stderr and the reason to refuse with
+# on stdout: the caller owns what happens to the fold, which has to come back
+# before the run exits either way.
 push_folded_base() {
-	local base_branch="$1" origin_sha="$2" kept="$3" output status=0
+	local base_branch="$1" origin_sha="$2" branch="$3" base_before="$4" output status=0 remote_sha
 	output=$(git push --quiet --force-with-lease="$base_branch:$origin_sha" origin "$base_branch" 2>&1) || status=$?
-	if ((status == 0)); then
-		return 0
-	fi
+	((status != 0)) || return 0
 	printf '%s\n' "$output" >&2
-	[[ "$output" != *"stale info"* ]] ||
-		die "pushing $base_branch to origin was rejected: origin/$base_branch moved since this run fetched it; $kept, so re-run after 'git fetch origin $base_branch'." 1
-	die "pushing $base_branch to origin failed; $kept." 1
+	remote_sha=$(git ls-remote origin "refs/heads/$base_branch" 2>/dev/null | cut -f1) || remote_sha=""
+	if [[ -n "$remote_sha" && "$remote_sha" != "$origin_sha" ]]; then
+		printf "pushing %s to origin was rejected: origin/%s moved since this run fetched it. Catch %s up and replay %s on it with 'git switch %s && git pull --ff-only origin %s' and 'git rebase --onto %s %s %s', then re-run; fetching alone leaves %s behind origin, which a re-run refuses" \
+			"$base_branch" "$base_branch" "$base_branch" "$branch" "$base_branch" \
+			"$base_branch" "$base_branch" "$base_before" "$branch" "$base_branch"
+	else
+		printf "pushing %s to origin failed, so run 'git fetch origin %s' and re-run once the remote is reachable" \
+			"$base_branch" "$base_branch"
+	fi
+	return 1
 }
 
 # Drops the branch here and on origin (when origin has it) and the message file.
@@ -494,27 +681,44 @@ clean_up_branch() {
 cmd_merge() {
 	local git_dir="$1"
 	shift
-	local branch force base_branch slug msg_file tip origin_sha fixups fork plain_count base_before kept
+	local branch force base_branch slug msg_file tip origin_sha fixups fork plain_count
+	local start base_before release_count fold_remaining reason squash_status
 	parse_merge_args "$@"
 	branch=$(resolve_plan_branch "$branch")
 	base_branch=$(resolve_base_branch "$branch")
 	slug=${branch#"$PLAN_BRANCH_PREFIX"}
 	msg_file="$git_dir/plan-squash/$slug.msg"
 	tip=$(git rev-parse --verify "refs/heads/$branch")
+	start=$(head_position)
 
 	require_clean_worktree
 	require_branch_contains_base "$branch" "$base_branch"
+	require_replayable_history "$base_branch" "$branch"
 	origin_sha=$(require_branch_in_sync "$base_branch")
 	require_plan_branch_matches_origin "$branch" "$tip"
 	$force || require_ci_success "$branch" "$tip"
 
 	fixups=$(fixup_subjects "$base_branch" "$branch")
 	plain_count=$(plain_commit_count "$base_branch" "$branch")
+	base_before=$(git rev-parse --verify "refs/heads/$base_branch")
 	if [[ -z "$fixups" ]]; then
 		require_message_file "$msg_file"
-		squash_onto_base "$branch" "$base_branch" "$msg_file" "nothing here changed"
-		git push --quiet origin "$base_branch" ||
-			die "pushing $base_branch to origin failed; the squash commit, $branch, and $msg_file are kept." 1
+		squash_status=0
+		reason=$(squash_onto_base "$branch" "$base_branch" "$msg_file") || squash_status=$?
+		if ((squash_status != 0)); then
+			# Status 2 never reached the index; 1 has the squash sitting in it, and
+			# "nothing here changed" holds again only once that squash is gone.
+			if ((squash_status != 2)); then
+				discard_uncommitted
+				return_to_head_position "$start" "$base_branch and $branch are untouched" 1
+			fi
+			die "$reason; nothing here changed." "$squash_status"
+		fi
+		git push --quiet origin "$base_branch" || {
+			restore_branches "$base_branch" "$base_before" "" "" "$start" ||
+				die "pushing $base_branch to origin failed, and restoring $base_branch failed too; recover with 'git branch -f $base_branch $base_before'." 1
+			die "pushing $base_branch to origin failed; $base_branch was restored to its pre-squash tip, and $branch and $msg_file are untouched, so re-run once the remote is reachable." 1
+		}
 		clean_up_branch "$branch" "$base_branch" "$msg_file"
 		printf 'release: %s squashed onto %s and pushed.\n' "$branch" "$base_branch"
 		return
@@ -523,20 +727,19 @@ cmd_merge() {
 	fork=$(git merge-base "$TRUNK" "$base_branch") ||
 		die "'$base_branch' shares no history with $TRUNK, so there is no range for the fold to replay."
 	require_foldable "$branch" "$base_branch" "$fork"
-	kept="the fold on $base_branch and $branch are kept"
-	if ((plain_count > 0)); then
-		require_message_file "$msg_file"
-		kept="the fold on $base_branch, $branch, and $msg_file are kept"
-	fi
+	((plain_count == 0)) || require_message_file "$msg_file"
 
-	base_before=$(git rev-parse --verify "refs/heads/$base_branch")
-	fold_fixups "$branch" "$base_branch" "$fork" "$plain_count"
-	if ((plain_count > 0)); then
-		squash_onto_base "$branch" "$base_branch" "$msg_file" "$kept" 1
+	release_count=$(git rev-list --count "$fork..$base_branch")
+	fold_fixups "$branch" "$base_branch" "$fork" "$release_count" "$tip" "$base_before" "$start"
+	if ((fold_remaining > 0)); then
+		reason=$(squash_onto_base "$branch" "$base_branch" "$msg_file") ||
+			restore_fold_or_die "$reason" 1 "$branch" "$base_branch" "$tip" "$base_before" "$start"
 	else
-		switch_or_die "$base_branch" 1 "$kept"
+		git switch --quiet "$base_branch" ||
+			restore_fold_or_die "could not switch to $base_branch" 1 "$branch" "$base_branch" "$tip" "$base_before" "$start"
 	fi
-	push_folded_base "$base_branch" "$origin_sha" "$kept"
+	reason=$(push_folded_base "$base_branch" "$origin_sha" "$branch" "$base_before") ||
+		restore_fold_or_die "$reason" 1 "$branch" "$base_branch" "$tip" "$base_before" "$start"
 	clean_up_branch "$branch" "$base_branch" "$msg_file"
 
 	printf 'release: %s folded into %s and pushed; %s was %s before the fold (git branch -f %s %s undoes it).\n' \

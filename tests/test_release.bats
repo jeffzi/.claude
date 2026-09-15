@@ -13,9 +13,10 @@ PLAN_MSG="feat(widget): add the widget
 Also fixes: the sprocket.
 "
 
-# Subjects of the two commits the fold fixtures put on the release branch.
+# Subjects of the commits the fold fixtures put on the release branch.
 ALPHA_SUBJECT="feat: add alpha"
 BETA_SUBJECT="feat: add beta"
+GAMMA_SUBJECT="feat: add gamma"
 
 # CHANGELOG.md the release commit adds. Only the [0.1.0] section belongs in the
 # GitHub release body; the older section must stay out of it.
@@ -180,6 +181,69 @@ setup_ambiguous_fold_repo() {
 	printf '%s' "$work"
 }
 
+# Commit file $2 with content $3 under subject $4 in the repo at $1 — commit_file
+# with the two told apart, for fixtures whose content must repeat across subjects.
+commit_as() {
+	local repo="$1" name="$2" text="$3" subject="$4"
+	printf '%s\n' "$text" >"$repo/$name"
+	git -C "$repo" add "$name"
+	git -C "$repo" -c commit.gpgsign=false commit -q -m "$subject"
+}
+
+# setup_open_release with v0.1 carrying the alpha commit and two commits sharing
+# the beta subject, and a plan/x whose first ordinary commit makes exactly the
+# change its trailing fixup makes, so the rebase replays it as empty; gh reports
+# a successful run. Prints the work dir.
+setup_emptied_fold_repo() {
+	local work
+	work=$(setup_open_release)
+	git -C "$work" switch -q v0.1
+	commit_file "$work" alpha.txt "$ALPHA_SUBJECT"
+	commit_file "$work" beta.txt "$BETA_SUBJECT"
+	commit_file "$work" beta2.txt "$BETA_SUBJECT"
+	git -C "$work" push -q origin v0.1
+	git -C "$work" switch -q -c plan/x
+	git -C "$work" config branch.plan/x.planBase v0.1
+	commit_as "$work" alpha.txt "patched alpha" "feat: patch alpha"
+	commit_as "$work" alpha.txt "$ALPHA_SUBJECT" "feat: unpatch alpha"
+	commit_as "$work" alpha.txt "patched alpha" "fixup! $ALPHA_SUBJECT"
+	stub_gh "$(gh_runs completed success)"
+	printf '%s' "$work"
+}
+
+# setup_release_pair with alpha, beta and gamma seeded on main, a v0.1 holding
+# one commit per file, and a plan/x whose ordinary commit undoes the beta and
+# gamma commits while its fixup for the alpha commit redoes both — so the rebase
+# replays the beta and gamma commits as empty. gh reports a successful run;
+# prints the work dir.
+setup_vanishing_fold_repo() {
+	local work
+	work=$(setup_release_pair)
+	commit_file "$work" alpha.txt "seed alpha"
+	commit_file "$work" beta.txt "seed beta"
+	commit_file "$work" gamma.txt "seed gamma"
+	git -C "$work" push -q origin main
+	git -C "$work" branch v0.1 main
+	git -C "$work" config branch.v0.1.release 0.1.0
+	git -C "$work" switch -q v0.1
+	commit_file "$work" alpha.txt "$ALPHA_SUBJECT"
+	commit_file "$work" beta.txt "$BETA_SUBJECT"
+	commit_file "$work" gamma.txt "$GAMMA_SUBJECT"
+	git -C "$work" push -q origin v0.1
+	git -C "$work" switch -q -c plan/x
+	git -C "$work" config branch.plan/x.planBase v0.1
+	printf 'seed beta\n' >"$work/beta.txt"
+	printf 'seed gamma\n' >"$work/gamma.txt"
+	git -C "$work" add beta.txt gamma.txt
+	git -C "$work" -c commit.gpgsign=false commit -q -m "chore: undo beta and gamma"
+	printf '%s\n' "$BETA_SUBJECT" >"$work/beta.txt"
+	printf '%s\n' "$GAMMA_SUBJECT" >"$work/gamma.txt"
+	git -C "$work" add beta.txt gamma.txt
+	git -C "$work" -c commit.gpgsign=false commit -q -m "fixup! $ALPHA_SUBJECT"
+	stub_gh "$(gh_runs completed success)"
+	printf '%s' "$work"
+}
+
 # Path of the squash message file for slug $2 in the repo at $1.
 msg_path() {
 	printf '%s/plan-squash/%s.msg' "$(git -C "$1" rev-parse --absolute-git-dir)" "$2"
@@ -209,6 +273,72 @@ diverge_push_target() {
 	git clone -q --bare "$(bare_of "$work")" "$other"
 	git -C "$other" update-ref "refs/heads/$branch" "$(git -C "$work" rev-parse main)"
 	git -C "$work" config remote.origin.pushurl "$other"
+}
+
+# Commit on branch $2 in a second clone of $1's origin, and install a pre-push
+# hook in $1 that pushes that commit to the real origin before letting the run's
+# own push through — so the push meets an origin that moved after the opening
+# fetch took its lease. The hook removes itself, leaving a later push free.
+move_origin_before_push() {
+	local work="$1" branch="$2" other hook
+	other="${work%/work}/second"
+	git clone -q "$(bare_of "$work")" "$other"
+	init_git_identity "$other"
+	git -C "$other" switch -q "$branch"
+	commit_file "$other" THEIRS "theirs"
+	hook="$(git -C "$work" rev-parse --absolute-git-dir)/hooks/pre-push"
+	mkdir -p "$(dirname "$hook")"
+	{
+		printf '#!/usr/bin/env bash\n'
+		printf 'rm -f %q\n' "$hook"
+		printf 'env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C %q push -q origin %q\n' \
+			"$other" "$branch"
+	} >"$hook"
+	chmod +x "$hook"
+}
+
+# setup_fold_repo whose merge run, made with HEAD on branch $1, met an origin
+# that moved after its opening fetch and failed, with the recovery steps that
+# run printed already carried out; prints the work dir.
+setup_recovered_fold_repo() {
+	local work
+	work=$(setup_fold_repo)
+	write_msg "$work" x "$PLAN_MSG"
+	move_origin_before_push "$work" v0.1
+	git -C "$work" switch -q "$1"
+	run_merge "$work" plan/x
+	run_printed_steps "$work"
+	printf '%s' "$work"
+}
+
+# Install a pre-push hook in $1 that points origin at a missing path and then
+# fails the push, so the push and every remote read after it meet a remote that
+# cannot be reached at all.
+unreachable_origin_before_push() {
+	local work="$1" hook
+	hook="$(git -C "$work" rev-parse --absolute-git-dir)/hooks/pre-push"
+	mkdir -p "$(dirname "$hook")"
+	{
+		printf '#!/usr/bin/env bash\n'
+		printf 'env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C %q config remote.origin.url %q\n' \
+			"$work" "$TMPDIR_ROOT/missing.git"
+		printf 'exit 1\n'
+	} >"$hook"
+	chmod +x "$hook"
+}
+
+# Install a pre-commit hook in $1 that fails every commit the script makes.
+fail_commits() {
+	local hook
+	hook="$(git -C "$1" rev-parse --absolute-git-dir)/hooks/pre-commit"
+	mkdir -p "$(dirname "$hook")"
+	printf '#!/usr/bin/env bash\nexit 1\n' >"$hook"
+	chmod +x "$hook"
+}
+
+# Drop the hook fail_commits installed in $1, so commits succeed again.
+allow_commits() {
+	rm -f "$(git -C "$1" rev-parse --absolute-git-dir)/hooks/pre-commit"
 }
 
 # ── finish fixtures ──────────────────────────────────────────────────────────
@@ -365,6 +495,27 @@ run_merge_without_gh() {
 	run_script_on_path "$work" "$bin" "$RELEASE_SCRIPT" merge "$@"
 }
 
+# Run every 'git …' command the last run quoted in its message, in the order it
+# quoted them, from the repo at $1; fails if a step fails or none was quoted.
+run_printed_steps() {
+	local work="$1" rest="$RUN_STDERR" step out ran=0
+	while [[ "$rest" == *"'"* ]]; do
+		rest="${rest#*\'}"
+		step="${rest%%\'*}"
+		rest="${rest#*\'}"
+		[[ "$step" == git\ * ]] || continue
+		out=$(cd "$work" && eval "$step" 2>&1) || {
+			printf 'quoted step failed: %s\n%s\n' "$step" "$out" >&2
+			return 1
+		}
+		ran=$((ran + 1))
+	done
+	((ran > 0)) || {
+		printf 'no git steps quoted\nstderr: %s\n' "$RUN_STDERR" >&2
+		return 1
+	}
+}
+
 # ── Assertions ───────────────────────────────────────────────────────────────
 
 # Config key $2 of repo $1 holds exactly $3.
@@ -464,6 +615,16 @@ assert_blob_at() {
 	}
 }
 
+# Repo $1 has nothing staged, nothing modified and nothing untracked.
+assert_tree_clean() {
+	local repo="$1" got
+	got=$(git -C "$repo" status --porcelain --untracked-files=all)
+	[[ -z "$got" ]] || {
+		printf 'expected a clean tree in %s, got:\n%s\n' "$repo" "$got" >&2
+		return 1
+	}
+}
+
 # Subjects of the commits $2 carries beyond its fork point with main, in repo $1.
 release_subjects() {
 	git -C "$1" log --format=%s "$(git -C "$1" merge-base main "$2")..$2"
@@ -490,6 +651,16 @@ commit_by_subject() {
 	printf '<no commit with subject %s>' "$want"
 }
 
+# HEAD in repo $1 is detached at commit $2.
+assert_detached_at() {
+	local repo="$1" want="$2" head
+	if head=$(git -C "$repo" symbolic-ref -q HEAD); then
+		printf 'HEAD is on %s, expected it detached at %s\n' "$head" "$want" >&2
+		return 1
+	fi
+	assert_rev_at "$repo" HEAD "$want"
+}
+
 # Snapshot of the repo at $1 a run could change: HEAD, local refs, local config,
 # origin refs, work tree.
 repo_state() {
@@ -499,6 +670,20 @@ repo_state() {
 	git -C "$work" config --list --local
 	git -C "$(bare_of "$work")" for-each-ref --format='%(refname) %(objectname)'
 	git -C "$work" status --porcelain --untracked-files=all
+}
+
+# Merge in the repo at $1 is refused naming $2 and the linear-only reason,
+# leaving the repo exactly as it was.
+assert_merge_refuses_fold() {
+	local work="$1" name="$2" state_before
+	state_before=$(repo_state "$work")
+
+	run_merge "$work"
+
+	assert_refused
+	assert_reason "$name"
+	assert_reason "a fold replays only linear fixup! and ordinary commits"
+	assert_repo_state "$work" "$state_before"
 }
 
 # ── Marker gate ──────────────────────────────────────────────────────────────
@@ -744,6 +929,35 @@ repo_state() {
 	assert_ref_absent "$(bare_of "$work")" v1.2
 }
 
+@test "start: a repeat after a failed push pushes the existing branch with upstream and ends on it" {
+	local work main_before
+	work=$(setup_release_pair)
+	git -C "$work" branch v1.2 main
+	git -C "$work" config branch.v1.2.release 1.2.0
+	main_before=$(git -C "$work" rev-parse main)
+
+	run_release "$work" start 1.2.0
+
+	assert_run_ok
+	assert_stdout_line "release: v1.2 was already cut for 1.2.0 and is now pushed."
+	assert_ref_at "$(bare_of "$work")" v1.2 "$main_before"
+	assert_upstream_at "$work" v1.2 origin/v1.2
+	assert_config_at "$work" branch.v1.2.release 1.2.0
+	assert_on_branch "$work" v1.2
+}
+
+@test "start: a version whose branch origin already has is refused naming it" {
+	local work state_before
+	work=$(setup_open_release)
+	state_before=$(repo_state "$work")
+
+	run_release "$work" start 0.1.0
+
+	assert_refused
+	assert_reason v0.1
+	assert_repo_state "$work" "$state_before"
+}
+
 @test "start: off main is refused naming the branch" {
 	local work state_before
 	work=$(setup_release_pair)
@@ -816,6 +1030,20 @@ repo_state() {
 
 	assert_refused
 	assert_reason "v0.1"
+	assert_repo_state "$work" "$state_before"
+}
+
+@test "start: the same version keyed on another branch is refused naming that branch" {
+	local work state_before
+	work=$(setup_release_pair)
+	git -C "$work" branch feature/x main
+	git -C "$work" config branch.feature/x.release 1.2.0
+	state_before=$(repo_state "$work")
+
+	run_release "$work" start 1.2.0
+
+	assert_refused
+	assert_reason "feature/x"
 	assert_repo_state "$work" "$state_before"
 }
 
@@ -1477,7 +1705,7 @@ repo_state() {
 
 # ── merge: push and cleanup failures ─────────────────────────────────────────
 
-@test "merge: a failed push keeps the squash commit, the branch, and the message file" {
+@test "merge: a failed push restores the base and keeps the branch and the message file" {
 	local work main_before msg
 	work=$(setup_plan_repo widget)
 	ready_widget_merge "$work"
@@ -1489,9 +1717,63 @@ repo_state() {
 
 	assert_run_failed 1
 	assert_reason "pushing main to origin failed"
-	assert_rev_at "$work" main^ "$main_before"
+	assert_reason "main was restored"
+	assert_reason "re-run"
+	assert_rev_at "$work" main "$main_before"
 	assert_ref_present "$work" plan/widget
 	assert_present "$msg"
+}
+
+@test "merge: a re-run after a failed push squashes and pushes" {
+	local work main_before
+	work=$(setup_plan_repo widget)
+	ready_widget_merge "$work"
+	main_before=$(git -C "$work" rev-parse main)
+	git -C "$work" config remote.origin.pushurl "$TMPDIR_ROOT/missing.git"
+	run_merge "$work" plan/widget
+	git -C "$work" config --unset remote.origin.pushurl
+
+	run_merge "$work" plan/widget
+
+	assert_run_ok
+	assert_rev_at "$work" main^ "$main_before"
+	assert_ref_at "$(bare_of "$work")" main "$(git -C "$work" rev-parse main)"
+	assert_ref_absent "$work" plan/widget
+}
+
+@test "merge: a failed squash leaves the base clean and keeps the branch and the message file" {
+	local work main_before msg
+	work=$(setup_plan_repo widget)
+	ready_widget_merge "$work"
+	msg=$(msg_path "$work" widget)
+	main_before=$(git -C "$work" rev-parse main)
+	fail_commits "$work"
+
+	run_merge "$work"
+
+	assert_run_failed 1
+	assert_reason "nothing here changed"
+	assert_rev_at "$work" main "$main_before"
+	assert_tree_clean "$work"
+	assert_ref_present "$work" plan/widget
+	assert_present "$msg"
+}
+
+@test "merge: a re-run after a failed squash squashes and pushes" {
+	local work main_before
+	work=$(setup_plan_repo widget)
+	ready_widget_merge "$work"
+	main_before=$(git -C "$work" rev-parse main)
+	fail_commits "$work"
+	run_merge "$work" plan/widget
+	allow_commits "$work"
+
+	run_merge "$work" plan/widget
+
+	assert_run_ok
+	assert_rev_at "$work" main^ "$main_before"
+	assert_ref_at "$(bare_of "$work")" main "$(git -C "$work" rev-parse main)"
+	assert_ref_absent "$work" plan/widget
 }
 
 @test "merge: a failing ls-remote is reported and leaves the branches in place" {
@@ -1742,40 +2024,293 @@ repo_state() {
 	assert_ref_present "$work" plan/x
 }
 
-@test "merge: a rejected lease keeps the fold local and says the remote moved" {
-	local work msg plan_tree
+@test "merge: a lease rejected by a moved origin restores both branches and names the recovery steps" {
+	local work msg base_before plan_before
 	work=$(setup_fold_repo)
 	write_msg "$work" x "$PLAN_MSG"
 	msg=$(msg_path "$work" x)
-	plan_tree=$(git -C "$work" rev-parse "plan/x^{tree}")
-	diverge_push_target "$work" v0.1
+	base_before=$(git -C "$work" rev-parse v0.1)
+	plan_before=$(git -C "$work" rev-parse plan/x)
+	move_origin_before_push "$work" v0.1
 
 	run_merge "$work"
 
 	assert_run_failed 1
 	assert_reason "origin/v0.1 moved"
-	assert_reason "git fetch"
-	assert_rev_at "$work" "v0.1^{tree}" "$plan_tree"
-	assert_commit_message "$work" v0.1 "$PLAN_MSG"
-	assert_ref_present "$work" plan/x
+	assert_reason "were restored"
+	assert_reason "git switch v0.1"
+	assert_reason "git pull --ff-only origin v0.1"
+	assert_reason "git rebase --onto v0.1 $base_before plan/x"
+	assert_reason "re-run"
+	assert_rev_at "$work" v0.1 "$base_before"
+	assert_rev_at "$work" plan/x "$plan_before"
+	assert_tree_clean "$work"
 	assert_present "$msg"
 }
 
-@test "merge: a failed move of the release branch says the fold is on the plan branch" {
-	local work base_before
+@test "merge: a re-run after only a fetch is refused as out of sync with origin" {
+	local work
 	work=$(setup_fold_repo)
 	write_msg "$work" x "$PLAN_MSG"
-	stub_git_failing_on --force
+	move_origin_before_push "$work" v0.1
+	run_merge "$work" plan/x
+	git -C "$work" fetch -q origin
+
+	run_merge "$work" plan/x
+
+	assert_refused
+	assert_reason "differs from origin/v0.1"
+}
+
+@test "merge: the recovery steps printed to a run made from the release branch fold and push on a re-run" {
+	local work subjects_before
+	work=$(setup_recovered_fold_repo v0.1)
+	subjects_before=$(release_subjects "$work" v0.1)
+
+	run_merge "$work" plan/x
+
+	assert_run_ok
+	assert_release_subjects "$work" "v0.1^" "$subjects_before"
+	assert_ref_at "$(bare_of "$work")" v0.1 "$(git -C "$work" rev-parse v0.1)"
+	assert_ref_absent "$work" plan/x
+}
+
+@test "merge: the recovery steps printed to a run made from the plan branch fold and push on a re-run" {
+	local work subjects_before
+	work=$(setup_recovered_fold_repo plan/x)
+	subjects_before=$(release_subjects "$work" v0.1)
+
+	run_merge "$work" plan/x
+
+	assert_run_ok
+	assert_release_subjects "$work" "v0.1^" "$subjects_before"
+	assert_ref_at "$(bare_of "$work")" v0.1 "$(git -C "$work" rev-parse v0.1)"
+	assert_ref_absent "$work" plan/x
+}
+
+@test "merge: the recovery steps printed to a run made from a third branch fold and push on a re-run" {
+	local work subjects_before
+	work=$(setup_recovered_fold_repo main)
+	subjects_before=$(release_subjects "$work" v0.1)
+
+	run_merge "$work" plan/x
+
+	assert_run_ok
+	assert_release_subjects "$work" "v0.1^" "$subjects_before"
+	assert_ref_at "$(bare_of "$work")" v0.1 "$(git -C "$work" rev-parse v0.1)"
+	assert_ref_absent "$work" plan/x
+}
+
+@test "merge: a restore that fails after a rejected lease prints both shas and their recovery commands" {
+	local work base_before plan_before
+	work=$(setup_fold_repo)
+	write_msg "$work" x "$PLAN_MSG"
 	base_before=$(git -C "$work" rev-parse v0.1)
+	plan_before=$(git -C "$work" rev-parse plan/x)
+	diverge_push_target "$work" v0.1
+	stub_git_failing_on "$base_before"
+
+	run_merge "$work"
+
+	assert_run_failed 1
+	assert_reason "git branch -f v0.1 $base_before"
+	assert_reason "git branch -f plan/x $plan_before"
+}
+
+@test "merge: an unreachable remote on the fold path restores both branches and says to fetch and re-run" {
+	local work msg base_before plan_before
+	work=$(setup_fold_repo)
+	write_msg "$work" x "$PLAN_MSG"
+	msg=$(msg_path "$work" x)
+	base_before=$(git -C "$work" rev-parse v0.1)
+	plan_before=$(git -C "$work" rev-parse plan/x)
+	git -C "$work" config remote.origin.pushurl "$TMPDIR_ROOT/missing.git"
+
+	run_merge "$work"
+
+	assert_run_failed 1
+	assert_reason "were restored"
+	assert_reason "git fetch"
+	assert_reason "re-run"
+	assert_rev_at "$work" v0.1 "$base_before"
+	assert_rev_at "$work" plan/x "$plan_before"
+	assert_present "$msg"
+}
+
+@test "merge: a remote that cannot be reached at all restores both branches and says to re-run once it is reachable" {
+	local work msg base_before plan_before
+	work=$(setup_fold_repo)
+	write_msg "$work" x "$PLAN_MSG"
+	msg=$(msg_path "$work" x)
+	base_before=$(git -C "$work" rev-parse v0.1)
+	plan_before=$(git -C "$work" rev-parse plan/x)
+	unreachable_origin_before_push "$work"
+
+	run_merge "$work"
+
+	assert_run_failed 1
+	assert_reason "were restored"
+	assert_reason "re-run once the remote is reachable"
+	assert_rev_at "$work" v0.1 "$base_before"
+	assert_rev_at "$work" plan/x "$plan_before"
+	assert_tree_clean "$work"
+	assert_present "$msg"
+}
+
+@test "merge: a failed move of the release branch restores the plan branch and says so" {
+	local work msg base_before plan_before lock
+	work=$(setup_fold_repo)
+	write_msg "$work" x "$PLAN_MSG"
+	msg=$(msg_path "$work" x)
+	base_before=$(git -C "$work" rev-parse v0.1)
+	plan_before=$(git -C "$work" rev-parse plan/x)
+	lock="$(git -C "$work" rev-parse --absolute-git-dir)/refs/heads/v0.1.lock"
+	mkdir -p "$(dirname "$lock")"
+	: >"$lock"
 
 	run_merge "$work"
 
 	assert_run_failed 1
 	assert_reason "moving v0.1 onto the folded commits failed"
-	assert_reason "the fold is on plan/x"
-	assert_reason "v0.1 is untouched"
+	assert_reason "plan/x was restored"
 	assert_rev_at "$work" v0.1 "$base_before"
-	assert_ref_present "$work" plan/x
+	assert_rev_at "$work" plan/x "$plan_before"
+	assert_present "$msg"
+}
+
+@test "merge: a failed squash after the fold restores both branches and the tree" {
+	local work msg base_before plan_before
+	work=$(setup_fold_repo)
+	write_msg "$work" x "$PLAN_MSG"
+	msg=$(msg_path "$work" x)
+	base_before=$(git -C "$work" rev-parse v0.1)
+	plan_before=$(git -C "$work" rev-parse plan/x)
+	fail_commits "$work"
+
+	run_merge "$work"
+
+	assert_run_failed 1
+	assert_reason "and the tree were restored"
+	assert_rev_at "$work" v0.1 "$base_before"
+	assert_rev_at "$work" plan/x "$plan_before"
+	assert_tree_clean "$work"
+	assert_present "$msg"
+}
+
+@test "merge: a re-run after a failed squash folds and pushes" {
+	local work subjects_before
+	work=$(setup_fold_repo)
+	write_msg "$work" x "$PLAN_MSG"
+	subjects_before=$(release_subjects "$work" v0.1)
+	fail_commits "$work"
+	run_merge "$work" plan/x
+	allow_commits "$work"
+
+	run_merge "$work" plan/x
+
+	assert_run_ok
+	assert_release_subjects "$work" "v0.1^" "$subjects_before"
+	assert_commit_message "$work" v0.1 "$PLAN_MSG"
+	assert_ref_at "$(bare_of "$work")" v0.1 "$(git -C "$work" rev-parse v0.1)"
+	assert_ref_absent "$work" plan/x
+}
+
+@test "merge: a merge commit on the plan branch is refused naming it" {
+	local work sha
+	work=$(setup_fold_repo)
+	write_msg "$work" x "$PLAN_MSG"
+	git -C "$work" switch -q -c side v0.1
+	commit_file "$work" side.txt "feat: add the side"
+	git -C "$work" switch -q plan/x
+	git -C "$work" -c commit.gpgsign=false merge -q --no-ff -m "Merge branch 'side'" side
+	sha=$(git -C "$work" rev-parse --short HEAD)
+
+	assert_merge_refuses_fold "$work" "$sha"
+}
+
+@test "merge: a squash! commit on the plan branch is refused naming it" {
+	local work
+	work=$(setup_fold_repo)
+	write_msg "$work" x "$PLAN_MSG"
+	commit_file "$work" alpha.txt "squash! $ALPHA_SUBJECT"
+
+	assert_merge_refuses_fold "$work" "squash! $ALPHA_SUBJECT"
+}
+
+@test "merge: an amend! commit on the plan branch is refused naming it" {
+	local work
+	work=$(setup_fold_repo)
+	write_msg "$work" x "$PLAN_MSG"
+	commit_file "$work" beta.txt "amend! $BETA_SUBJECT"
+
+	assert_merge_refuses_fold "$work" "amend! $BETA_SUBJECT"
+}
+
+@test "merge: a fold that replays a plan commit as empty keeps every release commit" {
+	local work subjects_before
+	work=$(setup_emptied_fold_repo)
+	write_msg "$work" x "$PLAN_MSG"
+	subjects_before=$(release_subjects "$work" v0.1)
+
+	run_merge "$work"
+
+	assert_run_ok
+	assert_release_subjects "$work" "v0.1^" "$subjects_before"
+	assert_blob_at "$work" "$(commit_by_subject "$work" v0.1 "$ALPHA_SUBJECT"):alpha.txt" "patched alpha"
+}
+
+@test "merge: a fold that cancels a release commit restores both branches and is refused naming the counts" {
+	local work base_before plan_before
+	work=$(setup_vanishing_fold_repo)
+	write_msg "$work" x "$PLAN_MSG"
+	base_before=$(git -C "$work" rev-parse v0.1)
+	plan_before=$(git -C "$work" rev-parse plan/x)
+
+	run_merge "$work"
+
+	assert_refused
+	assert_reason "the fold left 2 commits above the fork point, fewer than the 3 v0.1 carried"
+	assert_rev_at "$work" v0.1 "$base_before"
+	assert_rev_at "$work" plan/x "$plan_before"
+	assert_on_branch "$work" plan/x
+}
+
+@test "merge: a conflicting fixup named from a detached HEAD leaves it detached where it was" {
+	local work head_before
+	work=$(setup_conflicting_fold_repo)
+	git -C "$work" switch -q --detach v0.1
+	head_before=$(git -C "$work" rev-parse HEAD)
+
+	run_merge "$work" plan/x
+
+	assert_refused
+	assert_reason "the rebase was aborted"
+	assert_detached_at "$work" "$head_before"
+}
+
+@test "merge: a fold with ordinary commits and no message file is refused before the rebase" {
+	local work state_before
+	work=$(setup_fold_repo)
+	state_before=$(repo_state "$work")
+
+	run_merge "$work"
+
+	assert_refused
+	assert_reason "no squash message at $(msg_path "$work" x)"
+	assert_repo_state "$work" "$state_before"
+}
+
+@test "merge: a fold with ordinary commits and an empty message file is refused before the rebase" {
+	local work state_before
+	work=$(setup_fold_repo)
+	write_msg "$work" x ""
+	state_before=$(repo_state "$work")
+
+	run_merge "$work"
+
+	assert_refused
+	assert_reason "is empty"
+	assert_repo_state "$work" "$state_before"
 }
 
 # ── finish: mode flags ───────────────────────────────────────────────────────
