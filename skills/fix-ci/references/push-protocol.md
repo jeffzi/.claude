@@ -37,6 +37,8 @@ Message per `Skill(write-commit)`:
 | a feature branch | `git switch <branch>` → `git merge --squash fix-ci/<slug>` → commit → `~/.claude/scripts/fix-ci-push.sh origin <branch>` → `git branch -D fix-ci/<slug>` → `~/.claude/scripts/fix-ci-push.sh origin --delete fix-ci/<slug>`                                                                                                                                                |
 | `plan/<slug>`    | Same as a feature branch: `git switch plan/<slug>` → `git merge --squash fix-ci/<slug>` → commit → `~/.claude/scripts/fix-ci-push.sh origin plan/<slug>` → `git branch -D fix-ci/<slug>` → `~/.claude/scripts/fix-ci-push.sh origin --delete fix-ci/<slug>`. Never its base: the plan branch reaches the branch it was created from only through the user's `/merge-plan`. |
 
-Then confirm the target branch's own new run goes green — this loop's exit condition. When
-`execute-plan` dispatched the loop, its ship phase re-checks the run for the branch tip itself as
-the gate; report the final tip and its conclusion so it can.
+Then locate the run for the target branch's new tip (`gh run list --commit $(git rev-parse HEAD)`,
+never `.[0]` of an unfiltered list), watch it, and pass the green gate on it — this loop's exit
+condition. The squash push itself proves nothing; the report names this run's id and conclusion.
+When `execute-plan` dispatched the loop, its ship phase re-checks the run for the branch tip itself
+as the gate; report the final tip and its conclusion so it can.

@@ -43,8 +43,13 @@ Ignore this block when `\$0` names a different PR, run, or SHA — the entry-poi
 warm up signing → locate run → wait if running → read failing logs → triage
 → touch marker → checkout PR branch → check branch CI coverage → branch fix-ci/<slug>
 → reproduce locally → fix → verify locally → commit → push branch → watch its run
-→ green? squash back : loop (max 3 pushed attempts) → rm marker (EVERY exit path)
+→ green gate? squash back : loop (max 3 pushed attempts) → watch the target tip's run
+→ green gate → rm marker (EVERY exit path)
 ```
+
+Two green gates, both passed by `gh run view` output in your context (see "The green gate"): the fix
+branch's run gates the squash; the target branch's run for the squashed tip gates the final report.
+Nothing is "green" between them — the squash push creates a new SHA that has no run yet.
 
 **Scope of approval.** A read-only ask — "why is CI red?", "check CI", "what's failing?" — gets
 locate/read/triage and a report with the proposed fix described: no marker, no edits, no commits
@@ -132,12 +137,28 @@ are stale. The `event` field distinguishes `push`- from `pull_request`-triggered
 Run still in progress → never analyze the previous run's failures as current. Wait:
 
 ```bash
-gh run watch <run-id> --exit-status --interval 30 2>&1 | tee /tmp/ci-watch.txt
+gh run watch <run-id> --exit-status --interval 30 > /tmp/ci-watch.txt 2>&1
 ```
 
-(background it; read the tee'd file on completion — never re-run to see output). A non-zero exit
-here means the run finished red — the loop's signal to read the failing logs, not an error to
-surface.
+(background it). The watch only tells you the run stopped. Its exit code is never a verdict: piped
+through `tee` it is `tee`'s, a stale or wrong run id exits 0 too, and the notification carries
+nothing else. On completion, pass the green gate below — never read `/tmp/ci-watch.txt` as a result.
+
+## The green gate
+
+**Bright line: "green" names exactly one observation — `status: completed` and `conclusion: success`
+from `gh run view`, for a run whose `headSha` is the tip you pushed, with that output in your
+context.** Run it after every watch, on the fix branch's run and on the target tip's run:
+
+```bash
+gh run view <run-id> --json headSha,status,conclusion
+gh pr view <n> --json headRefOid --jq .headRefOid     # must equal headSha above (PR entry only)
+```
+
+Anything else — a watch exit code, a task notification, `gh pr checks` alone, "no failures in the
+log", the squash push succeeding — is a claim, not a verification. Any reply that says "green",
+"passing", or "fix complete" quotes the gate output that proves it: run id, headSha, conclusion.
+Without it, the truthful words are "run `<id>` pending".
 
 ## Read only the failing logs
 
@@ -187,20 +208,23 @@ squash an unproven fix into the target.
 
 ## Rationalizations
 
-| Excuse                                             | Reality                                                                  |
-| -------------------------------------------------- | ------------------------------------------------------------------------ |
-| "Skip/xfail the flaky test, fix it later"          | That deletes the signal. Root-cause it or hand back.                     |
-| "`# type: ignore` unblocks the release"            | It suppresses every future error on that line. Fix or hand back.         |
-| "Rerun first — might be flaky"                     | Rerun before reading the log tells you nothing. Read first.              |
-| "Branching is overhead, I'll commit on main"       | Attempts on the original branch are permanent. Branch first.             |
-| "No CI on the branch — I'll just push to main"     | The target branch is never the test bed. Hard stop, report.              |
-| "Merge normally — squash loses the detail"         | The attempts are noise by design. Squash is the contract.                |
-| "I'll leave the marker, I might loop again later"  | A lingering marker disarms the guard repo-wide. Remove it now.           |
-| "The file isn't mine / pre-existing failure"       | It's a CI error; the request is fixing CI errors. No origin talk.        |
-| "I can analyze from main / read the diff remotely" | Reproduce means run the code. Switch to the target branch first.         |
-| "I'm still triaging, just checking one thing"      | Running a local command is reproduction, not triage. Checkout first.     |
-| "`gh pr checkout` failed, I'll work from main"     | Fix the checkout or use manual fetch+switch. Main is never the fallback. |
-| "Push #4 will surely be the one"                   | Three misses means the model of the bug is wrong. Hand back.             |
+| Excuse                                             | Reality                                                                   |
+| -------------------------------------------------- | ------------------------------------------------------------------------- |
+| "Skip/xfail the flaky test, fix it later"          | That deletes the signal. Root-cause it or hand back.                      |
+| "`# type: ignore` unblocks the release"            | It suppresses every future error on that line. Fix or hand back.          |
+| "Rerun first — might be flaky"                     | Rerun before reading the log tells you nothing. Read first.               |
+| "Branching is overhead, I'll commit on main"       | Attempts on the original branch are permanent. Branch first.              |
+| "No CI on the branch — I'll just push to main"     | The target branch is never the test bed. Hard stop, report.               |
+| "Merge normally — squash loses the detail"         | The attempts are noise by design. Squash is the contract.                 |
+| "I'll leave the marker, I might loop again later"  | A lingering marker disarms the guard repo-wide. Remove it now.            |
+| "The file isn't mine / pre-existing failure"       | It's a CI error; the request is fixing CI errors. No origin talk.         |
+| "I can analyze from main / read the diff remotely" | Reproduce means run the code. Switch to the target branch first.          |
+| "I'm still triaging, just checking one thing"      | Running a local command is reproduction, not triage. Checkout first.      |
+| "`gh pr checkout` failed, I'll work from main"     | Fix the checkout or use manual fetch+switch. Main is never the fallback.  |
+| "Push #4 will surely be the one"                   | Three misses means the model of the bug is wrong. Hand back.              |
+| "The watch exited 0, so the run passed"            | That's `tee`'s exit, or a stale id. Green is `gh run view` output only.   |
+| "Squashed and pushed — CI on the target is green"  | The new tip has no finished run yet. Watch it; that run is the exit gate. |
+| "User's waiting; it'll pass, report green now"     | Unverified green is a lie. Report "run `<id>` pending" or wait.           |
 
 ## Red flags — STOP
 
@@ -216,3 +240,5 @@ squash an unproven fix into the target.
   or `--no-verify` anywhere in this loop
 - About to edit permission settings because a push was denied — never; surface it instead
 - The marker file still exists and you're about to report results
+- About to write "green" or "fix complete" without `gh run view … conclusion` output in context
+- About to report after the squash push without a run id for the new target tip
