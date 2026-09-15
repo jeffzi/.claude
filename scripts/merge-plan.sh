@@ -4,7 +4,7 @@ set -euo pipefail
 # Squash a green plan branch into the branch it was started from, from the
 # message the plan run wrote.
 #
-# Usage: merge-plan.sh [plan/<slug>] [--skip-ci]
+# Usage: merge-plan.sh [plan/<slug>] [--force]
 #
 # The user runs this through /merge-plan, which raises the
 # `$GIT_DIR/merge-plan-active` marker this script requires. Its `git commit` on
@@ -16,36 +16,23 @@ set -euo pipefail
 # later failure (exit 1, a rejected push) keeps the commit, the branch, and the
 # message file, so the run can be retried after the cause is fixed.
 
-# Marker freshness, shared with the guard that gates invocations of this script.
+# Marker freshness shared with the guard that gates invocations of this script,
+# the planBase config key, the clean-tree precondition, and help handling.
 # shellcheck source=SCRIPTDIR/branch-policy.sh
 . "${BASH_SOURCE[0]%/*}/branch-policy.sh"
 PROG=merge-plan
 
-readonly USAGE="usage: merge-plan.sh [plan/<slug>] [--skip-ci]"
+readonly USAGE="usage: merge-plan.sh [plan/<slug>] [--force]"
 
-# Help is a successful request, answered before the repo or the marker is
-# consulted, so it works anywhere and whatever else argv holds.
-exit_if_help_requested() {
-	local arg
-	for arg in "$@"; do
-		case "$arg" in
-		-h | --help)
-			printf '%s\n' "$USAGE"
-			exit 0
-			;;
-		esac
-	done
-}
-
-# Sets the caller's `branch` and `skip_ci` from argv; `branch` stays empty for
+# Sets the caller's `branch` and `force` from argv; `branch` stays empty for
 # "use the current one".
 parse_args() {
 	local arg
 	branch=""
-	skip_ci=false
+	force=false
 	for arg in "$@"; do
 		case "$arg" in
-		--skip-ci) skip_ci=true ;;
+		--force) force=true ;;
 		-*) die "unknown option '$arg'; $USAGE" ;;
 		*)
 			[[ -z "$branch" ]] || die "only one branch may be named, got '$branch' and '$arg'."
@@ -71,25 +58,19 @@ resolve_branch() {
 }
 
 # Prints the branch the plan lands on: the base recorded by the run that created
-# the plan branch, otherwise main, otherwise master. Local branches decide it,
-# since the squash commit is made on one of them — which is also why a recorded
-# base that is gone is a refusal rather than a silent fall back to the trunk.
+# the plan branch, and nothing else. A missing or unusable record is a refusal
+# rather than a fall back to the trunk, which would land a plan on a branch it
+# was never cut from. The record must name a local branch, since the squash
+# commit is made on it here.
 resolve_base_branch() {
-	local branch="$1" recorded candidate
-	recorded=$(git config --get "branch.$branch.planBase") || recorded=""
-	if [[ -n "$recorded" ]]; then
-		git show-ref --quiet --verify "refs/heads/$recorded" ||
-			die "'$branch' records '$recorded' as its base, but that is not a local branch; restore it, or clear branch.$branch.planBase."
-		printf '%s' "$recorded"
-		return
-	fi
-	for candidate in main master; do
-		if git show-ref --quiet --verify "refs/heads/$candidate"; then
-			printf '%s' "$candidate"
-			return
-		fi
-	done
-	die "this repo has no local 'main' or 'master' branch; a plan branch with no recorded base lands on one of them."
+	local branch="$1" key recorded
+	key="branch.$branch.$PLAN_BASE_CONFIG_KEY"
+	recorded=$(git config --get "$key") || recorded=""
+	[[ -n "$recorded" ]] ||
+		die "$key is unset, so there is no recorded base to squash '$branch' onto; branches from 'plan-branch.sh create' carry it, or record one with 'git config $key <branch>'."
+	git show-ref --quiet --verify "refs/heads/$recorded" ||
+		die "'$branch' records '$recorded' as its base, but that is not a local branch; restore it, or re-record one with 'git config $key <branch>'."
+	printf '%s' "$recorded"
 }
 
 # The marker proves the run came through /merge-plan; a stale or future-dated one
@@ -100,15 +81,6 @@ require_merge_marker() {
 	die_if_stat_unusable "$status"
 	((status == 0)) ||
 		die "no fresh marker at $marker; this script runs only through /merge-plan, which the user invokes."
-}
-
-require_clean_worktree() {
-	local dirty
-	dirty=$(sh_git_dirty .) || return 0
-	case "$dirty" in
-	unstaged) die "the working tree has unstaged changes; commit or set them aside first." ;;
-	*) die "the index has staged changes; commit or set them aside first." ;;
-	esac
 }
 
 require_message_file() {
@@ -142,15 +114,16 @@ require_branch_contains_base() {
 }
 
 # Refuses unless the newest run gh reports for the branch tip concluded success.
+# `--force` skips this gate only; the tree, message, and base checks always run.
 require_ci_success() {
 	local branch="$1" tip="$2" summary
 	command -v gh >/dev/null ||
-		die "gh is not installed; re-run with --skip-ci to merge without the CI check."
+		die "gh is not installed; re-run with --force to merge without the CI check."
 	summary=$(gh run list --commit "$tip" --limit 1 --json status,conclusion \
 		--jq '.[0] | if . == null then "none" else "\(.status) \(.conclusion)" end') ||
-		die "'gh run list' failed for $tip; re-run with --skip-ci to merge without the CI check."
+		die "'gh run list' failed for $tip; re-run with --force to merge without the CI check."
 	[[ "$summary" != "none" ]] ||
-		die "no CI run found for $branch tip $tip; push the branch, or re-run with --skip-ci."
+		die "no CI run found for $branch tip $tip; push the branch, or re-run with --force."
 	[[ "$summary" == *" success" ]] ||
 		die "the latest CI run for $branch tip $tip is '$summary'; merge only a green branch."
 }
@@ -189,7 +162,7 @@ clean_up_branch() {
 }
 
 main() {
-	local git_dir branch skip_ci base_branch msg_file tip
+	local git_dir branch force base_branch msg_file tip
 	exit_if_help_requested "$@"
 	git_dir=$(policy_git_dir) || exit $?
 	require_merge_marker "$git_dir"
@@ -204,7 +177,7 @@ main() {
 	require_message_file "$msg_file"
 	require_base_in_sync "$base_branch"
 	require_branch_contains_base "$branch" "$base_branch"
-	if ! $skip_ci; then
+	if ! $force; then
 		require_ci_success "$branch" "$tip"
 	fi
 

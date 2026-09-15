@@ -8,7 +8,7 @@ PLAN_MSG="feat(widget): add the widget
 Also fixes: the sprocket.
 "
 
-USAGE_LINE="usage: merge-plan.sh [plan/<slug>] [--skip-ci]"
+USAGE_LINE="usage: merge-plan.sh [plan/<slug>] [--force]"
 
 setup() {
 	export TMPDIR_ROOT
@@ -22,8 +22,8 @@ teardown() {
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
 # Work repo whose trunk $2 (default main) is seeded to origin, with a plan/$1
-# branch two commits ahead checked out and a fresh merge-plan marker raised;
-# prints the work dir.
+# branch two commits ahead checked out, the trunk recorded as its base and a
+# fresh merge-plan marker raised; prints the work dir.
 setup_plan_repo() {
 	local slug="$1" trunk="${2:-main}" work
 	work=$(setup_pair plan "$trunk")
@@ -31,6 +31,7 @@ setup_plan_repo() {
 	git -C "$work" switch -q -c "plan/$slug"
 	commit_file "$work" WIDGET "first"
 	commit_file "$work" SPROCKET "second"
+	git -C "$work" config "branch.plan/$slug.planBase" "$trunk"
 	raise_merge_marker "$work"
 	printf '%s' "$work"
 }
@@ -155,15 +156,6 @@ assert_commit_message() {
 	}
 }
 
-# The run printed exactly the usage line on stdout, nothing on stderr, and exited 0.
-assert_help_printed() {
-	((RUN_EXIT == 0)) && [[ "$RUN_STDOUT" == "$USAGE_LINE" && -z "$RUN_STDERR" ]] || {
-		printf 'expected exit 0 with only the usage line on stdout\nexit: %d\nstdout: %s\nstderr: %s\n' \
-			"$RUN_EXIT" "$RUN_STDOUT" "$RUN_STDERR" >&2
-		return 1
-	}
-}
-
 # Snapshot of the repo at $1 a run could change: HEAD, local refs, origin refs, work tree.
 repo_state() {
 	local work="$1"
@@ -171,24 +163,6 @@ repo_state() {
 	git -C "$work" for-each-ref --format='%(refname) %(objectname)'
 	git -C "$(bare_of "$work")" for-each-ref --format='%(refname) %(objectname)'
 	git -C "$work" status --porcelain --untracked-files=all
-}
-
-assert_repo_state() {
-	local work="$1" want="$2" got
-	got=$(repo_state "$work")
-	[[ "$got" == "$want" ]] || {
-		printf 'repo state changed:\n%s\nexpected:\n%s\n' "$got" "$want" >&2
-		return 1
-	}
-}
-
-assert_on_branch() {
-	local got
-	got=$(git -C "$1" symbolic-ref --short HEAD)
-	[[ "$got" == "$2" ]] || {
-		printf 'on branch %s, expected %s\n' "$got" "$2" >&2
-		return 1
-	}
 }
 
 # ── Marker gate ──────────────────────────────────────────────────────────────
@@ -341,9 +315,9 @@ assert_on_branch() {
 	assert_on_branch "$work" main
 }
 
-# ── Target branch ───────────────────────────────────────────────────────────────
+# ── Recorded base branch ─────────────────────────────────────────────────────
 
-@test "target branch: a repo without main squashes onto master with the message and pushes origin/master" {
+@test "recorded base: a recorded master takes the squash and is pushed to origin/master" {
 	local work bare master_before squashed
 	work=$(setup_plan_repo widget master)
 	bare=$(bare_of "$work")
@@ -361,21 +335,21 @@ assert_on_branch() {
 	assert_on_branch "$work" master
 }
 
-@test "target branch: a repo with neither main nor master is refused naming both" {
-	local work
-	work=$(setup_plan_repo widget trunk)
+@test "recorded base: a plan branch with no recorded base is refused naming the key and plan-branch.sh" {
+	local work state_before
+	work=$(setup_plan_repo widget)
 	write_msg "$work" widget "$PLAN_MSG"
 	stub_gh "$(gh_runs completed success)"
+	git -C "$work" config --unset branch.plan/widget.planBase
+	state_before=$(repo_state "$work")
 
 	run_merge "$work"
 
 	assert_refused
-	assert_reason "main"
-	assert_reason "master"
-	assert_ref_present "$work" plan/widget
+	assert_reason "branch.plan/widget.planBase"
+	assert_reason "plan-branch.sh"
+	assert_repo_state "$work" "$state_before"
 }
-
-# ── Recorded base branch ─────────────────────────────────────────────────────
 
 @test "recorded base: the squash lands on the recorded branch and leaves main untouched" {
 	local work bare feature_before main_before branch_tree squashed
@@ -579,7 +553,7 @@ assert_on_branch() {
 	assert_rev_at "$work" main "$main_before"
 }
 
-@test "ci gate: a missing gh without --skip-ci is refused naming gh" {
+@test "ci gate: a missing gh without --force is refused naming gh" {
 	local work main_before
 	work=$(setup_plan_repo widget)
 	write_msg "$work" widget "$PLAN_MSG"
@@ -620,14 +594,14 @@ assert_on_branch() {
 	assert_rev_at "$work" main "$main_before"
 }
 
-@test "ci gate: --skip-ci merges despite a failed run" {
+@test "ci gate: --force merges despite a failed run" {
 	local work main_before
 	work=$(setup_plan_repo widget)
 	write_msg "$work" widget "$PLAN_MSG"
 	stub_gh "$(gh_runs completed failure)"
 	main_before=$(git -C "$work" rev-parse main)
 
-	run_merge "$work" --skip-ci
+	run_merge "$work" --force
 
 	assert_run_ok
 	assert_rev_at "$work" main^ "$main_before"

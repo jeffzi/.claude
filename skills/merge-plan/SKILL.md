@@ -4,7 +4,7 @@ description: >
   Use when the user invokes /merge-plan to land a finished plan branch on its base branch as one squash
   commit — after execute-plan's Ship section names it, or "merge the plan", "squash the plan
   branch". Not for feature branches or CI fixes — use fix-ci. Never for the assistant's own use.
-argument-hint: "[--skip-ci]"
+argument-hint: "[--force]"
 disable-model-invocation: true
 allowed-tools:
   - Bash(~/.claude/scripts/merge-plan.sh *)
@@ -14,7 +14,12 @@ allowed-tools:
   - Bash(git log *)
   - Bash(git rev-parse *)
   - Bash(git status *)
+  - Bash(~/.claude/scripts/plan-branch.sh base*)
+  - Bash(git diff *)
+  - Bash(mkdir -p *plan-squash)
   - Bash(ls *)
+  - Read
+  - Write
 ---
 
 # Merge Plan
@@ -45,8 +50,22 @@ rm -f "$(git rev-parse --absolute-git-dir)/merge-plan-active"                   
 Off a `plan/*` branch (Context shows another branch): report the branch and stop. No marker.
 
 The script refuses, with a reason, when the tree is dirty, the squash message file is missing, the
-base is behind its `origin/` counterpart, the recorded base no longer exists, or the branch tip's CI
-run is not green. `--skip-ci` passes through to it and bypasses only the CI gate.
+base is behind its `origin/` counterpart, the branch has no recorded base or it no longer exists, or
+the branch tip's CI run is not green. `--force` passes through to it and bypasses only the CI gate.
+
+## `--force`
+
+The user's word for "merge what is on the branch". It does two things and nothing else:
+
+1. **CI gate off.** The script skips the CI check; every other refusal still stands.
+2. **Missing message written.** When Context shows `(none)` for the squash message, write it before
+   call 1: load `Skill(write-commit)`, compose one conventional message for the whole branch from
+   the plan's **Goal** in `.planning/` and `git diff <base>...HEAD --stat` (`<base>` is what
+   `~/.claude/scripts/plan-branch.sh base` prints), `mkdir -p "$git_dir/plan-squash"`, and Write it
+   to `$git_dir/plan-squash/<slug>.msg`. No plan slug, no `.planning/` path, no process words in the
+   message. A message that already exists is never rewritten.
+
+Without `--force` a missing message is a refusal to report, exactly as the script says.
 
 ## Report
 
@@ -56,7 +75,7 @@ plan branch is gone. On refusal: the script's reason verbatim, and stop. Nothing
 ## Bright lines
 
 - **One run.** A refusal is the answer, not a retry prompt. Never fix the tree, rewrite the message
-  file, or re-run with `--skip-ci` on your own initiative — the user reads the reason and decides.
+  file, or re-run with `--force` on your own initiative — the user reads the reason and decides.
 - **No git writes here.** No `git commit`, `merge`, `push`, `branch -D`, `switch` — the script owns
   them. This skill's own git use is the read-only Context above.
 - **The marker lives only inside the block above.** Touched immediately before the script, removed
@@ -65,8 +84,9 @@ plan branch is gone. On refusal: the script's reason verbatim, and stop. Nothing
 
 | Excuse                                               | Reality                                                      |
 | ---------------------------------------------------- | ------------------------------------------------------------ |
-| "CI is just slow — skip it this once"                | `--skip-ci` is the user's word, passed in. Never added.      |
-| "The message file is missing, I'll write one"        | The message is execute-plan's output. Missing → report.      |
+| "CI is just slow — skip it this once"                | `--force` is the user's word, passed in. Never added.        |
+| "The message file is missing, I'll write one"        | Only under `--force`. Otherwise missing → report.            |
+| "`--force` means merge no matter what"               | CI and the message only. Dirty tree, stale base → refusal.   |
 | "The tree is dirty with one obvious file, commit it" | Refusal. The user decides what that file is.                 |
 | "The refusal is a precondition, fix it and re-run"   | One run. Report the reason; the next run is the user's call. |
 | "Leave the marker, the user might merge again"       | A lingering marker lets the script run outside this skill.   |

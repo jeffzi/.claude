@@ -50,7 +50,7 @@ context stolen from triage and the report — the steps only you can do.
 branch=$(git branch --show-current 2>/dev/null)
 case "$branch" in
 plan/*)
- base=$(git config "branch.$branch.planBase" 2>/dev/null || true)
+ base=$(~/.claude/scripts/plan-branch.sh base 2>/dev/null || true)
  git log "${base:-main}..HEAD" --oneline 2>/dev/null || git log master..HEAD --oneline 2>/dev/null ;;
 *) git log @{u}..HEAD --oneline 2>/dev/null || echo "(no upstream or up to date)" ;;
 esac
@@ -138,8 +138,8 @@ on them), run task 7, and report the stop status.
 **No-argument file collection** — always run all four, combine and deduplicate:
 
 1. Committed work: on a `plan/*` branch, `git diff --name-only --diff-filter=d "$(git merge-base
-   "$base" HEAD)" HEAD` where `base` is `git config branch.<branch>.planBase`, falling back to
-   `main`, else `master`, when the key is absent — the whole plan, whether or not the branch was
+   "$base" HEAD)" HEAD` where `base` is what `~/.claude/scripts/plan-branch.sh base` prints, falling
+   back to `main`, else `master`, when it refuses — the whole plan, whether or not the branch was
    pushed; on any other branch, `git diff --name-only --diff-filter=d @{push}` — committed but not
    yet pushed (skip if `@{push}` fails — no upstream)
 2. `git diff --name-only --diff-filter=d` — unstaged working-tree changes

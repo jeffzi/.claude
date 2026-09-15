@@ -1,9 +1,10 @@
 # shellcheck shell=bash
 #
 # Policy for the branches the assistant owns, shared by the fix-ci push wrapper
-# (scripts/fix-ci-push.sh), the plan squash script (scripts/merge-plan.sh), and
-# the git guard hook (hooks/git-guard.sh). They gate on the same facts — is a
-# fix-ci loop or a /merge-plan run live in this repo, and does this push delete
+# (scripts/fix-ci-push.sh), the plan branch scripts (scripts/plan-branch.sh and
+# scripts/merge-plan.sh), and the git guard hook (hooks/git-guard.sh). They gate
+# on the same facts — is a fix-ci loop or a /merge-plan run live in this repo,
+# is the worktree clean enough to move a branch, and does this push delete
 # anything outside the assistant's own branches — so the answers are defined
 # once, here.
 #
@@ -33,6 +34,27 @@ readonly MARKER_TTL_SECONDS=1800
 # The branch a plan run works and ships on is plan/<slug>.
 readonly PLAN_BRANCH_PREFIX=plan/
 
+# The key under `branch.<name>` holding the branch a plan branch was started
+# from: `git config branch.plan/<slug>.planBase`. The plan branch script writes
+# it, the squash reads it to land the plan back where it came from.
+# shellcheck disable=SC2034 # read by the sourcing scripts, not here
+readonly PLAN_BASE_CONFIG_KEY=planBase
+
+# Exits 0 on `-h`/`--help` in argv, printing the caller's USAGE; a no-op
+# otherwise. Help is a successful request, answered before anything else is
+# consulted, so it works anywhere and whatever else argv holds.
+exit_if_help_requested() {
+	local arg
+	for arg in "$@"; do
+		case "$arg" in
+		-h | --help)
+			printf '%s\n' "$USAGE"
+			exit 0
+			;;
+		esac
+	done
+}
+
 # Dies naming stat when marker_fresh's status $1 says no stat dialect answered;
 # returns otherwise. Exit 1: a broken tool, not a refusal of the run.
 die_if_stat_unusable() {
@@ -47,6 +69,18 @@ die_if_stat_unusable() {
 policy_git_dir() {
 	command -v git >/dev/null || die "git is not installed."
 	git rev-parse --absolute-git-dir || die "not inside a usable git repository."
+}
+
+# Dies unless the caller's worktree holds no change git would carry onto another
+# branch. Untracked files are left out: switching branches keeps them where they
+# are, and a plan run's scratch files are exactly that.
+require_clean_worktree() {
+	local dirty
+	dirty=$(sh_git_dirty .) || return 0
+	case "$dirty" in
+	unstaged) die "the working tree has unstaged changes; commit or set them aside first." ;;
+	*) die "the index has staged changes; commit or set them aside first." ;;
+	esac
 }
 
 # True when the marker at $1 proves a run is live right now. Only a regular file

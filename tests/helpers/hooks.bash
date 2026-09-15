@@ -13,6 +13,10 @@ readonly TDD_RED_GUARD_HOOK="$PROJECT_DIR/hooks/tdd-red-guard.sh"
 readonly FIX_CI_PUSH_WRAPPER="$PROJECT_DIR/scripts/fix-ci-push.sh"
 # shellcheck disable=SC2034 # consumed by test_merge_plan.bats, which loads this file
 readonly MERGE_PLAN_SCRIPT="$PROJECT_DIR/scripts/merge-plan.sh"
+# shellcheck disable=SC2034 # consumed by test_plan_branch.bats, which loads this file
+readonly PLAN_BRANCH_SCRIPT="$PROJECT_DIR/scripts/plan-branch.sh"
+# shellcheck disable=SC2034 # consumed by test_plan_branch.bats, which loads this file
+readonly BRANCH_POLICY_LIB="$PROJECT_DIR/scripts/branch-policy.sh"
 BASH_BIN=$(command -v bash)
 readonly BASH_BIN
 
@@ -274,6 +278,36 @@ assert_ref_absent() {
 	local repo="$1" ref="$2"
 	! git -C "$repo" show-ref --quiet --verify "refs/heads/$ref" || {
 		printf 'refs/heads/%s present in %s\n' "$ref" "$repo" >&2
+		return 1
+	}
+}
+
+# The run printed exactly the usage line on stdout, nothing on stderr, and exited 0.
+# Relies on $USAGE_LINE, which each spec file defines for its own script.
+assert_help_printed() {
+	((RUN_EXIT == 0)) && [[ "$RUN_STDOUT" == "$USAGE_LINE" && -z "$RUN_STDERR" ]] || {
+		printf 'expected exit 0 with only the usage line on stdout\nexit: %d\nstdout: %s\nstderr: %s\n' \
+			"$RUN_EXIT" "$RUN_STDOUT" "$RUN_STDERR" >&2
+		return 1
+	}
+}
+
+assert_on_branch() {
+	local got
+	got=$(git -C "$1" symbolic-ref --short HEAD)
+	[[ "$got" == "$2" ]] || {
+		printf 'on branch %s, expected %s\n' "$got" "$2" >&2
+		return 1
+	}
+}
+
+# Repo $1 still matches the repo_state() snapshot $2. Relies on repo_state,
+# which each spec file defines to cover what its own script could change.
+assert_repo_state() {
+	local repo="$1" want="$2" got
+	got=$(repo_state "$repo")
+	[[ "$got" == "$want" ]] || {
+		printf 'repo state changed:\n%s\nexpected:\n%s\n' "$got" "$want" >&2
 		return 1
 	}
 }
