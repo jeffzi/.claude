@@ -4,7 +4,8 @@ description: >
   Use when an approved plan in `.planning/` is ready to run — "execute the plan",
   "go ahead with the plan", or invoked via /execute-plan. Also use mid-plan when tempted to ask
   "should I continue?", "want me to launch the next task?", or to end the turn on a progress
-  update, or to file a defect in code the plan just wrote as a finding instead of fixing it.
+  update, to file a defect in code the plan just wrote as a finding instead of fixing it, or to
+  skip the ship phase because the repo looks to have no CI.
   Not for writing the plan — use write-plan. Not for an ad hoc single task — use tdd or fix.
 argument-hint: "[plan-slug] [--commit|--no-commit] [--attended|--unattended] [--no-push]"
 ---
@@ -34,13 +35,13 @@ plan once.
 
 ## Flags
 
-| Flag                     | Effect                                                                                                                                                                                                                                 |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--commit` (default)     | Load `Skill(autocommit)` **once, before Task 1** — its signing warm-up runs while the user is still at the keyboard. Each task commits on the plan branch when its Verify block passes. Never reload per task.                         |
-| `--no-commit`            | Nothing is committed — every `/tdd` invocation carries `no-commit plan execution` so its COMMIT phase returns file lists instead. The final report says `Nothing committed` in one line.                                               |
-| `--unattended` (default) | Findings are recorded, never paused on (see Findings). Raise the marker before Task 1; remove it as the last step of the final report **or of a halt report**. Mechanics: `references/unattended.md`.                                  |
-| `--attended`             | Findings pause the loop at the SURFACE gate as `tdd` prescribes (see Pauses and Halts). No marker.                                                                                                                                     |
-| `--no-push`              | Skip the ship phase (no push, no CI watch) for a repo with no CI. The squash message is still written; the Ship section names the merge command with `--skip-ci`. Implied by `--no-commit`: an uncommitted branch has nothing to push. |
+| Flag                     | Effect                                                                                                                                                                                                                                                                                                      |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--commit` (default)     | Load `Skill(autocommit)` **once, before Task 1** — its signing warm-up runs while the user is still at the keyboard. Each task commits on the plan branch when its Verify block passes. Never reload per task.                                                                                              |
+| `--no-commit`            | Nothing is committed — every `/tdd` invocation carries `no-commit plan execution` so its COMMIT phase returns file lists instead. The final report says `Nothing committed` in one line.                                                                                                                    |
+| `--unattended` (default) | Findings are recorded, never paused on (see Findings). Raise the marker before Task 1; remove it as the last step of the final report **or of a halt report**. Mechanics: `references/unattended.md`.                                                                                                       |
+| `--attended`             | Findings pause the loop at the SURFACE gate as `tdd` prescribes (see Pauses and Halts). No marker.                                                                                                                                                                                                          |
+| `--no-push`              | Skip the ship phase (no push, no CI watch). The user passes it; you never infer it — a repo that looks to have no CI still gets the ship phase, which records `no branch CI` by observation. The squash message is still written. Implied by `--no-commit` only: an uncommitted branch has nothing to push. |
 
 ## The Branch
 
@@ -70,9 +71,10 @@ Two `/tdd` invocations never run concurrently.
    for test-only tasks; `Skill(code-core)` for tasks the plan implements directly. Final Task: no
    implementation — dispatch the plan's `claim-reviewer` call as written (do not set `model`), with
    every `unverified` entry from the running Findings list appended as claims; `Confirmed` → the
-   entry loses its mark, anything else → it keeps it. Then, in order: the **findings-fix phase**,
-   the **ship phase**, the **squash message** (all three in `references/branch-flow.md`), then the
-   Final Report. Steps 2–3 do not apply to the Final Task.
+   entry loses its mark, anything else → it keeps it. Then read `references/branch-flow.md` again —
+   the prologue's read is hours and compactions old — and run, in order: the **findings-fix phase**,
+   the **ship phase**, the **squash message**, then the Final Report. Steps 2–3 do not apply to the
+   Final Task.
 2. **Verify** per the task's **Verify** block. Directly implemented tasks: run the task's mechanical
    checks (suite, build, lint as the Verify block names them) — red → halt 1; then dispatch
    `claim-reviewer` with the task's behavioral claims. `/tdd` tasks: `/tdd` dispatched the reviewer
@@ -214,6 +216,9 @@ already removed when the ship phase ended; a halt report removes both.
 | "Mark it `unverified`; the Final Task re-checks it"                 | `unverified` is for findings you could not read. A claim you fixed is re-verified now, in its task.                       |
 | "The user only asked which findings remain"                         | "we need to fix" is a fix request for the `needs decision` entries. Ledger first, one durable fix each, then `/tdd`.      |
 | "Answering from memory is faster than reading the ledger"           | Memory gave 3, then 6, then 7. One Read of the ledger is the answer.                                                      |
+| "The repo has no CI, so `--no-push` is implied"                     | Only the user passes `--no-push`. Push, poll twice, record `no branch CI` — observed, not assumed.                        |
+| "I remember the ship phase well enough to run it"                   | A paraphrase drops the marker, the two-poll rule, the `--force` rule. Read `branch-flow.md` first.                        |
+| "The watch exited 0, so CI is green"                                | That is `tee`'s exit, or a wake-up. Green is `gh run view` showing `conclusion: success` on the pushed tip, nothing else. |
 
 ## Red Flags — Stop and Re-read Approval Is the Grant
 
@@ -228,8 +233,12 @@ already removed when the ship phase ended; a halt report removes both.
   raised by this loop, or a push by this loop of anything but `plan/<slug>` (the dispatched `fix-ci`
   agent pushes its own `fix-ci/*` branch under its own rules)
 - A report with no Ship section, or a Ship section that names a push instead of the merge command
+- A Ship line saying `CI green` without `gh run view … conclusion: success` for the pushed tip in
+  context, or one written from a watch's exit code
+- A ship phase skipped without `--no-push` on the invocation, or a merge line whose `--force` does
+  not match the CI result (`CI green` → none; anything else → `--force`)
 - A Ship section with raw git commands (`git switch`, `git merge --squash`) instead of `Merge:
-  /merge-plan [--skip-ci]`
+  /merge-plan [--force]`
 - A report entry with no `what it costs`, or one that begins with "I" (I fixed, I deleted, I left)
 - A per-task file list, or a task described by what it built
 - A confirmed finding gone from a reply after a "too long" complaint

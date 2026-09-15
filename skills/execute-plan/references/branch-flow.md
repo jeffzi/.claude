@@ -9,18 +9,18 @@ branch=$(git branch --show-current)
 git diff --quiet && git diff --cached --quiet    # index and working tree clean; untracked files are fine
 ```
 
-| State                                       | Action                                                                              |
-| ------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Clean, on a branch that is not `plan/*`     | `git switch -c plan/<slug>` then `git config branch.plan/<slug>.planBase "$branch"` |
-| Already on `plan/<slug>` (this plan's slug) | Resume — the branch is this run's earlier work                                      |
-| Another plan's `plan/*`, or a dirty tree    | Halt (condition 4) naming the branch or the files                                   |
+| State                                       | Action                                                                           |
+| ------------------------------------------- | -------------------------------------------------------------------------------- |
+| Clean, on a branch that is not `plan/*`     | `~/.claude/scripts/plan-branch.sh create <slug>` — switches and records the base |
+| Already on `plan/<slug>` (this plan's slug) | Resume — the branch is this run's earlier work                                   |
+| Another plan's `plan/*`, or a dirty tree    | Halt (condition 4) naming the branch or the files                                |
 
 `<slug>` is the plan file's slug (`plan-<slug>.md`). The branch name is the only place the slug
 appears in git; task commit messages never carry it. The recorded base is what `/merge-plan`
 squashes onto — `main` when you started there, a feature branch when you started on one; it lives in
-`.git/config` and disappears with the branch. Wherever this file says `<base>`, read that value:
-`git config branch.plan/<slug>.planBase`, falling back to `main`, else `master`, on a branch created
-before the key existed.
+`.git/config` and disappears with the branch. Wherever this file says `<base>`, read that value with
+`~/.claude/scripts/plan-branch.sh base` — never by typing the config key; a mistyped key is a base
+`/merge-plan` cannot find, and the script refuses rather than guessing `main`.
 
 ## Findings-fix phase (after the Final Task's `claim-reviewer` run)
 
@@ -47,14 +47,26 @@ gh run list --commit "$sha" --json databaseId,status,conclusion --limit 5
   `Confirmed` finding (`.github/workflows — no push trigger for plan/** — the branch is unverified
   until the base's run`; you observed it directly), remove the marker, continue to the squash
   message.
-- A run exists → watch it in the background, output to a file under `<scratchpad>` (the session's
-  scratchpad directory the harness names in its environment block), never re-run to read output:
+- A run exists → watch it in the background, output redirected to a file under `<scratchpad>` (the
+  session's scratchpad directory the harness names in its environment block). No pipe, no `tee`:
 
   ```bash
-  gh run watch <run-id> --exit-status --interval 30 2>&1 | tee <scratchpad>/plan-ci-watch.txt
+  gh run watch <run-id> --exit-status --interval 30 > <scratchpad>/plan-ci-watch.txt 2>&1
   ```
 
-  Re-touch the marker on each poll; it expires after thirty minutes.
+  Re-touch the marker on each poll; it expires after thirty minutes. The watch's exit code is a
+  wake-up signal, nothing more — a piped `tee` returns 0 on any run, and `--exit-status` is not a
+  gate you read. Never read the watch file as a result.
+- On completion, pass the green gate — the only observation the word "green" names:
+
+  ```bash
+  gh run view <run-id> --json headSha,status,conclusion
+  ```
+
+  Green is exactly `status: completed`, `conclusion: success`, and `headSha` equal to the branch tip
+  you pushed. Any other conclusion (`failure`, `cancelled`, `timed_out`, `action_required`) is red.
+  This output in your context is what the Ship line `CI green (run <id>)` quotes; without it the
+  line is a claim, not a result.
 - Green → remove the marker, continue.
 - Red → dispatch one `general-purpose` Agent (do not set `model`) with this prompt shape, then
   re-check the run for the new branch tip yourself:
@@ -66,9 +78,9 @@ gh run list --commit "$sha" --json databaseId,status,conclusion --limit 5
   conclusion.
   ```
 
-  The agent's own "confirm green" is its exit condition; your re-check of the run for the branch tip
-  is the ship phase's gate. Agent hands back (stop condition) → halt 1 with its report. Green →
-  remove the marker, continue.
+  The agent's own "confirm green" is its exit condition; your own green gate on the run for the new
+  branch tip is the ship phase's gate — its report is not your observation. Agent hands back (stop
+  condition) → halt 1 with its report. Green → remove the marker, continue.
 - Every exit path removes the marker: `rm -f "$git_dir/fix-ci-active"`.
 
 ## Squash message
@@ -96,7 +108,7 @@ The repo has a commitlint config when a `.commitlintrc*` or `commitlint.config.*
 ## `--no-push`
 
 Skips the ship phase entirely: no marker, no push, no CI watch. The squash message is still written
-and the Ship section still names the merge command, with `--skip-ci` appended.
+and the Ship section still names the merge command, with `--force` appended.
 
 `--no-commit` implies `--no-push`. The squash message is then composed from the working tree (`git
 diff <base> --stat`, not `<base>...HEAD`), and the Ship line reads `uncommitted` in place of the CI
@@ -106,7 +118,11 @@ result, so the user knows to commit on the branch before merging.
 
 ```text
 Ship: plan/<slug> → <base> — CI green (run <id>) | CI skipped (--no-push) | no branch CI | uncommitted
-Merge: /merge-plan [--skip-ci]
+Merge: /merge-plan [--force]
 Optional first: /preflight on the branch, commit its fixes, push again with
   ~/.claude/scripts/fix-ci-push.sh origin plan/<slug> under a fresh marker.
 ```
+
+The merge line follows the CI result, not your judgment: `CI green` → `/merge-plan`; every other
+result → `/merge-plan --force`. `merge-plan.sh` refuses a tip with no CI run, so a bare
+`/merge-plan` after `no branch CI` is a command the user runs and watches fail.
