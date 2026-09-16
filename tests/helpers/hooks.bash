@@ -15,7 +15,7 @@ readonly FIX_CI_PUSH_WRAPPER="$PROJECT_DIR/scripts/fix-ci-push.sh"
 readonly PLAN_BRANCH_SCRIPT="$PROJECT_DIR/scripts/plan-branch.sh"
 # shellcheck disable=SC2034 # consumed by test_plan_branch.bats, which loads this file
 readonly BRANCH_POLICY_LIB="$PROJECT_DIR/scripts/branch-policy.sh"
-# shellcheck disable=SC2034 # consumed by test_release.bats, which loads this file
+# shellcheck disable=SC2034 # consumed by the test_release_*.bats suites, which load this file
 readonly RELEASE_SCRIPT="$PROJECT_DIR/scripts/release.sh"
 BASH_BIN=$(command -v bash)
 readonly BASH_BIN
@@ -35,6 +35,22 @@ cleanup_tmpdir_root() {
 	[[ -n "$TMPDIR_ROOT" ]] && rm -rf "$TMPDIR_ROOT"
 }
 
+# ── Fixture wiring ───────────────────────────────────────────────────────────
+
+# Refuse a runner call whose fixture directory $1 is empty, naming subject $2 so
+# the failure points at the suite that left its fixture variable unset. bash's
+# `cd ""` succeeds without moving, so the subject would otherwise run in the
+# bats working directory and the test would report an ordinary verdict on a
+# repo nobody set up.
+require_fixture_dir() {
+	local dir="$1" subject="$2"
+	[[ -n "$dir" ]] || {
+		printf 'missing fixture directory for %s: the suite left its fixture variable empty or unset\n' \
+			"$(basename "$subject")" >&2
+		return 1
+	}
+}
+
 # ── Hook invocation ──────────────────────────────────────────────────────────
 
 hook_input() {
@@ -43,7 +59,8 @@ hook_input() {
 
 # Run hook script $1 in $2 with command $3; sets GUARD_EXIT and GUARD_OUTPUT.
 run_hook_for_command() {
-	local hook="$1" dir="$2" cmd="$3"
+	local hook="$1" dir="${2:-}" cmd="$3"
+	require_fixture_dir "$dir" "$hook" || return 1
 	GUARD_EXIT=0
 	GUARD_OUTPUT=$(cd "$dir" && hook_input "$cmd" | bash "$hook" 2>&1 1>/dev/null) || GUARD_EXIT=$?
 }
@@ -85,14 +102,16 @@ tdd_read_hook_input() {
 # Run tdd-red-guard hook in $1 with Bash command $2 from agent type $3 (default
 # tdd-cycle); sets GUARD_EXIT and GUARD_OUTPUT.
 run_tdd_guard() {
-	local dir="$1" cmd="$2" type="${3:-tdd-cycle}"
+	local dir="${1:-}" cmd="$2" type="${3:-tdd-cycle}"
+	require_fixture_dir "$dir" "$TDD_RED_GUARD_HOOK" || return 1
 	GUARD_EXIT=0
 	GUARD_OUTPUT=$(cd "$dir" && tdd_hook_input "$cmd" "$type" | bash "$TDD_RED_GUARD_HOOK" 2>&1 1>/dev/null) || GUARD_EXIT=$?
 }
 
 # Run tdd-red-guard hook in $1 for a Read of $2; sets GUARD_EXIT and GUARD_OUTPUT.
 run_tdd_guard_read() {
-	local dir="$1" path="$2"
+	local dir="${1:-}" path="$2"
+	require_fixture_dir "$dir" "$TDD_RED_GUARD_HOOK" || return 1
 	GUARD_EXIT=0
 	GUARD_OUTPUT=$(cd "$dir" && tdd_read_hook_input "$path" | bash "$TDD_RED_GUARD_HOOK" 2>&1 1>/dev/null) || GUARD_EXIT=$?
 }
@@ -163,7 +182,8 @@ run_script() {
 
 # Same as run_script, with PATH set to $2 for the child.
 run_script_on_path() {
-	local dir="$1" path="$2" err
+	local dir="${1:-}" path="$2" err
+	require_fixture_dir "$dir" "${3:-the script under test}" || return 1
 	shift 2
 	err=$(mktemp)
 	RUN_EXIT=0
