@@ -1515,18 +1515,64 @@ assert_merge_refuses_fold() {
 
 # ── merge: base sync ─────────────────────────────────────────────────────────
 
-@test "merge: a main behind origin/main is refused as out of sync" {
-	local work main_before
+@test "merge: a main ahead of origin/main is refused saying to push it" {
+	local work state_before
 	work=$(setup_plan_repo widget)
 	ready_widget_merge "$work"
-	advance_origin_main "$work"
-	main_before=$(git -C "$work" rev-parse main)
+	git -C "$work" switch -q main
+	commit_file "$work" LOCAL "local work"
+	commit_file "$work" LATER "more local work"
+	git -C "$work" switch -q plan/widget
+	git -C "$work" rebase -q main
+	state_before=$(repo_state "$work")
 
 	run_merge "$work"
 
 	assert_refused
-	assert_reason "differs from origin/main"
-	assert_rev_at "$work" main "$main_before"
+	assert_reason "main has 2 commits origin lacks"
+	assert_reason "git push origin main"
+	assert_reason "re-run"
+	assert_repo_state "$work" "$state_before"
+}
+
+@test "merge: a main behind origin/main is refused saying to update it and rebase the plan branch" {
+	local work state_before
+	work=$(setup_plan_repo widget)
+	ready_widget_merge "$work"
+	advance_origin_main "$work"
+	git -C "$work" fetch -q origin
+	state_before=$(repo_state "$work")
+
+	run_merge "$work"
+
+	assert_refused
+	assert_reason "origin/main has 1 commit the local branch lacks"
+	assert_reason "git pull --ff-only origin main"
+	assert_reason "rebase plan/widget onto it"
+	assert_reason "re-run"
+	assert_repo_state "$work" "$state_before"
+}
+
+@test "merge: a main diverged from origin/main is refused naming both sides" {
+	local work state_before
+	work=$(setup_plan_repo widget)
+	ready_widget_merge "$work"
+	git -C "$work" switch -q main
+	commit_file "$work" LOCAL "local work"
+	git -C "$work" switch -q plan/widget
+	git -C "$work" rebase -q main
+	advance_origin_main "$work"
+	git -C "$work" fetch -q origin
+	state_before=$(repo_state "$work")
+
+	run_merge "$work"
+
+	assert_refused
+	assert_reason "main has 1 commit origin lacks"
+	assert_reason "origin/main has 1 commit the local branch lacks"
+	assert_reason "Reconcile the branch with origin"
+	assert_reason "re-run"
+	assert_repo_state "$work" "$state_before"
 }
 
 @test "merge: an unreachable origin is refused as a failed fetch" {

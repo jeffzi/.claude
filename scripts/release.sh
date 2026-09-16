@@ -332,19 +332,49 @@ require_message_file() {
 		die "the squash message at $msg_file is empty."
 }
 
+# "1 commit" or "N commits", for a message counting how far two tips stand apart.
+commits_phrase() {
+	local count="$1"
+	if ((count == 1)); then
+		printf '1 commit'
+	else
+		printf '%s commits' "$count"
+	fi
+}
+
+# Says which side of $1 holds what the other lacks — $2 commits local-only, $3
+# origin-only — and the way back. $4 is appended to the behind case's pull, for
+# a caller whose own branch has to follow the one it is updating.
+out_of_sync_detail() {
+	local branch="$1" ahead="$2" behind="$3" follow_up="${4:-}"
+	if ((ahead > 0 && behind > 0)); then
+		printf '%s has %s origin lacks and origin/%s has %s the local branch lacks. Reconcile the branch with origin, then re-run.' \
+			"$branch" "$(commits_phrase "$ahead")" "$branch" "$(commits_phrase "$behind")"
+	elif ((ahead > 0)); then
+		printf "%s has %s origin lacks. Push it with 'git push origin %s', then re-run." \
+			"$branch" "$(commits_phrase "$ahead")" "$branch"
+	else
+		printf "origin/%s has %s the local branch lacks. Update it with 'git pull --ff-only origin %s'%s, then re-run." \
+			"$branch" "$(commits_phrase "$behind")" "$branch" "$follow_up"
+	fi
+}
+
 # Refuses unless the local branch is exactly its origin counterpart, so the work
 # lands on something nobody else has moved; prints the sha origin answered with,
-# which the fold later takes its push lease against.
+# which the fold later takes its push lease against. $2 is handed to
+# out_of_sync_detail for the behind case.
 require_branch_in_sync() {
-	local branch="$1" local_sha remote_sha
+	local branch="$1" follow_up="${2:-}" local_sha remote_sha ahead behind
 	git fetch --quiet origin "$branch" ||
 		die "'git fetch origin $branch' failed; fix the remote, then re-run."
 	local_sha=$(git rev-parse --verify --quiet "refs/heads/$branch") ||
 		die "this repo has no local '$branch' branch."
 	remote_sha=$(git rev-parse --verify FETCH_HEAD) ||
 		die "origin has no '$branch' branch."
-	[[ "$local_sha" == "$remote_sha" ]] ||
-		die "local $branch ($(git rev-parse --short "$local_sha")) differs from origin/$branch ($(git rev-parse --short "$remote_sha")); sync it first."
+	if [[ "$local_sha" != "$remote_sha" ]]; then
+		read -r ahead behind <<<"$(git rev-list --left-right --count "$local_sha...$remote_sha")"
+		die "local $branch ($(git rev-parse --short "$local_sha")) differs from origin/$branch ($(git rev-parse --short "$remote_sha")): $(out_of_sync_detail "$branch" "$ahead" "$behind" "$follow_up")"
+	fi
 	printf '%s' "$remote_sha"
 }
 
@@ -694,7 +724,7 @@ cmd_merge() {
 	require_clean_worktree
 	require_branch_contains_base "$branch" "$base_branch"
 	require_replayable_history "$base_branch" "$branch"
-	origin_sha=$(require_branch_in_sync "$base_branch")
+	origin_sha=$(require_branch_in_sync "$base_branch" " and rebase $branch onto it")
 	require_plan_branch_matches_origin "$branch" "$tip"
 	$force || require_ci_success "$branch" "$tip"
 
