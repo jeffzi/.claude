@@ -51,6 +51,23 @@ require_fixture_dir() {
 	}
 }
 
+# ── Output capture ───────────────────────────────────────────────────────────
+
+# Run $2.. — a command, or a function that itself pipes into one — in
+# directory $1, capturing stdout and stderr on separate streams; sets
+# RUN_EXIT, RUN_STDOUT, RUN_STDERR. This file runs without pipefail, so a
+# pipeline's exit status is its last command's, same as $2.. would report run
+# unwrapped; that status is what lands in RUN_EXIT.
+run_capture() {
+	local dir="$1" err
+	shift
+	err=$(mktemp)
+	RUN_EXIT=0
+	RUN_STDOUT=$(cd "$dir" && "$@" 2>"$err") || RUN_EXIT=$?
+	RUN_STDERR=$(<"$err")
+	rm -f "$err"
+}
+
 # ── Hook invocation ──────────────────────────────────────────────────────────
 
 hook_input() {
@@ -182,14 +199,10 @@ run_script() {
 
 # Same as run_script, with PATH set to $2 for the child.
 run_script_on_path() {
-	local dir="${1:-}" path="$2" err
+	local dir="${1:-}" path="$2"
 	require_fixture_dir "$dir" "${3:-the script under test}" || return 1
 	shift 2
-	err=$(mktemp)
-	RUN_EXIT=0
-	RUN_STDOUT=$(cd "$dir" && env "PATH=$path" "$@" 2>"$err") || RUN_EXIT=$?
-	RUN_STDERR=$(<"$err")
-	rm -f "$err"
+	run_capture "$dir" env "PATH=$path" "$@"
 }
 
 # Run fix-ci-push.sh from $1 with remaining args.

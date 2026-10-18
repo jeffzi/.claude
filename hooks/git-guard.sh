@@ -472,14 +472,17 @@ check_destructive_operations() {
 	fi
 
 	# ── Rm ───────────────────────────────────────────────────────
+	# Without --force, git rm refuses any path whose working copy or index
+	# differs from HEAD, so it only ever removes tracked, clean files that git
+	# can restore. Only the forced form can discard uncommitted work.
 	if is_git_subcmd "rm"; then
 		git_parse_command "$command"
 		subcmd_args=" ${GIT_SUBCMD_ARGS[*]-}"
-		[[ "$subcmd_args" =~ [[:space:]]--cached([[:space:]]|$) ]] && return 0
-		[[ "$subcmd_args" =~ [[:space:]]--dry-run([[:space:]]|$) ]] && return 0
-		# Bundled short flags containing n (dry-run): -n, -rn, -fn, etc.
-		[[ "$subcmd_args" =~ [[:space:]]-[a-zA-Z]*n ]] && return 0
-		block_destructive "git rm" "Deletes files from the working tree. Use --cached to only unstage."
+		# Bundled short flags containing f (force): -f, -rf, -fq, etc.
+		if [[ "$subcmd_args" =~ [[:space:]]--force([[:space:]]|$) ]] ||
+			[[ "$subcmd_args" =~ [[:space:]]-[a-zA-Z]*f ]]; then
+			block_destructive "git rm --force" "Discards local modifications on the way out. Drop --force so git refuses files with uncommitted changes."
+		fi
 	fi
 
 	# ── Reflog / prune ──────────────────────────────────────────
