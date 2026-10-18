@@ -145,27 +145,27 @@ teardown_file() {
 
 # ── Rm ───────────────────────────────────────────────────────────────────────
 
-@test "rm: rm that touches the working tree is blocked" {
+@test "rm: every force spelling is blocked" {
 	each_blocked_in "$REPO" \
+		"git rm -f file" \
+		"git rm --force file" \
+		"git rm -rf dir/" \
+		"git rm -qf file"
+}
+
+@test "rm: rm without --force is allowed" {
+	each_allowed_in "$REPO" \
 		"git rm file" \
 		"git rm -r dir/" \
-		"git rm -f file"
-}
-
-@test "rm: --cached and every dry-run spelling are allowed" {
-	each_allowed_in "$REPO" \
 		"git rm --cached file" \
 		"git rm -n file" \
-		"git rm --dry-run file" \
-		"git rm -rn dir/"
+		"git rm --dry-run file"
 }
 
-@test "rm: --cached or dry-run text inside a global option value does not allow the rm" {
-	each_blocked_in "$REPO" \
-		"git -C --cached rm file" \
-		"git --namespace --cached rm file" \
-		"git -c a.b=--dry-run rm file" \
-		"git -Cn rm file"
+@test "rm: force text inside a global option value does not block the rm" {
+	each_allowed_in "$REPO" \
+		"git -C x--force rm file" \
+		"git -c a.b=--force rm file"
 }
 
 # ── Reflog / prune ───────────────────────────────────────────────────────────
