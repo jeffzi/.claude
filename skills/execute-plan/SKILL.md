@@ -32,28 +32,35 @@ plan once.
 
 ## Flags
 
-| Flag                     | Effect                                                                                                                                                                                                                                                                                                      |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--commit` (default)     | Load `Skill(autocommit)` **once, before Task 1** — its signing warm-up runs while the user is still at the keyboard. Each task commits on the plan branch when its Verify block passes. Never reload per task.                                                                                              |
-| `--no-commit`            | Nothing is committed — every `/tdd` invocation carries `no-commit plan execution` so its COMMIT phase returns file lists instead. The final report says `Nothing committed` in one line.                                                                                                                    |
-| `--unattended` (default) | Findings are recorded, never paused on (see Findings). Raise the marker before Task 1; remove it as the last step of the final report **or of a halt report**. Mechanics: `references/unattended.md`.                                                                                                       |
-| `--attended`             | Findings pause the loop at the SURFACE gate as `tdd` prescribes (see Pauses and Halts). No marker.                                                                                                                                                                                                          |
-| `--no-push`              | Skip the ship phase (no push, no CI watch). The user passes it; you never infer it — a repo that looks to have no CI still gets the ship phase, which records `no branch CI` by observation. The squash message is still written. Implied by `--no-commit` only: an uncommitted branch has nothing to push. |
+| Flag                     | Effect                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--commit` (default)     | Load `Skill(autocommit)` **once, before Task 1** — its signing warm-up runs while the user is still at the keyboard. Each task commits on the plan branch when its Verify block passes. Never reload per task.                                                                                                                                     |
+| `--no-commit`            | Nothing is committed — every `/tdd` invocation carries `no-commit plan execution` so its COMMIT phase returns file lists instead. The final report says `Nothing committed` in one line.                                                                                                                                                           |
+| `--unattended` (default) | Findings are recorded, never paused on (see Findings). Raise the marker before Task 1; remove it as the last step of the final report **or of a halt report**. Mechanics: `references/unattended.md`.                                                                                                                                              |
+| `--attended`             | Findings pause the loop at the SURFACE gate as `tdd` prescribes (see Pauses and Halts). No marker.                                                                                                                                                                                                                                                 |
+| `--no-push`              | Skip the ship phase (no push, no CI watch, no pull request). The user passes it; you never infer it — a repo that looks to have no CI still gets the ship phase, which records `no branch CI` or `no CI configured` by observation. The squash message is still written. Implied by `--no-commit` only: an uncommitted branch has nothing to push. |
 
 ## The Branch
 
 Every run works on `plan/<slug>`, never on the branch it started from. The prologue's entry gate
 creates it from any clean branch — `main` by default, a feature branch when you are on one — records
 that base in git config, or halts (condition 4); a run resumed on its own `plan/<slug>` continues
-there. Task commits, finding fixes, and CI fixes all land on the plan branch. The user lands it on
-the recorded base by invoking `/release merge` — this skill never commits on the base, never merges,
-and never raises that skill's marker or runs its script. Mechanics: `references/branch-flow.md`.
+there. Task commits, finding fixes, and CI fixes all land on the plan branch.
+
+The recorded base picks how the branch lands. The **trunk path** applies when the base equals
+origin's default branch as `git ls-remote --symref origin HEAD` reports it, whatever its name; when
+that read fails, the entry gate halts (condition 4) and never guesses the trunk. The ship phase runs
+`ils push`, which pushes the branch, opens its pull request, and waits for checks; the user merges
+the pull request by hand with the `gh pr merge` command `ils` prints. Any other base takes the
+**release path**: the user lands the branch on the base by invoking `/release merge`. On either path
+this skill never commits on the base, never merges — no `gh pr merge`, no `--auto` — and never
+raises `/release`'s marker or runs its script. Mechanics: `references/branch-flow.md`.
 
 A task whose **Folds into** line names a release commit subject is committed as a fixup of that
 commit (`git commit --fixup=<sha>`, sha resolved per `references/branch-flow.md` § Fold target), so
 the plan branch itself carries the mapping `/release merge` folds by; a `none` task commits with a
 composed message as before. The plan's `## Folds` section says whether the run ends in a rewriting
-merge; the Ship line says so too.
+merge; on the release path the Ship section's Folds line says so too. The trunk path never folds.
 
 ## The Loop
 
@@ -65,11 +72,13 @@ unblocked at once and touch disjoint files, merge them into **one** `/tdd` invoc
 task's behavior list — its wave rule parallelizes the cycles — and step 4 lists each task's hashes.
 Two `/tdd` invocations never run concurrently.
 
-0. **Prologue** — entry gate first (`references/branch-flow.md`): on a clean branch that is not
-   another plan's → `git switch -c plan/<slug>` and record the base; already on `plan/<slug>` →
-   resume, the unfinished task's own uncommitted files included; anything else → halt 4. Then,
-   unless `--attended`: write the marker (see `references/unattended.md`). Unless `--no-commit`:
-   load `Skill(autocommit)` once. Then Task 1.
+0. **Prologue** — entry gate first (`references/branch-flow.md`): read the trunk from origin and
+   choose the path, and on the trunk path check the local trunk against `origin/<trunk>` — a failed
+   read or fetch, or local trunk commits origin lacks → halt 4, before any switch. Then on a clean
+   branch that is not another plan's → `plan-branch.sh create <slug>`, which switches and records
+   the base; already on `plan/<slug>` → resume, the unfinished task's own uncommitted files
+   included; anything else → halt 4. Then, unless `--attended`: write the marker (see
+   `references/unattended.md`). Unless `--no-commit`: load `Skill(autocommit)` once. Then Task 1.
 1. **Implement** per the task's **Implementation** line: `/tdd` for TDD tasks — the invocation
    carries `fixup target: <sha>` when the task's **Folds into** is a subject, resolved first per
    `references/branch-flow.md` § Fold target; `Skill(test-core)` for test-only tasks;
@@ -78,8 +87,11 @@ Two `/tdd` invocations never run concurrently.
    `unverified` entry from the running Findings list appended as claims; `Confirmed` → the entry
    loses its mark, anything else → it keeps it. Then read `references/branch-flow.md` again — the
    prologue's read is hours and compactions old — and run, in order: the **findings-fix phase**
-   (each finding's fold target derived and recorded on its ledger entry), the **ship phase**, the
-   **squash message**, then the Final Report. Steps 2–3 do not apply to the Final Task.
+   (each finding's fold target derived and recorded on its ledger entry), the **ship phase** of the
+   run's path, the **squash message** (a file on the release path or when nothing was pushed; the
+   pull request's title and body on the trunk path after a push that exits 0; neither after a pushed
+   trunk run that ends `not green`), then the Final Report. Steps 2–3 do not apply to the Final
+   Task.
 2. **Verify** per the task's **Verify** block. Directly implemented tasks: run the task's mechanical
    checks (suite, build, lint as the Verify block names them) — red → halt 1; then dispatch
    `claim-reviewer` with the task's behavioral claims. `/tdd` tasks: `/tdd` dispatched the reviewer
@@ -212,17 +224,21 @@ the findings or the cycle, never about whether to continue.
 
 1. A gap at `refuted: 2`, or a `halted` gap refuted again (step 2), or a task's mechanical checks
    red — a `tdd-cycle` `STUCK` or `TEST_FLAWED` status is this condition, and so is a `fix-ci`
-   handback in the ship phase.
+   handback in the ship phase, the ship phase's `ils push` refused, broke, or did not run (exit 1,
+   2, 127, or any code but 0, 4, 5), or a trunk merge whose conflict does not resolve with the suite
+   green (the merge is left in progress).
 2. A task needs a behavior change something depends on that the plan did not state
    (`rules/decision-policy.md` exception 1). A finding whose fix would be one is not a halt — it is
    marked `needs decision` (see Findings).
 3. An unchanged boundary: cross-repo edit, a push other than the ship phase's push of `plan/<slug>`
-   through the wrapper, or a destructive op the plan did not prescribe. File deletions the plan
-   explicitly names are covered by approval — no halt, no ask.
+   (through `ils push` on the trunk path, through the wrapper on the release path), or a destructive
+   op the plan did not prescribe. File deletions the plan explicitly names are covered by approval —
+   no halt, no ask.
 4. The entry gate fails: on another plan's `plan/*` branch, the index or working tree is dirty — on
    a resumed run, dirty with a path its unfinished task does not name — or the plan's `## Folds`
-   section names a release branch other than the one you are on. Name the branch or those paths, and
-   the release the plan expects.
+   section names a release branch other than the one you are on, or origin's default branch cannot
+   be read, or on the trunk path the local trunk carries commits `origin/<trunk>` does not. Name the
+   branch, those paths or commits, the failed read, and the release the plan expects.
 
 A halt is a report — tasks done, the blocked task and why, findings so far, marker removed — then
 the turn ends. It names the condition from this list. It is never a question: a report that asks the
@@ -240,10 +256,13 @@ nothing else:
 2. **Deviations** — every entry, `Task N — plan said — did — why`. None → no heading.
 3. **State** — the hashes, one line (`--no-commit` → `Nothing committed`). Each verification command
    as `command → result`, one line.
-4. **Ship** — the branch, the CI result, the one merge command (`/release merge [--force]`), whether
-   a squash message was written, the folds — each target subject with the tasks and findings that
-   fold into it, since the findings' folds were not on the plan the user approved — and the optional
-   `/preflight` line, in the shape `references/branch-flow.md` gives.
+4. **Ship** — the branch, the CI result, the one merge line, and the optional `/preflight` line, in
+   the shape `references/branch-flow.md` gives for the run's path. Trunk path: the pull request,
+   whether its title and body were written, and the merge line for the result — `Merge: <the merge
+   command ils printed>, by hand` after exit 0, the forms `branch-flow.md` gives when nothing was
+   pushed or the result is `not green`. Release path: `/release merge [--force]`, whether a squash
+   message was written, and the folds — each target subject with the tasks and findings that fold
+   into it, since the findings' folds were not on the plan the user approved.
 
 Never in the report: per-task file lists, what each task built, which skill ran which step, how you
 found a finding, what you fixed on the way (a deviation or nothing), a plan choice you followed. A
@@ -253,8 +272,9 @@ Pushback on the report's length or count removes nothing confirmed. Re-rank, res
 one line, keep the count — a confirmed defect the user has not yet acted on is exactly what they pay
 the report for.
 
-Unless `--attended` → remove the unattended marker as the last step. The `fix-ci-active` marker was
-already removed when the ship phase ended; a halt report removes both.
+Unless `--attended` → remove the unattended marker as the last step. On the release path the
+`fix-ci-active` marker was already removed when the ship phase ended, and a halt report removes
+both; the trunk path never raises it.
 
 ## Rationalizations
 
@@ -284,7 +304,12 @@ already removed when the ship phase ended; a halt report removes both.
 | "The tree is only dirty with unrelated files — carry on"             | Unrelated dirt is exactly what ends up in the wrong commit. Halt 4; the user decides.                                     |
 | "A dirty tree ends the gate however the files relate to the plan"    | On your own plan branch the unfinished task's files are this run's earlier work. Resume; halt 4 names only other paths.   |
 | "CI takes minutes — push and let the user watch it"                  | The ship phase watches. A red run fixed after the report is a second commit on the base.                                  |
-| "The squash is trivial, I'll merge it myself"                        | Never on the base. The user invokes `/release merge`; the report says so.                                                 |
+| "The squash is trivial, I'll merge it myself"                        | Never. The user runs the `gh pr merge` command `ils` printed, or invokes `/release merge`; the report says which.         |
+| "`ils push` is green — `gh pr merge --auto` saves the user a step"   | The merge is the user's hand on both paths. Report the command; never run it, never pass `--auto`.                        |
+| "Pipe `ils push` through `tee` to keep its output"                   | The output is already in context. A pipe hides the exit code, and the exit code is the verdict.                           |
+| "`ils push` exited 4, so the push is done"                           | Pending is not green. Run it again; after 60 minutes of exit 4 the result is `not green: pending`.                        |
+| "The output has a `Next:` line that says so"                         | Only the last line is `ils`'s. A `Next:` above it is CI log text.                                                         |
+| "The base is `main`, so it is the trunk"                             | The trunk is what `git ls-remote --symref origin HEAD` reports. A failed read halts; it never defaults.                   |
 | "The target sha is right there in the plan"                          | The plan names a subject. The sha is looked up when the task is about to commit, after any fold that happened since.      |
 | "The verdict is Verified; the note is only Reasoning"                | A gap the reviewer names is a refutation with the wrong label. Fix, re-dispatch that claim.                               |
 | "I fixed the main gap; the others are minor"                         | Every gap the reviewer named stays open until its own claim is Verified. Fix all of them before re-dispatching.           |
@@ -297,9 +322,9 @@ already removed when the ship phase ended; a halt report removes both.
 | "In-scope and broken, but I'll let the user pick the fix"            | No dependent at `file:line` → fix it in the batch. Asking hands back work the approval already granted.                   |
 | "Out of scope, so I'll ask whether to fix it"                        | Out of scope is reported, never asked about. One line in Findings; the user starts the work if they want it.              |
 | "Answering from memory is faster than reading the ledger"            | Memory gave 3, then 6, then 7. One Read of the ledger is the answer.                                                      |
-| "The repo has no CI, so `--no-push` is implied"                      | Only the user passes `--no-push`. Push, poll twice, record `no branch CI` — observed, not assumed.                        |
-| "I remember the ship phase well enough to run it"                    | A paraphrase drops the marker, the two-poll rule, the `--force` rule. Read `branch-flow.md` first.                        |
-| "The watch exited 0, so CI is green"                                 | That is `tee`'s exit, or a wake-up. Green is `gh run view` showing `conclusion: success` on the pushed tip, nothing else. |
+| "The repo has no CI, so `--no-push` is implied"                      | Only the user passes `--no-push`. Push and record what you observe: `no CI configured` from `ils`, or `no branch CI`.     |
+| "I remember the ship phase well enough to run it"                    | A paraphrase drops the marker, the two-poll rule, the `--force` rule, the last-line `Next:`. Read `branch-flow.md` first. |
+| "The watch exited 0, so CI is green"                                 | Green is `ils push` exit 0 (trunk path) or `gh run view` showing `conclusion: success` on the pushed tip (release path).  |
 
 ## Red Flags — Stop and Re-read Approval Is the Grant
 
@@ -313,17 +338,26 @@ already removed when the ship phase ended; a halt report removes both.
 - A findings-fix commit touching a file absent from the plan's diff before the findings-fix phase
 - A question about an out-of-scope finding, or about an in-scope one with no dependent at
   `file:line`
-- A commit or merge on the base branch, a `release.sh` invocation or `release-active` marker raised
-  by this loop, or a push by this loop of anything but `plan/<slug>` (the dispatched `fix-ci` agent
-  pushes its own `fix-ci/*` branch under its own rules)
+- A commit or merge on the base branch, a `gh pr merge` run or `--auto` passed, a `release.sh`
+  invocation or `release-active` marker raised by this loop, or a push by this loop of anything but
+  `plan/<slug>` (the dispatched `fix-ci` agent pushes its own `fix-ci/*` branch under its own rules)
+- The trunk taken from a branch name instead of `git ls-remote --symref origin HEAD`
+- `ils push` piped, `tee`d, backgrounded, or behind `cd`, or a `Next:` acted on that was not the
+  output's last line
+- `.git/plan-squash/<slug>.msg` written on the trunk path after a push, or a trunk-path report that
+  names `/release merge`
 - A task with a fold target committed with a composed message, or a `none` task committed as a fixup
-- A report with no Ship section, or a Ship section that names a push instead of the merge command
-- A Ship line saying `CI green` without `gh run view … conclusion: success` for the pushed tip in
-  context, or one written from a watch's exit code
-- A ship phase skipped without `--no-push` on the invocation, or a merge line whose `--force` does
-  not match the CI result (`CI green` → none; anything else → `--force`)
-- A Ship section with raw git commands (`git switch`, `git merge --squash`) instead of `Merge:
-  /release merge [--force]`, or one silent about a finding that folds into a release commit
+- A report with no Ship section, or a Ship section with no merge line, or one whose merge line is
+  not the form `branch-flow.md` gives for the run's path and result
+- A Ship line saying `CI green` without, in context, `ils push`'s exit 0 output (trunk path) or `gh
+  run view … conclusion: success` for the pushed tip (release path), or one written from a watch's
+  exit code
+- A ship phase skipped without `--no-push` on the invocation, or a release-path merge line whose
+  `--force` does not match the CI result (`CI green` → none; anything else → `--force`)
+- A Ship section with raw git commands (`git switch`, `git merge --squash`) instead of its path's
+  merge line (on the trunk path the form `branch-flow.md` gives for the result, `Merge: <the merge
+  command ils printed>, by hand` after exit 0; on the release path `Merge: /release merge
+  [--force]`), or one silent about a finding that folds into a release commit
 - A report entry with no `what it costs`, or one that begins with "I" (I fixed, I deleted, I left)
 - A per-task file list, or a task described by what it built
 - A confirmed finding gone from a reply after a "too long" complaint
