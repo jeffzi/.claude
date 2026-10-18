@@ -36,6 +36,10 @@ skills/statistical-analysis/
 skills/humanizer/
 skills/fallow/
 
+# Claude Code runtime state for synced and deleted skills
+skills/.trash/
+skills/synced/
+
 # Allow rules
 !rules/
 !rules/**
