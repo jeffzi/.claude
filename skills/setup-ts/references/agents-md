@@ -10,10 +10,13 @@ this file. It is gitignored for personal, machine-specific preferences and never
 - `npm run build` — compile with `tsc -p tsconfig.build.json`
 - `npm test` — `vitest run --coverage`; coverage thresholds fail the run, and untested `src/` files
   count against them
-- `npm run check` — every pre-commit hook over all tracked and untracked files: lint, markdown,
-  formatting, workflow lint/audit, type-aware lint, dead code, spelling, types, then publish hygiene
-  (`publint` + `@arethetypeswrong/cli`). The lint, markdown, and formatting hooks rewrite files in
-  place. Run before committing.
+- `npm run check` — every pre-commit hook over all tracked and untracked files (lint, markdown,
+  formatting, workflow lint/audit, type-aware lint, spelling, types), plus dead code and publish
+  hygiene (`publint` + `@arethetypeswrong/cli`). The lint, markdown, and formatting hooks rewrite
+  files in place. The dead-code hook scores complexity against the coverage `npm test` writes and
+  refuses to run when a `src/` file is newer than that report, so run `npm test` first after
+  editing `src/`. It runs in `check` and `pre-push` (right after `npm test`), never at pre-commit.
+  Run before committing.
 - `npm run fix` — auto-fix lint, markdown, and formatting, then remove unused exports, dependencies,
   and enum members (`fallow fix`). Deletes code — review the diff before committing.
 - `npm run check:security` — surface security candidates (`fallow security`). Candidates need
@@ -25,8 +28,10 @@ this file. It is gitignored for personal, machine-specific preferences and never
 
 - Never run `git commit --no-verify`, `git commit -n`, or anything else that skips the lefthook
   hooks — the hooks are the gate, not an obstacle.
-- Fix a failing check at its source. Never edit a test to make it pass; never widen a lint ignore to
-  silence a real finding.
+- Fix a failing check at its source. Never weaken a test to make it pass; never widen a lint ignore
+  to silence a real finding. A test whose assertion is right but whose input is wrong (a sample
+  value that collides with a fixture, a typo, a bad import) is a test bug: fix the input and say
+  so in one line.
 
 ## Linter and type-checker configuration
 

@@ -24,30 +24,32 @@ package. `init`/`update` run from the target project's cwd, so always read the s
 `${CLAUDE_SKILL_DIR}/references/<template>`, never a bare relative `references/` path. Each maps to
 a fixed destination in the project root:
 
-| Template (in `${CLAUDE_SKILL_DIR}/references/`) | Destination                          |
-| ----------------------------------------------- | ------------------------------------ |
-| `.oxlintrc.json`                                | `.oxlintrc.json`                     |
-| `.oxfmtrc.json`                                 | `.oxfmtrc.json`                      |
-| `.markdownlint-cli2.jsonc`                      | `.markdownlint-cli2.jsonc`           |
-| `cspell.json`                                   | `cspell.json`                        |
-| `fallow.json`                                   | `.fallowrc.json`                     |
-| `tsconfig.json`                                 | `tsconfig.json`                      |
-| `tsconfig.build.json`                           | `tsconfig.build.json`                |
-| `vitest.config.ts`                              | `vitest.config.ts`                   |
-| `lefthook.yml`                                  | `lefthook.yml`                       |
-| `commitlintrc.json`                             | `.commitlintrc.json`                 |
-| `ci.yml`                                        | `.github/workflows/ci.yml`           |
-| `audit.yml`                                     | `.github/workflows/audit.yml`        |
-| `publish.yml`                                   | `.github/workflows/publish.yml`      |
-| `update-tools.yml`                              | `.github/workflows/update-tools.yml` |
-| `dependabot.yml`                                | `.github/dependabot.yml`             |
-| `editorconfig`                                  | `.editorconfig`                      |
-| `gitignore`                                     | `.gitignore`                         |
-| `npmrc`                                         | `.npmrc`                             |
-| `agents-md`                                     | `AGENTS.md`                          |
-| `agents-local-md`                               | `AGENTS.local.md`                    |
-| `mcp.json`                                      | `.mcp.json`                          |
-| `package.json`                                  | `package.json`                       |
+| Template (in `${CLAUDE_SKILL_DIR}/references/`) | Destination                         |
+| ----------------------------------------------- | ----------------------------------- |
+| `.oxlintrc.json`                                | `.oxlintrc.json`                    |
+| `.oxfmtrc.json`                                 | `.oxfmtrc.json`                     |
+| `.markdownlint-cli2.jsonc`                      | `.markdownlint-cli2.jsonc`          |
+| `cspell.json`                                   | `cspell.json`                       |
+| `fallow.json`                                   | `.fallowrc.json`                    |
+| `tsconfig.json`                                 | `tsconfig.json`                     |
+| `tsconfig.build.json`                           | `tsconfig.build.json`               |
+| `vitest.config.ts`                              | `vitest.config.ts`                  |
+| `check-coverage-fresh.ts`                       | `scripts/check-coverage-fresh.ts`   |
+| `coverage-fresh.test.ts`                        | `tests/coverage-fresh.test.ts`      |
+| `lefthook.yml`                                  | `lefthook.yml`                      |
+| `commitlintrc.json`                             | `.commitlintrc.json`                |
+| `ci.yml`                                        | `.github/workflows/ci.yml`          |
+| `audit.yml`                                     | `.github/workflows/audit.yml`       |
+| `publish.yml`                                   | `.github/workflows/publish.yml`     |
+| `update-deps.yml`                               | `.github/workflows/update-deps.yml` |
+| `dependabot.yml`                                | `.github/dependabot.yml`            |
+| `editorconfig`                                  | `.editorconfig`                     |
+| `gitignore`                                     | `.gitignore`                        |
+| `npmrc`                                         | `.npmrc`                            |
+| `agents-md`                                     | `AGENTS.md`                         |
+| `agents-local-md`                               | `AGENTS.local.md`                   |
+| `mcp.json`                                      | `.mcp.json`                         |
+| `package.json`                                  | `package.json`                      |
 
 Copy to the **Destination** column name, not the template name; create missing destination
 directories (`.github/workflows/`) before copying. `editorconfig`, `gitignore`, and `npmrc` are

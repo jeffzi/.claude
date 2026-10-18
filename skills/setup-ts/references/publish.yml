@@ -65,7 +65,7 @@ jobs:
     timeout-minutes: 10
     environment: npm
     permissions:
-      id-token: write
+      id-token: write # OIDC token for npm trusted publishing; no repository access
     steps:
       - name: Setup Node.js
         # zizmor: ignore[cache-poisoning] -- setup-node does not cache unless cache: is set

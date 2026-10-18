@@ -22,10 +22,6 @@ pre-commit:
       priority: 3
       glob: "**/*.{ts,tsx,mts,cts}"
       run: npx tsc -p tsconfig.json --noEmit
-    quality:
-      priority: 3
-      glob: "**/*.{ts,tsx,mts,cts,js,json}"
-      run: npx fallow --fail-on-issues --quiet
     typelint:
       priority: 3
       glob: "**/*.{ts,tsx,mts,cts}"
@@ -43,6 +39,13 @@ check:
   files: git ls-files --cached --others --exclude-standard
   commands:
     <<: *checks
+    quality:
+      priority: 3
+      glob: "**/*.{ts,tsx,mts,cts,js,json}"
+      # check-coverage-fresh.ts must run before fallow: fallow scores CRAP against
+      # coverage/coverage-final.json, so a src/ edit made after the last test run
+      # would be scored against stale line maps.
+      run: npx tsx scripts/check-coverage-fresh.ts && npx fallow --fail-on-issues --quiet
     package:
       priority: 4
       run: npm run build && npx publint --strict && npx attw --pack . --profile esm-only

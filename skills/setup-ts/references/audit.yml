@@ -1,4 +1,4 @@
-name: Audit
+name: Security audit
 
 on:
   push:
@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   audit:
-    name: Audit
+    name: Known vulnerabilities
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
