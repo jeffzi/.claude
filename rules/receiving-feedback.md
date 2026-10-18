@@ -27,8 +27,9 @@ Before acting on any suggestion, check it against codebase reality:
 3. Is there a reason the current code is the way it is?
 4. Does the source have full context, or only a slice?
 
-If you can't verify without more work, say so — "I can't confirm this without running X;
-investigate, or proceed on your call?" — rather than implementing on faith.
+If you can't verify without more work, do the work — run X, read the file, or dispatch
+`claim-reviewer` — rather than implementing on faith or handing the user "I can't confirm this
+without running X; your call?" (`no-unverified-findings.md`).
 
 ## Push back on merit
 

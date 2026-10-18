@@ -13,7 +13,10 @@ user first and explain why. This includes but is not limited to:
   that match a local or global gitignore rule.
 - **File overwriting**: Reading content from git history (`git show`, `git cat-file`) and writing it
   back via Write/Edit tools or shell redirects (`git show HEAD:file > file`) to revert a file.
-- **File deletion**: `rm`, `rm -rf`, `unlink`, or any command that removes files.
+- **File deletion**: `rm`, `rm -rf`, `unlink`, or any command that removes an untracked file, a file
+  with uncommitted changes, or a whole directory. A file git tracks with a clean working copy — an
+  unused fixture, a stale stub — is restorable, so deleting it is an ordinary edit: do it under the
+  current request's scope and report it, no question.
 - **Shell redirects**: Truncating project files via `> file` or `echo "" > file` — scratch/temp
   capture files (`/tmp/*`, scratchpad) are exempt.
 - **Worktrees**: `git worktree remove` or `ExitWorktree` when the worktree has uncommitted changes.

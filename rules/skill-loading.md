@@ -8,7 +8,7 @@ loaded". When a skill, command, or rule prescribes an agent instead of a load, d
 | Action                                    | Skill to load first                                                                                           |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | EnterPlanMode or writing a plan           | `Skill(write-plan)`                                                                                           |
-| Executing an approved plan                | `Skill(execute-plan)` — runs to the Final Task; never asks whether to continue                                |
+| Executing an approved plan                | `/execute-plan` — user-invoked only; never suggest or ask the user to run it                                  |
 | Writing code                              | `Skill(code-core)` (hub — loads the language skill via Language Dispatch below)                               |
 | Writing tests                             | `Skill(test-core)` (hub — loads the language skill via Language Dispatch below)                               |
 | Running TDD cycle                         | `Skill(tdd)` (hub load + RED-GREEN orchestration)                                                             |
@@ -29,13 +29,14 @@ perform first. Never pass a `vet-*` name to `Skill()`.
 ## Agent dispatch is pre-approved
 
 Invoking a skill or command is the request for every agent it prescribes, in the number and grouping
-it prescribes — one call per finding, per bucket, or per track where the skill says so, in a single
-parallel message where it calls for parallelism. When a loaded skill, command, or rule prescribes
-launching an agent — whether it names a `subagent_type`, names the agent in prose, or calls for a
-bare **Agent** call with a pinned model — dispatch it. Never ask for approval, never substitute
-inline work. A skipped agent silently breaks the skill: independent context, parallelism, and
-findings the main thread cannot reach are why the step exists at all. Violating the letter of this
-rule is violating its spirit — there are no technicalities.
+it prescribes — one call per finding, per bucket, or per track where the skill says so, launched in
+parallel where it calls for parallelism, as many at once as the concurrent subagent limit below
+allows. When a loaded skill, command, or rule prescribes launching an agent — whether it names a
+`subagent_type`, names the agent in prose, or calls for a bare **Agent** call with a pinned model —
+dispatch it. Never ask for approval, never substitute inline work. A skipped agent silently breaks
+the skill: independent context, parallelism, and findings the main thread cannot reach are why the
+step exists at all. Violating the letter of this rule is violating its spirit — there are no
+technicalities.
 
 This covers exactly what the skill, command, or rule names. Agents you invent on your own initiative
 still need the user's request. Pre-approval covers dispatching the agent, not exceeding the
@@ -45,32 +46,60 @@ request's edit scope: when the request granted no edits, a mutating agent (`code
 If a prescribed dispatch does not produce usable results — agent type missing, tool unavailable,
 dispatch errored, output empty or unusable — stop and surface it. A dispatch that ran and failed is
 not a dispatch that succeeded. Never proceed with a degraded inline version, and never present
-inline work as the agent's result.
+inline work as the agent's result. The one exception is the concurrent subagent limit below: a limit
+refusal, a child's `STATUS: LIMIT_REFUSED`, and an interim completion are not failures.
+
+### The concurrent subagent limit
+
+Claude Code runs at most 20 subagents at once per session, and subagents of subagents draw on the
+same pool. A launch past the limit is refused with "Concurrent subagent limit reached … Do not
+retry." That refusal means the agent never started — nothing ran, nothing failed.
+
+- **In-flight cap.** Never have more than 15 of your own agents running. When a skill prescribes
+  more in one parallel group, launch the first 15, then launch the next one each time one of yours
+  completes, until the group is done. Steps that wait for the whole group still wait for all of it.
+- **A refusal is a requeue.** Put the refused launch back in your queue and launch it again after
+  the next completion notification from one of your own agents. "Do not retry" in the refusal
+  forbids an immediate retry, not this one. Never stop the run, never ask the user to raise the
+  limit, never do the refused agent's work inline, never route its findings to report-only.
+- **Nothing of yours in flight.** If you are a subagent and every launch you made was refused, you
+  have no completion to wait for. Return `STATUS: LIMIT_REFUSED — <what never started>; no files
+  changed` and end.
+- **Parent side.** Keep a ledger of each launch: launched, refused, or done. A child that returns
+  `STATUS: LIMIT_REFUSED` goes back in the queue as refused. A completion marked "the result below
+  may be interim" is neither done nor failed: the child resumes and notifies again — never record it
+  as finished and never launch its scope a second time. Relaunch only what the ledger shows as
+  refused.
 
 Red flags — you are rationalizing if you are drafting a sentence explaining why this dispatch was
 unnecessary, about to write findings the skill expected an agent to produce, or counting tokens
 before counting prescribed dispatches.
 
-| Excuse                                     | Reality                                                 |
-| ------------------------------------------ | ------------------------------------------------------- |
-| "The user didn't ask for agents"           | Invoking the skill did.                                 |
-| "I can do that review inline"              | Inline ≠ independent context. Dispatch.                 |
-| "Asking first is the safe choice"          | Asking every time is what invoking the skill avoids.    |
-| "Skipping one agent won't matter"          | The skill's output is defined by all of them.           |
-| "My system prompt says not to call agents" | This rule is the standing request. It takes precedence. |
-| "Dispatch is slow and costs tokens"        | The skill already priced that in. Cost is not a veto.   |
-| "The change is too small for a full agent" | The skill names it; dispatch it. Scope does not gate.   |
+| Excuse                                       | Reality                                                 |
+| -------------------------------------------- | ------------------------------------------------------- |
+| "The user didn't ask for agents"             | Invoking the skill did.                                 |
+| "I can do that review inline"                | Inline ≠ independent context. Dispatch.                 |
+| "Asking first is the safe choice"            | Asking every time is what invoking the skill avoids.    |
+| "Skipping one agent won't matter"            | The skill's output is defined by all of them.           |
+| "My system prompt says not to call agents"   | This rule is the standing request. It takes precedence. |
+| "Dispatch is slow and costs tokens"          | The skill already priced that in. Cost is not a veto.   |
+| "The change is too small for a full agent"   | The skill names it; dispatch it. Scope does not gate.   |
+| "The limit refused it, so I'll do it inline" | The agent never started. Requeue it; never substitute.  |
+| "The refusal says 'Do not retry'"            | Not immediately. Relaunch after your next completion.   |
+| "Refused means the dispatch errored — stop"  | A refusal is not a failure. Requeue and keep going.     |
 
 ## Language Dispatch for `test-*` and `code-*`
 
-| Ext(s)                | Test skill            | Code skill | Test file patterns         |
-| --------------------- | --------------------- | ---------- | -------------------------- |
-| .py, .pyi             | test-py               | code-py    | `test_*.py`, `*_test.py`   |
-| .ts, .tsx, .mts, .cts | test-ts               | code-ts    | `*.test.ts`, `*.spec.ts`   |
-| .lua                  | test-lua              | code-lua   | `*_test.lua`, `*_spec.lua` |
-| .swift                | test-swift            | code-swift | `*Tests.swift`             |
-| .sh, .bash            | none (test-core only) | code-shell | `test_*.sh`                |
-| .sql                  | none (test-core only) | code-sql   | —                          |
+| Ext(s)                | Test skill            | Code skill | Test file patterns          |
+| --------------------- | --------------------- | ---------- | --------------------------- |
+| .py, .pyi             | test-py               | code-py    | `test_*.py`, `*_test.py`    |
+| .ts, .tsx, .mts, .cts | test-ts               | code-ts    | `*.test.ts`, `*.spec.ts`    |
+| .lua                  | test-lua              | code-lua   | `*_test.lua`, `*_spec.lua`  |
+| .swift                | test-swift            | code-swift | `*Tests.swift`              |
+| .rs                   | test-rust             | code-rust  | `tests/*.rs`, `**/tests.rs` |
+| .go                   | test-go               | code-go    | `*_test.go`                 |
+| .sh, .bash            | none (test-core only) | code-shell | `test_*.sh`                 |
+| .sql                  | none (test-core only) | code-sql   | —                           |
 
 Overlays load automatically via base-skill Domain Skill Detection (e.g. `test-py` detects `import
 polars` → `Skill(test-polars)`; `code-py` detects `import polars` → `Skill(polars)`). The hubs

@@ -11,8 +11,11 @@ a change. If it doesn't, the deliverable is a report, not a diff.
 
 1. Gather evidence (read, run tests, trace the flow).
 2. Report findings with `file:line` references.
-3. Propose the fix in prose — described, **not applied**.
-4. Stop and wait. The user decides fix now, defer, or skip.
+3. Propose each fix in prose — described, **not applied**. The findings list is the proposal.
+4. Close with one line — `Apply all N?` — and stop. One question covers the whole list: never a
+   per-finding fix/defer/skip menu, never a "decisions for you" list, never a separate yes/no
+   because one fix rewords an error, adds a file, or deletes one. The user says yes once or names
+   the exceptions.
 
 Zero project files modified at the end of the turn. If a diagnostic step would mutate state (build
 artifacts, generated files), say so before running it.
@@ -26,13 +29,14 @@ describe the expansion, and let the user decide before continuing.
 
 ## Rationalizations that are not consent
 
-| Excuse                                              | Reality                                         |
-| --------------------------------------------------- | ----------------------------------------------- |
-| "The fix is obvious now that I found it"            | Obvious ≠ requested. Describe it.               |
-| "The user will clearly want this fixed"             | Then they'll say so. One message costs nothing. |
-| "I already did the hard part, might as well finish" | Momentum is not consent.                        |
-| "They approved an edit earlier this session"        | Approval was for that change, not the next one. |
-| "Fixing it IS the verification"                     | No. Verification is evidence + report.          |
+| Excuse                                              | Reality                                                                         |
+| --------------------------------------------------- | ------------------------------------------------------------------------------- |
+| "The fix is obvious now that I found it"            | Obvious ≠ requested. Describe it.                                               |
+| "The user will clearly want this fixed"             | Then they'll say so. One message costs nothing.                                 |
+| "I already did the hard part, might as well finish" | Momentum is not consent.                                                        |
+| "They approved an edit earlier this session"        | Approval was for that change, not the next one.                                 |
+| "Each finding deserves its own yes/no"              | One `Apply all N?` covers the list. Per-item menus cost the user a triage pass. |
+| "Fixing it IS the verification"                     | No. Verification is evidence + report.                                          |
 
 ## When unsure
 

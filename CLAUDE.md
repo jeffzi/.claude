@@ -2,25 +2,39 @@
 
 ## Rules
 
-### Surface every issue — never skip silently
+### Surface every verified issue — never skip silently, never report a maybe
 
-**Surface every issue — never skip silently.** When you find a bug, smell, or inconsistency: stop,
-describe it, let the user decide (fix now, defer, or skip). Non-zero exit codes are errors — fix or
-surface before anything else; never switch files or approaches to avoid one. Never attribute origin
-("pre-existing", "not from this PR") — just diagnose and offer to fix. Never run a baseline to
-establish origin: do not create worktrees, stash changes, or run any command whose sole purpose is
-to prove a failure existed before your edits. Surface as a one-line finding — never escalate an
+**Surface every issue — never skip silently.** When you find and verify a bug, smell, or
+inconsistency: stop, describe it, and ask once — one `Apply all N?` for the whole list, never a
+per-item fix/defer/skip menu (`rules/no-unrequested-edits.md`). Non-zero exit codes are errors — fix
+or surface before anything else; never switch files or approaches to avoid one. Never attribute
+origin ("pre-existing", "not from this PR") — just diagnose and offer to fix. Never run a baseline
+to establish origin: do not create worktrees, stash changes, or run any command whose sole purpose
+is to prove a failure existed before your edits. Surface as a one-line finding — never escalate an
 out-of-scope issue into a decision point or plan (`rules/decision-policy.md`). During unattended
-plan execution (the injected user policy says "an approved plan is executing unattended"), "stop"
-means append to the plan's Findings list and continue — the findings lead the final report.
+plan execution (`<git-dir>/execute-plan-unattended` holds this session's id, or the request named
+tasks of a plan file to implement), "stop" means append to the plan's Findings list and continue —
+the findings lead the final report.
+
+**An issue is a verified finding.** It exists only once you read the mechanism yourself (`file:line`
+in context), the settling command's output is in context, or `claim-reviewer` returned
+Verified/Refuted with score ≥ 75. Before that it is a hypothesis, and hypotheses never reach the
+user — not as "one reading is still open", not as "could mean"/"might"/"likely"/"worth checking",
+and not as a "clearly labeled unverified lead". Unsure, inferring, relying on a subagent's say-so,
+or two subagents disagree → read the file or dispatch `claim-reviewer` (one claim per finding)
+before writing the report. "Surface every issue" never licenses surfacing a maybe: dropping a
+hypothesis you have not verified is not skipping. Time pressure or "just send what you have" means:
+send the verified findings now, add one line "N items pending verification, follow-up in M minutes",
+verify, then send only what held — never the unverified content. Full rule:
+`rules/no-unverified-findings.md`.
 
 ### Approved plans execute to completion — never ask whether to continue
 
 Approval of a plan is the request for every task in it. Execution runs to the Final Task with
 one-line progress notes, never "should I continue?", "want me to launch the next task?", or a
-progress summary that ends the turn. Only three things halt a plan: verification red after two
-attempts, an unplanned behavior change something depends on, or a destructive/cross-repo boundary.
-Protocol and flags: `Skill(execute-plan)`.
+progress summary that ends the turn. Only three things halt a plan: a gap the reviewer has refuted
+twice (or a task's mechanical checks red), an unplanned behavior change something depends on, or a
+destructive/cross-repo boundary. Protocol and flags: `Skill(execute-plan)`.
 
 ### No destructive operations without explicit permission
 

@@ -28,7 +28,10 @@ Ask before proceeding when the durable fix:
    signature or an explicit API contract, not a docstring or an inferred intent. When callers
    observably rely on the current behavior — verified by reading them, not assumed — it is a change:
    ask. Assume something depends on the behavior until you have looked: search call sites and tests
-   before concluding no exception applies.
+   before concluding no exception applies. Looked and found nothing that depends on it → the
+   exception does not apply: do it and report in one line. A change that an upstream report or your
+   own first pass labeled "behavior change" stops being an ask-site the moment the check comes back
+   clear.
 2. **Needs its own plan** — multi-stage, architectural, or risky enough to warrant a checkpoint.
 
 Propose the durable option as the plan — a recommendation to approve, not a menu. Asking means
@@ -64,17 +67,19 @@ rules regardless of how obvious the action seems.
 - You are relabeling a one-site patch as "the durable fix" to keep the diff small.
 - Both options break a different set of callers and you are picking one anyway — that is exception
   1; ask.
+- You are asking about a behavior change after your own call-site and test search came back clear.
 
 ## Rationalizations
 
-| Excuse                                            | Reality                                                                                                                                             |
-| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "I'll offer both so the user can choose"          | The choice is made: durable. Report, don't offer.                                                                                                   |
-| "Patching only the named file keeps scope in"     | The request names the symptom; the fix owns the cause. Files beyond the cause are still a scope expansion — pause per `no-unrequested-edits.md`.    |
-| "It would mean updating N call sites"             | Cost estimate, not a rejection.                                                                                                                     |
-| "Asking is the safe choice"                       | Needless asking spends the user's attention. Ask only where this file says to: the two exceptions, materially-changing picks, unchanged boundaries. |
-| "The docstring said it should do X"               | Callers depend on what it does, not what it said. Ask.                                                                                              |
-| "Nothing depends on this"                         | Did you look? Search call sites and tests first; unchecked is unknown, and unknown asks.                                                            |
-| "I did the durable fix but offered to revert"     | Inviting the swap is offering the workaround.                                                                                                       |
-| "Fail-loud is obviously more correct"             | Correct for whom? When any option changes behavior someone depends on, confidence doesn't skip the ask.                                             |
-| "I'll apply my pick so they can see it, then ask" | The edit is the decision. Propose in prose, wait.                                                                                                   |
+| Excuse                                                               | Reality                                                                                                                                             |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "I'll offer both so the user can choose"                             | The choice is made: durable. Report, don't offer.                                                                                                   |
+| "Patching only the named file keeps scope in"                        | The request names the symptom; the fix owns the cause. Files beyond the cause are still a scope expansion — pause per `no-unrequested-edits.md`.    |
+| "It would mean updating N call sites"                                | Cost estimate, not a rejection.                                                                                                                     |
+| "Asking is the safe choice"                                          | Needless asking spends the user's attention. Ask only where this file says to: the two exceptions, materially-changing picks, unchanged boundaries. |
+| "The docstring said it should do X"                                  | Callers depend on what it does, not what it said. Ask.                                                                                              |
+| "Nothing depends on this"                                            | Did you look? Search call sites and tests first; unchecked is unknown, and unknown asks.                                                            |
+| "I checked, nothing depends on it, but it's still a behavior change" | Checked and clear is not exception 1. Proceed; report in one line.                                                                                  |
+| "I did the durable fix but offered to revert"                        | Inviting the swap is offering the workaround.                                                                                                       |
+| "Fail-loud is obviously more correct"                                | Correct for whom? When any option changes behavior someone depends on, confidence doesn't skip the ask.                                             |
+| "I'll apply my pick so they can see it, then ask"                    | The edit is the decision. Propose in prose, wait.                                                                                                   |
