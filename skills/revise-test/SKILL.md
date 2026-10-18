@@ -24,24 +24,23 @@ the fixes here. The agents find; you fix.
 ## Changed files (no-argument path)
 
 ```!
-git diff --name-only 2>/dev/null
-git diff --cached --name-only 2>/dev/null
-git ls-files --others --exclude-standard 2>/dev/null
+git diff --name-only 2>/dev/null || true
+git diff --cached --name-only 2>/dev/null || true
+git ls-files --others --exclude-standard 2>/dev/null || true
 ```
 
 ## Process
 
 1. **Resolve targets.**
-   - No argument → the changed files listed above.
+   - No argument → the changed files listed above. If the list is empty (no git repo or no changes),
+     stop and ask the user for an explicit target.
    - File or directory argument → that path.
    - Filter to test files only. Production code belongs to `/revise-code`.
 
 2. **Dispatch the reviewers.**
    - Dispatch `subagent_type: vet-test` per bucket, following the revise-core bucketing rule.
-   - **Directory targets only:** also dispatch exactly one `subagent_type: vet-test-suite` with the
-     whole directory, scope `full` — never one per bucket: cross-file duplication crosses
-     directories, and the suite agent scales by inventory, not by reading. It joins the same
-     parallel message. `STATUS: WRONG_INPUT` → discard it; the per-file agents still run.
+   - The suite agent is `subagent_type: vet-test-suite`; revise-core step 2 sets where it runs and
+     how many times. `STATUS: WRONG_INPUT` → discard it; the per-file agents still run.
 
 3. **Triage the findings.** Impact enum: `coverage` → `fragility` → `cost` → `clarity`. Coverage
    holes get fixed even when the session is cut short; a misleading name waits.
@@ -71,8 +70,7 @@ git ls-files --others --exclude-standard 2>/dev/null
 5. **Verify.** Before applying any fix, record test file count, test count, and test LOC. After all
    fixes: run the test suite — every test passes, and the test count differs from the recorded count
    only by the tests the fix queue merged or deleted, each accounted for by a named surviving pin. A
-   failing suite means the fix is wrong — revert that fix and move it to the report-only queue with
-   the failure attached.
+   failing suite → isolate and revert the culprit fixes per revise-core step 5.
 
 6. **Report** (template below).
 

@@ -22,7 +22,8 @@ Review a SKILL.md with the `vet-skill` agent, then apply the fixes here. The age
 
 1. **Resolve targets and scope.**
    - Path argument → that skill directory or SKILL.md.
-   - No argument → SKILL.md files appearing in any of:
+   - No argument → SKILL.md files appearing in any of (skip commands that fail outside a git repo;
+     if the list is empty, stop and ask for an explicit target):
      - `git diff --name-only`
      - `git diff --cached --name-only`
      - `git ls-files --others --exclude-standard`

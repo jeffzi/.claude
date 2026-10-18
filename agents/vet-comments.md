@@ -58,6 +58,8 @@ Load all three, then walk the five standards.
    | `(====\|####\|#region\|/region)`                                                                                                                          | non-standard separators   |
    | `(originally\|used to\|earlier version\|previously\|no longer\|Historically\|we considered\|rejected\|trade-off)`                                         | history narration (S5)    |
    | `(Arrange\|Act\|Assert)\b`                                                                                                                                | AAA phase-label noise     |
+   | `^\s*(//\|#\|--)\s*\w+ (is\|are\|returns\|reports\|names\|tells\|holds\|contains\|stores\|represents)`                                                    | declarative restatement   |
+   | `^\s*(//\|#\|--)\s*The \w+ (of\|for)`                                                                                                                     | declaration-group labels  |
 
    These are _seeds_, not verdicts. Read every hit in full context before deciding. A match inside a
    string literal, URL, or version number is not a comment issue.
@@ -68,12 +70,13 @@ Load all three, then walk the five standards.
 
    `Grep -n` for the language's export shape:
 
-   | Language   | Pattern                                                                                           |
-   | ---------- | ------------------------------------------------------------------------------------------------- |
-   | TypeScript | `^export\s+(default\s+\|async\s+)*(function\|const\|let\|class\|type\|interface\|enum\|abstract)` |
-   | Python     | `^(def\|class)\s+[a-zA-Z]` (leading underscore = private, skip)                                   |
-   | Lua        | `^(function\s+M\.\|M\.[a-zA-Z_]+\s*=\|local\s+function\s+[a-zA-Z_]+)`                             |
-   | Swift      | `^\s*(public\|open)\s+(func\|class\|struct\|enum\|protocol\|var\|let\|actor)`                     |
+   | Language   | Pattern                                                                                                                    |
+   | ---------- | -------------------------------------------------------------------------------------------------------------------------- |
+   | TypeScript | `^export\s+(default\s+\|async\s+)*(function\|const\|let\|class\|type\|interface\|enum\|abstract)`                          |
+   | Python     | `^(def\|class)\s+[a-zA-Z]` (leading underscore = private, skip)                                                            |
+   | Lua        | `^(function\s+M\.\|M\.[a-zA-Z_]+\s*=\|local\s+function\s+[a-zA-Z_]+)`                                                      |
+   | Swift      | `^\s*(public\|open)\s+(func\|class\|struct\|enum\|protocol\|var\|let\|actor)`                                              |
+   | Go         | `^(func\s+(\([^)]*\)\s*)?[A-Z]\|type\s+[A-Z]\|(var\|const)\s+[A-Z(])` (skip `Test`/`Benchmark`/`Fuzz`/`Example` functions) |
 
    Re-export blocks (`export { … }`, `__all__`) name symbols declared elsewhere in the file — do not
    double-count them.
@@ -92,6 +95,18 @@ Load all three, then walk the five standards.
      language's structured form (S4 shape table) and cover every parameter? If not, S4 finding,
      `confirmed`.
 
+   **Members are symbols too.** After the top-level list, walk the members each declaration holds:
+   struct and class fields, enum and const-block members, interface methods, and the label comment
+   above a declaration group. A member with no comment is clean unless the language leaf requires
+   one. A member that carries a comment gets the second question — does it say more than the
+   member's name and type? If not, S1 finding, `confirmed`. Each commented member gets its own
+   ledger row, written `Type.Member`.
+
+   **When the leaf requires the comment.** Where the `code-{lang}` leaf says a name-first one-line
+   doc comment stands on a required symbol whose name says everything, a restating doc block on that
+   symbol is clean — deleting it would only create an S4 finding. This clears the symbol the
+   requirement names and nothing else: never a member, never a comment the leaf calls optional.
+
    Every symbol gets both questions, and every symbol gets a row in the export ledger you emit under
    **Output format** — including the ones you clear. A symbol you looked at and cleared is a
    decision; a symbol you never listed is a miss, and the two are indistinguishable in the report
@@ -103,16 +118,20 @@ Load all three, then walk the five standards.
 
 ## Standards
 
-### S1. Step-comment criteria
+### S1. Restatement
 
-A step comment inside a function is allowed only if it carries information the surrounding code does
-not state:
+A comment is allowed only if it carries information the surrounding code does not state. This holds
+wherever the comment sits: a step comment inside a function, a doc block, a comment on a field,
+constant, or enum member, a label above a group of declarations. What it must carry:
 
 - A **why** — the reason this step exists, not what it does.
 - A **constraint or ordering invariant** — "must run before X while Y still holds."
 - A **non-obvious domain fact** — "0 is a valid mask — numbers are truthy in Lua."
 
-A step comment that restates the code is a violation. Patterns that almost always restate:
+A comment that restates the code is a violation. On a declaration, restating means repeating the
+name and type in a sentence: `// InstallHint tells the user how to install the tool.` above
+`InstallHint string`, `// The states of a change.` above a block of `ChangeState` constants. Step
+patterns that almost always restate:
 
 > "Check if …", "Get the …", "Set the …", "Add … to …", "Create a …", "Declare the …", "Initialize
 > …", "Build the …", "Update the …", "Remove …", "Return the …", "Loop through …", "Iterate over …",
@@ -193,6 +212,9 @@ Exported and public symbols need a doc comment in the language's conventional st
 | Python                | PEP 257 docstring `"""…"""` |
 | Lua                   | LuaLS `--- @` annotations   |
 | Swift                 | `/// …` or `/** … */`       |
+
+A language with no row in this table or the shape table below (Go) takes its style, its required
+symbols, and its shape from the doc-comment section of its `code-{lang}` leaf.
 
 Flag omissions. An exported symbol with no doc comment is `confirmed`, whatever the symbol's size. A
 one-line type alias gets the same verdict as a 40-line class.
@@ -291,6 +313,7 @@ codegen markers, license blocks) and never a `TODO`/`FIXME` pointing at future w
 | Comment shape                                                           | Verdict                                                                |
 | ----------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | Restates next line ("Check if relation is optional")                    | Violation — remove, or rewrite with the why if one exists              |
+| Field, constant, or group label that repeats the name and type          | Violation — S1; remove unless the leaf requires a comment there        |
 | Names a policy/invariant the code can't show                            | Clean — keep                                                           |
 | Topic sentence + useful policy lines below                              | Flag only the topic sentence, if the policy lines stand alone          |
 | Comment required by a project policy (CLAUDE.md, codegen marker)        | Clean — keep                                                           |

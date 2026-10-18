@@ -21,7 +21,8 @@ Review comments with the `vet-comments` agent, then apply the fixes here. The ag
 ## Process
 
 1. **Resolve targets and scope.**
-   - No argument → source files in the current diff.
+   - No argument → source files in the current diff (if not in a git repo or no changes, stop and
+     ask for an explicit target).
 
 2. **Dispatch the reviewer:** `subagent_type: vet-comments`. The agent loads `code-core` plus the
    language leaf and walks standards S1–S5.

@@ -26,25 +26,24 @@ apply the fixes here. The agents find; you fix.
 ## Changed files (no-argument path)
 
 ```!
-git diff --name-only 2>/dev/null
-git diff --cached --name-only 2>/dev/null
-git ls-files --others --exclude-standard 2>/dev/null
+git diff --name-only 2>/dev/null || true
+git diff --cached --name-only 2>/dev/null || true
+git ls-files --others --exclude-standard 2>/dev/null || true
 ```
 
 ## Process
 
 1. **Resolve targets and scope.**
-   - No argument → the changed files listed above.
+   - No argument → the changed files listed above. If the list is empty (no git repo or no changes),
+     stop and ask the user for an explicit target.
    - File or directory argument → that path.
    - Filter to production code. Test files belong to `/revise-test`; docs to `/revise-doc`.
 
 2. **Dispatch the reviewers.**
    - Dispatch `subagent_type: vet-code` per bucket, following the revise-core bucketing rule. The
      agent loads `code-core` plus the language leaf.
-   - **Directory targets only:** also dispatch exactly one `subagent_type: vet-codebase` with the
-     whole directory, scope `full` — never one per bucket: cross-file duplication crosses
-     directories, and the codebase agent scales by inventory, not by reading. It joins the same
-     parallel message. `STATUS: WRONG_INPUT` → discard it; the per-file agent still runs.
+   - The suite agent is `subagent_type: vet-codebase`; revise-core step 2 sets where it runs and how
+     many times. `STATUS: WRONG_INPUT` → discard it; the per-file agents still run.
 
 3. **Triage the findings.** Impact enum: `silent-failure` → `type-safety` → `structure` → `clarity`.
    Swallowed errors get fixed even when the session is cut short; a naming issue waits.
@@ -65,8 +64,8 @@ git ls-files --others --exclude-standard 2>/dev/null
    unifying divergent error conventions or rewiring a bypassed seam changes behavior — surface those
    instead.
 
-5. **Verify.** Run the project's lint, type-check, and test commands. A failing check means the fix
-   is wrong — revert that fix and move it to the report-only queue with the failure attached.
+5. **Verify.** Run the project's lint, type-check, and test commands. A failing check → isolate and
+   revert the culprit fixes per revise-core step 5.
 
    For each applied cross-file finding, additionally Grep the tree for the extracted symbol,
    constant, or merged module's name: zero definitions survive outside the module the finding's

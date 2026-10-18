@@ -21,7 +21,8 @@ Review documentation with the `vet-doc` agent, then apply the fixes here. The ag
 ## Process
 
 1. **Resolve targets and scope.**
-   - No argument → documentation files in the current diff (`.md`, `README*`, `CHANGELOG*`).
+   - No argument → documentation files in the current diff (`.md`, `README*`, `CHANGELOG*`). If not
+     in a git repo or no changes, stop and ask for an explicit target.
 
 2. **Dispatch the reviewer:** `subagent_type: vet-doc`. The agent routes CHANGELOG.md to
    `write-changelog` rules and CLAUDE.md to `references/claude-md-quality.md` automatically.
