@@ -16,17 +16,20 @@ This doc covers only where each one writes to git.
 
 ## The branches
 
-| Branch          | Who creates it         | What lands on it                                            |
-| --------------- | ---------------------- | ----------------------------------------------------------- |
-| `main`          | —                      | Release branches, fast-forwarded by `/release finish`       |
-| `vX.Y`          | `/release start X.Y.Z` | One squash commit per plan, then the release commit and tag |
-| `plan/<slug>`   | `/execute-plan`        | One commit per task, findings fixes, CI fixes               |
-| `fix-ci/<slug>` | `/fix-ci`              | Attempts to make a red run green, squashed back when it is  |
+| Branch          | Who creates it         | What lands on it                                                                                                |
+| --------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `main`          | —                      | Release branches, fast-forwarded by `/release finish`; pull requests from plans cut from `main`, merged by hand |
+| `vX.Y`          | `/release start X.Y.Z` | One squash commit per plan, then the release commit and tag                                                     |
+| `plan/<slug>`   | `/execute-plan`        | One commit per task, findings fixes, CI fixes                                                                   |
+| `fix-ci/<slug>` | `/fix-ci`              | Attempts to make a red run green, squashed back when it is                                                      |
 
 The script finds a release branch by its config key, `branch.vX.Y.release = X.Y.Z`, never by its
 name. A plan branch records the branch it was cut from as `branch.plan/<slug>.planBase`; that is
-where `/release merge` lands it. A plan cut from `main` while no release is open lands on `main` the
-same way.
+where it lands. A plan cut from a release or feature branch lands there through `/release merge`. A
+plan cut from `main` (origin's default branch) lands as a pull request instead: `/execute-plan`
+ships it through `ils push`, and you merge it by hand with `gh pr merge`. That path needs
+[`ils`](https://github.com/jeffzi/ils) v0.1.0 on your `PATH` and its skill installed; this
+repository does not install it.
 
 ## Starting a release
 
@@ -45,7 +48,9 @@ refuses once origin already has the branch — see [Recovering](#recovering).
 
 One release is one pass of this loop: `/release start`, then per plan `/write-plan`,
 `/execute-plan`, optionally `/preflight`, and `/release merge`, repeating until `/release finish`
-ships it. `/release status` answers "where are we" at any point.
+ships it. Plans cut from `vX.Y` are release-path plans; a plan cut from `main` stays outside the
+loop and lands as a pull request (see [One plan, one commit](#one-plan-one-commit)). `/release
+status` answers "where are we" at any point.
 
 ```mermaid
 flowchart TD
@@ -64,9 +69,18 @@ flowchart TD
 ## One plan, one commit
 
 `/execute-plan` runs on `plan/<slug>`, never on the branch it started from. Every task commits on
-the plan branch when its verification passes. At the end it pushes the branch once through
-[`fix-ci-push.sh`](../scripts/fix-ci-push.sh) and watches the branch's CI run. It then writes the
-squash message under `.git/plan-squash/` and reports the one command left for you: `/release merge`.
+the plan branch when its verification passes. How the branch ships depends on its base:
+
+- **Cut from `main`.** `/execute-plan` runs `ils push`, which pushes the branch, opens its pull
+  request against `main`, and waits for its checks. On green it writes the pull request's title and
+  body, which become the squash commit, and reports the `gh pr merge` command `ils` printed. You
+  merge by hand; `/execute-plan` never merges.
+- **Cut from a release or feature branch.** `/execute-plan` pushes the branch once through
+  [`fix-ci-push.sh`](../scripts/fix-ci-push.sh) and watches the branch's CI run. It then writes the
+  squash message under `.git/plan-squash/` and reports the one command left for you: `/release
+  merge`.
+
+The rest of this section covers the second case.
 
 `/release merge` acts on the checked-out plan branch, or on one named as `plan/<slug>`. It refuses,
 and changes nothing, unless:
@@ -181,8 +195,11 @@ tag on its tip, so `git log main` reads as the changelog.
   the leased force-push included, happen inside the script where the guard does not look, which is
   why the invocation itself is marker-gated. A typed `git push --force` stays blocked under every
   marker.
-- Branch pushes go through [`fix-ci-push.sh`](../scripts/fix-ci-push.sh): append-only, no force, and
-  only `fix-ci/*` and `plan/*` branches may be deleted.
+- A plan branch cut from `main` is pushed by `ils push`, which also opens its pull request; the
+  assistant never runs `gh pr merge`. Every other branch push — `fix-ci/*` branches and plan
+  branches cut from a release or feature branch — goes through
+  [`fix-ci-push.sh`](../scripts/fix-ci-push.sh): append-only, no force, and only `fix-ci/*` and
+  `plan/*` branches may be deleted.
 - The CI templates trigger on `main`, `plan/**`, `fix-ci/**`, and `v[0-9]*` pushes, so a plan branch
   is green before it lands and a release branch has a run for `finish` to gate on. Projects pick the
   trigger up on `/setup-py update` or `/setup-ts update`.

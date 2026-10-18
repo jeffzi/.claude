@@ -183,20 +183,28 @@ See the [Process](#process) skills table for additional workflows (`/harden`, `/
 ### Plan Flow
 
 One plan is one commit on the branch it started from, `main` by default. The assistant never commits
-on that base; every plan runs on its own branch and lands as a single squash. A release groups
-several plans: `/release start X.Y.Z` cuts `vX.Y` from `main`, plans land on it, and `/release
-finish` ships it onto `main` with a tag. [`docs/release-flow.md`](docs/release-flow.md) walks
-through the whole flow, including how fixes fold back into the commits they correct.
+on that base; every plan runs on its own branch and lands as a single squash. How it lands depends
+on that base. A plan cut from `main` (origin's default branch) ships as a pull request through `ils
+push` and you merge it by hand with `gh pr merge`. A plan cut from a release or feature branch lands
+through `/release merge`. The `main` path needs [`ils`](https://github.com/jeffzi/ils) v0.1.0 on
+your `PATH` and its skill installed; this repository does not install it. A release groups several
+plans: `/release start X.Y.Z` cuts `vX.Y` from `main`, plans land on it, and `/release finish` ships
+it onto `main` with a tag. [`docs/release-flow.md`](docs/release-flow.md) walks through the whole
+flow, including how fixes fold back into the commits they correct.
 
 1. `/write-plan` writes the plan; you approve it. On a release branch it also decides, per task,
    which earlier release commit the task corrects (its **Folds into** target), and says so.
 2. `/execute-plan` creates `plan/<slug>` from the clean branch you are on, records that base,
-   commits once per task (as a `fixup!` of the target when one was named), fixes confirmed findings,
-   pushes the branch once, watches CI (dispatching `/fix-ci` on red), and writes the squash commit
-   message. Its report ends with the one command left for you.
+   commits once per task (as a `fixup!` of the target when one was named), and fixes confirmed
+   findings. Cut from `main`, it runs `ils push`, which pushes the branch, opens its pull request,
+   and waits for CI (dispatching `/fix-ci` on red); it then writes the pull request's title and
+   body. Cut from any other branch, it pushes the branch once, watches CI (dispatching `/fix-ci` on
+   red), and writes the squash commit message. Its report ends with the one command left for you.
 3. Optionally, `/preflight` on the branch.
-4. `/release merge` folds the branch's `fixup!` commits into the release commits they name, squashes
-   the rest onto the base with that message, pushes, and deletes the branch.
+4. Cut from `main`: merge the pull request by hand with the `gh pr merge` command the report names.
+   Cut from a release or feature branch: `/release merge` folds the branch's `fixup!` commits into
+   the release commits they name, squashes the rest onto the base with that message, pushes, and
+   deletes the branch.
 5. `/release finish` runs the release commit and tag, pushes, watches CI, fast-forwards `main`, and
    deletes the release branch. `/release status` shows where the release stands at any point.
 
@@ -211,11 +219,14 @@ What enforces it:
   absent and the script refuses. Both the guard and the script check it, so every release write —
   the cut, the squash or fold, the fast-forward of `main` — happens only when you invoke the skill.
   Its force-push is confined to release branches, under a lease, and only when a fold rewrote one.
-- Branch pushes go through [`fix-ci-push.sh`](scripts/fix-ci-push.sh): append-only, no force, and
-  only `fix-ci/*` and `plan/*` branches may be deleted.
+- A plan branch cut from `main` is pushed by `ils push`, which also opens its pull request; the
+  assistant never runs `gh pr merge`. Every other branch push — `fix-ci/*` branches and plan
+  branches cut from a release or feature branch — goes through
+  [`fix-ci-push.sh`](scripts/fix-ci-push.sh): append-only, no force, and only `fix-ci/*` and
+  `plan/*` branches may be deleted.
 - CI templates trigger on pushes to `main`, `fix-ci/**`, `plan/**`, and `v[0-9]*`, so a plan branch
-  is green before it reaches its base and a release branch has a run for `/release finish` to gate
-  on.
+  is green before its pull request is merged or it reaches its base through `/release merge`, and a
+  release branch has a run for `/release finish` to gate on.
 
 ## Tooling
 
@@ -284,15 +295,15 @@ bats tests/
 
 ### Scripts
 
-| Script                                               | Description                                                                        |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| [`cleanup-sessions.sh`](scripts/cleanup-sessions.sh) | Remove stale session data older than a configurable age                            |
-| [`branch-policy.sh`](scripts/branch-policy.sh)       | Marker and branch policy shared by `fix-ci`, `plan-branch`, `release`, `git-guard` |
-| [`fix-ci-push.sh`](scripts/fix-ci-push.sh)           | Sanctioned push wrapper for the `fix-ci` loop and plan branches                    |
-| [`release.sh`](scripts/release.sh)                   | Cut, inspect, land plans on, and finish a release branch; run by `/release`        |
-| [`sh-common.sh`](scripts/sh-common.sh)               | Sourced helpers shared by the scripts and hooks: `die`, portable `stat`            |
-| [`statusline.sh`](scripts/statusline.sh)             | Custom status line: model, context gauge, rate limit pacing                        |
-| [`sync-skills.sh`](scripts/sync-skills.sh)           | Sync selected skills from external repositories via `npx skills`                   |
+| Script                                               | Description                                                                                 |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| [`cleanup-sessions.sh`](scripts/cleanup-sessions.sh) | Remove stale session data older than a configurable age                                     |
+| [`branch-policy.sh`](scripts/branch-policy.sh)       | Marker and branch policy shared by `fix-ci`, `plan-branch`, `release`, `git-guard`          |
+| [`fix-ci-push.sh`](scripts/fix-ci-push.sh)           | Sanctioned push wrapper for `fix-ci` and plan branches cut from a release or feature branch |
+| [`release.sh`](scripts/release.sh)                   | Cut, inspect, land plans on, and finish a release branch; run by `/release`                 |
+| [`sh-common.sh`](scripts/sh-common.sh)               | Sourced helpers shared by the scripts and hooks: `die`, portable `stat`                     |
+| [`statusline.sh`](scripts/statusline.sh)             | Custom status line: model, context gauge, rate limit pacing                                 |
+| [`sync-skills.sh`](scripts/sync-skills.sh)           | Sync selected skills from external repositories via `npx skills`                            |
 
 ### Hooks
 
