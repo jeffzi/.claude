@@ -8,6 +8,9 @@ only here — reviewers report everything.
 - Collect all `### Finding N` blocks from every lens. They share one format and one verdict enum —
   Verdict is confidence (`false-positive` / `suspected` / `unconfirmed` / `confirmed`), Impact is
   the consequence tag — so they share one queue.
+- Every batch of a lens numbers its findings from 1, so `Finding 3` is ambiguous across batches. Key
+  each finding by lens, batch, and number from collection onward — adjudication, fix dispatch, and
+  the report all refer to it by that key.
 - Keep a per-agent tally (found / fixed / report-only) as you go; the report's Review Agents table
   is built from it.
 - Discard `false-positive` findings (list below).
@@ -34,13 +37,13 @@ only here — reviewers report everything.
 Rank each finding's Impact tag by its position in the emitting lens's enum — rank 1 is worst. The
 enums are reproduced here so no agent definition needs consulting:
 
-| Lens                       | Rank 1         | Rank 2       | Rank 3     | Rank 4      |
-| -------------------------- | -------------- | ------------ | ---------- | ----------- |
-| vet-code / distill-scanner | silent-failure | type-safety  | structure  | clarity     |
-| vet-test                   | coverage       | fragility    | cost       | clarity     |
-| vet-doc                    | misinformation | access       | navigation | polish      |
-| vet-comments               | misdirection   | coverage     | noise      | structure   |
-| bug-scanner                | corruption     | wrong-result | crash      | degradation |
+| Lens                                      | Rank 1         | Rank 2       | Rank 3     | Rank 4      |
+| ----------------------------------------- | -------------- | ------------ | ---------- | ----------- |
+| vet-code / vet-codebase / distill-scanner | silent-failure | type-safety  | structure  | clarity     |
+| vet-test / vet-test-suite                 | coverage       | fragility    | cost       | clarity     |
+| vet-doc                                   | misinformation | access       | navigation | polish      |
+| vet-comments                              | misdirection   | coverage     | noise      | structure   |
+| bug-scanner                               | corruption     | wrong-result | crash      | degradation |
 
 An `unconfirmed` or `confirmed` finding with no Impact line is treated as rank 1 — never demoted for
 missing metadata. Ranks drive the mender Severity line (rank 1–2 → high, rank 3–4 → medium) and the

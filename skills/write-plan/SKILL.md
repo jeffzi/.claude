@@ -130,8 +130,8 @@ or the single line `No folds: every task is new work`.]
 
 **Verify:** After implementation is complete and before committing, dispatch a `claim-reviewer`
 agent with this task's behavioral claims, each worded as the outcome plus the test that pins it:
-`<outcome>; a test in <test file> fails if it regresses`. Close every open claim per `execute-plan`
-step 2 — fix, re-dispatch that claim once, halt if still refuted — before committing.
+`<outcome>; a test in <test file> fails if it regresses`. Close every gap the reviewer names per
+`execute-plan` step 2 before committing.
 ```
 
 The **Verify** block goes on every task except the one directly before the Final Task — the Final
@@ -160,12 +160,11 @@ behavior yields a claim covering both branches; a behavior that reads external s
 covering the failure branch.
 
 This catches cross-task integration issues that per-task verification misses (e.g. Task 3 broke Task
-1's behavior). Close every open claim per `execute-plan` step 2: fix the gap, re-dispatch that claim
-once, halt if it still fails — a gap the reviewer names on a `Verified` claim is open. Mechanical
-claims (tests pass, build green) are not for the reviewer — verify those by running the commands
-directly. The run ends with `execute-plan`'s Ship section: the plan branch, its CI result, and the
-merge command. `/preflight` on the branch before merging is optional — plan execution defers the
-deep review lenses to it.
+1's behavior). Close every gap the reviewer names per `execute-plan` step 2 — a gap named on a
+`Verified` claim is open. Mechanical claims (tests pass, build green) are not for the reviewer —
+verify those by running the commands directly. The run ends with `execute-plan`'s Ship section: the
+plan branch, its CI result, and the merge command. `/preflight` on the branch before merging is
+optional — plan execution defers the deep review lenses to it.
 ```
 
 ## Test-Only Plans

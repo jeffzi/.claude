@@ -7,13 +7,19 @@ Mechanics for the plan branch. The rules live in `SKILL.md`; this file carries t
 ```bash
 branch=$(git branch --show-current)
 git diff --quiet && git diff --cached --quiet    # index and working tree clean; untracked files are fine
+git status --short                               # not clean: the paths the rows below sort
 ```
 
-| State                                                                                                    | Action                                                                              |
-| -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Clean, on a branch that is not `plan/*`, and the plan's `## Folds` names no release or names this branch | `~/.claude/scripts/plan-branch.sh create <slug>` — switches and records the base    |
-| Already on `plan/<slug>` (this plan's slug)                                                              | Resume — the branch is this run's earlier work                                      |
-| Another plan's `plan/*`, a dirty tree, or `## Folds` names a release other than this branch              | Halt (condition 4) naming the branch or the files, and the release the plan expects |
+| State                                                                                                         | Action                                                                                     |
+| ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Clean, on a branch that is not `plan/*`, and the plan's `## Folds` names no release or names this branch      | `~/.claude/scripts/plan-branch.sh create <slug>` — switches and records the base           |
+| Already on `plan/<slug>` (this plan's slug), clean or dirty only in files its unfinished task names           | Resume at that task — the branch and those files are this run's earlier work               |
+| Another plan's `plan/*`, any other dirty or staged path, or `## Folds` names a release other than this branch | Halt (condition 4) naming the branch or those paths only, and the release the plan expects |
+
+The unfinished task is the first one with no commit on the branch — the one a halt or a dead session
+left mid-way. Its own uncommitted files are not dirt: a halt inside a task always leaves them, and
+the re-run exists to finish them. A path no task names is dirt on any branch, this one included; the
+halt report names those paths and leaves the task's files as they are.
 
 The `## Folds` check is what keeps a fold target true: `write-plan` found each subject on the
 release branch it names there, and the sha lookup below runs over the recorded base — cutting the
@@ -62,10 +68,13 @@ printed); none → `none`. Record the target on the ledger entry and pass it per
 
 ## Findings-fix phase (after the Final Task's `claim-reviewer` run)
 
-1. Read the ledger. Take every entry marked `Confirmed` that is not `dismissed`.
-2. For each, decide once: would the fix change behavior something depends on (search call sites and
-   tests, `rules/decision-policy.md` exception 1)? Yes → mark the entry `needs decision` and leave
-   it. No → it goes into the batch.
+1. Read the ledger. Take every entry marked `Confirmed` that is not `dismissed`, and list the plan's
+   files: `git diff --name-only "$(~/.claude/scripts/plan-branch.sh base)"...HEAD`. An entry whose
+   file is not in that list is out of scope (SKILL.md § Findings): it stays `Confirmed`, unfixed,
+   for the report — no question.
+2. For each in-scope entry, decide once: would the fix change behavior something depends on (search
+   call sites and tests, `rules/decision-policy.md` exception 1)? Yes → mark the entry `needs
+   decision`, with the dependent's `file:line`, and leave it. No → it goes into the batch.
 3. Derive each entry's fold target (§ Fold target) and record it on the entry: a defect in an
    earlier release commit folds into it instead of landing as a squash commit after the commit it
    corrects.

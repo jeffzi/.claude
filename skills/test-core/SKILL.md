@@ -2,8 +2,9 @@
 name: test-core
 description: >
   Use when writing or reviewing tests in any language. Covers test behavior vs. implementation, AAA
-  structure, merge/redundancy rules, false-coverage detection, parametrization, and mocking
-  anti-patterns. Not for TDD orchestration — use `Skill(tdd)`.
+  structure, merge/redundancy rules, false-coverage detection (including tests of a dependency's own
+  behavior), parametrization, and mocking anti-patterns. Not for TDD orchestration — use
+  `Skill(tdd)`.
 user-invocable: false
 ---
 
@@ -82,6 +83,23 @@ or a signature lacks a name pins an absence, not a behavior. There is no product
 cover, and it breaks the moment any legitimate parameter is added. When a feature is dropped, delete
 its tests. When you find such a test, delete it — it is never renamed, kept, or "tightened".
 
+**A dependency's behavior is not yours to test.** For every test, name the line this project wrote
+that _decides_ what the test asserts. A pass-through call into a library, the standard library, or
+an external tool decides nothing: when it is the only project line involved and the assertion is the
+dependency's own rendering, parsing, environment handling, or error handling, the test covers the
+dependency. Don't write it; when you find one, delete it. That the test fails once the call is
+removed changes nothing — it fails because someone else's output changed.
+
+A choice the project makes _through_ a dependency is project behavior and stays pinned: the argument
+list it builds, the field tags it declares, the entries it turns on or off, a guarantee it documents
+("never through a shell"). Assert it in the project's own terms — the argv sent, the value decoded,
+the commands listed. An assertion that can only be written in the dependency's encoding (escape
+codes, padding, column layout) has nothing of the project's to pin.
+
+When the only failing test available for a change asserts a dependency's output — one option handed
+to a library — write no test: say why none covers the change and ask for the exception to the
+test-first rule. Never manufacture a test of the dependency to put a red-green in the diff.
+
 ### 5. Minimum Tests, Maximum Coverage
 
 | Merge when                          | Keep separate when    |
@@ -136,6 +154,9 @@ test.
 | "The mock returns the right value"       | That tests the mock, not the code. See false coverage note.     |
 | "It guards against re-adding the param"  | Code review guards that. An absence has no behavior. Delete it. |
 | "The linter would have caught this"      | Linters miss redundancy, naming, philosophy, structure.         |
+| "Remove our call and the test fails"     | It fails on the library's output. Name the line that decides.   |
+| "Test-first needs a red; one is at hand" | A red on someone else's code proves nothing. Ask the exception. |
+| "It asserts the command's real output"   | Output the project does not compute is not its behavior.        |
 | "Loop is cleaner than parametrize"       | Parametrize shows all cases; loop stops at first failure.       |
 | "I scanned the file and found no issues" | Scanning ≠ rule-by-rule. Walk the checklist rule-by-rule.       |
 
@@ -153,3 +174,5 @@ STOP and re-check if:
 - A test asserts a name is **absent** — `not in signature`, `hasattr(...) is False`, `TypeError` on
   a kwarg that was removed
 - A test has `// Arrange`, `// Act`, or `// Assert` phase-label comments
+- The only project line a test depends on is a call into a library, and the assertion is written in
+  the library's encoding — escape codes, layout, its reading of the environment

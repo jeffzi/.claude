@@ -44,8 +44,9 @@ test suite: gates ran checkers only")
 | ----- | ----- | ----- | ----------- |
 
 (one row per lens dispatched in step 3 — vet-code, vet-test, vet-doc, vet-comments, bug-scanner,
-distill-scanner — including lenses that returned "No findings."; plus a `claim-reviewer` row when
-adjudication or fix verification ran, mapped as Found = claims sent, Fixed = `Verified`,
+distill-scanner, vet-codebase, vet-test-suite — including lenses that returned "No findings."; a
+lens dispatched in several batches gets one row summing all its batches; plus a `claim-reviewer` row
+when adjudication or fix verification ran, mapped as Found = claims sent, Fixed = `Verified`,
 Report-only = `Refuted` + `Unsubstantiated`)
 
 ## Issues Fixed (confirmed)

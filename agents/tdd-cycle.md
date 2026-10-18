@@ -261,9 +261,16 @@ TEST_NAME: <name(s)>
 TEST_COMMAND: <command>
 FULL_SUITE_COMMAND: <command>
 FAILURE_OUTPUT: <RED phase output>
+FLAW: input | behavior
 REASON: <why the test appears incorrect>
 EVIDENCE: <specific output or behavior showing the issue>
 ```
+
+`FLAW: input` means the assertion is right and only the test's setup is wrong — a sample value that
+collides with a fixture, a bad fixture, a typo, a missing import. `FLAW: behavior` means the test
+asserts something the request did not specify or the production code rightly rejects. The
+orchestrator fixes `input` flaws itself and asks the user only about `behavior` flaws, so pick
+honestly.
 
 ## Rationalizations
 

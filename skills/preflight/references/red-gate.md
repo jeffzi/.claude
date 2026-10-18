@@ -11,6 +11,15 @@ already resolved in the rendered SKILL.md commands in context.
   new format failure lives in those files; formatting untouched files is outside the snapshot and
   the restore guarantee. Record the Gates row as `🔴→✅ (formatter re-run)`, never a plain ✅. A
   second red, or any non-format red, takes the repair branch below.
+- **Red on mechanical lint alone** (tests green, and every red sub-check is a linter, spell checker,
+  or markdown linter whose capture names each failure as `file:line` in a file preflight edited —
+  line length, an unknown word, a heading rule, an argument count): this is a lint miss, not a
+  regression, and it never reaches the user as a restore decision. Dispatch one `code-mender` per
+  implicated group with the capture lines as the finding, `Behavior: preserve`, and the instruction
+  to satisfy the rule without suppressions or config edits, then re-run the gate script, both
+  halves. Repeat while every red stays mechanical lint, at most three rounds; record the Gates row
+  as `🔴→✅ (lint repair)`. A failing test, type check, or build at any point, or a fourth lint red,
+  takes the repair branch below.
 - **Red otherwise — one repair attempt before anyone is asked.** A regression a mender introduced is
   something a mender can remove; the user question is the fallback, never the first response.
   Extract the implicated files and widen each to its whole mender group — a group is the atomic unit

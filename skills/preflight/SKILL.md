@@ -202,29 +202,37 @@ ref diff). Nothing edits between here and triage, so this diff stays current for
 **Path-argument mode has no diff** — scope is `full`, so skip capture entirely; prompts carry the
 file list and scope only. Capturing a diff means `git diff` output, never reading files.
 
-**Launch all applicable lenses in a single message** — one **Agent** tool call per lens. Every lens
-is a typed agent: **never set a model on any dispatch — each agent defines its own.**
+**Batch every per-file lens's file list** before dispatching: group its files by parent directory —
+the target root is its own batch — and split any batch over 10 files into roughly even chunks. Each
+lens batches its own list, so a lens fed code + test files batches the combined list. One **Agent**
+call per lens per batch — never one call carrying a whole bucket; a single reviewer over dozens of
+files loses per-file recall, and preflight has no second review pass to recover it. Each batch's
+prompt carries only its own files and the diff sections whose `diff --git` headers name those files
+— sliced from the captured diff, never re-captured.
+
+**Launch every batch of every applicable lens in a single message.** Every lens is a typed agent:
+**never set a model on any dispatch — each agent defines its own.**
 
 Project CLAUDE.md conventions need no lens of their own: the harness injects the project's CLAUDE.md
 into every subagent, and the reviewers' hub skills make its imperative conventions citeable rules. A
 convention violation arrives as an ordinary `vet-*` finding.
 
-**Checklist reviewers** — one per non-empty bucket from step 1:
+**Checklist reviewers** — one lens per non-empty bucket from step 1, dispatched per batch:
 
 - `subagent_type: vet-code` on the code files
 - `subagent_type: vet-test` on the test files
 - `subagent_type: vet-doc` on the doc files
-- Prompt each: `"Review these files.\n\nFiles: [bucket file list]\n\nDiff:\n[review diff]\n\nScope:
+- Prompt each: `"Review these files.\n\nFiles: [batch file list]\n\nDiff:\n[review diff]\n\nScope:
   [full if path-argument mode, changed otherwise]"`
 - Each loads its own hub and language leaves and returns `### Finding N` blocks. Do not name a skill
   in the prompt. `vet-doc` routes CHANGELOG.md to `write-changelog` rules on its own.
 - `vet-skill` is not part of preflight — no bucket feeds it.
 
-**Comment lens** (when code or test files exist) — comments in both buckets, one dispatch:
+**Comment lens** (when code or test files exist) — comments in both buckets, one dispatch per batch:
 
 - `subagent_type: vet-comments`
-- Prompt: `"Review these files.\n\nFiles: [code + test file list]\n\nDiff:\n[review diff]\n\nScope:
-  [full if path-argument mode, changed otherwise]"`
+- Prompt: `"Review these files.\n\nFiles: [batch file list]\n\nDiff:\n[review diff]\n\nScope: [full
+  if path-argument mode, changed otherwise]"`
 - It resolves its own language skills per file and emits `### Finding N` blocks with Impact tags
   like every other lens. Its Skills/Exports preamble is its completeness proof — read past it;
   triage collects only the finding blocks.
@@ -232,7 +240,7 @@ convention violation arrives as an ordinary `vet-*` finding.
 **Bug Scanner** (when code files exist)
 
 - `subagent_type: bug-scanner`
-- Prompt: `"Review these files for runtime correctness bugs.\n\nFiles: [code file
+- Prompt: `"Review these files for runtime correctness bugs.\n\nFiles: [batch file
   list]\n\nDiff:\n[review diff]\n\nScope: [full if path-argument mode, changed otherwise]"`
 
 **Distill lens** (when code or test files exist) — read-only; it emits findings, it does not edit.
@@ -240,27 +248,41 @@ Silent unrecorded edits become countable, scoreable, gated findings instead.
 
 - `subagent_type: distill-scanner` — its tool set has no Edit, so read-only is structural, not a
   prompt promise.
-- Prompt: `"Review these files for distillation opportunities.\n\nFiles: [code + test file
+- Prompt: `"Review these files for distillation opportunities.\n\nFiles: [batch file
   list]\n\nDiff:\n[review diff]\n\nScope: [full if path-argument mode, changed otherwise]"`
 - The agent loads `distill-code` itself and carries its own scoring rubric and impact enum. Do not
   name a skill in the prompt.
+
+**Cross-file lenses** — never batched: exactly one dispatch each, alongside the batches in the same
+message. Batching is what hides cross-file duplication from every per-file lens; these two are the
+only reviewers that see the tree as one artifact.
+
+- `subagent_type: vet-codebase` when code files exist; `subagent_type: vet-test-suite` when test
+  files exist.
+- **Path argument naming a directory:** root = that directory, no focus, scope `full`.
+- **Every other mode** (file path arguments, commit ref/range, no argument): root = the repo root,
+  focus = the bucket's files, scope `full` for file paths and `changed` otherwise. Both agents
+  hard-stop on a single-file root, so a file target is always passed as focus, never as root.
+- Prompt: `"Review this tree.\n\nRoot: [root]\n\nFocus: [bucket file list, or none]\n\nDiff:\n[the
+  bucket's diff sections]\n\nScope: [full or changed, per the rules above]"`
+- Each loads its own skills. Do not name a skill in the prompt.
 
 **Review scope by input mode:**
 
 - **Path argument**: scope = `full` — review entire file(s)
 - **Commit ref / range / no-argument**: scope = `changed` — flag only issues in changed lines
 
-**Completion gate — every lens back, verified.** Keep a dispatch ledger from the launch results:
-lens → task-id. Step 3 ends only when every ledger row has a received task-notification whose
-task-id matches its row. Match notifications to ledger rows, never keep a running tally — "five
-results seen" is how a fabricated or twice-fired notification closes the step early. A
-task-notification is an incoming message from the harness; lens-result text you authored,
+**Completion gate — every batch back, verified.** Keep a dispatch ledger from the launch results:
+one row per dispatch, lens + batch → task-id. Step 3 ends only when every ledger row has a received
+task-notification whose task-id matches its row. Match notifications to ledger rows, never keep a
+running tally — "five results seen" is how a fabricated or twice-fired notification closes the step
+early. A task-notification is an incoming message from the harness; lens-result text you authored,
 summarized, or predicted is not one — composing a pending lens's result is fabrication, and a triage
-pass over it is corrupt. Before the TaskUpdate below, confirm the ledger with TaskList: every lens
+pass over it is corrupt. Before the TaskUpdate below, confirm the ledger with TaskList: every batch
 task `completed` with its notification received. Still running → keep waiting; an auto-continuation
 nudge is not evidence a lens finished, and elapsed time is not a signal this contract recognizes.
 Errored, or `completed` with empty or unusable output → stop and surface it
-(`rules/skill-loading.md`) — never triage a partial lens set. Notification lost but TaskList shows
+(`rules/skill-loading.md`) — never triage a partial batch set. Notification lost but TaskList shows
 `completed` → read that task's output file; never re-dispatch, never reconstruct.
 
 → **TaskUpdate** task 3 to `completed`. **TaskUpdate** task 4 to `in_progress`.
@@ -309,7 +331,7 @@ dispatches in a single parallel message. Per group, pass every finding for its f
 Issue: [description from finding]
 Location: [file_path:line_number from finding]
 Severity: [high if the Impact tag ranks 1 or 2 in the enum table in references/triage.md, medium if it ranks 3 or 4]
-Behavior: [may-change if the finding came from bug-scanner; preserve for every other lens — vet-code, vet-test, vet-comments, distill-scanner — and for adjudication-promoted findings of those lenses]
+Behavior: [may-change if the finding came from bug-scanner; preserve for every other lens — vet-code, vet-test, vet-comments, distill-scanner, vet-codebase, vet-test-suite — and for adjudication-promoted findings of those lenses]
 Suggested fix: [reasoning from finding]
 
 Issue: [next finding for this file]
@@ -354,7 +376,8 @@ fan-out for, so this is `bug-scanner` only.
 - `subagent_type: bug-scanner`, scoped to the files step 4 edited, with a fresh diff: `git diff --
   <edited files>`. An untracked edited file has no diff — pass its name and let the scanner read it
   in full; never `cat` it into your own context.
-- Prompt as in step 3, scope `changed`.
+- Prompt as in step 3, scope `changed`, batched by step 3's rule — one call per batch of the edited
+  files, all in one parallel message.
 
 **If it returns `confirmed` findings:** one corrective round, then stop fixing regardless.
 
@@ -366,11 +389,11 @@ fan-out for, so this is `bug-scanner` only.
    snapshot. The gate's single repair attempt is gate machinery, not a round — the round cap counts
    scan-driven fix rounds.
 4. **Scan the corrective edits** — dispatch `bug-scanner` once more, scoped to the files the
-   corrective menders touched, with a fresh diff. Its findings — at any verdict — are report-only by
-   the round cap: they join the Post-Fix Bugs (unresolved) table, never a fix queue. No snapshot or
-   gate follows; a scan that cannot trigger edits needs neither. This is not a third round — the cap
-   counts edit rounds, and a read-only scan edits nothing. Without it, the corrective menders' code
-   would be the only code in the pipeline no reviewer ever reads.
+   corrective menders touched, with a fresh diff, batched by step 3's rule. Its findings — at any
+   verdict — are report-only by the round cap: they join the Post-Fix Bugs (unresolved) table, never
+   a fix queue. No snapshot or gate follows; a scan that cannot trigger edits needs neither. This is
+   not a third round — the cap counts edit rounds, and a read-only scan edits nothing. Without it,
+   the corrective menders' code would be the only code in the pipeline no reviewer ever reads.
 
 Anything found after the corrective round is a report, not another iteration — including bugs you
 notice yourself while reading a mender's report. The cap counts edit rounds, not who spotted the
