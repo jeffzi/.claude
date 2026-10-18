@@ -237,8 +237,9 @@ the findings or the cycle, never about whether to continue.
 4. The entry gate fails: on another plan's `plan/*` branch, the index or working tree is dirty — on
    a resumed run, dirty with a path its unfinished task does not name — or the plan's `## Folds`
    section names a release branch other than the one you are on, or origin's default branch cannot
-   be read, or on the trunk path the local trunk carries commits `origin/<trunk>` does not. Name the
-   branch, those paths or commits, the failed read, and the release the plan expects.
+   be read, or on the trunk path `git fetch origin <trunk>` fails, or the local trunk carries
+   commits `origin/<trunk>` does not. Name the branch, those paths or commits, the failed read, and
+   the release the plan expects.
 
 A halt is a report — tasks done, the blocked task and why, findings so far, marker removed — then
 the turn ends. It names the condition from this list. It is never a question: a report that asks the

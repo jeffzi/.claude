@@ -220,8 +220,9 @@ What enforces it:
   the cut, the squash or fold, the fast-forward of `main` — happens only when you invoke the skill.
   Its force-push is confined to release branches, under a lease, and only when a fold rewrote one.
 - A plan branch cut from `main` is pushed by `ils push`, which also opens its pull request; the
-  assistant never runs `gh pr merge`. Every other branch push — `fix-ci/*` branches and plan
-  branches cut from a release or feature branch — goes through
+  assistant never runs `gh pr merge`. `ils push` also lands `/fix-ci`'s squashed fix onto any branch
+  with an open pull request. Every other branch push — `fix-ci/*` branches, plan branches cut from a
+  release or feature branch, and squash-backs onto branches without a pull request — goes through
   [`fix-ci-push.sh`](scripts/fix-ci-push.sh): append-only, no force, and only `fix-ci/*` and
   `plan/*` branches may be deleted.
 - CI templates trigger on pushes to `main`, `fix-ci/**`, `plan/**`, and `v[0-9]*`, so a plan branch

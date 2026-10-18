@@ -45,12 +45,13 @@ warm up signing → locate run → wait if running → read failing logs → tri
 → touch marker → checkout PR branch → check branch CI coverage → branch fix-ci/<slug>
 → reproduce locally → fix → verify locally → commit → push branch → watch its run
 → green gate? squash back : loop (max 3 pushed attempts) → watch the target tip's run
-→ green gate → rm marker (EVERY exit path)
+  (or `ils push` when the target has an open pull request) → green gate → rm marker (EVERY exit path)
 ```
 
-Two green gates, both passed by `gh run view` output in your context (see "The green gate"): the fix
-branch's run gates the squash; the target branch's run for the squashed tip gates the final report.
-Nothing is "green" between them — the squash push creates a new SHA that has no run yet.
+Two green gates, each passed by output in your context (see "The green gate"): the fix branch's run
+gates the squash, by `gh run view`; the squashed target tip gates the final report, by `gh run view`
+on its run, or by `ils push`'s exit 0 when the target has an open pull request. Nothing is "green"
+between them — the squash push creates a new SHA that has no run yet.
 
 **Scope of approval.** A read-only ask — "why is CI red?", "check CI", "what's failing?" — gets
 locate/read/triage and a report with the proposed fix described: no marker, no edits, no commits
@@ -218,23 +219,23 @@ squash an unproven fix into the target.
 
 ## Rationalizations
 
-| Excuse                                             | Reality                                                                   |
-| -------------------------------------------------- | ------------------------------------------------------------------------- |
-| "Skip/xfail the flaky test, fix it later"          | That deletes the signal. Root-cause it or hand back.                      |
-| "`# type: ignore` unblocks the release"            | It suppresses every future error on that line. Fix or hand back.          |
-| "Rerun first — might be flaky"                     | Rerun before reading the log tells you nothing. Read first.               |
-| "Branching is overhead, I'll commit on main"       | Attempts on the original branch are permanent. Branch first.              |
-| "No CI on the branch — I'll just push to main"     | The target branch is never the test bed. Hard stop, report.               |
-| "Merge normally — squash loses the detail"         | The attempts are noise by design. Squash is the contract.                 |
-| "I'll leave the marker, I might loop again later"  | A lingering marker disarms the guard repo-wide. Remove it now.            |
-| "The file isn't mine / pre-existing failure"       | It's a CI error; the request is fixing CI errors. No origin talk.         |
-| "I can analyze from main / read the diff remotely" | Reproduce means run the code. Switch to the target branch first.          |
-| "I'm still triaging, just checking one thing"      | Running a local command is reproduction, not triage. Checkout first.      |
-| "`gh pr checkout` failed, I'll work from main"     | Fix the checkout or use manual fetch+switch. Main is never the fallback.  |
-| "Push #4 will surely be the one"                   | Three misses means the model of the bug is wrong. Hand back.              |
-| "The watch exited 0, so the run passed"            | That's `tee`'s exit, or a stale id. Green is `gh run view` output only.   |
-| "Squashed and pushed — CI on the target is green"  | The new tip has no finished run yet. Watch it; that run is the exit gate. |
-| "User's waiting; it'll pass, report green now"     | Unverified green is a lie. Report "run `<id>` pending" or wait.           |
+| Excuse                                             | Reality                                                                                                 |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| "Skip/xfail the flaky test, fix it later"          | That deletes the signal. Root-cause it or hand back.                                                    |
+| "`# type: ignore` unblocks the release"            | It suppresses every future error on that line. Fix or hand back.                                        |
+| "Rerun first — might be flaky"                     | Rerun before reading the log tells you nothing. Read first.                                             |
+| "Branching is overhead, I'll commit on main"       | Attempts on the original branch are permanent. Branch first.                                            |
+| "No CI on the branch — I'll just push to main"     | The target branch is never the test bed. Hard stop, report.                                             |
+| "Merge normally — squash loses the detail"         | The attempts are noise by design. Squash is the contract.                                               |
+| "I'll leave the marker, I might loop again later"  | A lingering marker disarms the guard repo-wide. Remove it now.                                          |
+| "The file isn't mine / pre-existing failure"       | It's a CI error; the request is fixing CI errors. No origin talk.                                       |
+| "I can analyze from main / read the diff remotely" | Reproduce means run the code. Switch to the target branch first.                                        |
+| "I'm still triaging, just checking one thing"      | Running a local command is reproduction, not triage. Checkout first.                                    |
+| "`gh pr checkout` failed, I'll work from main"     | Fix the checkout or use manual fetch+switch. Main is never the fallback.                                |
+| "Push #4 will surely be the one"                   | Three misses means the model of the bug is wrong. Hand back.                                            |
+| "The watch exited 0, so the run passed"            | That's `tee`'s exit, or a stale id. Green is `gh run view` output, or `ils push` exit 0 on a PR target. |
+| "Squashed and pushed — CI on the target is green"  | The new tip has no finished run yet. Watch it; that run is the exit gate.                               |
+| "User's waiting; it'll pass, report green now"     | Unverified green is a lie. Report "run `<id>` pending" or wait.                                         |
 
 ## Red flags — STOP
 

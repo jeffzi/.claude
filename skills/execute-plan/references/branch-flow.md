@@ -70,7 +70,7 @@ the sha.
 
 ```bash
 base=$(~/.claude/scripts/plan-branch.sh base)    # must equal the release the plan's ## Folds names
-fork=$(git merge-base main "$base")
+fork=$(git merge-base <trunk> "$base")           # <trunk> as the entry gate read it, never a typed main
 git log --format='%H %s' "$fork..$base" | awk -v s='<subject>' '{ if (substr($0, index($0, " ") + 1) == s) print $1 }'
 ```
 
@@ -105,7 +105,8 @@ printed); none → `none`. Record the target on the ledger entry and pass it per
    decision`, with the dependent's `file:line`, and leave it. No → it goes into the batch.
 3. Derive each entry's fold target (§ Fold target) and record it on the entry: a defect in an
    earlier release commit folds into it instead of landing as a squash commit after the commit it
-   corrects.
+   corrects. On the trunk path skip the lookup: the trunk path never folds, so every target is
+   `none`.
 4. Dispatch **one** `/tdd` invocation carrying the batch, one behavior per finding, each worded as
    the outcome the fix restores plus the file, with `fixup target: <sha>` on every finding whose
    target is a subject. `--no-commit` runs pass `no-commit plan execution` as usual; otherwise

@@ -2,7 +2,7 @@
 
 How work moves from an approved plan to a tag on `main`, which command does each git write, and what
 stops the assistant from doing any of it by hand. The assistant plans and implements; you run the
-four `/release` commands.
+four `/release` commands, and merge by hand the pull request a plan cut from `main` ends in.
 
 **What this doc covers:** [the branches](#the-branches), [starting a release](#starting-a-release),
 [the loop](#the-loop), [one plan, one commit](#one-plan-one-commit),
@@ -196,8 +196,9 @@ tag on its tip, so `git log main` reads as the changelog.
   why the invocation itself is marker-gated. A typed `git push --force` stays blocked under every
   marker.
 - A plan branch cut from `main` is pushed by `ils push`, which also opens its pull request; the
-  assistant never runs `gh pr merge`. Every other branch push — `fix-ci/*` branches and plan
-  branches cut from a release or feature branch — goes through
+  assistant never runs `gh pr merge`. `ils push` also lands `/fix-ci`'s squashed fix onto any branch
+  with an open pull request. Every other branch push — `fix-ci/*` branches, plan branches cut from a
+  release or feature branch, and squash-backs onto branches without a pull request — goes through
   [`fix-ci-push.sh`](../scripts/fix-ci-push.sh): append-only, no force, and only `fix-ci/*` and
   `plan/*` branches may be deleted.
 - The CI templates trigger on `main`, `plan/**`, `fix-ci/**`, and `v[0-9]*` pushes, so a plan branch

@@ -104,9 +104,9 @@ grep -E "..." /tmp/out.txt
 Re-running a command solely to change the filter is always wrong: it wastes time, doubles side
 effects.
 
-**`ils` runs bare:** never piped, `tee`d, or backgrounded, because a pipe hides the exit code that
-carries the verdict. Running `ils push` again on exit 4 is not a re-run to filter output: it asks
-GitHub for a verdict the first run did not get.
+**`ils` runs bare:** never piped, `tee`d, backgrounded, or behind `cd`, because a pipe hides the
+exit code that carries the verdict. Running `ils push` again on exit 4 is not a re-run to filter
+output: it asks GitHub for a verdict the first run did not get.
 
 **Background commands:** the completion notification carries only the exit code — the output is not
 in context. Always `tee` to a file when running a command in the background, then `Read` the file on
