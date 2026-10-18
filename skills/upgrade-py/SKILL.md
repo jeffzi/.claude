@@ -56,7 +56,7 @@ source, bumped by `prek autoupdate` (step 5).
 
 ## Steps
 
-1. Run `uv sync --upgrade --all-groups` to upgrade all dependencies
+1. Run `uv sync --upgrade --all-groups --all-extras` to upgrade all dependencies
 
 2. Find all dependencies explicitly mentioned in the pyproject.toml file. Use `uv pip list` to show
    the packages that are now installed.
@@ -65,8 +65,8 @@ source, bumped by `prek autoupdate` (step 5).
    Strategy above (installed 2.12.5 → `>=2.12,<3`; installed 0.16.4 → `>=0.16.4,<0.17`). If
    constraints already match, skip to next step.
 
-4. Run `uv sync --all-groups` again to ensure the updated constraints work (skip if no changes were
-   made)
+4. Run `uv sync --all-groups --all-extras` again to ensure the updated constraints work (skip if no
+   changes were made)
 
 5. Run `uv run prek autoupdate` to upgrade the remote prek hook revs (markdownlint, cspell,
    actionlint, zizmor, ...). Dual-use tools (ruff, pyrefly, prek) are local hooks with no rev —

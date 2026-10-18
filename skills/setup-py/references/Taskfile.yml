@@ -70,13 +70,37 @@ tasks:
     cmds:
       - uv run prek run --files {{.PREK_FILES}}
 
+  check:fix:
+    desc: Auto-fix everything that supports it (ruff lint, ruff format, dprint, markdownlint)
+    deps: [_sync, _require-dprint]
+    cmds:
+      - uv run ruff check --fix
+      - uv run ruff format
+      - dprint fmt
+      - uv run prek run -a markdownlint-cli2
+
+  # Requires Task >= 3.45.3, whose built-in `rm` makes the last command run on
+  # Windows as written.
   clean:
     desc: Remove build artifacts, caches, and virtualenvs
+    deps: [_require-uv]
     cmds:
-      - cmd: rm -rf {{.CLEAN_PATHS | join " "}}
-        platforms: [darwin, linux]
-      - cmd: >-
-          powershell -NoProfile -Command
-          "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-          -Path {{.CLEAN_PATHS | join ","}}"
-        platforms: [windows]
+      # Runs before the virtualenvs go, on an interpreter outside them: every
+      # `__pycache__` under src/ and tests/ sits too deep for CLEAN_PATHS to name.
+      # Directories a removed cache leaves empty go with it.
+      - |
+        uv run --no-project python - <<'PY'
+        import shutil
+        from pathlib import Path
+
+        for tree in (Path("src"), Path("tests")):
+            for cache in list(tree.rglob("__pycache__")):
+                shutil.rmtree(cache, ignore_errors=True)
+                # Only the directories above a removed cache are candidates: one
+                # that was empty beforehand is somebody's and stays.
+                for parent in cache.parents:
+                    if parent == tree or any(parent.iterdir()):
+                        break
+                    parent.rmdir()
+        PY
+      - rm -rf {{.CLEAN_PATHS | join " "}}

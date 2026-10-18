@@ -1,4 +1,5 @@
 default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_stages: [pre-commit]
 
 repos:
   # Built-in hooks (fast, native Rust)
@@ -16,7 +17,6 @@ repos:
       - id: end-of-file-fixer
       - id: fix-byte-order-marker
       - id: mixed-line-ending
-        args: [--fix=auto]
       - id: trailing-whitespace
 
   # Python hooks from pre-commit-hooks (not in prek builtin)
@@ -40,6 +40,13 @@ repos:
         entry: uv run ruff format
         language: system
         types_or: [python, pyi]
+
+  # Docstring Args: sections must match the signature
+  - repo: https://github.com/jsh9/pydoclint
+    rev: 0.9.1
+    hooks:
+      - id: pydoclint
+        args: [--config=pyproject.toml]
 
   # Python code line limits
   - repo: https://github.com/jeffzi/pymaxlines
@@ -65,7 +72,7 @@ repos:
         name: uv lock --check
         entry: uv lock --check
         language: system
-        files: ^(pyproject\.toml|uv\.lock)$
+        always_run: true
         pass_filenames: false
 
   # JSON, YAML, Markdown, TOML formatting

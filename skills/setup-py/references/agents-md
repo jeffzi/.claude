@@ -24,14 +24,18 @@ layers manage the virtualenv, file selection, and flags.
   of checking limits. Pass paths to scope it: `uvx pymaxlines --show-sizes src/heavy_module.py`.
   Use it to find the biggest files and functions before deciding where to split. Counts exclude
   blanks, comments, and docstrings — matching what the `check-max-lines` hook enforces.
+- `task check:fix` — auto-fix everything that supports it: `uv run ruff check --fix`,
+  `uv run ruff format`, `dprint fmt`, markdownlint (`uv run prek run -a markdownlint-cli2`).
 - `task clean` — remove build artifacts, caches, and virtualenvs.
 
 ## Git hygiene
 
 - Never run `git commit --no-verify`, `git commit -n`, or anything else that skips the prek hooks —
   the hooks are the gate, not an obstacle.
-- Fix a failing check at its source. Never edit a test to make it pass; never widen a lint ignore to
-  silence a real finding.
+- Fix a failing check at its source. Never weaken a test to make it pass; never widen a lint ignore
+  to silence a real finding. A test whose assertion is right but whose input is wrong (a sample
+  value that collides with a fixture, a typo, a bad import) is a test bug: fix the input and say
+  so in one line.
 
 ## Linter and type-checker configuration
 
@@ -43,17 +47,104 @@ directive with a reason — not in the shared config. When the same inline direc
 for the same rule, that is a signal the rule may deserve a config-level ignore — propose it to the
 user and wait for explicit approval; never promote a suppression into config on your own.
 
+## Module layout
+
+A line-count check caps a file's code lines and a function's. The cap marks a file that holds more
+than one concern; it is not a budget. These rules decide where code lives. A reason that is not
+written here does not move code: apply the rules as written and report the reason in one line, so
+it can become a rule. A reason becomes a rule by becoming checkable: a blocker under rule 4, or a
+fact under Project facts. The numbers and names the rules refer to are listed under Project facts.
+
+A module's **importers** are the project modules that import it in any form: at module level,
+inside a function, or under `TYPE_CHECKING`. Tests, `__main__.py` and `__init__.py` are not
+importers. To **fold** a module is to move all of it into another module and delete the file.
+
+**Registration is not use.** A module that only registers another (a command, a handler, a plugin)
+and never calls it is neither its user nor its home, and does not count among its importers. A
+module that nothing but its registrar imports is a module of its own at any size; one that other
+modules also import is placed by those importers alone.
+
+The **generic-helpers module** holds code that passes this admission test: it imports no project
+module, names no project type, imports the standard library only, and would make sense pasted
+unchanged into an unrelated repository.
+
+1. **New code goes in the module that uses it.** One user: that module. No new file until rule 2
+   or rule 6 calls for one.
+2. **Shared code goes to its home.** When two or more modules use it, the first of these that
+   applies:
+   - It passes the admission test: the generic-helpers module.
+   - One of its importers is already imported by every other importer: that importer is the home,
+     because nobody loads the code without loading it. The home must use the code at runtime, and
+     the fold must not turn another module's `TYPE_CHECKING` import of the home into a runtime
+     import.
+   - It is a rule about one project type (a predicate, a constructor, a conversion) and every user
+     already imports the module that defines the type: beside the type. Code that merely mentions
+     the type does not qualify.
+   - Otherwise: an existing module you have read that already owns that concern, or a module of
+     its own, named for what it does, whatever its size.
+3. **A module that has a home folds into it.** A module with one importer folds into that
+   importer. A shared module that passes the admission test folds into the generic-helpers module.
+   Any other shared module whose importers satisfy the second test in rule 2 folds into that
+   home. When several modules could fold into the same target and not all fit, fold the smallest
+   first and stop before the first that does not fit. A module nothing in the project imports (a
+   console-script target, a `python -m` target) stands.
+4. **Only four things block a fold**, and each one can be checked:
+   - **Size.** The target would land above the fold limit, summing the code lines of every file
+     that goes into it. The fold limit sits below the cap so that a fold is not undone by the next
+     edit. A file may grow past the fold limit afterwards; only the cap forces a move.
+   - **Standing.** The module holds at least the stand floor of code lines and its name says what
+     everything in it does (rule 5). Below the floor, or under a name that fits only because it is
+     wide, it folds.
+   - **Layer.** Code stays in the layer its subject belongs to, even when every caller is in
+     another layer. A module whose only importer is in another layer stands in its own. The
+     generic-helpers module belongs to no layer.
+   - **Seam.** A seam test would fail after the fold. A seam without a test is a preference: write
+     the test first if the property matters.
+
+   None of these block a fold: "it is a distinct concern", "it is pure logic", "it is easier to
+   test alone", "it is one of several alike", "reusable later", "keeps the importer small",
+   "matches the existing small modules". Small modules already in the tree are debt, not
+   precedent: report one that has a home and no block, and fold it when asked.
+5. **Never pool.** Merging two modules when neither imports the other is pooling, whatever the
+   file count gained. A module's name says what everything in it does; a name that fits only
+   because it is wide (`helpers`, `common`, `shared`, `core`, `misc`) marks a pool. The
+   generic-helpers module is the one exemption from both sentences: the admission test, not its
+   name, decides what belongs in it, and it obeys the cap like any file. Asked to consolidate,
+   apply rule 3 until nothing more folds and report every other module with the block or the lack
+   of a home that keeps it.
+6. **At the cap, move one whole concern**: the code least tied to the rest that changes together
+   for one reason. The code just added is never the concern that moves. It goes to a new module
+   named for what it does, or to an existing module you have read that already owns that concern.
+   The file must land at or below the fold limit; if it does not, pick a different, larger
+   concern. Never move just enough to pass, never top up the move with unrelated code, and never
+   compress code to fit. The module carved out stands for as long as folding it back would exceed
+   the fold limit.
+7. **A package is a directory of modules that each stand under these rules.** Its `__init__.py`
+   holds no code beyond a docstring. When folding leaves a package with one module, the package
+   becomes that module.
+8. **One import path per name.** Import a name from the module that defines it. An `__init__.py`
+   re-exports nothing, and a module's `__all__` lists only names it defines.
+
+### Project facts
+
+- **Cap:** `check-max-lines` allows 500 code lines per file and 60 per function.
+- **Fold limit:** 450 code lines.
+- **Stand floor:** 100 code lines.
+- **Layers:** none. Every module is in the same layer.
+- **Seam test:** none. No fold is blocked by a seam.
+- **Generic-helpers module:** `utils.py`.
+
 ## Docstrings
 
-Google style. None is required on private functions. A one-line docstring is complete on its own —
-no `Args:`, `Returns:`, or `Raises:` sections — when the signature says the rest. When a function
-needs more than one line (a side effect, an invariant, a precondition, what None means, or behavior
-the name does not convey), use a multi-line docstring with sections: `Args:` listing every
-parameter, however obvious its name, `Returns:`, and `Raises:` for every exception raised or
-propagated. Parameters, return values, and exceptions are described only in their sections, never in
-prose. A function you edit gets its docstring brought to this shape even if you did not write it;
-deadlines and reviewer preference do not change that. Tests: no docstrings on test functions, the
-name carries the intent; every fixture gets a one-line docstring.
+Google style. Private functions need none. A one-line docstring has no sections; a longer one has
+every section that applies — `Args:` whenever the function takes parameters. Beyond what it raises
+directly, `Raises:` lists every error that propagates from a callee and that its callers are
+expected to handle. An error a callee may raise that no caller handles stays out (an `OSError` from
+a file call).
+
+- Prose never restates what a section says.
+- A function you edit gets its docstring brought to this shape, even if you did not write it.
+- Tests: no docstrings on test functions; every fixture gets a one-line docstring.
 
 ## Spelling (cspell)
 

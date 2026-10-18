@@ -13,7 +13,7 @@ dependencies = []
 dev = [
   "diff-cover>=10.5,<11",
   "hypothesis>=6.165,<7",
-  "prek>=0.5,<0.5",
+  "prek>=0.5,<0.6",
   "pyrefly>=1.2,<2",
   "pytest>=9.1,<10",
   "pytest-cov>=7.1,<8",
@@ -40,10 +40,9 @@ preset = "strict"
 min-severity = "warn"
 project-includes = ["src", "tests"]
 python-version = "3.12"
-search-path = ["src", "tests"]
+search-path = ["src", "."]
 
 [tool.ruff]
-target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
@@ -60,11 +59,9 @@ ignore = [
   "COM812", # trailing comma (handled by formatter)
   "CPY001", # missing copyright notice (not wanted on every file)
   "G004", # logging f-string (acceptable for modern Python)
-  "ISC001", # single-line implicit string concat (conflicts with formatter)
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["E402", "F401"]
 "**/{tests,docs}/*" = ["D101", "D102", "D103", "E402"]
 "**/tests/*" = [
   "ANN001",  # missing type annotation for function argument
@@ -102,11 +99,32 @@ convention = "google"
 [tool.ruff.lint.pydoclint]
 ignore-one-line-docstrings = true
 
+[tool.pydoclint]
+style = "google"
+# Ruff's DOC501 covers direct raises; propagated errors are documented by review, which pydoclint's
+# body-only raise analysis would flag as extraneous.
+skip-checking-raises = true
+arg-type-hints-in-docstring = false
+check-class-attributes = false
+check-return-types = false
+check-style-mismatch = true
+check-yield-types = false
+
+[tool.pymaxlines]
+max-lines = 500
+max-lines-per-function = 60
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-n auto --cov --cov-report=term-missing"
+pythonpath = ["."]
+addopts = "--import-mode=importlib -n auto --cov --cov-report=term-missing"
 filterwarnings = ["error"]
 strict = true
+# A test stuck past this many seconds dumps every thread's stack and exits its
+# worker, so a hang fails the run instead of stalling it. Keep it above the
+# slowest legitimate test, or that test is killed mid-run.
+faulthandler_timeout = 180
+faulthandler_exit_on_timeout = true
 
 [tool.coverage.run]
 source = ["src"]
@@ -115,9 +133,7 @@ parallel = true
 
 [tool.coverage.report]
 exclude_also = [
-  "if TYPE_CHECKING:",
   "if __name__ == .__main__.",
   "raise NotImplementedError",
 ]
-show_missing = true
 fail_under = 90

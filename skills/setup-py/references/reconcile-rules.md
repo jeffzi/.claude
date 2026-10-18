@@ -4,17 +4,22 @@ How each config file is compared and merged during `update`. Apply after the lea
 in SKILL.md, using the same _add_ / _conflict_ / _removal candidate_ / project-owned classification.
 Apply the chosen edits with `Edit`/`Write`, preserving comments and key order.
 
-- `pyproject.toml` is TOML: reconcile the `[tool.ruff]`, `[tool.pyrefly]`,
+- `pyproject.toml` is TOML: reconcile the `[tool.ruff]`, `[tool.pyrefly]`, `[tool.pymaxlines]`,
   `[tool.pytest.ini_options]`, `[tool.coverage]`, `[tool.uv]`, and `[build-system]` tables with the
   leaf-path rules; `[project]` and the `dev` group's version ranges are project-owned (see
   project-owned-keys.md), and within `[dependency-groups] dev` reconcile only the key set.
 - `.pre-commit-config.yaml` reconciles at the hook level: a `repo`/`id` in the template but absent
-  in the project is an _add_; a project-dropped hook is a _removal candidate_; `rev` values are
-  never a conflict — they belong to `/upgrade-py`.
-- `AGENTS.md` reconciles at the section level, not by leaf path: reconcile only the house sections
-  `## Commands`, `## Git hygiene`, `## Linter and type-checker configuration`, `## Docstrings`, and
-  `## Spelling (cspell)` against the template; leave every other section untouched and never surface
-  it as drift (see project-owned-keys.md).
+  in the project is an _add_; a project-dropped hook is a _removal candidate_; a project-added hook
+  is owned and never surfaced as drift; `rev` values are never a conflict — they belong to
+  `/upgrade-py`.
+- `AGENTS.md` reconciles at the section level, not by leaf path. Reconcile only these house sections
+  against the template: `## Commands`, `## Git hygiene`, `## Linter and type-checker configuration`,
+  `## Module layout`, `## Docstrings`, and `## Spelling (cspell)`. Leave every other section
+  untouched and never surface it as drift (see project-owned-keys.md).
+  - `## Module size` is the former heading of `## Module layout`: a project section under the old
+    heading is that house section (offer replace-or-keep), never a removal candidate plus an add.
+  - Within `## Module layout`, the `### Project facts` subsection is project-owned: reconcile only
+    that it exists with the template's six bullets, never their values.
 - `Taskfile.yml` and the `.github/workflows/*.yml` files are house-owned but routinely extended:
   ensure the template's tasks/jobs/steps are present, and keep project-added tasks, jobs, matrix
   entries, and steps without surfacing them as drift. If a template task/job differs, offer

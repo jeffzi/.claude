@@ -10,11 +10,55 @@ permissions: {}
 concurrency:
   group: ${{ github.workflow }}
 
+# A PR opened with the default GITHUB_TOKEN triggers no `pull_request` workflow,
+# so this workflow runs the checks such a PR would get — prek, the audit, and the
+# full test matrix — on the upgraded tree itself, and opens the PR only when all
+# of them pass.
 jobs:
-  autoupdate:
-    name: Update dependencies and dev tools
+  upgrade:
+    name: Upgrade dependencies and dev tools
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - name: Upgrade dependencies
+        run: uv lock --upgrade
+      - uses: ./.github/actions/setup-dprint # zizmor: ignore[self-repository] — actionlint rejects $/
+      - name: Bump hook revs and dprint plugins
+        run: |
+          uv run prek autoupdate
+          dprint config update
+      - name: Auto-fix and verify
+        run: uv run prek run -a || uv run prek run -a --show-diff-on-failure
+      - name: Audit dependencies for known vulnerabilities
+        run: uv audit
+      - name: Collect the update as a patch
+        run: |
+          git add --all
+          git diff --cached --binary >"$RUNNER_TEMP/update.patch"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: update-patch
+          path: ${{ runner.temp }}/update.patch
+
+  test:
+    needs: upgrade
+    permissions:
+      contents: read
+    uses: ./.github/workflows/pytest.yml # zizmor: ignore[self-repository] — actionlint rejects $/
+    with:
+      patch-artifact: update-patch
+
+  pull-request:
+    name: Open the update PR
+    needs: [upgrade, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write # push the autoupdate branch
       pull-requests: write # open or update the PR
@@ -22,25 +66,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          python-version: "3.14"
-      - name: Upgrade dependencies
+          name: update-patch
+          path: ${{ runner.temp }}
+      - name: Apply the tested update
         run: |
-          uv lock --upgrade
-          uv sync
-      - uses: ./.github/actions/setup-dprint # zizmor: ignore[self-repository] — actionlint rejects $/
-      - name: Bump hook revs and dprint plugins
-        run: |
-          uv run prek autoupdate
-          dprint config update
-      - name: Auto-fix and verify
-        run: |
-          if ! uv run prek run -a; then
-            uv run prek run -a --show-diff-on-failure
+          # An empty patch means nothing was upgraded; `git apply` rejects one.
+          if [[ -s "$RUNNER_TEMP/update.patch" ]]; then
+            git apply "$RUNNER_TEMP/update.patch"
           fi
-      - name: Run tests
-        run: uv run pytest --no-cov -x -q
       - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1 # zizmor: ignore[superfluous-actions]
         with:
           commit-message: "chore: update dependencies and dev tools"
