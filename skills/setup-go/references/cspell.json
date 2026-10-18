@@ -1,0 +1,43 @@
+{
+  "$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json",
+  "version": "0.2",
+  "language": "en-US",
+  "files": ["**/*.{go,md,yml,yaml,toml,json,jsonc}"],
+  "words": [
+    "covermode",
+    "coverprofile",
+    "depguard",
+    "dprint",
+    "errcheck",
+    "errorlint",
+    "gochecknoglobals",
+    "gocritic",
+    "gocognit",
+    "gofmt",
+    "gofumpt",
+    "goimports",
+    "golangci",
+    "gosec",
+    "govet",
+    "govulncheck",
+    "ineffassign",
+    "jeffzi",
+    "misspell",
+    "modernize",
+    "nestif",
+    "nilerr",
+    "noctx",
+    "nolint",
+    "prek",
+    "revive",
+    "semver",
+    "staticcheck",
+    "Taskfile",
+    "taskkill",
+    "zizmor"
+  ],
+  "ignorePaths": [
+    ".planning",
+    ".research"
+  ]
+}

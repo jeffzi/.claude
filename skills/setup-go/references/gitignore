@@ -1,0 +1,38 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Go build artifacts
+dist/
+
+# Coverage
+coverage.out
+coverage.html
+*.coverprofile
+profile.cov
+
+# Go workspace (developer-local)
+go.work
+go.work.sum
+
+# Environment
+.env
+
+# macOS
+.DS_Store
+
+# Planning and research (local-only)
+.planning/
+.research/
+
+# Agents
+.agents/settings.local.json
+.claude/settings.local.json
+AGENTS.local.md
+CLAUDE.local.md

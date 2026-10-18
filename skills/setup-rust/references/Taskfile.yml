@@ -1,0 +1,61 @@
+version: "3"
+
+vars:
+  CLEAN_PATHS:
+    - target
+
+tasks:
+  default:
+    cmds:
+      - task --list --sort none
+    silent: true
+
+  _require-prek:
+    internal: true
+    preconditions:
+      - sh: command -v prek
+        msg: "prek is required — install: https://github.com/j178/pre-commit-rs"
+
+  _require-dprint:
+    internal: true
+    preconditions:
+      - sh: command -v dprint
+        msg: "dprint is required — install: https://dprint.dev/install/"
+
+  install:
+    desc: Install pre-commit hooks
+    deps: [_require-prek]
+    cmds:
+      - prek install
+
+  test:
+    desc: "Run the test suite (pass extra args after --)"
+    cmds:
+      - cargo nextest run --all-features {{.CLI_ARGS}}
+      - cargo test --doc
+
+  cov:
+    desc: Run tests with coverage via cargo-llvm-cov
+    cmds:
+      - cargo llvm-cov nextest --all-features --html
+
+  check:
+    desc: Run every pre-commit hook across the repo
+    deps: [_require-prek, _require-dprint]
+    vars:
+      GIT_FILES:
+        sh: git ls-files --cached --others --exclude-standard
+      PREK_FILES: "{{range $f := .GIT_FILES | splitLines}}{{$f | shellQuote}} {{end}}"
+    cmds:
+      - prek run --files {{.PREK_FILES}}
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - cmd: rm -rf {{.CLEAN_PATHS | join " "}}
+        platforms: [darwin, linux]
+      - cmd: >-
+          powershell -NoProfile -Command
+          "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+          -Path {{.CLEAN_PATHS | join ","}}"
+        platforms: [windows]

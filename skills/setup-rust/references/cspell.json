@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json",
+  "version": "0.2",
+  "language": "en-US",
+  "files": ["**/*.{rs,md,yml,yaml,toml,json,jsonc}"],
+  "words": [
+    "clippy",
+    "deps",
+    "dprint",
+    "doctests",
+    "jeffzi",
+    "nextest",
+    "prek",
+    "rustdoc",
+    "rustfmt",
+    "semver",
+    "Taskfile",
+    "taskkill",
+    "zizmor"
+  ],
+  "ignorePaths": [
+    ".planning",
+    ".research",
+    "target"
+  ]
+}

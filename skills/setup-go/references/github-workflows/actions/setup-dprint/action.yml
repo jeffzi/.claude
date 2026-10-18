@@ -1,0 +1,21 @@
+# Bump manually — Dependabot does not track env vars.
+# Checksum from the release's SHASUMS256.txt.
+name: Setup dprint
+description: Install a pinned, checksum-verified dprint release.
+
+runs:
+  using: composite
+  steps:
+    - name: Install dprint
+      shell: bash
+      env:
+        DPRINT_VERSION: "0.57.1"
+        DPRINT_SHA256: 4117443cc5fade617dd5f4850cc2fa6b2902136052ef313ee20947036c3554cc
+      run: | # zizmor: ignore[github-env] — GITHUB_PATH entry is built from pinned literals in this file, not attacker-controlled input
+        set -euo pipefail
+        curl -fsSL -o dprint.zip "https://github.com/dprint/dprint/releases/download/${DPRINT_VERSION}/dprint-x86_64-unknown-linux-gnu.zip"
+        printf "%s  dprint.zip" "${DPRINT_SHA256}" | sha256sum -c -
+        mkdir -p "${HOME}/.dprint/bin"
+        unzip -o -d "${HOME}/.dprint/bin" dprint.zip
+        rm -f dprint.zip
+        printf "%s/.dprint/bin" "${HOME}" >> "${GITHUB_PATH}"

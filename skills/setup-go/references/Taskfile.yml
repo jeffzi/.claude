@@ -1,0 +1,67 @@
+version: "3"
+
+vars:
+  CLEAN_PATHS:
+    - dist
+    - coverage.out
+    - coverage.html
+
+tasks:
+  default:
+    cmds:
+      - task --list --sort none
+    silent: true
+
+  _require-prek:
+    internal: true
+    preconditions:
+      - sh: command -v prek
+        msg: "prek is required — install: https://github.com/j178/prek"
+
+  _require-dprint:
+    internal: true
+    preconditions:
+      - sh: command -v dprint
+        msg: "dprint is required — install: https://dprint.dev/install/"
+
+  _hooks:
+    internal: true
+    deps: [_require-prek]
+    status:
+      - test -f "$(git rev-parse --git-path hooks/pre-commit)"
+      - test -f "$(git rev-parse --git-path hooks/commit-msg)"
+      - test -f "$(git rev-parse --git-path hooks/pre-push)"
+    cmds:
+      - prek install
+
+  test:
+    desc: "Run the test suite with coverage (extra args after -- skip coverage)"
+    cmds:
+      - go test -race {{if not .CLI_ARGS}}-coverprofile=coverage.out {{end}}./... {{.CLI_ARGS}}
+      - "{{if not .CLI_ARGS}}go tool cover -html=coverage.out -o coverage.html{{end}}"
+      - "{{if not .CLI_ARGS}}go tool go-test-coverage --config=.coverage.yml{{end}}"
+
+  check:
+    desc: Run every pre-commit hook across the repo (fixing hooks rewrite files in place)
+    deps: [_require-prek, _require-dprint, _hooks]
+    vars:
+      GIT_FILES:
+        sh: git ls-files --cached --others --exclude-standard
+      PREK_FILES: "{{range $f := .GIT_FILES | splitLines}}{{$f | shellQuote}} {{end}}"
+    cmds:
+      - prek run --files {{.PREK_FILES}}
+
+  check:fix:
+    desc: Auto-fix everything that supports it (go mod tidy, golangci-lint, dprint, markdownlint)
+    deps: [_require-prek, _require-dprint]
+    cmds:
+      - go mod tidy
+      - go tool golangci-lint run --fix
+      - go tool golangci-lint fmt
+      - dprint fmt
+      - prek run -a markdownlint-cli2
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -rf {{.CLEAN_PATHS | join " "}}

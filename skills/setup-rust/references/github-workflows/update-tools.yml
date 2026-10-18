@@ -1,0 +1,48 @@
+name: Update tools
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+
+jobs:
+  autoupdate:
+    name: Update dependencies and dev tools
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+      - uses: taiki-e/install-action@26e9283f268b880168bdbd2c545dfcd60ec2c6ab # v2
+        with:
+          tool: cargo-nextest,cargo-deny,cargo-machete
+      - name: Update lockfile
+        run: cargo update
+      - name: Verify
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --all-targets --all-features -- -D warnings
+          cargo nextest run --all-features
+          cargo test --doc
+          cargo deny check advisories bans licenses sources
+          cargo machete
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1 # zizmor: ignore[superfluous-actions]
+        with:
+          commit-message: "chore: update dependencies"
+          branch: autoupdate-deps
+          title: "chore: update dependencies"
+          body: Automated lockfile update via `cargo update`.
+          delete-branch: true

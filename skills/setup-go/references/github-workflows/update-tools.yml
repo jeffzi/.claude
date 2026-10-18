@@ -1,0 +1,45 @@
+name: Update tools
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+
+jobs:
+  autoupdate:
+    name: Update dependencies and dev tools
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # zizmor: ignore[undocumented-permissions]
+      pull-requests: write # zizmor: ignore[undocumented-permissions]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+      - name: Update dependencies
+        run: |
+          go get -u ./...
+          go get -u -tool
+          go mod tidy
+      - name: Verify
+        run: |
+          go build ./...
+          go test -race ./...
+          go tool golangci-lint run
+          go tool govulncheck ./...
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1 # zizmor: ignore[superfluous-actions]
+        with:
+          commit-message: "chore: update dependencies"
+          branch: autoupdate-deps
+          title: "chore: update dependencies"
+          body: Automated dependency update via `go get -u`.
+          delete-branch: true

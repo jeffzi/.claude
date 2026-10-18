@@ -1,0 +1,14 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - revive
+  settings:
+    revive:
+      rules:
+        - name: file-length-limit
+          arguments:
+            - max: 1000
+              skip-comments: true
+              skip-blank-lines: true

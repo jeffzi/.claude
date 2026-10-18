@@ -15,21 +15,23 @@ script's `add` commands are the source map.
 
 #### Code
 
-| Skill                                                    | Description                                                                      |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| [`code-core`](skills/code-core/SKILL.md)                 | Production code principles hub (types, errors, verification, comments)           |
-| [`code-py`](skills/code-py/SKILL.md)                     | Python: type hints, modern syntax (3.10+), Pythonic idioms                       |
-| [`code-lua`](skills/code-lua/SKILL.md)                   | Lua: LuaLS annotations, naming conventions, performance                          |
-| [`code-marimo`](skills/code-marimo/SKILL.md)             | Marimo: directed acyclic graph (DAG) patterns, SQL-first analysis, UI reactivity |
-| [`code-shell`](skills/code-shell/SKILL.md)               | Bash: strict mode, quoting, ShellCheck/shfmt compliance                          |
-| [`code-shiny`](skills/code-shiny/SKILL.md)               | Shiny for Python: reactive logic, Express/Core mode                              |
-| [`code-sql`](skills/code-sql/SKILL.md)                   | SQL: warehouse naming conventions, query structure, lowercase keywords           |
-| [`code-sql-redshift`](skills/code-sql-redshift/SKILL.md) | Redshift: pinned dialect facts (QUALIFY, lateral aliases), AUTO tuning defaults  |
-| [`code-swift`](skills/code-swift/SKILL.md)               | Swift: strict concurrency, structured concurrency                                |
-| [`code-ts`](skills/code-ts/SKILL.md)                     | TypeScript: strict types, modern patterns                                        |
-| [`code-tstl`](skills/code-tstl/SKILL.md)                 | TypeScript-to-Lua: TSTL targeting Lua 5.1                                        |
-| [`code-tstl-plugin`](skills/code-tstl-plugin/SKILL.md)   | TSTL plugins: visitor transforms, printer overrides                              |
-| [`design-cli`](skills/design-cli/SKILL.md)               | CLI design: subcommands, flags, help text, output formatting                     |
+| Skill                                                    | Description                                                                                       |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| [`code-core`](skills/code-core/SKILL.md)                 | Production code principles hub (types, errors, verification, comments)                            |
+| [`code-go`](skills/code-go/SKILL.md)                     | Go: `%w` error chains, goroutine ownership, consumer-side interfaces, modern 1.22+ idioms         |
+| [`code-py`](skills/code-py/SKILL.md)                     | Python: type hints, modern syntax (3.10+), Pythonic idioms                                        |
+| [`code-lua`](skills/code-lua/SKILL.md)                   | Lua: LuaLS annotations, naming conventions, performance                                           |
+| [`code-marimo`](skills/code-marimo/SKILL.md)             | Marimo: directed acyclic graph (DAG) patterns, SQL-first analysis, UI reactivity                  |
+| [`code-shell`](skills/code-shell/SKILL.md)               | Bash: strict mode, quoting, ShellCheck/shfmt compliance                                           |
+| [`code-shiny`](skills/code-shiny/SKILL.md)               | Shiny for Python: reactive logic, Express/Core mode                                               |
+| [`code-sql`](skills/code-sql/SKILL.md)                   | SQL: warehouse naming conventions, query structure, lowercase keywords                            |
+| [`code-sql-redshift`](skills/code-sql-redshift/SKILL.md) | Redshift: pinned dialect facts (QUALIFY, lateral aliases), AUTO tuning defaults                   |
+| [`code-rust`](skills/code-rust/SKILL.md)                 | Rust: typed errors (thiserror/anyhow), no-panic library paths, ownership over clone, unsafe audit |
+| [`code-swift`](skills/code-swift/SKILL.md)               | Swift: strict concurrency, structured concurrency                                                 |
+| [`code-ts`](skills/code-ts/SKILL.md)                     | TypeScript: strict types, modern patterns                                                         |
+| [`code-tstl`](skills/code-tstl/SKILL.md)                 | TypeScript-to-Lua: TSTL targeting Lua 5.1                                                         |
+| [`code-tstl-plugin`](skills/code-tstl-plugin/SKILL.md)   | TSTL plugins: visitor transforms, printer overrides                                               |
+| [`design-cli`](skills/design-cli/SKILL.md)               | CLI design: subcommands, flags, help text, output formatting                                      |
 
 #### Testing
 
@@ -37,10 +39,12 @@ script's `add` commands are the source map.
 | -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | [`tdd`](skills/tdd/SKILL.md)                 | Test-driven development orchestrator (RED-GREEN-REFACTOR)                                      |
 | [`test-core`](skills/test-core/SKILL.md)     | Cross-language testing principles hub (Arrange-Act-Assert, merge rules, mocking anti-patterns) |
+| [`test-go`](skills/test-go/SKILL.md)         | Go tests with table-driven subtests, synctest, export_test.go, go-cmp                          |
 | [`test-py`](skills/test-py/SKILL.md)         | Python tests with pytest                                                                       |
 | [`test-ts`](skills/test-ts/SKILL.md)         | TypeScript tests with Vitest                                                                   |
 | [`test-lua`](skills/test-lua/SKILL.md)       | Lua tests with busted                                                                          |
 | [`test-polars`](skills/test-polars/SKILL.md) | Polars DataFrame assertions and fixtures                                                       |
+| [`test-rust`](skills/test-rust/SKILL.md)     | Rust tests with cargo-nextest, rstest, proptest, insta                                         |
 | [`test-swift`](skills/test-swift/SKILL.md)   | Swift tests with Swift Testing and XCTest                                                      |
 | [`stryker-js`](skills/stryker-js/SKILL.md)   | Mutation testing with StrykerJS for JS/TS projects                                             |
 
@@ -77,6 +81,11 @@ script's `add` commands are the source map.
 
 Each `/revise-*` command dispatches the matching read-only `vet-*` agent, then applies what it
 finds. Dispatch the agent directly when you want findings without edits.
+
+Run a `/revise-*` command once on the root of what you want reviewed, such as `/revise-test tests/`.
+Don't split the target across agents you launch yourself. Each split agent runs its own pipeline, so
+the agent count multiplies past the concurrent subagent limit. Each split agent also sees only its
+own subtree, so cross-directory duplicates go unfixed.
 
 #### Process
 
@@ -294,12 +303,9 @@ bats tests/
 | [`git-guard.sh`](hooks/git-guard.sh)               | Blocks auto-push, destructive ops, commits on a protected `main`, unsanctioned merges |
 | [`git-lock-guard.sh`](hooks/git-lock-guard.sh)     | Absorbs `.git/index.lock` races from parallel agents/sessions                         |
 | [`marimo-check.sh`](hooks/marimo-check.sh)         | Validates marimo notebooks on edit                                                    |
-| [`plan-claim-guard.sh`](hooks/plan-claim-guard.sh) | Reminds to verify plan claims before exiting plan mode                                |
-| [`plan-skill-guard.sh`](hooks/plan-skill-guard.sh) | Enforces skill loading before plan mode                                               |
 | [`shiny-check.sh`](hooks/shiny-check.sh)           | Smoke-tests staged Shiny apps before commit                                           |
 | [`tdd-red-guard.sh`](hooks/tdd-red-guard.sh)       | Blocks reading implementation source during TDD RED phase                             |
 | [`worktree-guard.sh`](hooks/worktree-guard.sh)     | Blocks exiting worktrees with uncommitted changes                                     |
-| [`collab-reminder.sh`](hooks/collab-reminder.sh)   | Re-injects propose-decisions / answer-first policy on every prompt                    |
 
 ## Configuration Notes
 

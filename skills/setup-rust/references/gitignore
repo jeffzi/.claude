@@ -1,0 +1,28 @@
+# Rust build artifacts
+debug
+target
+**/*.rs.bk
+*.pdb
+
+# Mutation testing
+**/mutants.out*/
+
+# ICE reports
+rustc-ice-*.txt
+
+# Coverage
+lcov.info
+tarpaulin-report.html
+
+# macOS
+.DS_Store
+
+# Planning and research (local-only)
+.planning/
+.research/
+
+# Agents
+.agents/settings.local.json
+.claude/settings.local.json
+AGENTS.local.md
+CLAUDE.local.md

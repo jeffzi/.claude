@@ -1,0 +1,29 @@
+name: prek
+
+on:
+  pull_request:
+  push:
+    branches: [main, fix-ci/**, plan/**, "v[0-9]*"]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prek-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prek:
+    name: Lint and format
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version-file: go.mod
+      - uses: ./.github/actions/setup-dprint # zizmor: ignore[self-repository] — actionlint rejects $/
+      - uses: j178/prek-action@4e14d07f9231acabce116ccfca13b13dd9755ece # v3.0.0

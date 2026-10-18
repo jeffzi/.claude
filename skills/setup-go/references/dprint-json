@@ -1,0 +1,18 @@
+{
+  "$schema": "https://dprint.dev/schemas/v0.json",
+  "includes": [
+    "**/*.{json,yaml,yml,md}",
+    "**/Dockerfile",
+    "**/Dockerfile.*"
+  ],
+  "lineWidth": 100,
+  "markdown": {
+    "textWrap": "maintain"
+  },
+  "plugins": [
+    "npm:@dprint/json@0.23.0",
+    "npm:dprint-plugin-yaml@0.6.0",
+    "npm:@dprint/markdown@0.23.3",
+    "npm:@dprint/dockerfile@0.6.0"
+  ]
+}

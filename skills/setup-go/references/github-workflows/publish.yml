@@ -1,0 +1,21 @@
+name: Publish
+
+on:
+  push:
+    tags: ["v[0-9]*"]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  ci:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository] — actionlint rejects $/
+
+  audit:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/audit.yml # zizmor: ignore[self-repository] — actionlint rejects $/
