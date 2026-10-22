@@ -207,6 +207,39 @@ assert_guard_output_excludes() {
 	}
 }
 
+# The guard blocked the command with output naming reason $1.
+assert_blocked_with_reason() {
+	assert_blocked && assert_guard_output_includes "$1"
+}
+
+# ── Case lists ───────────────────────────────────────────────────────────────
+
+# for_each_case <runner> [arg...] -- <assertion> [arg...] -- <case>...
+#
+# For every case, runs `<runner> [arg...] <case>`, then `<assertion> [arg...]
+# <case>`. Stops at the first failing assertion and names its case on stderr.
+for_each_case() {
+	local -a runner=() assertion=()
+	while (($#)) && [[ "$1" != -- ]]; do
+		runner+=("$1")
+		shift
+	done
+	shift
+	while (($#)) && [[ "$1" != -- ]]; do
+		assertion+=("$1")
+		shift
+	done
+	shift
+	local case
+	for case in "$@"; do
+		"${runner[@]}" "$case"
+		"${assertion[@]}" "$case" || {
+			printf 'case: %s\n' "$case" >&2
+			return 1
+		}
+	done
+}
+
 # ── Script invocation ────────────────────────────────────────────────────────
 # One runner for every executable under test. Streams stay apart: refusals and
 # diagnostics land on stderr, a script's success line on stdout.

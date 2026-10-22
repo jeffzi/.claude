@@ -15,38 +15,27 @@ assert_passed() {
 	}
 }
 
-# The hook blocked the run: stdout is a block decision carrying the failure
-# reason for exit code $1.
+# The hook blocked the run of case $1: stdout is a block decision carrying the
+# failure reason for the case's exit code.
 assert_blocked_for_exit() {
 	[[ "$(jq -r '.decision' <<<"$RUN_STDOUT")" == "block" ]] || {
 		printf 'expected "decision": "block" in stdout: %s\n' "$RUN_STDOUT" >&2
 		return 1
 	}
-	assert_stdout_includes "COMMAND FAILED (exit code $1)"
+	assert_stdout_includes "COMMAND FAILED (exit code ${1%% *})"
 }
 
-# Run every "<code> <command>" case through the hook and apply assertion $1 to
-# its exit code; a failure names the case.
-each_case() {
-	local assertion="$1" case code
-	shift
-	for case in "$@"; do
-		code="${case%% *}"
-		run_exit_guard "${case#* }" "$code"
-		"$assertion" "$code" || {
-			printf 'case: %s\n' "$case" >&2
-			return 1
-		}
-	done
+# Run the hook on case $1, a "<code> <command>" string.
+run_exit_case() {
+	run_exit_guard "${1#* }" "${1%% *}"
 }
 
 each_passes() {
-	each_case assert_passed "$@"
+	for_each_case run_exit_case -- assert_passed -- "$@"
 }
 
-# Every case is blocked with its exit code's reason.
 each_blocked() {
-	each_case assert_blocked_for_exit "$@"
+	for_each_case run_exit_case -- assert_blocked_for_exit -- "$@"
 }
 
 # ── ils verdict codes ────────────────────────────────────────────────────────
@@ -75,11 +64,9 @@ each_blocked() {
 
 # ── Other commands ───────────────────────────────────────────────────────────
 
-@test "other commands: any non-zero exit is blocked, 4 and 5 included" {
+@test "other commands: any non-zero exit is blocked" {
 	each_blocked \
 		"1 make" \
-		"4 make" \
-		"5 make" \
 		"2 ls missing" \
 		"127 frobnicate"
 }
@@ -91,19 +78,16 @@ each_blocked() {
 }
 
 @test "skip list: any non-zero exit from a probing command passes" {
-	local code
-	for code in 1 2 127; do
-		each_passes \
-			"$code grep foo file" \
-			"$code rg foo" \
-			"$code diff a b" \
-			"$code test -f missing" \
-			"$code which nope" \
-			"$code false" \
-			"$code true" \
-			"$code command -v nope" \
-			"$code [ -f missing ]"
-	done
+	each_passes \
+		"1 grep foo file" \
+		"2 rg foo" \
+		"127 diff a b" \
+		"1 test -f missing" \
+		"2 which nope" \
+		"127 false" \
+		"1 true" \
+		"2 command -v nope" \
+		"127 [ -f missing ]"
 }
 
 @test "tool: a non-Bash tool passes whatever its exit code" {

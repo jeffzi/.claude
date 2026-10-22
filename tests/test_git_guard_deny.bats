@@ -164,8 +164,8 @@ teardown_file() {
 
 @test "rm: force text inside a global option value does not block the rm" {
 	each_allowed_in "$REPO" \
-		"git -C x--force rm file" \
-		"git -c a.b=--force rm file"
+		"git --namespace --force rm file" \
+		"git -c -f rm file"
 }
 
 # ── Reflog / prune ───────────────────────────────────────────────────────────

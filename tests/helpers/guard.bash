@@ -27,42 +27,24 @@ setup_release_marked_repo() {
 
 # Every command in the list is blocked in repo $1; a failure names the command.
 each_blocked_in() {
-	local dir="$1" cmd
+	local dir="$1"
 	shift
-	for cmd in "$@"; do
-		run_guard "$dir" "$cmd"
-		assert_blocked || {
-			printf 'command: %s\n' "$cmd" >&2
-			return 1
-		}
-	done
+	for_each_case run_guard "$dir" -- assert_blocked -- "$@"
 }
 
 # Every command in the list is blocked in repo $2 with output naming reason $1;
 # a failure names the command.
 each_blocked_for_in() {
-	local reason="$1" dir="$2" cmd
+	local reason="$1" dir="$2"
 	shift 2
-	for cmd in "$@"; do
-		run_guard "$dir" "$cmd"
-		{ assert_blocked && assert_guard_output_includes "$reason"; } || {
-			printf 'command: %s\n' "$cmd" >&2
-			return 1
-		}
-	done
+	for_each_case run_guard "$dir" -- assert_blocked_with_reason "$reason" -- "$@"
 }
 
 # Every command in the list is allowed in repo $1; a failure names the command.
 each_allowed_in() {
-	local dir="$1" cmd
+	local dir="$1"
 	shift
-	for cmd in "$@"; do
-		run_guard "$dir" "$cmd"
-		assert_allowed || {
-			printf 'command: %s\n' "$cmd" >&2
-			return 1
-		}
-	done
+	for_each_case run_guard "$dir" -- assert_allowed -- "$@"
 }
 
 # run_guard on the command read from stdin — for commands that embed their own
