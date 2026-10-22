@@ -2,7 +2,7 @@
 
 How work moves from an approved plan to a tag on `main`, which command does each git write, and what
 stops the assistant from doing any of it by hand. The assistant plans and implements; you run the
-four `/release` commands, and merge by hand the pull request a plan cut from `main` ends in.
+four `/release` commands. When a plan is cut from `main`, you also merge its pull request by hand.
 
 **What this doc covers:** [the branches](#the-branches), [starting a release](#starting-a-release),
 [the loop](#the-loop), [one plan, one commit](#one-plan-one-commit),
@@ -27,9 +27,10 @@ The script finds a release branch by its config key, `branch.vX.Y.release = X.Y.
 name. A plan branch records the branch it was cut from as `branch.plan/<slug>.planBase`; that is
 where it lands. A plan cut from a release or feature branch lands there through `/release merge`. A
 plan cut from `main` (origin's default branch) lands as a pull request instead: `/execute-plan`
-ships it through `ils push`, and you merge it by hand with `gh pr merge`. That path needs
-[`ils`](https://github.com/jeffzi/ils) v0.1.0 on your `PATH` and its skill installed; this
-repository does not install it.
+ships it through `ils push`, and you merge it by hand with `gh pr merge`. That path needs the
+[`ils`](https://github.com/jeffzi/ils) binary 0.1.x on your `PATH`, and the `ils` skill linked at
+`~/.claude/skills/ils` (a symlink into a clone of the ils repository; see `.gitignore`). This
+repository installs neither.
 
 ## Starting a release
 
@@ -80,7 +81,7 @@ the plan branch when its verification passes. How the branch ships depends on it
   squash message under `.git/plan-squash/` and reports the one command left for you: `/release
   merge`.
 
-The rest of this section covers the second case.
+The rest of this section covers release-path plans, the second case.
 
 `/release merge` acts on the checked-out plan branch, or on one named as `plan/<slug>`. It refuses,
 and changes nothing, unless:
@@ -195,12 +196,13 @@ tag on its tip, so `git log main` reads as the changelog.
   the leased force-push included, happen inside the script where the guard does not look, which is
   why the invocation itself is marker-gated. A typed `git push --force` stays blocked under every
   marker.
-- A plan branch cut from `main` is pushed by `ils push`, which also opens its pull request; the
-  assistant never runs `gh pr merge`. `ils push` also lands `/fix-ci`'s squashed fix onto any branch
-  with an open pull request. Every other branch push — `fix-ci/*` branches, plan branches cut from a
-  release or feature branch, and squash-backs onto branches without a pull request — goes through
-  [`fix-ci-push.sh`](../scripts/fix-ci-push.sh): append-only, no force, and only `fix-ci/*` and
-  `plan/*` branches may be deleted.
+- `ils push` pushes a plan branch cut from `main` and opens its pull request. `/execute-plan` never
+  merges that pull request; the merge is yours. Only the skill's instructions stop it; no hook
+  blocks it. `ils push` also lands `/fix-ci`'s squashed fix onto any branch with an open pull
+  request against `main`. Outside `release.sh` and trunk pull requests, the assistant pushes through
+  [`fix-ci-push.sh`](../scripts/fix-ci-push.sh): `fix-ci/*` branches, plan branches cut from a
+  release or feature branch, and squash-backs onto branches without a pull request. The wrapper is
+  append-only, never forces, and deletes only `fix-ci/*` and `plan/*` branches.
 - The CI templates trigger on `main`, `plan/**`, `fix-ci/**`, and `v[0-9]*` pushes, so a plan branch
   is green before it lands and a release branch has a run for `finish` to gate on. Projects pick the
   trigger up on `/setup-py update` or `/setup-ts update`.
