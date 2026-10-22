@@ -60,10 +60,13 @@ auto-loaded as agent instructions when editing templates here).
 `AGENTS.local.md` and `.mcp.json` are per-developer files (gitignored). `init` seeds them if
 missing; `update` never reconciles them — they are personal overrides.
 
-`AGENTS.md` ships with a companion symlink: in both `init` and `update`, after the copy, ensure
-`CLAUDE.md` exists as a symlink to it (`ln -s AGENTS.md CLAUDE.md`). If `CLAUDE.md` already exists
-as a regular file, never replace it — surface it and let the user decide (usually: merge its content
-into `AGENTS.md`, then symlink).
+`AGENTS.md` ships with a companion `CLAUDE.md`: in both `init` and `update`, after the copy, ensure
+`CLAUDE.md` is a regular file holding `# <project name>`, a blank line, and `@AGENTS.md`. Claude
+Code skips `AGENTS.md` whenever a `CLAUDE.md` or `CLAUDE.local.md` applies, so the import is what
+loads it; never symlink instead, because the Edit and Write tools don't write through a symlink.
+Replace an existing `CLAUDE.md` symlink with the import file. A regular `CLAUDE.md` holding anything
+else is never replaced — surface it and let the user decide (usually: merge its content into
+`AGENTS.md`, then write the import file).
 
 **Project-owned keys** are listed in `${CLAUDE_SKILL_DIR}/references/project-owned-keys.md`. Exclude
 them from every reconcile bucket — never surface as drift.

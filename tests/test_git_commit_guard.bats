@@ -5,27 +5,14 @@ load helpers/hooks
 # Every command in the list is blocked with the reason $1; a failure names the
 # command that broke the run.
 each_blocked() {
-	local reason="$1" cmd
+	local reason="$1"
 	shift
-	for cmd in "$@"; do
-		run_commit_guard "$cmd"
-		if ! assert_blocked || ! assert_guard_output_includes "$reason"; then
-			printf 'command: %s\n' "$cmd" >&2
-			return 1
-		fi
-	done
+	for_each_case run_commit_guard -- assert_blocked_with_reason "$reason" -- "$@"
 }
 
 # Every command in the list is allowed; a failure names the command.
 each_allowed() {
-	local cmd
-	for cmd in "$@"; do
-		run_commit_guard "$cmd"
-		assert_allowed || {
-			printf 'command: %s\n' "$cmd" >&2
-			return 1
-		}
-	done
+	for_each_case run_commit_guard -- assert_allowed -- "$@"
 }
 
 # ── Forbidden patterns in the command text ───────────────────────────────────

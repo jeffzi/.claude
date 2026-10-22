@@ -39,9 +39,11 @@ esac
 # CI is still pending, 5 means delivered but not green. Each
 # names a next step the ils workflow already handles, so neither
 # is a failure to block on. Every other ils exit still blocks.
+readonly ILS_EXIT_PENDING=4
+readonly ILS_EXIT_NOT_GREEN=5
 if [[ "$first_word" == "ils" ]]; then
 	case "$exit_code" in
-	4 | 5) exit 0 ;;
+	"$ILS_EXIT_PENDING" | "$ILS_EXIT_NOT_GREEN") exit 0 ;;
 	esac
 fi
 
