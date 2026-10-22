@@ -45,13 +45,13 @@ warm up signing → locate run → wait if running → read failing logs → tri
 → touch marker → checkout PR branch → check branch CI coverage → branch fix-ci/<slug>
 → reproduce locally → fix → verify locally → commit → push branch → watch its run
 → green gate? squash back : loop (max 3 pushed attempts) → watch the target tip's run
-  (or `ils push` when the target has an open pull request) → green gate → rm marker (EVERY exit path)
+  (or `ils push` when the target has an open PR against the trunk) → green gate → rm marker (EVERY exit path)
 ```
 
-Two green gates, each passed by output in your context (see "The green gate"): the fix branch's run
-gates the squash, by `gh run view`; the squashed target tip gates the final report, by `gh run view`
-on its run, or by `ils push`'s exit 0 when the target has an open pull request. Nothing is "green"
-between them — the squash push creates a new SHA that has no run yet.
+Two green gates pass on output in your context (see "The green gate"). The fix branch's `gh run
+view` gates the squash. The squashed target tip gates the final report: `gh run view` on its run, or
+`ils push` exit 0 when the target has an open PR against the trunk. Nothing is "green" between them
+— the squash push creates a new SHA that has no run yet.
 
 **Scope of approval.** A read-only ask — "why is CI red?", "check CI", "what's failing?" — gets
 locate/read/triage and a report with the proposed fix described: no marker, no edits, no commits
@@ -77,9 +77,9 @@ rm -f "$(git rev-parse --git-dir)/fix-ci-active"    # at loop end — ALWAYS
 - Fix attempts never land directly on the target branch — they live on `fix-ci/*` until proven.
 
 **On a fix request, read `references/push-protocol.md` before the first push** — it carries the
-wrapper contract (the push path, with `ils push` for a squash-back onto a target with an open pull
-request), the marker TTL, the signing warm-up (the FIRST action of any fix request), and the
-squash-back procedure.
+wrapper contract (the push path, with `ils push` for a squash-back onto a target with an open PR
+against the trunk), the marker TTL, the signing warm-up (the FIRST action of any fix request), and
+the squash-back procedure.
 
 ## The fix branch
 
@@ -106,18 +106,20 @@ failed.
 
 Attempts are plain commits; the squash erases them, so retries never amend or force. If pushing the
 branch triggers no workflow, open the PR early (`gh pr create --fill --base <original>`) to fire
-`pull_request` workflows — except for a `plan/*` target, which never gets one from the fix branch: a
-plan branch with no open pull request lands through `/release merge`, and one with an open pull
-request against the trunk already fires `pull_request` workflows (see the hard stop below).
+`pull_request` workflows — except for a `plan/*` target, which never gets one from the fix branch. A
+plan branch with no open PR lands through `/release merge`. A plan branch with an open PR against
+the trunk already fires `pull_request` workflows on the plan tip, not on `fix-ci/<slug>`. A fix
+branch whose push fires nothing is the "No CI coverage on a `fix-ci/*` branch" stop condition (see
+"Stop conditions" below).
 
 **No CI coverage on the branch → hard stop.** Check `.github/workflows/*` triggers on the
 checked-out target branch, before `git switch -c fix-ci/*`: nothing fires on branch pushes or
 `pull_request` → investigate and report only, noting `workflow_dispatch` when offered. Never use the
-target branch itself as the CI test bed. A `plan/*` target with no open pull request and no run for
-its pushed tip is this stop with a known diagnosis: the workflow's `on.push.branches` lacks
-`plan/**` — and a `vX.Y` release branch with none lacks `"v[0-9]*"` — report that line as the fix,
-never push `main` to get a run. A `plan/*` target with an open pull request gets runs from
-`pull_request` workflows, so a missing `plan/**` push trigger alone is not this stop.
+target branch itself as the CI test bed. A `plan/*` target with no open PR and no run for its pushed
+tip is this stop with a known diagnosis: the workflow's `on.push.branches` lacks `plan/**`. A `vX.Y`
+release branch with no run is the same stop; its `on.push.branches` lacks `"v[0-9]*"`. Report that
+line as the fix, never push `main` to get a run. A `plan/*` target with an open PR against the trunk
+gets runs from `pull_request` workflows, so a missing `plan/**` push trigger alone is not this stop.
 
 **Squash back when the branch's run is green** — procedure in `references/push-protocol.md`.
 
@@ -132,14 +134,14 @@ gh run list --commit <sha> --json databaseId,workflowName,event,status,conclusio
 Always key runs off the head SHA, never "latest run" — every push rotates the SHA, and older runs
 are stale. The `event` field distinguishes `push`- from `pull_request`-triggered runs.
 
-| Given (\$0 or context)       | Entry point                                            |
-| ---------------------------- | ------------------------------------------------------ |
-| PR number                    | `gh pr checks $0` / `gh pr view $0 --json headRefOid`  |
-| Run id                       | `gh run view $0`                                       |
-| Commit SHA                   | `gh run list --commit $0`                              |
-| Nothing, no PR (bare branch) | `gh run list --commit $(git rev-parse HEAD)`           |
-| A `plan/<slug>` branch, PR   | PR-number path: `gh pr view <branch> --json number`    |
-| A `plan/<slug>` branch, none | Bare-branch path: no PR exists; key off the branch tip |
+| Given (\$0 or context)                   | Entry point                                            |
+| ---------------------------------------- | ------------------------------------------------------ |
+| PR number                                | `gh pr checks $0` / `gh pr view $0 --json headRefOid`  |
+| Run id                                   | `gh run view $0`                                       |
+| Commit SHA                               | `gh run list --commit $0`                              |
+| Nothing, no PR (bare branch)             | `gh run list --commit $(git rev-parse HEAD)`           |
+| A `plan/<slug>` branch, open PR to trunk | PR-number path: `gh pr view <branch> --json number`    |
+| A `plan/<slug>` branch, no open PR       | Bare-branch path: no PR exists; key off the branch tip |
 
 Run still in progress → never analyze the previous run's failures as current. Wait:
 
@@ -153,12 +155,11 @@ nothing else. On completion, pass the green gate below — never read `/tmp/ci-w
 
 ## The green gate
 
-**Bright line: "green" names exactly one observation — `status: completed` and `conclusion: success`
-from `gh run view`, for a run whose `headSha` is the tip you pushed, with that output in your
-context.** Run it after every watch, on the fix branch's run and on the target tip's run. One
-exception: a target with an open pull request lands its squash through `ils push`, and that
-command's exit 0 output in your context is the target tip's green gate (see
-`references/push-protocol.md`).
+**Bright line: "green" names exactly one observation per gate: `status: completed` and `conclusion:
+success` from `gh run view` for a run whose `headSha` is the tip you pushed, or, for the target tip
+of a target with an open PR against the trunk, `ils push` exit 0 output — with that output in your
+context.** Run the gate after every watch, on the fix branch's run and on the target tip's run (see
+`references/push-protocol.md` for the `ils push` case).
 
 ```bash
 gh run view <run-id> --json headSha,status,conclusion
@@ -168,8 +169,8 @@ gh pr view <n> --json headRefOid --jq .headRefOid     # must equal headSha above
 Anything else — a watch exit code, a task notification, `gh pr checks` alone, "no failures in the
 log", the squash push succeeding — is a claim, not a verification. Any reply that says "green",
 "passing", or "fix complete" quotes the gate output that proves it: run id, headSha, conclusion.
-Without it, the truthful words are "run `<id>` pending". On the `ils push` row the quote is its exit
-0 output in place of a run id.
+Without it, the truthful words are "run `<id>` pending". When the target has an open PR against the
+trunk, the quote is `ils push`'s exit 0 output in place of the run id, headSha, and conclusion.
 
 ## Read only the failing logs
 
@@ -219,23 +220,23 @@ squash an unproven fix into the target.
 
 ## Rationalizations
 
-| Excuse                                             | Reality                                                                                                 |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| "Skip/xfail the flaky test, fix it later"          | That deletes the signal. Root-cause it or hand back.                                                    |
-| "`# type: ignore` unblocks the release"            | It suppresses every future error on that line. Fix or hand back.                                        |
-| "Rerun first — might be flaky"                     | Rerun before reading the log tells you nothing. Read first.                                             |
-| "Branching is overhead, I'll commit on main"       | Attempts on the original branch are permanent. Branch first.                                            |
-| "No CI on the branch — I'll just push to main"     | The target branch is never the test bed. Hard stop, report.                                             |
-| "Merge normally — squash loses the detail"         | The attempts are noise by design. Squash is the contract.                                               |
-| "I'll leave the marker, I might loop again later"  | A lingering marker disarms the guard repo-wide. Remove it now.                                          |
-| "The file isn't mine / pre-existing failure"       | It's a CI error; the request is fixing CI errors. No origin talk.                                       |
-| "I can analyze from main / read the diff remotely" | Reproduce means run the code. Switch to the target branch first.                                        |
-| "I'm still triaging, just checking one thing"      | Running a local command is reproduction, not triage. Checkout first.                                    |
-| "`gh pr checkout` failed, I'll work from main"     | Fix the checkout or use manual fetch+switch. Main is never the fallback.                                |
-| "Push #4 will surely be the one"                   | Three misses means the model of the bug is wrong. Hand back.                                            |
-| "The watch exited 0, so the run passed"            | That's `tee`'s exit, or a stale id. Green is `gh run view` output, or `ils push` exit 0 on a PR target. |
-| "Squashed and pushed — CI on the target is green"  | The new tip has no finished run yet. Watch it; that run is the exit gate.                               |
-| "User's waiting; it'll pass, report green now"     | Unverified green is a lie. Report "run `<id>` pending" or wait.                                         |
+| Excuse                                             | Reality                                                                                                                                 |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| "Skip/xfail the flaky test, fix it later"          | That deletes the signal. Root-cause it or hand back.                                                                                    |
+| "`# type: ignore` unblocks the release"            | It suppresses every future error on that line. Fix or hand back.                                                                        |
+| "Rerun first — might be flaky"                     | Rerun before reading the log tells you nothing. Read first.                                                                             |
+| "Branching is overhead, I'll commit on main"       | Attempts on the original branch are permanent. Branch first.                                                                            |
+| "No CI on the branch — I'll just push to main"     | The target branch is never the test bed. Hard stop, report.                                                                             |
+| "Merge normally — squash loses the detail"         | The attempts are noise by design. Squash is the contract.                                                                               |
+| "I'll leave the marker, I might loop again later"  | A lingering marker disarms the guard repo-wide. Remove it now.                                                                          |
+| "The file isn't mine / pre-existing failure"       | It's a CI error; the request is fixing CI errors. No origin talk.                                                                       |
+| "I can analyze from main / read the diff remotely" | Reproduce means run the code. Switch to the target branch first.                                                                        |
+| "I'm still triaging, just checking one thing"      | Running a local command is reproduction, not triage. Checkout first.                                                                    |
+| "`gh pr checkout` failed, I'll work from main"     | Fix the checkout or use manual fetch+switch. Main is never the fallback.                                                                |
+| "Push #4 will surely be the one"                   | Three misses means the model of the bug is wrong. Hand back.                                                                            |
+| "The watch exited 0, so the run passed"            | That's `tee`'s exit, or a stale id. Green is `gh run view` output, or `ils push` exit 0 for a target with an open PR against the trunk. |
+| "Squashed and pushed — CI on the target is green"  | The new tip has no finished run yet. Watch it; that run is the exit gate.                                                               |
+| "User's waiting; it'll pass, report green now"     | Unverified green is a lie. Report "run `<id>` pending" or wait.                                                                         |
 
 ## Red flags — STOP
 
@@ -247,13 +248,14 @@ squash an unproven fix into the target.
 - Editing code before reproducing the failure locally
 - About to commit a fix attempt on the target branch instead of `fix-ci/*`
 - About to merge the fix branch without `--squash`, or squash a branch whose run isn't green
-- Typing raw `git push` — the wrapper is the push path, and `ils push` only for the squash-back onto
-  a target with an open pull request — or `--force` in any form, `--amend`, or `--no-verify`
-  anywhere in this loop
-- Piping, `tee`ing, or backgrounding `ils push`, or running it on any target but one with an open
-  pull request
+- Typing raw `git push`: the wrapper is the push path, and `ils push` is the push path only for the
+  squash-back onto a target with an open PR against the trunk
+- `--force` in any form, `--amend`, or `--no-verify` anywhere in this loop
+- Piping, `tee`ing, or backgrounding `ils push`, or running it on any target but one with an open PR
+  against the trunk
 - About to edit permission settings because a push was denied — never; surface it instead
 - The marker file still exists and you're about to report results
-- About to write "green" or "fix complete" without `gh run view … conclusion` output in context
+- About to write "green" or "fix complete" without `gh run view … conclusion` output in context, or,
+  for the target tip of a target with an open PR against the trunk, without `ils push` exit 0 output
 - About to report after the squash push without a run id for the new target tip, or, on a target
-  with an open pull request, without `ils push`'s exit 0 output
+  with an open PR against the trunk, without `ils push`'s exit 0 output
