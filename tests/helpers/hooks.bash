@@ -10,6 +10,7 @@ readonly GIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-guard.sh"
 readonly GIT_LOCK_GUARD_HOOK="$PROJECT_DIR/hooks/git-lock-guard.sh"
 readonly GIT_COMMIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-commit-guard.sh"
 readonly TDD_RED_GUARD_HOOK="$PROJECT_DIR/hooks/tdd-red-guard.sh"
+readonly BASH_EXIT_GUARD_HOOK="$PROJECT_DIR/hooks/bash-exit-guard.sh"
 readonly FIX_CI_PUSH_WRAPPER="$PROJECT_DIR/scripts/fix-ci-push.sh"
 # shellcheck disable=SC2034 # consumed by test_plan_branch.bats, which loads this file
 readonly PLAN_BRANCH_SCRIPT="$PROJECT_DIR/scripts/plan-branch.sh"
@@ -136,6 +137,26 @@ run_tdd_guard_read() {
 # Path of the per-instance RED-phase marker the hook gates on, for the repo at $1.
 tdd_marker_path() {
 	printf '%s/tdd-red-phase.%s' "$(git -C "$1" rev-parse --absolute-git-dir)" "$TDD_AGENT_ID"
+}
+
+# PostToolUse payload for the bash-exit-guard hook: command $1 that exited $2,
+# reported by tool $3 (default Bash).
+exit_hook_input() {
+	jq -n --arg cmd "$1" --argjson code "$2" --arg tool "${3:-Bash}" \
+		'{"tool_name":$tool,"tool_input":{"command":$cmd},"tool_response":{"exit_code":$code}}'
+}
+
+# One-command wrapper so run_capture can run the exit_hook_input | hook pipeline;
+# args are exit_hook_input's.
+pipe_exit_guard() {
+	exit_hook_input "$@" | bash "$BASH_EXIT_GUARD_HOOK"
+}
+
+# Run bash-exit-guard on command $1 that exited $2, reported by tool $3
+# (default Bash); sets RUN_EXIT, RUN_STDOUT, RUN_STDERR. The hook writes its
+# block JSON on stdout, so RUN_STDOUT carries the verdict.
+run_exit_guard() {
+	run_capture "$PWD" pipe_exit_guard "$@"
 }
 
 # ── Guard assertions ─────────────────────────────────────────────────────────

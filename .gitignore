@@ -36,6 +36,10 @@ skills/statistical-analysis/
 skills/humanizer/
 skills/fallow/
 
+# Symlinked from a local clone of its own repository (no trailing slash: a
+# directory pattern does not match a symlink)
+skills/ils
+
 # Claude Code runtime state for synced and deleted skills
 skills/.trash/
 skills/synced/

@@ -7,14 +7,16 @@
 **Surface every issue — never skip silently.** When you find and verify a bug, smell, or
 inconsistency: stop, describe it, and ask once — one `Apply all N?` for the whole list, never a
 per-item fix/defer/skip menu (`rules/no-unrequested-edits.md`). Non-zero exit codes are errors — fix
-or surface before anything else; never switch files or approaches to avoid one. Never attribute
-origin ("pre-existing", "not from this PR") — just diagnose and offer to fix. Never run a baseline
-to establish origin: do not create worktrees, stash changes, or run any command whose sole purpose
-is to prove a failure existed before your edits. Surface as a one-line finding — never escalate an
-out-of-scope issue into a decision point or plan (`rules/decision-policy.md`). During unattended
-plan execution (`<git-dir>/execute-plan-unattended` holds this session's id, or the request named
-tasks of a plan file to implement), "stop" means append to the plan's Findings list and continue —
-the findings lead the final report.
+or surface before anything else; never switch files or approaches to avoid one. One exception: `ils`
+exits 4 (pending: run `ils push` again) and 5 (delivered, not green: follow the last `Next:` line)
+are verdicts, handled per the `ils` skill. Every other non-zero `ils` exit is an error under this
+rule. Never attribute origin ("pre-existing", "not from this PR") — just diagnose and offer to fix.
+Never run a baseline to establish origin: do not create worktrees, stash changes, or run any command
+whose sole purpose is to prove a failure existed before your edits. Surface as a one-line finding —
+never escalate an out-of-scope issue into a decision point or plan (`rules/decision-policy.md`).
+During unattended plan execution (`<git-dir>/execute-plan-unattended` holds this session's id, or
+the request named tasks of a plan file to implement), "stop" means append to the plan's Findings
+list and continue — the findings lead the final report.
 
 **An issue is a verified finding.** It exists only once you read the mechanism yourself (`file:line`
 in context), the settling command's output is in context, or `claim-reviewer` returned
@@ -101,6 +103,10 @@ grep -E "..." /tmp/out.txt
 
 Re-running a command solely to change the filter is always wrong: it wastes time, doubles side
 effects.
+
+**`ils` runs bare:** never piped, `tee`d, backgrounded, or behind `cd`, because a pipe hides the
+exit code that carries the verdict. Running `ils push` again on exit 4 is not a re-run to filter
+output: it asks GitHub for a verdict the first run did not get.
 
 **Background commands:** the completion notification carries only the exit code — the output is not
 in context. Always `tee` to a file when running a command in the background, then `Read` the file on
