@@ -2,7 +2,8 @@
 
 How work moves from an approved plan to a tag on `main`, which command does each git write, and what
 stops the assistant from doing any of it by hand. The assistant plans and implements; you run the
-four `/release` commands. When a plan is cut from `main`, you also merge its pull request by hand.
+four `/release` commands. When a plan is cut from `main`, you also merge its pull request with `ils
+merge`.
 
 **What this doc covers:** [the branches](#the-branches), [starting a release](#starting-a-release),
 [the loop](#the-loop), [one plan, one commit](#one-plan-one-commit),
@@ -16,19 +17,19 @@ This doc covers only where each one writes to git.
 
 ## The branches
 
-| Branch          | Who creates it         | What lands on it                                                                                                |
-| --------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `main`          | —                      | Release branches, fast-forwarded by `/release finish`; pull requests from plans cut from `main`, merged by hand |
-| `vX.Y`          | `/release start X.Y.Z` | One squash commit per plan, then the release commit and tag                                                     |
-| `plan/<slug>`   | `/execute-plan`        | One commit per task, findings fixes, CI fixes                                                                   |
-| `fix-ci/<slug>` | `/fix-ci`              | Attempts to make a red run green, squashed back when it is                                                      |
+| Branch          | Who creates it         | What lands on it                                                                                                         |
+| --------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `main`          | —                      | Release branches, fast-forwarded by `/release finish`; pull requests from plans cut from `main`, merged with `ils merge` |
+| `vX.Y`          | `/release start X.Y.Z` | One squash commit per plan, then the release commit and tag                                                              |
+| `plan/<slug>`   | `/execute-plan`        | One commit per task, findings fixes, CI fixes                                                                            |
+| `fix-ci/<slug>` | `/fix-ci`              | Attempts to make a red run green, squashed back when it is                                                               |
 
 The script finds a release branch by its config key, `branch.vX.Y.release = X.Y.Z`, never by its
 name. A plan branch records the branch it was cut from as `branch.plan/<slug>.planBase`; that is
 where it lands. A plan cut from a release or feature branch lands there through `/release merge`. A
 plan cut from `main` (origin's default branch) lands as a pull request instead: `/execute-plan`
-ships it through `ils push`, and you merge it by hand with `gh pr merge`. That path needs the
-[`ils`](https://github.com/jeffzi/ils) binary 0.1.x on your `PATH`, and the `ils` skill linked at
+ships it through `ils push`, and you merge it with `ils merge`. That path needs the
+[`ils`](https://github.com/jeffzi/ils) binary 0.2.x on your `PATH`, and the `ils` skill linked at
 `~/.claude/skills/ils` (a symlink into a clone of the ils repository; see `.gitignore`). This
 repository installs neither.
 
@@ -74,8 +75,8 @@ the plan branch when its verification passes. How the branch ships depends on it
 
 - **Cut from `main`.** `/execute-plan` runs `ils push`, which pushes the branch, opens its pull
   request against `main`, and waits for its checks. On green it writes the pull request's title and
-  body, which become the squash commit, and reports the `gh pr merge` command `ils` printed. You
-  merge by hand; `/execute-plan` never merges.
+  body, which become the squash commit, and reports `ils merge` as the step left for you. You run
+  it, or ask the assistant to; `/execute-plan` never merges on its own.
 - **Cut from a release or feature branch.** `/execute-plan` pushes the branch once through
   [`fix-ci-push.sh`](../scripts/fix-ci-push.sh) and watches the branch's CI run. It then writes the
   squash message under `.git/plan-squash/` and reports the one command left for you: `/release

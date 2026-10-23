@@ -130,3 +130,53 @@ write_planning_msg_file() {
 	assert_blocked
 	assert_guard_output_includes "internal .planning/ path"
 }
+
+# ── Pull request title and body (gh pr create/edit) ──────────────────────────
+
+@test "pull request: a phase ID in the title, body, or a heredoc of gh pr create or edit is blocked" {
+	# shellcheck disable=SC2016 # the literal $(...) is the command text under test
+	each_blocked "internal phase ID" \
+		'gh pr create --title "feat(05-01): add layout" --body "Adds the layout."' \
+		'gh pr create -t "feat(05-01): add layout" -b "Adds the layout."' \
+		'gh pr create --title "Add layout" --body "Follows feat(05-01): add layout."' \
+		'gh pr edit 12 --title "feat(05-01): add layout"' \
+		'gh pr edit 12 -b "Follows feat(05-01): add layout."' \
+		"$(printf 'gh pr create --title "Add layout" --body-file - <<EOF\nfeat(05-01): add layout\n\nBody text\nEOF')" \
+		"$(printf 'gh pr edit 12 --body "$(cat <<EOF\nfeat(05-01): add layout\nEOF\n)"')"
+}
+
+@test "pull request: every body-file spelling reads the file and blocks on its .planning/ reference" {
+	local msg
+	msg=$(write_planning_msg_file)
+
+	each_blocked "internal .planning/ path" \
+		"gh pr create --title \"Add layout\" -F $msg" \
+		"gh pr create --title \"Add layout\" --body-file $msg" \
+		"gh pr create --title \"Add layout\" --body-file=$msg" \
+		"gh pr edit 12 -F \"$msg\"" \
+		"gh pr edit 12 --body-file='$msg'" \
+		"gh pr edit 12 --body-file=\"$msg\""
+}
+
+@test "pull request: a clean, missing, or stdin body file is allowed" {
+	local clean="$BATS_TEST_TMPDIR/clean.txt"
+	printf 'Adds the login flow.\n\nSupports the password grant.\n' >"$clean"
+
+	each_allowed \
+		"gh pr create --title \"feat(auth): add login flow\" --body-file $clean" \
+		"gh pr edit 12 -F $BATS_TEST_TMPDIR/absent.txt" \
+		'gh pr create --title "feat(auth): add login flow" -F -'
+}
+
+@test "pull request: a clean gh pr create or edit is allowed" {
+	each_allowed \
+		'gh pr create --title "feat(auth): add login flow" --body "Supports the password grant."' \
+		'gh pr edit 12 -t "fix(net/http): handle redirects" -b "Follows redirects."'
+}
+
+@test "pull request: other gh commands carrying a pattern are allowed" {
+	each_allowed \
+		'gh pr view 12 --json title --jq ".title == \"feat(05-01): add layout\""' \
+		'gh issue create --title "feat(05-01): add layout" --body "Tracks the layout."' \
+		'gh pr comment 12 --body "See .planning/notes.md"'
+}

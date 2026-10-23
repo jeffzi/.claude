@@ -185,10 +185,10 @@ See the [Process](#process) skills table for additional workflows (`/harden`, `/
 One plan is one commit on the branch it started from, `main` by default. The assistant never commits
 on that base; every plan runs on its own branch and lands as a single squash. How it lands depends
 on that base. A plan cut from `main` (origin's default branch) ships as a pull request through `ils
-push` and you merge it by hand with `gh pr merge`. A plan cut from a release or feature branch lands
-through `/release merge`.
+push` and you merge it with `ils merge`. A plan cut from a release or feature branch lands through
+`/release merge`.
 
-Requirement: plans cut from `main` need [`ils`](https://github.com/jeffzi/ils) 0.1.x on your `PATH`
+Requirement: plans cut from `main` need [`ils`](https://github.com/jeffzi/ils) 0.2.x on your `PATH`
 and its skill installed; this repository does not install it.
 
 A release groups several plans: `/release start X.Y.Z` cuts `vX.Y` from `main`, plans land on it,
@@ -206,9 +206,9 @@ fold back into the commits they correct.
    `/fix-ci` on red), and writes the squash commit message. Its report ends with the one command
    left for you.
 3. Optionally, `/preflight` on the branch.
-4. Cut from `main`: merge the pull request by hand with the `gh pr merge` command the report names.
-   Cut from a release or feature branch: `/release merge` folds the branch's `fixup!` commits into
-   the release commits they name. It squashes the rest onto the base with that message, pushes, and
+4. Cut from `main`: merge the pull request with `ils merge`, or ask the assistant to run it. Cut
+   from a release or feature branch: `/release merge` folds the branch's `fixup!` commits into the
+   release commits they name. It squashes the rest onto the base with that message, pushes, and
    deletes the branch.
 5. `/release finish` runs the release commit and tag, pushes, watches CI, fast-forwards `main`, and
    deletes the release branch. `/release status` shows where the release stands at any point.

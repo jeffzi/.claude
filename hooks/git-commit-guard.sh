@@ -3,13 +3,23 @@ set -euo pipefail
 
 # git-commit-guard.sh — PreToolUse hook: blocks git commit messages that
 # contain internal tooling references (plan IDs, TDD process labels, internal paths).
+# The title and body of `gh pr create` and `gh pr edit` get the same scan: a
+# squash merge turns them into the commit message.
 
 command -v jq >/dev/null || exit 0
 
 input=$(cat)
 cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
 [[ -n "$cmd" ]] || exit 0
-[[ "$cmd" =~ git[[:space:]].*commit ]] || exit 0
+
+# Each command reads its message from a file under its own flags.
+if [[ "$cmd" =~ git[[:space:]].*commit ]]; then
+	message_file_flags='-F|--file'
+elif [[ "$cmd" =~ gh[[:space:]]+pr[[:space:]]+(create|edit)([[:space:]]|$) ]]; then
+	message_file_flags='-F|--body-file'
+else
+	exit 0
+fi
 
 # Each check pairs a grep invocation (flags + pattern) with its block reason.
 check_flags=(-qE -qE -qiE -qE -qE)
@@ -40,12 +50,13 @@ scan_text() {
 	return 0
 }
 
-# Print the path given to -F/--file/--file= in $1; nothing when the flag is absent.
-# The path may be quoted in the command text; the quotes are shell syntax, not
-# part of the path, so a quoted span is matched whole and unwrapped.
+# Print the path given in $1 to one of the flags in alternation $2, spelled
+# `<flag> <path>` or `<flag>=<path>`; nothing when no flag is present. The path
+# may be quoted in the command text; the quotes are shell syntax, not part of
+# the path, so a quoted span is matched whole and unwrapped.
 message_file_path() {
-	local text="$1" path
-	local flag_re="(^|[[:space:]])(-F|--file)([[:space:]]+|=)(\"[^\"]*\"|'[^']*'|[^[:space:]]+)"
+	local text="$1" flags="$2" path
+	local flag_re="(^|[[:space:]])($flags)([[:space:]]+|=)(\"[^\"]*\"|'[^']*'|[^[:space:]]+)"
 	[[ "$text" =~ $flag_re ]] || return 0
 	path="${BASH_REMATCH[4]}"
 	if [[ "$path" == '"'*'"' || "$path" == "'"*"'" ]]; then
@@ -57,10 +68,10 @@ message_file_path() {
 # Do not extract only -m "...": heredoc and -F commits would be missed.
 reason=$(scan_text "$cmd")
 
-# A -F/--file commit keeps the message out of the command text, so scan the file
+# A message file keeps the message out of the command text, so scan the file
 # too. "-" is stdin, already covered by the command-text scan of the heredoc.
 if [[ -z "$reason" ]]; then
-	message_file=$(message_file_path "$cmd")
+	message_file=$(message_file_path "$cmd" "$message_file_flags")
 	if [[ -n "$message_file" && "$message_file" != "-" && -f "$message_file" && -r "$message_file" ]]; then
 		reason=$(scan_text "$(cat -- "$message_file")")
 	fi
