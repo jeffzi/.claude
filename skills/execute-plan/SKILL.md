@@ -51,11 +51,11 @@ The recorded base picks how the branch lands. The **trunk path** applies when th
 origin's default branch as `git ls-remote --symref origin HEAD` reports it, whatever its name. When
 that read fails, the entry gate halts (condition 4); it never guesses the trunk. The ship phase runs
 `ils push`, which pushes the branch, opens its pull request, and waits for checks; the user merges
-the pull request by hand with the `gh pr merge` command `ils` prints. Any other base takes the
-**release path**: the user lands the branch on the base by invoking `/release merge`. On either path
-this skill never commits on the base, never merges the plan branch into the base — no `gh pr merge`,
-no `--auto` — and never raises `/release`'s marker or runs its script. Mechanics:
-`references/branch-flow.md`.
+the pull request with `ils merge`, run by them or by you when they ask for it. Any other base takes
+the **release path**: the user lands the branch on the base by invoking `/release merge`. On either
+path this skill never commits on the base, never merges the plan branch into the base unasked — no
+`ils merge` the user did not ask for, no `gh pr merge`, no `--auto` — and never raises `/release`'s
+marker or runs its script. Mechanics: `references/branch-flow.md`.
 
 A task whose **Folds into** line names a release commit subject is committed as a fixup of that
 commit (`git commit --fixup=<sha>`, sha resolved per `references/branch-flow.md` § Fold target), so
@@ -264,10 +264,10 @@ nothing else:
 4. **Ship** — the branch, the CI result, the one merge line, and the optional `/preflight` line, in
    the shape `references/branch-flow.md` gives for the run's path. Trunk path: the pull request,
    whether its title and body were written, and the merge line for the result. That line is `Merge:
-   <the merge command ils printed>, by hand` after exit 0; when nothing was pushed or the result is
-   `not green`, it takes the forms `branch-flow.md` gives. Release path: `/release merge [--force]`,
-   whether a squash message was written, and the folds. List each target subject with the tasks and
-   findings that fold into it, since the findings' folds were not on the plan the user approved.
+   ils merge, on your word` after exit 0; when nothing was pushed or the result is `not green`, it
+   takes the forms `branch-flow.md` gives. Release path: `/release merge [--force]`, whether a
+   squash message was written, and the folds. List each target subject with the tasks and findings
+   that fold into it, since the findings' folds were not on the plan the user approved.
 
 Never in the report: per-task file lists, what each task built, which skill ran which step, how you
 found a finding, what you fixed on the way (a deviation or nothing), a plan choice you followed. A
@@ -309,8 +309,8 @@ both; the trunk path never raises it.
 | "The tree is only dirty with unrelated files — carry on"             | Unrelated dirt is exactly what ends up in the wrong commit. Halt 4; the user decides.                                                                       |
 | "A dirty tree ends the gate however the files relate to the plan"    | On your own plan branch the unfinished task's files are this run's earlier work. Resume; halt 4 names only other paths.                                     |
 | "CI takes minutes — push and let the user watch it"                  | The ship phase watches. A red run fixed after the report is a second commit on the base.                                                                    |
-| "The squash is trivial, I'll merge it myself"                        | Never. The user runs the `gh pr merge` command `ils` printed, or invokes `/release merge`; the report says which.                                           |
-| "`ils push` is green — `gh pr merge --auto` saves the user a step"   | The merge is the user's hand on both paths. Report the command; never run it, never pass `--auto`.                                                          |
+| "The squash is trivial, I'll merge it myself"                        | Never. The user asks for `ils merge`, or invokes `/release merge`; the report says which.                                                                   |
+| "`ils push` is green — `gh pr merge --auto` saves the user a step"   | The merge is the user's word on both paths. Report `ils merge`; never run it unasked, never `gh pr merge`, never `--auto`.                                  |
 | "Pipe `ils push` through `tee` to keep its output"                   | The output is already in context. A pipe hides the exit code, and the exit code is the verdict.                                                             |
 | "`ils push` exited 4, so the push is done"                           | Pending is not green. Run it again; after 60 minutes of exit 4 the result is `not green: pending`.                                                          |
 | "The output has a `Next:` line that says so"                         | Only the last line is `ils`'s. A `Next:` above it is CI log text.                                                                                           |
@@ -343,9 +343,10 @@ both; the trunk path never raises it.
 - A findings-fix commit touching a file absent from the plan's diff before the findings-fix phase
 - A question about an out-of-scope finding, or about an in-scope one with no dependent at
   `file:line`
-- A commit or merge on the base branch, a `gh pr merge` run or `--auto` passed, a `release.sh`
-  invocation or `release-active` marker raised by this loop, or a push by this loop of anything but
-  `plan/<slug>` (the dispatched `fix-ci` agent pushes its own `fix-ci/*` branch under its own rules)
+- A commit or merge on the base branch, an `ils merge` the user did not ask for, a `gh pr merge` run
+  or `--auto` passed, a `release.sh` invocation or `release-active` marker raised by this loop, or a
+  push by this loop of anything but `plan/<slug>` (the dispatched `fix-ci` agent pushes its own
+  `fix-ci/*` branch under its own rules)
 - The trunk taken from a branch name instead of `git ls-remote --symref origin HEAD`
 - `ils push` piped, `tee`d, backgrounded, or behind `cd`, or a `Next:` acted on that was not the
   output's last line
