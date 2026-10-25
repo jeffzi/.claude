@@ -118,21 +118,27 @@ dispatch in this sequence):
       uncommitted work out of the count)
   11. If < 50 insertions: log "REFACTOR skipped: <N> lines", go to COMMIT
   12. If >= 50 insertions:
-      a. Split changed files into implementation files and test files; dispatch
-         code-distiller on each set, in one parallel message
-      b. After both return: dispatch subagent_type: vet-comments once over ALL
+      a. Dispatch ONE code-distiller over ALL_CHANGED_FILES, implementation and
+         test files together (distill-code keeps every assertion verbatim, so
+         one pass cannot bend a test to fit its implementation)
+      b. After it returns: dispatch subagent_type: vet-comments once over ALL
          changed files (distillation rewrites the code its comments describe);
          it is read-only and returns ### Finding N blocks
       c. Triage the findings -- no skill loads, no file reads:
          confirmed -> fix queue; suspected or unconfirmed -> OPEN_ITEMS (surfaced
          at the SURFACE gate below, never silently dropped)
       d. Fix queue non-empty -> group findings into transitive file groups
-         (findings sharing any target file share a group); dispatch one
-         code-mender per group in a single parallel message, passing per finding:
-           Issue: <description>
-           Location: <file:line>
-           Severity: <high if the Impact tag ranks in the lens's top two, else medium>
-           Suggested fix: <reasoning from the finding>
+         (findings sharing any target file share a group):
+         - One group -> load Skill(code-core) and apply the fixes yourself, one
+           finding at a time. Context isolation ended with the last cycle; a
+           comment fix is a local edit, and a code-mender would re-read the
+           same file from a brief.
+         - Several groups -> one code-mender per group in a single parallel
+           message, passing per finding:
+             Issue: <description>
+             Location: <file:line>
+             Severity: <high if the Impact tag ranks in the lens's top two, else medium>
+             Suggested fix: <reasoning from the finding>
       e. Any edits applied -> re-run FULL_SUITE_COMMAND; when an enclosing workflow
          defines a per-task gate (e.g. a hardening round's gate block), run that gate
          instead -- it subsumes the suite re-run, and every commit must sit behind

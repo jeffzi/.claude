@@ -43,14 +43,14 @@ tested there.
 | "write-commit handles approval, so the TDD gate is redundant"  | The TDD gate is the orchestrator's own rule. Loading write-commit does not replace it.                                                                                                                                                                                                                         |
 | "Plan task → proceed, so I commit and list the findings after" | The grant covers verified work, not unseen findings. SURFACE gate first: findings, end turn, then commit. Only an unattended enclosing workflow (its marker holds this session's id, or the request named the plan's tasks) lifts this — then findings go to the list the caller named and the loop continues. |
 
-| Red flag — STOP, delete the code, start over with TDD                          |
-| ------------------------------------------------------------------------------ |
-| Code before test / test passes immediately / can't explain why the test failed |
-| Dispatching `tdd-cycle` without invoking `/tdd` first                          |
-| Agent loop: orchestrator reading implementation source or writing test code    |
-| Dispatching agents without a plan for multi-behavior tasks                     |
-| Dispatching agents from plan mode instead of writing plan tasks                |
-| Plan contains implementation details or inline RED/GREEN test/impl code        |
+| Red flag — STOP, delete the code, start over with TDD                                        |
+| -------------------------------------------------------------------------------------------- |
+| Code before test / test passes immediately / can't explain why the test failed               |
+| Dispatching `tdd-cycle` without invoking `/tdd` first                                        |
+| Agent loop, before REFACTOR: orchestrator reading implementation source or writing test code |
+| Dispatching agents without a plan for multi-behavior tasks                                   |
+| Dispatching agents from plan mode instead of writing plan tasks                              |
+| Plan contains implementation details or inline RED/GREEN test/impl code                      |
 
 ## Choose the Path
 
@@ -80,10 +80,10 @@ Loop govern that path alone.
 Context isolation prevents the LLM from designing tests around planned implementation. It applies to
 the agent loop; the other paths in Choose the Path have no orchestrator.
 
-| Phase     | Agent                                       | Can see (Phase 1 / Phase 2)                      | Cannot see/modify                          |
-| --------- | ------------------------------------------- | ------------------------------------------------ | ------------------------------------------ |
-| RED-GREEN | `tdd-cycle`                                 | Phase 1: tests, stubs, public API / Phase 2: all | Phase 1: impl source / Phase 2: test files |
-| REFACTOR  | code-distiller → vet-comments → code-mender | Everything                                       | N/A                                        |
+| Phase     | Agent                                 | Can see (Phase 1 / Phase 2)                      | Cannot see/modify                          |
+| --------- | ------------------------------------- | ------------------------------------------------ | ------------------------------------------ |
+| RED-GREEN | `tdd-cycle`                           | Phase 1: tests, stubs, public API / Phase 2: all | Phase 1: impl source / Phase 2: test files |
+| REFACTOR  | code-distiller → vet-comments → fixes | Everything                                       | N/A                                        |
 
 **NEVER dispatch `tdd-cycle` directly** — this skill is the orchestrator.
 
@@ -98,9 +98,9 @@ or check between the task's behavior list and the Agent call: no Read, no Bash, 
 | "A green baseline confirms the suite works first" | tdd-cycle resolves and runs the commands in RED. Your first run is Verify GREEN. |
 | "I said I'd dispatch — these reads are just prep" | The announcement is not the dispatch. Any prep before the Agent call is drift.   |
 
-**The orchestrator routes; it never reads target files.** Prompts carry behavior descriptions and
-file paths; `tdd-cycle` loads the test/code hubs and resolves TEST_COMMAND and FULL_SUITE_COMMAND in
-RED; the orchestrator loads no testing or coding skills.
+**Until REFACTOR, the orchestrator routes; it never reads target files.** Prompts carry behavior
+descriptions and file paths; `tdd-cycle` loads the test/code hubs and resolves TEST_COMMAND and
+FULL_SUITE_COMMAND in RED; the orchestrator loads no testing or coding skills.
 
 ## Batching
 
