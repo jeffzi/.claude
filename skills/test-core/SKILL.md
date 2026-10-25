@@ -90,15 +90,68 @@ dependency's own rendering, parsing, environment handling, or error handling, th
 dependency. Don't write it; when you find one, delete it. That the test fails once the call is
 removed changes nothing — it fails because someone else's output changed.
 
-A choice the project makes _through_ a dependency is project behavior and stays pinned: the argument
-list it builds, the field tags it declares, the entries it turns on or off, a guarantee it documents
-("never through a shell"). Assert it in the project's own terms — the argv sent, the value decoded,
-the commands listed. An assertion that can only be written in the dependency's encoding (escape
-codes, padding, column layout) has nothing of the project's to pin.
+The project's own other packages count as dependencies here. When a caller's test asserts how a
+package it calls renders, parses, or styles, it re-checks the called package, whose own tests own
+that behavior. The caller pins only what it chose: the marker, argument, or wording it passed in.
+
+A choice the project makes _through_ a dependency is project behavior and stays pinned when the
+project computes it (§ 4a): the argument list it builds from inputs, the field tags it declares, the
+entries it turns on or off, a guarantee it documents ("never through a shell"). Assert it in the
+project's own terms — the argv sent, the value decoded, the commands listed. An assertion that can
+only be written in the dependency's encoding (escape codes, padding, column layout) has nothing of
+the project's to pin.
 
 When the only failing test available for a change asserts a dependency's output — one option handed
 to a library — write no test: say why none covers the change and ask for the exception to the
 test-first rule. Never manufacture a test of the dependency to put a red-green in the diff.
+
+**Name the regression.** For every assertion, name an edit someone could make by accident (§ 4a) to
+a line of logic this project wrote that fails it while every earlier or cheaper check still passes.
+No such edit → delete the assertion. The usual cases with none: it is implied by sibling assertions
+on the same Act; it re-checks a called package's behavior; it repeats a pin another test already
+makes on the same path. Two things look redundant and are not:
+
+- **A choice no other assertion can see.** Before calling a choice "already pinned", name the
+  assertion that fails when the choice changes. A count marked as a tally and the same count printed
+  bare produce identical plain text — only the styled check pins the marker.
+- **A precondition.** An assertion that proves the code under test ran, so a later assertion cannot
+  pass vacuously, stays — even when another test checks the same fact.
+
+### 4a. What Deserves a Test
+
+A test is warranted only when you can name **an edit someone could make by accident** — while
+changing something else — to a line of logic this project wrote, and the test fails on it. Logic
+means something computed: an expression, a condition, a loop, cleanup, parsing, a value derived from
+inputs. Naming a mutant is not enough: the edit must be one a person makes without meaning to.
+
+No test, by rule — no user grant needed:
+
+- **Fixed configuration**: a value, reference, or omitted block that changes only when someone edits
+  that line — a hard-coded attribute, a lifetime, a flag, a resource reference, a block left out on
+  purpose, an argv entry written out in a Taskfile or hook config, a `desc:` string, a dependency
+  list. The test for it: would the test fail only if someone edits the value the test itself copies?
+  Then changing it is deliberate, and review guards it. This holds even when a stated outcome or
+  guarantee depends on the value: a note that the outcome "no longer holds" or "would pass every
+  test" without it describes a deliberate edit to that line, not an accident.
+- **A message's fixed wording.** Assert the parts of a message the code computes — the name, value,
+  path, or count it inserts — and that the right failure surfaced (error type, exit code, stream).
+  Never pin the fixed text around them word for word: rewording is a deliberate edit. This holds
+  when the repo builds the expected text from a shared constant or helper too: assert `suggestion in
+  hint`, never `hint == f"did you mean {suggestion}? {HINT}"`.
+- **Dependency behavior.** Terraform failing an apply when a provisioner fails, Task stopping at a
+  failing command, a library's parsing or errors, a linter's exit code.
+- **Prose.** Markdown, SKILL.md, README text. Verify by reading that the paths it names exist.
+- **A shared helper's behavior through a caller.** The helper's own tests own it; a caller's tests
+  never repeat a missing setting, a client that cannot be built, or hidden terminal input.
+- **A fake's or stub's own output.** A check command (a tool whose job is to test something else)
+  gets one smoke test against a well-behaved fake, not a case per failure it reports. A new failure
+  it detects adds no test case. A per-failure table already in its test file is debt, not a project
+  convention (§ 7 covers written rules, not existing tests): never add a row to it.
+
+Still tested: argv or values the project _computes_ from inputs, conditions, cleanup and restore
+paths, every branch of project logic. "It is passed to a dependency" never exempts a computed value,
+and "it is fixed configuration" never exempts a value the project's logic branches on (a validation
+regex is tested through what it rejects, never through its text).
 
 ### 5. Minimum Tests, Maximum Coverage
 
@@ -107,6 +160,12 @@ test-first rule. Never manufacture a test of the dependency to put a red-green i
 | Same code path, different inputs    | Different code paths  |
 | Related edge cases (None, empty, 0) | Complex setup differs |
 | Same behavior across APIs           | Tests need isolation  |
+
+**A case earns its row.** Each test or parametrized case must take a different branch, cross a
+different boundary, or exercise a different rule than its siblings. Inputs that differ only in value
+— another invalid character, the same character at another position, another casing, another sample
+of the same class — take the same path: keep one. Count the classes first, then write one case per
+class.
 
 Test trivial behavior only to traverse a code path — **once** across the entire suite: one
 parametrized test per call shape (or one test with grouped asserts per subject), never one test
@@ -144,7 +203,9 @@ test.
 
 | Excuse                                   | Reality                                                         |
 | ---------------------------------------- | --------------------------------------------------------------- |
-| "Too simple to test"                     | Simple code breaks. Test takes 30 seconds.                      |
+| "I can name a mutant, so test it"        | Only an accidental edit to logic counts. See § 4a.              |
+| "A reviewer said no test pins it"        | § 4a decides, not the reviewer. Fixed config stays untested.    |
+| "A stated outcome depends on this value" | Still fixed configuration: only a deliberate edit changes it.   |
 | "Tests look reasonable"                  | "Reasonable" skips pairwise comparison. Apply the merge table.  |
 | "AAA is implied"                         | Implicit ≠ verified. Check phase separation per test.           |
 | "AAA comments help readability"          | A blank line separates phases; the label restates the obvious.  |
@@ -157,6 +218,9 @@ test.
 | "Remove our call and the test fails"     | It fails on the library's output. Name the line that decides.   |
 | "Test-first needs a red; one is at hand" | A red on someone else's code proves nothing. Ask the exception. |
 | "It asserts the command's real output"   | Output the project does not compute is not its behavior.        |
+| "The plain text already pins the marker" | Name the assertion that fails if the marker changes.            |
+| "It's only a sanity check before assert" | A precondition that stops a vacuous pass stays. Keep it.        |
+| "Users see this styling in our output"   | The styling package owns that test. Pin only your marker.       |
 | "Loop is cleaner than parametrize"       | Parametrize shows all cases; loop stops at first failure.       |
 | "I scanned the file and found no issues" | Scanning ≠ rule-by-rule. Walk the checklist rule-by-rule.       |
 
@@ -176,3 +240,6 @@ STOP and re-check if:
 - A test has `// Arrange`, `// Act`, or `// Assert` phase-label comments
 - The only project line a test depends on is a call into a library, and the assertion is written in
   the library's encoding — escape codes, layout, its reading of the environment
+- You cannot name an edit to project code that fails an assertion while every earlier or cheaper
+  check still passes
+- A caller's test asserts how another package of the project renders, parses, or styles

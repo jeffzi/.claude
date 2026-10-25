@@ -66,6 +66,9 @@ LOOP (one wave per iteration; a wave = one or more independent behavior groups):
        (while tdd-cycle-active exists, a hook blocks all git add/commit -- including
        yours; the tdd-red-phase.<agent_id> files are per-agent read guards)
     3. Handle non-PASSED statuses, per agent:
+       - NO_TEST_WARRANTED -> the behavior is exempt per test-core § 4a; apply the
+         change directly (no RED), verify it by running the tool once, and record
+         `no test: <REASON>` -- never ask, never manufacture a test.
        - PASSED_UNEXPECTEDLY -> behavior already exists; report to user;
          ask: skip (next behavior) or revise test scope? Under an unattended
          enclosing workflow (see SURFACE for what counts): record it on

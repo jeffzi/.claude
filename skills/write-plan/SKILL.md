@@ -70,9 +70,11 @@ Good task: "Implement email validation: reject empty, malformed, and duplicate e
 Bad task:  "Step 1: Write failing test for empty email. Step 2: Run test. Step 3: Implement…"
 ```
 
-Word behaviors per `references/behavior-wording.md`: observable outcomes, never mechanisms;
-flag-gated → both branches with coverage each; drop mechanism, never outcome. Done when every spec
-requirement sits in exactly one task's **Behaviors** list.
+A behavior `test-core` § 4a exempts (fixed configuration, prose, dependency behavior) carries `Test:
+none — <rule>`. A behavior a shared helper owns is not listed; a Notes line names the helper and its
+test file. Word behaviors per `references/behavior-wording.md`: observable outcomes, never
+mechanisms; flag-gated → both branches with coverage each; drop mechanism, never outcome. Done when
+every spec requirement sits in exactly one task's **Behaviors** list.
 
 ## Plan Header
 
@@ -130,8 +132,9 @@ or the single line `No folds: every task is new work`.]
 
 **Verify:** After implementation is complete and before committing, dispatch a `claim-reviewer`
 agent with this task's behavioral claims, each worded as the outcome plus the test that pins it:
-`<outcome>; a test in <test file> fails if it regresses`. Close every gap the reviewer names per
-`execute-plan` step 2 before committing.
+`<outcome>; a test in <test file> fails if it regresses` — or, for a behavior marked `Test: none`,
+`<outcome>; verified by reading <file:line>`. Close every gap the reviewer names per `execute-plan`
+step 2 before committing.
 ```
 
 The **Verify** block goes on every task except the one directly before the Final Task — the Final

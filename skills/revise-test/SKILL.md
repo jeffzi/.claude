@@ -50,7 +50,10 @@ git ls-files --others --exclude-standard 2>/dev/null || true
    rule the fix satisfies.
 
    Deleting a redundant test is a fix; deleting a test because it fails is not. If a finding would
-   reduce what the suite covers (not how many times it covers it), surface it instead of applying.
+   reduce what the suite covers (not how many times it covers it), surface it instead of applying. A
+   test `test-core` § 4a exempts — fixed configuration, a dependency's behavior, prose, a message's
+   fixed wording, a shared helper re-checked through a caller, a fake's own output — covers nothing
+   the project owns: deleting it reduces nothing, so the finding is applied, never surfaced.
 
    **Apply suite-agent findings first**, before per-file fixes touch the same files — extraction and
    merges reshape the preambles per-file fixes would otherwise edit twice. They are this skill's
@@ -69,8 +72,9 @@ git ls-files --others --exclude-standard 2>/dev/null || true
 
 5. **Verify.** Before applying any fix, record test file count, test count, and test LOC. After all
    fixes: run the test suite — every test passes, and the test count differs from the recorded count
-   only by the tests the fix queue merged or deleted, each accounted for by a named surviving pin. A
-   failing suite → isolate and revert the culprit fixes per revise-core step 5.
+   only by the tests the fix queue merged or deleted, each accounted for by a named surviving pin —
+   or, for a § 4a deletion, by the § 4a rule that exempts it. A failing suite → isolate and revert
+   the culprit fixes per revise-core step 5.
 
 6. **Report** (template below).
 

@@ -55,9 +55,10 @@ Nothing after the block. The caller decides what to dispatch instead.
 1. **Load `Skill(vet-core)`** — the reviewer contract: verdicts, Impact, output grammar. A report
    produced without this load is malformed. Your slot declarations are in Contract slots below.
 
-2. **Load `Skill(test-core)`** — § 5 "Minimum Tests, Maximum Coverage" (merge table, trivial paths
-   once per suite), "When Adding Coverage" (no parallel overflow files), and
-   `references/anti-patterns.md` ("When Mocks Become Too Complex") are your primary rule sources.
+2. **Load `Skill(test-core)`** — § 4a "What Deserves a Test", § 5 "Minimum Tests, Maximum Coverage"
+   (merge table, trivial paths once per suite), "When Adding Coverage" (no parallel overflow files),
+   and `references/anti-patterns.md` ("When Mocks Become Too Complex") are your primary rule
+   sources.
 
 3. **Resolve language skills once per extension present** — look up each test-file extension in the
    **Language Dispatch** table in `~/.claude/rules/skill-loading.md` (read it if not in context) and
@@ -77,7 +78,7 @@ Nothing after the block. The caller decides what to dispatch instead.
    exemplars per group, widen if they confirm). Files in no group stay unread — per-file quality is
    `vet-test`'s job, not yours.
 
-7. **Run the four passes over the groups:**
+7. **Run the five passes over the groups:**
    - **Cloned setup** — mock preambles, stub factories, or helpers duplicated across files, and
      mocks a file's tests never exercise. One finding per cloned pattern; every sibling file in
      Reasoning; the fix names the shared fixture module to extract into.
@@ -87,6 +88,14 @@ Nothing after the block. The caller decides what to dispatch instead.
      pass-through wiring, framework behavior) exercised from multiple files (§ 5: once per suite).
    - **Parallel overflow files** — size-split siblings of an existing test file ("When Adding
      Coverage").
+   - **Owned elsewhere** (`test-core` § 4a) — a behavior pinned outside the file that owns it:
+     - a shared helper's outcome (a missing setting, a client that cannot be built, hidden input)
+       asserted from a caller's test file when the helper's own test file already pins it — the Acts
+       differ, so the duplicate pass misses it; match on the helper the caller's code calls;
+     - one script or module verified at several layers (a unit test, a test driving it through a
+       task runner or IaC tool, and a test of that driver) — keep the layer that owns the logic;
+     - a check command (a tool whose job is to test something else) with more than one smoke test,
+       or tests of its per-failure messages.
 
 ## Contract slots
 

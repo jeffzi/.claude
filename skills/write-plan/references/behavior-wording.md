@@ -13,6 +13,9 @@ addition to the outcome, never instead of it. Downstream verification checks exa
 sentence says — a mechanism-worded behavior gets verified at mechanism level and passes a broken
 implementation.
 
+Both-branch and failure-branch coverage apply to branches project logic decides — never to one a
+dependency or a shared helper decides.
+
 For a behavior gated on a flag or mode (color, output format, verbosity, TTY), state the outcome of
 **both branches** and spec test coverage for both — a fixture or assertion per branch. A behavior
 whose tests exercise only one branch is unverified on the other.

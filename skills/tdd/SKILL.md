@@ -21,7 +21,14 @@ argument-hint: "[feature or behavior to implement]"
 No production code without a failing test first. Wrote code before its test? Delete it — no keeping
 as "reference", no adapting while writing tests, no commit-and-fix-forward; start over from a
 failing test. Exceptions exist, but the user grants them — ask before skipping for throwaway
-prototypes, generated code, or configuration files.
+prototypes or generated code.
+
+The law covers logic `test-core` § 4a What Deserves a Test admits. A change whose only content is a
+fixed configuration or prose — Taskfile task commands and arguments, `.tf` attribute values, CI or
+hook YAML, dependency lists, Markdown and SKILL.md — needs no test and no grant: verify it by
+running the tool once (`task --list`, `terraform validate`, the hook) and report `no test: <§ 4a
+rule>`. Logic in such a file — a loop, a conditional, cleanup, parsing — moves to a script and is
+tested there.
 
 | Excuse                                                         | Reality                                                                                                                                                                                                                                                                                                        |
 | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

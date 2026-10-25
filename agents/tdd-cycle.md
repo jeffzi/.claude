@@ -110,6 +110,9 @@ different spelling.
    - Missing behavior (e.g., function doesn't exist, returns wrong value) → correct failure
    - Syntax error, import error, missing fixture → fix and re-run (each fix counts as an attempt)
    - Test passes unexpectedly → stop and report PASSED_UNEXPECTEDLY — **do NOT proceed to Phase 2**
+   - The only test available fails on fixed configuration, prose, a dependency's behavior, or a
+     shared helper's behavior (test-core § 4a) → write no test; report NO_TEST_WARRANTED with REASON
+     naming the rule — **do NOT proceed to Phase 2**
    - After 3 failed attempts → stop and report STUCK with PHASE: RED — **do NOT proceed to Phase 2**
 
 **Do NOT commit.** The orchestrator handles all commits. Never run `git add` or `git commit`.
@@ -176,7 +179,7 @@ remove `tdd-cycle-active` — not to commit, not to "clean up", not for any reas
 removes it after you return.
 
 ```text
-STATUS: PASSED | STUCK | PASSED_UNEXPECTEDLY | TEST_FLAWED
+STATUS: PASSED | STUCK | PASSED_UNEXPECTEDLY | TEST_FLAWED | NO_TEST_WARRANTED
 TEST_FILE: <path to test file>
 TEST_NAME: <test function/describe name(s)>
 TEST_COMMAND: <exact command to run the specific test>
