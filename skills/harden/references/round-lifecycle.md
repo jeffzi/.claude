@@ -29,6 +29,11 @@ per-area finder per Scan Area (its own finder, or folded into that area's correc
 what it exists to see. What each tier may claim is defined by `scan-simplification` itself, not
 here.
 
+The test lens is mandatory on the same terms: `vet-test` over each Scan Area's test files, bucketed
+per `revise-core`, plus **exactly one** `vet-test-suite` on the round's whole target. Production
+finders skip test files, so without it a round never sees an existing test. A target with no test
+files records "no tests to scan" in Context instead.
+
 Finders only _list_ — one line per claim, no edits. Every claim enters the same verify → classify →
 plan → approval pipeline; a per-area candidate that a repo-wide grep later refutes at Verify is the
 designed reconciliation, not wasted work.
@@ -38,6 +43,11 @@ designed reconciliation, not wasted work.
 A finder reports a _claim_, not a finding. Before it enters the plan: re-read the mechanism at the
 line level and build a repro. Classify per the Finding Classification table in SKILL.md. False
 claims are appended to the ledger, never silently dropped.
+
+An **Overtest** claim's repro is the rule plus a coverage check: name the `test-core` § 4a or § 5
+rule, then find whether any other test reaches the project logic the deleted test reaches. When none
+does, the claim stays an Overtest and its task moves that coverage to a direct test at the owning
+module before deleting.
 
 Claims are independent, so verification parallelizes. Group the claims by the module or file their
 mechanism targets — claims on one mechanism verify together and share the reading. One group →
@@ -61,11 +71,11 @@ gate; behavior tasks say "Implementation: Use `/tdd`."
 
 Then **verify the plan**: dispatch `claim-reviewer` (`subagent_type: claim-reviewer`, do NOT set
 model — the agent defines its own) over its classified findings — each Bug / Landmine / DRY /
-Docs-drift entry is a claim carrying a `file:line`. A finding the reviewer returns as **Refuted** or
-**Unsubstantiated** goes back through step 2 exactly once: re-confirmed → it stays; genuinely false
-→ ledger; still contested after that single pass → it stays in the plan marked **contested**, with
-both reads, for the user to rule on at the approval gate. Never loop further; never drop it
-silently.
+Overtest / Docs-drift entry is a claim carrying a `file:line`. A finding the reviewer returns as
+**Refuted** or **Unsubstantiated** goes back through step 2 exactly once: re-confirmed → it stays;
+genuinely false → ledger; still contested after that single pass → it stays in the plan marked
+**contested**, with both reads, for the user to rule on at the approval gate. Never loop further;
+never drop it silently.
 
 The plan now lives on disk at its resume path; there is no separate copy step.
 

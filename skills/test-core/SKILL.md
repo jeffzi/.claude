@@ -146,7 +146,14 @@ No test, by rule — no user grant needed:
 - **A fake's or stub's own output.** A check command (a tool whose job is to test something else)
   gets one smoke test against a well-behaved fake, not a case per failure it reports. A new failure
   it detects adds no test case. A per-failure table already in its test file is debt, not a project
-  convention (§ 7 covers written rules, not existing tests): never add a row to it.
+  convention (§ 7 covers written rules, not existing tests): never add a row to it. The logic that
+  decides each failure — a validation module, a `require_*` helper — is project logic: test its
+  branches directly at that module, one case per branch (§ 5).
+
+**Deleting a test never removes the last test of project logic.** When a deleted test or table is
+the only one reaching a line or branch of project logic, move that coverage first: a direct test at
+the module that owns the logic, one case per branch, then delete. "The more specific rule settles
+it" never deletes the only test of a branch; neither does "the coverage threshold still passes".
 
 Still tested: argv or values the project _computes_ from inputs, conditions, cleanup and restore
 paths, every branch of project logic. "It is passed to a dependency" never exempts a computed value,

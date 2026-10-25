@@ -95,6 +95,19 @@
 # full suite + linters
 ```
 
+## Coverage
+
+<!--
+  OPTIONAL — the command that prints line and branch coverage of production files. The harden skill
+  runs it before and after every Overtest deletion task and requires identical output. Omit it and
+  the round uses the project's own coverage command; a project with none names, per deleted test,
+  the rule or the surviving test that covers the same branch.
+-->
+
+```bash
+# e.g. uv run pytest --cov --cov-branch --cov-report=term-missing:skip-covered -q
+```
+
 ## Skill Dispatch
 
 <!--

@@ -67,16 +67,16 @@ input and every per-task gate, no matter how small the round's scope or the proj
 substitution below is as binding as the harness input it replaces — a substitution, not a tunable
 default, and a small project is never a reason to trim the round further:
 
-| Harness input         | Standalone substitution                                                                                                            |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Scan Areas            | The whole repo, one area: one `bug-scanner`, one `simplification-scanner` (the global tier), one `vet-codebase`                    |
-| Skill Dispatch        | The global Language Dispatch table in `rules/skill-loading.md`                                                                     |
-| Domain Doctrines      | None                                                                                                                               |
-| Diff Harness          | None — the per-task gate is the test suite                                                                                         |
-| Round-Completion Gate | The full test suite                                                                                                                |
-| Ledger                | Not kept — refuted claims are recorded in the plan's Context; there is no cross-round memory                                       |
-| `hardening-wip.md`    | The plan is still written and still gated — only the persistent wip file is dropped (plan-mode file only; no cross-session resume) |
-| `claim-reviewer` pass | Skipped — step 2's per-claim repro verification stands alone                                                                       |
+| Harness input         | Standalone substitution                                                                                                                                                                                         |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scan Areas            | The whole repo, one area: one `bug-scanner`, one `simplification-scanner` (the global tier), one `vet-codebase`, one `vet-test` per bucket of its test files (bucketed per `revise-core`), one `vet-test-suite` |
+| Skill Dispatch        | The global Language Dispatch table in `rules/skill-loading.md`                                                                                                                                                  |
+| Domain Doctrines      | None                                                                                                                                                                                                            |
+| Diff Harness          | None — the per-task gate is the test suite                                                                                                                                                                      |
+| Round-Completion Gate | The full test suite                                                                                                                                                                                             |
+| Ledger                | Not kept — refuted claims are recorded in the plan's Context; there is no cross-round memory                                                                                                                    |
+| `hardening-wip.md`    | The plan is still written and still gated — only the persistent wip file is dropped (plan-mode file only; no cross-session resume)                                                                              |
+| `claim-reviewer` pass | Skipped — step 2's per-claim repro verification stands alone                                                                                                                                                    |
 
 Everything else is unchanged: both finder agents must be dispatched — a lens is satisfied only by
 its own agent's run, never inline — every claim is verified before it enters the plan, the Finding
@@ -100,7 +100,10 @@ per-step mechanics before running a round.
    to the area named in the invocation argument, if any — plus **exactly one** cross-file finder
    (`subagent_type: vet-codebase`) on the round's whole target (the repo, or the named area): it
    produces the cross-file duplication and drift claims the per-area lenses cannot see, and is the
-   primary source of **DRY** classifications. Finders only _list_ claims; no edits.
+   primary source of **DRY** classifications. The **test lens** runs too: `subagent_type: vet-test`
+   over each Scan Area's test files (bucketed per `revise-core`), plus **exactly one**
+   `subagent_type: vet-test-suite` on the round's whole target — the source of **Overtest**
+   classifications. Finders only _list_ claims; no edits.
 
 2. **Verify claim.** A finder reports a _claim_, not a finding — re-read the mechanism, build a
    repro, classify per the table below. Claims are independent: verify them in parallel via forks,
@@ -120,22 +123,35 @@ per-step mechanics before running a round.
 
 ## Finding Classification
 
-| Class             | Definition                                                                                                       | Plan disposition                                                                                                                           |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Bug**           | Wrong output or crash; mechanism verified at line level, repro shape known                                       | Own task, `/tdd`                                                                                                                           |
-| **Landmine**      | Two sources that must agree disagree; unreachable today by convention only                                       | Own task; write a comparator test first — it must fail against current code before the fix                                                 |
-| **Smell**         | Same class as a past bug, harmless today                                                                         | Surface with a fix-vs-document recommendation — the user decides; silent status quo is not an option                                       |
-| **DRY**           | Verified duplication across files                                                                                | No-new-tests task, verified by the per-task gate                                                                                           |
-| **Docs drift**    | Docs disagree with source                                                                                        | `docs:` task; verify signatures against source, never from memory                                                                          |
-| **Audited clean** | Checked and sound                                                                                                | Record in the round's Context ("record only") — within-round coverage tracking, **not** cross-round memory; never read it in a later round |
-| **Refuted**       | Claim is false                                                                                                   | Append to the ledger — this stops round N+1 re-chasing it while the disproof holds                                                         |
-| **Declined**      | Change is _possible_ but unwise (order-sensitive, intentionally divergent, theoretical-only risk vs. real churn) | Record in Context as "reviewed, declined" with the reason — do not implement                                                               |
+| Class             | Definition                                                                                                       | Plan disposition                                                                                                                                            |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Bug**           | Wrong output or crash; mechanism verified at line level, repro shape known                                       | Own task, `/tdd`                                                                                                                                            |
+| **Landmine**      | Two sources that must agree disagree; unreachable today by convention only                                       | Own task; derive one source from the other — no comparator test (see below). Sources that must stay separate: comparator test first, failing before the fix |
+| **Overtest**      | A test or case that `test-core` § 4a or § 5 says should not exist                                                | Deletion task, no new tests, gated by unchanged production coverage (see below)                                                                             |
+| **Smell**         | Same class as a past bug, harmless today                                                                         | Surface with a fix-vs-document recommendation — the user decides; silent status quo is not an option                                                        |
+| **DRY**           | Verified duplication across files                                                                                | No-new-tests task, verified by the per-task gate                                                                                                            |
+| **Docs drift**    | Docs disagree with source                                                                                        | `docs:` task; verify signatures against source, never from memory                                                                                           |
+| **Audited clean** | Checked and sound                                                                                                | Record in the round's Context ("record only") — within-round coverage tracking, **not** cross-round memory; never read it in a later round                  |
+| **Refuted**       | Claim is false                                                                                                   | Append to the ledger — this stops round N+1 re-chasing it while the disproof holds                                                                          |
+| **Declined**      | Change is _possible_ but unwise (order-sensitive, intentionally divergent, theoretical-only risk vs. real churn) | Record in Context as "reviewed, declined" with the reason — do not implement                                                                                |
 
 A confirmed simplification finding routes by the diff its fix produces, not by which lens or tag
 reported it: a fix that leaves output byte-identical (dead-code deletion, duplication merge) is a
 **DRY** task; a fix that deliberately changes output (replacing custom code with stdlib or a native
 platform feature, removing a speculative abstraction) is a **deliberate-output-change** task
 confined to the named call sites.
+
+A **Landmine** fixed by deriving one source from the other needs no comparator test: with one
+source, the test fails only when someone deliberately reintroduces a second one (`test-core` § 4a).
+Keep the comparator test only when the two sources must stay separate — another language, a file the
+build cannot share.
+
+An **Overtest** deletion is gated by production coverage: record line and branch coverage before the
+task (the harness's **Coverage** block, or in standalone mode the project's own coverage command),
+and after it the coverage must be identical. A drop means the deleted test was the last test of that
+logic: the task fails until it first adds a direct test at the module that owns the logic, one case
+per branch, then deletes (`test-core` § 4a). A project with no coverage tool names, per deleted
+test, its § 4a or § 5 rule or the surviving test that takes the same branch.
 
 Refuted ≠ Declined: a refuted finding is _false_; a declined one is true but not worth the cost. A
 refactor that cannot reach an empty diff is **declined** (or surfaced), never "refuted."
@@ -156,6 +172,7 @@ re-baselining after every accepted non-empty diff.
 | ------------------------ | ----------------------------------------------------------------------------------------- |
 | DRY / pure refactor      | **Empty.** Any non-empty diff fails the task.                                             |
 | Bug fix                  | Confined to the lines implementing the fix — inspect every hunk.                          |
+| Overtest deletion        | **Empty** for build output; test files only in the source diff.                           |
 | Deliberate output change | Confined to the named functions / call sites; verify coupled properties move in lockstep. |
 
 The harness's **Diff Acceptability** section may add project-specific rules on top of this table
@@ -185,8 +202,8 @@ If any of these describes what you are doing right now, stop:
   this session.
 - A finder dispatch you are drafting carries rubric text, a `model:`, or an `effort:` — the agents
   define their own.
-- Your fan-out roster has no simplification lens, no cross-file lens (`vet-codebase`), or the global
-  tier is missing from it.
+- Your fan-out roster has no simplification lens, no cross-file lens (`vet-codebase`), no test lens
+  (`vet-test`, `vet-test-suite`), or the global tier is missing from it.
 - You are reading a diff hunk and forming the words "looks fine" or "cosmetic."
 - You are writing plan content inside plan mode instead of to
   `<repo-root>/.planning/hardening-wip.md` before entering it (harness rounds — standalone rounds
@@ -211,5 +228,7 @@ If any of these describes what you are doing right now, stop:
 | "I'll add the finder's claims to the plan unverified"                                      | Plan tasks would chase phantoms; repro-first is cheaper. Verify before it enters the plan.                                                                                                                                           |
 | "The reviewer and my re-verification disagree — one more verification pass will settle it" | One re-verification per finding, then it goes to the user marked contested. Extra passes launder uncertainty into false confidence.                                                                                                  |
 | "DRY task — I'll write tests for the extracted code"                                       | DRY tasks are gated by the existing suite plus the diff. New tests belong to behavior tasks.                                                                                                                                         |
+| "Coverage dropped a fraction, the threshold still passes"                                  | A drop is a branch that just lost its last test. The Overtest task fails until a direct test at the owning module covers it.                                                                                                         |
+| "The landmine needs a comparator test, the table says so"                                  | Only when the two sources stay separate. Once one derives from the other, nothing can drift — the test guards a deliberate edit.                                                                                                     |
 | "I'll run the diff gate once at the end of the round"                                      | A dirty hunk can then no longer be attributed to a task; rollback granularity is lost. Gate per task.                                                                                                                                |
 | "I'll condense the plan for presentation"                                                  | The presented plan and the executed plan are the same document. Author once, directly in `<repo-root>/.planning/hardening-wip.md`; the plan-mode file and the presentation are copies of it, never a re-authored summary.            |
