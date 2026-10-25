@@ -16,7 +16,10 @@ When `/tdd` is invoked, determine the entry point before doing anything else:
   for implementation." Do NOT dispatch agents from plan mode.
 - **Multiple behaviors, no plan yet** -- Load `Skill(write-plan)` and create a plan first. Do NOT
   dispatch agents until the plan is approved and you're executing a specific task.
-- **Single behavior or executing a plan task** -- Proceed to the RED-GREEN-REFACTOR loop below.
+- **Executing a plan task whose Implementation line says `/tdd`, or several behavior groups** --
+  Proceed to the RED-GREEN-REFACTOR loop below.
+- **Anything else** -- SKILL.md § Choose the Path: a direct edit, or inline test-first in the main
+  loop. No agent is dispatched.
 
 When the project has a test suite, plans describe **behaviors to implement** plus the files they
 touch -- implementation details compromise the agents' context isolation; file paths do not (the

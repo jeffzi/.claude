@@ -47,14 +47,38 @@ tested there.
 | ------------------------------------------------------------------------------ |
 | Code before test / test passes immediately / can't explain why the test failed |
 | Dispatching `tdd-cycle` without invoking `/tdd` first                          |
-| Orchestrator reading implementation source or writing test code directly       |
+| Agent loop: orchestrator reading implementation source or writing test code    |
 | Dispatching agents without a plan for multi-behavior tasks                     |
 | Dispatching agents from plan mode instead of writing plan tasks                |
 | Plan contains implementation details or inline RED/GREEN test/impl code        |
 
+## Choose the Path
+
+Pick the path once, from the change's description, before any dispatch or file read:
+
+| Change                                                                                     | Path                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Only fixed wording, configuration or prose (`test-core` § 4a)                              | Edit directly. Run the tool or the suite once. Report `no test: <§ 4a rule>`. An existing test that pins the old wording is narrowed to the computed parts, never rewritten to the new text.                                               |
+| Behavior-preserving: rename, move, extract, merge duplicates                               | Edit directly. The existing suite is the gate and stays green; test edits only follow moved names.                                                                                                                                         |
+| Logic, in conversation                                                                     | **Inline test-first.** Load `Skill(test-core)`, write the failing test, run it and read why it fails, implement, run the suite. When the test runs and reads would flood the main context, a fork (`subagent_type: "fork"`) does the same. |
+| Logic in a plan task whose **Implementation** line says `/tdd`, or several behavior groups | The agent loop below.                                                                                                                                                                                                                      |
+
+The Iron Law holds on every logic path: no code before a failing test. Only the agent loop
+dispatches `tdd-cycle`; Dispatch First, "the orchestrator routes", Batching, Parallel Waves and The
+Loop govern that path alone.
+
+| Excuse                                                                   | Reality                                                                                                         |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| "/tdd was invoked, so it dispatches `tdd-cycle`"                         | Invoking /tdd asks for TDD, not for agents. The table picks the path.                                           |
+| "One behavior, but an isolated agent is safer"                           | Isolation pays when the brief is written down, in a plan task. In conversation it costs a briefing and minutes. |
+| "A message change still needs red"                                       | Fixed wording has no test to turn red (`test-core` § 4a). Edit it and run the suite.                            |
+| "A rename touches production code, so the Iron Law needs a failing test" | No behavior changes, so no test can fail first. The existing suite proves the rename.                           |
+| "Inline test-first is not real TDD"                                      | Watching the test fail is the TDD. Who writes it is a cost choice.                                              |
+
 ## Architecture
 
-Context isolation prevents the LLM from designing tests around planned implementation.
+Context isolation prevents the LLM from designing tests around planned implementation. It applies to
+the agent loop; the other paths in Choose the Path have no orchestrator.
 
 | Phase     | Agent                                       | Can see (Phase 1 / Phase 2)                      | Cannot see/modify                          |
 | --------- | ------------------------------------------- | ------------------------------------------------ | ------------------------------------------ |
@@ -65,8 +89,8 @@ Context isolation prevents the LLM from designing tests around planned implement
 
 ## Dispatch First
 
-The `tdd-cycle` dispatch is each cycle's first tool call — nothing to read, run, or check between
-the task's behavior list and the Agent call: no Read, no Bash, no Glob, no Grep.
+On the agent loop, the `tdd-cycle` dispatch is each cycle's first tool call — nothing to read, run,
+or check between the task's behavior list and the Agent call: no Read, no Bash, no Glob, no Grep.
 
 | Excuse                                            | Reality                                                                          |
 | ------------------------------------------------- | -------------------------------------------------------------------------------- |

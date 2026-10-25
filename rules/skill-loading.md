@@ -17,7 +17,7 @@ loaded". When a skill, command, or rule prescribes an agent instead of a load, d
 | Reviewing a whole codebase cross-file     | Dispatch `subagent_type: vet-codebase` — reimplemented helpers, idiom drift, overflow modules, bypassed seams |
 | User explicitly asks to commit            | `Skill(write-commit)`                                                                                         |
 | Bug or regression with unknown root cause | `/fix` command — investigates, then TDD                                                                       |
-| New feature in a project with tests       | `Skill(tdd)` — start red–green cycle directly                                                                 |
+| New feature in a project with tests       | `Skill(tdd)` — its Choose the Path table picks direct edit, inline test-first, or the agent loop              |
 
 If no matching skill exists for a language or framework, note that explicitly in the plan rather
 than silently skipping the step.

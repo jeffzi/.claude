@@ -91,9 +91,8 @@ type: plan
 
 **Tech Stack:** [Key technologies/libraries]
 
-**Skills:** [Only when the project has no test suite and tasks are implemented directly — skills to
-load before implementation. Tasks routed through `/tdd` omit this line; the agents resolve language
-skills themselves.]
+**Skills:** [Only when some tasks are implemented directly — skills to load before those tasks.
+Tasks routed through `/tdd` need none; the agents resolve language skills themselves.]
 
 ## Folds
 
@@ -128,7 +127,7 @@ or the single line `No folds: every task is new work`.]
 
 **Notes:** [Non-obvious constraints, dependencies on prior tasks, gotchas]
 
-**Implementation:** Use `/tdd` for implementation.
+**Implementation:** [one of the three forms below]
 
 **Verify:** After implementation is complete and before committing, dispatch a `claim-reviewer`
 agent with this task's behavioral claims, each worded as the outcome plus the test that pins it:
@@ -136,6 +135,16 @@ agent with this task's behavioral claims, each worded as the outcome plus the te
 `<outcome>; verified by reading <file:line>`. Close every gap the reviewer names per `execute-plan`
 step 2 before committing.
 ```
+
+The **Implementation** line follows from the task's behaviors, never from habit:
+
+- `Use /tdd for implementation.` — at least one behavior is logic `test-core` § 4a admits.
+- `Direct edit — no test: <§ 4a rule>.` — every behavior is `Test: none`.
+- `Direct edit — behavior-preserving; gate: the existing suite.` — a rename, move, extraction or
+  duplicate merge with no behavior change.
+
+A task whose behaviors are all `Test: none` that still says `/tdd` sends a dispatch to find out
+there is nothing to test.
 
 The **Verify** block goes on every task except the one directly before the Final Task — the Final
 Task re-verifies it immediately. Token pressure never removes **Verify** from an earlier task; a

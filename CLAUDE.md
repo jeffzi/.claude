@@ -59,12 +59,15 @@ Full rule: `rules/skill-loading.md`.
 
 ### TDD
 
-When the project has a test suite, no production code before a failing test. A test suite anywhere
-in the project qualifies. No test suite at all → skip TDD.
+When the project has a test suite, no logic before a failing test. A test suite anywhere in the
+project qualifies. No test suite at all → skip TDD. Wording, configuration, prose and
+behavior-preserving changes (rename, move, merge) get no new test: edit directly and run the suite.
 
 - **Bug or regression** (unknown root cause): use `/fix` — it investigates first, then drives TDD. A
   bug report alone is read-only (`rules/no-unrequested-edits.md`); `/fix` requires a fix request.
-- **New feature** (root cause irrelevant): load `Skill(tdd)` directly and start the red–green cycle.
+- **New feature** (root cause irrelevant): load `Skill(tdd)`; its Choose the Path table picks the
+  path. In conversation the default is test-first inline, in the main loop. The `tdd-cycle` agent
+  loop is for plan tasks.
 
 Never dispatch `tdd-cycle` directly.
 
