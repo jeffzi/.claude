@@ -93,6 +93,7 @@ result if nothing changes).
  tdd            ─first-step→  Skill(test-core)  (hub does the rest)
  vet-test agent ─first-step→  Skill(vet-core) → Skill(test-core)   (loaded inside the agent)
                      └─also→  rules dispatch → Skill(code-{lang})  (code-side review)
+ vet-test-merit   ─first-step→  Skill(vet-core) → Skill(test-core)   (loaded inside the agent)
 ```
 
 `test-core` is the single entry point for all test work. It owns universal principles inline and
@@ -100,9 +101,9 @@ dispatches to the matching language skill based on the file extension looked up 
 `rules/skill-loading.md`. Loading is one-directional: `test-core` → `test-{lang}`. Language skills
 never load `test-core` back.
 
-`tdd` and the `vet-test` agent are orchestrators of _when_ tests are written and reviewed.
-`test-core` defines _what_ a good test looks like. This is why they are peers of the language
-skills, not parents of the testing philosophy.
+`tdd` and the `vet-test` and `vet-test-merit` agents are orchestrators of _when_ tests are written
+and reviewed. `test-core` defines _what_ a good test looks like. This is why they are peers of the
+language skills, not parents of the testing philosophy.
 
 ### Language dispatch
 
@@ -118,9 +119,9 @@ and code-\***.
 
 Each column serves a different caller:
 
-- `test-core`, `tdd`, `tdd-cycle` → **Test skill** column
-- `vet-code` agent, `tdd` (code side) → **Code skill** column
-- `preflight`, `vet-test` agent → **Test file patterns** column
+- `test-core`, `tdd`, `tdd-cycle`, `vet-test` and `vet-test-merit` agents → **Test skill** column
+- `vet-code` and `vet-test` agents, `tdd` (code side) → **Code skill** column
+- `preflight` → **Test file patterns** column
 
 Same row, different cells. One source of truth for every language.
 
@@ -232,7 +233,7 @@ Read-only review agent (`agents/vet-test.md`), dispatched as `subagent_type: vet
 review _process_, not the review _criteria_. Process:
 
 1. Load `Skill(vet-core)` — the shared reviewer contract (scoring verdicts, scope, Impact, output
-   grammar) all five `vet-*` agents fill with their domain slots
+   grammar) every reviewer agent fills with its domain slots
 2. Load `Skill(test-core)` — cascades to `test-{lang}` and overlays via DSD
 3. Look up the target extension in the rules-file Language Dispatch table → `code-{lang}`
 4. Load `Skill(code-{lang})`
@@ -243,7 +244,28 @@ The agent has no `Edit`, `Write`, or `Bash` tools: it reports, and the caller fi
 is the interactive entry point that dispatches it and then applies the findings.
 
 `vet-test` does not contain inline testing principles. The checklist is `test-core` principles plus
-language-skill rules plus code idioms.
+language-skill rules plus code idioms. It skips `test-core` § 4 and § 4a, which `vet-test-merit`
+owns.
+
+### `vet-test-merit` agent
+
+Read-only review agent (`agents/vet-test-merit.md`), dispatched as `subagent_type: vet-test-merit`.
+It asks one question of every test in its bucket: should this test exist? It owns `test-core` § 4
+"False Coverage" and § 4a "What Deserves a Test": tests of a dependency's behavior, fixed
+configuration or wording, a fake's own output, a shared helper re-checked through a caller, and
+fakes heavier than the logic they reach. It reads the production modules the tests reach, because it
+names the project line that decides each assertion.
+
+It makes two passes:
+
+1. **Ledger** — one line per test: the project line that decides it, or `none` plus the § rule, and
+   a decision (`keep`, `delete`, `narrow`, `move first`).
+2. **Proportion** — per production module, the test-side lines against the logic lines. A module
+   where at least a third of its ledger lines are not `keep` gets one module-level finding.
+
+`/revise-test` and `/harden` dispatch it per bucket next to `vet-test`, and `/preflight` per batch.
+Both report a row that repeats a sibling's path; the dispatcher merges the two findings. Repeats
+across buckets stay with `vet-test-suite`.
 
 ## Design decisions
 

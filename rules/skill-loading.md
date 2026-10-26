@@ -12,7 +12,8 @@ loaded". When a skill, command, or rule prescribes an agent instead of a load, d
 | Writing code                              | `Skill(code-core)` (hub — loads the language skill via Language Dispatch below)                               |
 | Writing tests                             | `Skill(test-core)` (hub — loads the language skill via Language Dispatch below)                               |
 | Running TDD cycle                         | `Skill(tdd)` (hub load + RED-GREEN orchestration)                                                             |
-| Reviewing code or tests                   | Dispatch `subagent_type: vet-code` / `vet-test`, or run `/revise-*` to also fix                               |
+| Reviewing code or tests                   | Dispatch `subagent_type: vet-code` / `vet-test` + `vet-test-merit`, or run `/revise-*` to also fix            |
+| Asking whether a test should exist        | Dispatch `subagent_type: vet-test-merit` — "is this suite over-tested?", "are we testing what we don't own?"  |
 | Reviewing a whole test suite              | Dispatch `subagent_type: vet-test-suite`; `/revise-test` with a directory also dispatches it                  |
 | Reviewing a whole codebase cross-file     | Dispatch `subagent_type: vet-codebase` — reimplemented helpers, idiom drift, overflow modules, bypassed seams |
 | User explicitly asks to commit            | `Skill(write-commit)`                                                                                         |

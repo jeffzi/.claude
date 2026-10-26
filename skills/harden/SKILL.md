@@ -67,16 +67,16 @@ input and every per-task gate, no matter how small the round's scope or the proj
 substitution below is as binding as the harness input it replaces — a substitution, not a tunable
 default, and a small project is never a reason to trim the round further:
 
-| Harness input         | Standalone substitution                                                                                                                                                                                         |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Scan Areas            | The whole repo, one area: one `bug-scanner`, one `simplification-scanner` (the global tier), one `vet-codebase`, one `vet-test` per bucket of its test files (bucketed per `revise-core`), one `vet-test-suite` |
-| Skill Dispatch        | The global Language Dispatch table in `rules/skill-loading.md`                                                                                                                                                  |
-| Domain Doctrines      | None                                                                                                                                                                                                            |
-| Diff Harness          | None — the per-task gate is the test suite                                                                                                                                                                      |
-| Round-Completion Gate | The full test suite                                                                                                                                                                                             |
-| Ledger                | Not kept — refuted claims are recorded in the plan's Context; there is no cross-round memory                                                                                                                    |
-| `hardening-wip.md`    | The plan is still written and still gated — only the persistent wip file is dropped (plan-mode file only; no cross-session resume)                                                                              |
-| `claim-reviewer` pass | Skipped — step 2's per-claim repro verification stands alone                                                                                                                                                    |
+| Harness input         | Standalone substitution                                                                                                                                                                                                                  |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scan Areas            | The whole repo, one area: one `bug-scanner`, one `simplification-scanner` (the global tier), one `vet-codebase`, one `vet-test` and one `vet-test-merit` per bucket of its test files (bucketed per `revise-core`), one `vet-test-suite` |
+| Skill Dispatch        | The global Language Dispatch table in `rules/skill-loading.md`                                                                                                                                                                           |
+| Domain Doctrines      | None                                                                                                                                                                                                                                     |
+| Diff Harness          | None — the per-task gate is the test suite                                                                                                                                                                                               |
+| Round-Completion Gate | The full test suite                                                                                                                                                                                                                      |
+| Ledger                | Not kept — refuted claims are recorded in the plan's Context; there is no cross-round memory                                                                                                                                             |
+| `hardening-wip.md`    | The plan is still written and still gated — only the persistent wip file is dropped (plan-mode file only; no cross-session resume)                                                                                                       |
+| `claim-reviewer` pass | Skipped — step 2's per-claim repro verification stands alone                                                                                                                                                                             |
 
 Everything else is unchanged: both finder agents must be dispatched — a lens is satisfied only by
 its own agent's run, never inline — every claim is verified before it enters the plan, the Finding
@@ -101,9 +101,10 @@ per-step mechanics before running a round.
    (`subagent_type: vet-codebase`) on the round's whole target (the repo, or the named area): it
    produces the cross-file duplication and drift claims the per-area lenses cannot see, and is the
    primary source of **DRY** classifications. The **test lens** runs too: `subagent_type: vet-test`
-   over each Scan Area's test files (bucketed per `revise-core`), plus **exactly one**
-   `subagent_type: vet-test-suite` on the round's whole target — the source of **Overtest**
-   classifications. Finders only _list_ claims; no edits.
+   and `subagent_type: vet-test-merit` over each Scan Area's test files (bucketed per
+   `revise-core`), plus **exactly one** `subagent_type: vet-test-suite` on the round's whole target.
+   `vet-test-merit` and `vet-test-suite` are the sources of **Overtest** classifications. Finders
+   only _list_ claims; no edits.
 
 2. **Verify claim.** A finder reports a _claim_, not a finding — re-read the mechanism, build a
    repro, classify per the table below. Claims are independent: verify them in parallel via forks,
@@ -127,7 +128,7 @@ per-step mechanics before running a round.
 | ----------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Bug**           | Wrong output or crash; mechanism verified at line level, repro shape known                                       | Own task, `/tdd`                                                                                                                                            |
 | **Landmine**      | Two sources that must agree disagree; unreachable today by convention only                                       | Own task; derive one source from the other — no comparator test (see below). Sources that must stay separate: comparator test first, failing before the fix |
-| **Overtest**      | A test or case that `test-core` § 4a or § 5 says should not exist                                                | Deletion task, no new tests, gated by unchanged production coverage (see below)                                                                             |
+| **Overtest**      | A test or case that `test-core` § 4, § 4a or § 5 says should not exist                                           | Deletion task, no new tests, gated by unchanged production coverage (see below)                                                                             |
 | **Smell**         | Same class as a past bug, harmless today                                                                         | Surface with a fix-vs-document recommendation — the user decides; silent status quo is not an option                                                        |
 | **DRY**           | Verified duplication across files                                                                                | No-new-tests task, verified by the per-task gate                                                                                                            |
 | **Docs drift**    | Docs disagree with source                                                                                        | `docs:` task; verify signatures against source, never from memory                                                                                           |
@@ -151,7 +152,7 @@ task (the harness's **Coverage** block, or in standalone mode the project's own 
 and after it the coverage must be identical. A drop means the deleted test was the last test of that
 logic: the task fails until it first adds a direct test at the module that owns the logic, one case
 per branch, then deletes (`test-core` § 4a). A project with no coverage tool names, per deleted
-test, its § 4a or § 5 rule or the surviving test that takes the same branch.
+test, its § 4, § 4a or § 5 rule or the surviving test that takes the same branch.
 
 Refuted ≠ Declined: a refuted finding is _false_; a declined one is true but not worth the cost. A
 refactor that cannot reach an empty diff is **declined** (or surfaced), never "refuted."
@@ -203,7 +204,7 @@ If any of these describes what you are doing right now, stop:
 - A finder dispatch you are drafting carries rubric text, a `model:`, or an `effort:` — the agents
   define their own.
 - Your fan-out roster has no simplification lens, no cross-file lens (`vet-codebase`), no test lens
-  (`vet-test`, `vet-test-suite`), or the global tier is missing from it.
+  (`vet-test`, `vet-test-merit`, `vet-test-suite`), or the global tier is missing from it.
 - You are reading a diff hunk and forming the words "looks fine" or "cosmetic."
 - You are writing plan content inside plan mode instead of to
   `<repo-root>/.planning/hardening-wip.md` before entering it (harness rounds — standalone rounds

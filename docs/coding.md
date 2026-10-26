@@ -145,9 +145,9 @@ and code-\***.
 
 Each column serves a different caller:
 
-- `code-core`, `tdd` (code side) → **Code skill** column
-- `test-core`, `tdd` (test side) → **Test skill** column
-- `vet-test` agent, `preflight` → **Test file patterns** column
+- `code-core`, `tdd` (code side), `vet-code` and `vet-test` agents → **Code skill** column
+- `test-core`, `tdd` (test side), `vet-test` and `vet-test-merit` agents → **Test skill** column
+- `preflight` → **Test file patterns** column
 
 Same row, different cells. One source of truth for every language.
 
@@ -253,7 +253,7 @@ Read-only review agent (`agents/vet-code.md`), dispatched as `subagent_type: vet
 review _process_, not the review _criteria_. Process:
 
 1. Load `Skill(vet-core)` — the shared reviewer contract (scoring verdicts, scope, Impact, output
-   grammar) all five `vet-*` agents fill with their domain slots
+   grammar) every reviewer agent fills with its domain slots
 2. Load `Skill(code-core)` — hub dispatches to `code-{lang}` and overlays via DSD
 3. Walk the combined checklist rule-by-rule (not scanning) for each mandatory rule, pitfall entry,
    and Instead-of/Use table from the loaded skills
@@ -306,8 +306,8 @@ through the harness's built-in auto-activation, without requiring shebang detect
 
 This is an intentional exception. New languages must follow the dispatch-table route — do not copy
 this pattern. The trade-off is that `code-shell` does not appear in `rules/skill-loading.md`, so
-orchestrators that resolve languages from the table (like the `vet-test` agent, since there is no
-`test-shell`) cannot discover it automatically.
+orchestrators that resolve languages from the table (like the `vet-test` and `vet-test-merit`
+agents, since there is no `test-shell`) cannot discover it automatically.
 
 ### The `code-tstl` two-layer overlay
 

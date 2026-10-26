@@ -350,6 +350,7 @@ BEFORE writing `for case in cases:` inside a test:
 **Warning signs:**
 
 - Mock setup longer than test logic
+- A fake larger than the production logic the test reaches (test-core § 4a)
 - Mocking everything to make the test pass
 - Mocks missing methods real components have
 - Test breaks when the mock changes

@@ -109,16 +109,16 @@ on them), run task 7, and report the stop status.
       extension but not matching a test pattern → code files; `.md`, `README*`, `CHANGELOG*` → doc
       files; extension not in the table → still review: test files if the filename matches a generic
       test pattern (`test_*`, `*_test.*`, `*.test.*`, `*_spec.*`, `*Tests.*`), otherwise code files
-      (the `vet-code`/`vet-test` agents fall back to hub-only review when no dispatch row exists).
-      **Exception — data and asset files are not review targets** (doc-named files bucket as docs
-      first; this exception never claims them): serialized/config data (`.json`, `.jsonl`, `.yaml`,
-      `.yml`, `.toml`, `.ini`, `.xml`, `.csv`, `.tsv`, `.txt` — fixtures and golden files included),
-      lockfiles, media and binaries, generated artifacts (`*.min.*`, `*.map`, `dist/`/`build/`), and
-      test snapshots. Skip them — no lens reviews them — and list them in the report's Files Checked
-      as `skipped (data/asset)`. Bucketing is filename-based throughout: no file is ever opened to
-      classify it. Collection stays extension-blind — never pre-filter by extension at the
-      `find`/git stage; every file under the target must reach bucketing, or the skipped-files
-      listing silently loses its rows.
+      (the `vet-code`/`vet-test`/`vet-test-merit` agents fall back to hub-only review when no
+      dispatch row exists). **Exception — data and asset files are not review targets** (doc-named
+      files bucket as docs first; this exception never claims them): serialized/config data
+      (`.json`, `.jsonl`, `.yaml`, `.yml`, `.toml`, `.ini`, `.xml`, `.csv`, `.tsv`, `.txt` —
+      fixtures and golden files included), lockfiles, media and binaries, generated artifacts
+      (`*.min.*`, `*.map`, `dist/`/`build/`), and test snapshots. Skip them — no lens reviews them —
+      and list them in the report's Files Checked as `skipped (data/asset)`. Bucketing is
+      filename-based throughout: no file is ever opened to classify it. Collection stays
+      extension-blind — never pre-filter by extension at the `find`/git stage; every file under the
+      target must reach bucketing, or the skipped-files listing silently loses its rows.
 - [ ] Resolve the gate commands (below)
 
 **Argument disambiguation:** if an argument is given:
@@ -221,6 +221,7 @@ convention violation arrives as an ordinary `vet-*` finding.
 
 - `subagent_type: vet-code` on the code files
 - `subagent_type: vet-test` on the test files
+- `subagent_type: vet-test-merit` on the test files
 - `subagent_type: vet-doc` on the doc files
 - Prompt each: `"Review these files.\n\nFiles: [batch file list]\n\nDiff:\n[review diff]\n\nScope:
   [full if path-argument mode, changed otherwise]"`
@@ -292,8 +293,9 @@ Errored, or `completed` with empty or unusable output → stop and surface it
 ### Step 4: Triage and Fix
 
 **Triage** — one orchestrator pass over every lens's output. Read `references/triage.md` now and
-follow it exactly: discard `false-positive` findings (its list), partition on verdict (`confirmed` →
-fix queue, `suspected` → report-only, `unconfirmed` → adjudication), rank Impact tags against its
+follow it exactly: discard `false-positive` findings (its list), send `confirmed` deletions of a
+test, row or assertion to adjudication, merge duplicate findings, partition on verdict (`confirmed`
+→ fix queue, `suspected` → report-only, `unconfirmed` → adjudication), rank Impact tags against its
 per-lens enum table, adjudicate all `unconfirmed` findings through one `claim-reviewer` dispatch,
 and keep the per-agent tally it defines.
 
@@ -331,7 +333,7 @@ dispatches in a single parallel message. Per group, pass every finding for its f
 Issue: [description from finding]
 Location: [file_path:line_number from finding]
 Severity: [high if the Impact tag ranks 1 or 2 in the enum table in references/triage.md, medium if it ranks 3 or 4]
-Behavior: [may-change if the finding came from bug-scanner; preserve for every other lens — vet-code, vet-test, vet-comments, distill-scanner, vet-codebase, vet-test-suite — and for adjudication-promoted findings of those lenses]
+Behavior: [may-change if the finding came from bug-scanner; preserve for every other lens — vet-code, vet-test, vet-test-merit, vet-comments, distill-scanner, vet-codebase, vet-test-suite — and for adjudication-promoted findings of those lenses]
 Suggested fix: [reasoning from finding]
 
 Issue: [next finding for this file]

@@ -129,10 +129,14 @@ No test, by rule — no user grant needed:
 - **Fixed configuration**: a value, reference, or omitted block that changes only when someone edits
   that line — a hard-coded attribute, a lifetime, a flag, a resource reference, a block left out on
   purpose, an argv entry written out in a Taskfile or hook config, a `desc:` string, a dependency
-  list. The test for it: would the test fail only if someone edits the value the test itself copies?
-  Then changing it is deliberate, and review guards it. This holds even when a stated outcome or
-  guarantee depends on the value: a note that the outcome "no longer holds" or "would pass every
-  test" without it describes a deliberate edit to that line, not an accident.
+  list. Neither the file nor the form matters: whatever the project wrote out by hand, in code as
+  much as in config, is fixed configuration when the test copies it back into its expected value. A
+  value, an argument list and calls that always run in the same order count alike (§ 2 already rates
+  asserting call order on mocks fragile). The test for it: would the test fail only if someone edits
+  the value the test itself copies? Then changing it is deliberate, and review guards it. This holds
+  even when a stated outcome or guarantee depends on the value: a note that the outcome "no longer
+  holds" or "would pass every test" without it describes a deliberate edit to that line, not an
+  accident.
 - **A message's fixed wording.** Assert the parts of a message the code computes — the name, value,
   path, or count it inserts — and that the right failure surfaced (error type, exit code, stream).
   Never pin the fixed text around them word for word: rewording is a deliberate edit. This holds
@@ -155,10 +159,15 @@ the only one reaching a line or branch of project logic, move that coverage firs
 the module that owns the logic, one case per branch, then delete. "The more specific rule settles
 it" never deletes the only test of a branch; neither does "the coverage threshold still passes".
 
-Still tested: argv or values the project _computes_ from inputs, conditions, cleanup and restore
-paths, every branch of project logic. "It is passed to a dependency" never exempts a computed value,
-and "it is fixed configuration" never exempts a value the project's logic branches on (a validation
-regex is tested through what it rejects, never through its text).
+**A fake never outweighs the logic it reaches.** Build a fake, stub or fixture only as large as what
+the tests read. When one is larger than the project lines a test drives through it, the test costs
+more than it pins. Cut the fake down to what the tests read, or reach the branch through a smaller
+seam. Its size alone never deletes the last test of a branch.
+
+Still tested: argv or values the project _computes_ from inputs, conditions, an order a condition
+chooses, cleanup and restore paths, every branch of project logic. "It is passed to a dependency"
+never exempts a computed value, and "it is fixed configuration" never exempts a value the project's
+logic branches on (a validation regex is tested through what it rejects, never through its text).
 
 ### 5. Minimum Tests, Maximum Coverage
 

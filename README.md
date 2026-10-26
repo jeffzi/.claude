@@ -133,6 +133,7 @@ own subtree, so cross-directory duplicates go unfixed.
 | [`distill-scanner`](agents/distill-scanner.md)               | Read-only distillation review: nesting, duplication     |
 | [`vet-code`](agents/vet-code.md)                             | Review code against idiom, type, and structure rules    |
 | [`vet-test`](agents/vet-test.md)                             | Review tests for redundancy, AAA, and drift             |
+| [`vet-test-merit`](agents/vet-test-merit.md)                 | Find tests that should not exist                        |
 | [`vet-test-suite`](agents/vet-test-suite.md)                 | Review whole test suite for cross-file redundancy       |
 | [`vet-doc`](agents/vet-doc.md)                               | Review docs for structure, prose, accessibility         |
 | [`vet-comments`](agents/vet-comments.md)                     | Review comment style, banners, and anchors              |

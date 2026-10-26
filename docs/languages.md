@@ -43,8 +43,9 @@ automatically when the base leaf detects a matching import pattern (Domain Skill
 is one-directional — leaves never load their hub back, and overlays never load their base leaf back.
 
 The `rules/skill-loading.md` Language Dispatch table is the **single source of truth** that feeds
-every orchestrator: the `vet-code` and `vet-test` agents, `tdd`, `tdd-cycle`, `preflight`, `fix`,
-`build`. A row in that table is all that is needed; no orchestrator requires individual changes.
+every orchestrator: the `vet-code`, `vet-test` and `vet-test-merit` agents, `tdd`, `tdd-cycle`,
+`preflight`, `fix`, `build`. A row in that table is all that is needed; no orchestrator requires
+individual changes.
 
 ## Decision tree
 
@@ -122,8 +123,9 @@ Confirm both resolve to the new `code-{lang}` and `test-{lang}` skills — the a
 skills they loaded on the first line of their findings. If either reports "no matching skill", the
 dispatch row or the skill filename does not match.
 
-> **No orchestrator changes are needed.** The `vet-code` and `vet-test` agents, `tdd`, `tdd-cycle`,
-> `preflight`, `fix`, and `build` all resolve languages through the rules-file dispatch table.
+> **No orchestrator changes are needed.** The `vet-code`, `vet-test` and `vet-test-merit` agents,
+> `tdd`, `tdd-cycle`, `preflight`, `fix`, and `build` all resolve languages through the rules-file
+> dispatch table.
 
 ## Adding an overlay for an existing language
 
@@ -185,7 +187,7 @@ A rule that applies to every language belongs in the hub, not in any leaf.
   pick it up through the hub. If a language has a specialized mechanism for the new rule, add an
   example row to that leaf's relevant section.
 - **Testing anti-pattern** → add to `test-core/references/anti-patterns.md`. All callers — `tdd`,
-  the `vet-test` agent, direct test writing — pick it up through the hub.
+  the `vet-test` and `vet-test-merit` agents, direct test writing — pick it up through the hub.
 
 See [`docs/coding.md`](coding.md) §"Design decisions" and [`docs/testing.md`](testing.md) §"Design
 decisions" for criteria on when a rule qualifies as universal vs. language-specific.

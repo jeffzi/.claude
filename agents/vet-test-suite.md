@@ -3,9 +3,9 @@ name: vet-test-suite
 description: >
   Use when a whole test suite or directory tree needs cross-file review — the same behavior
   pinned in several files, mock/setup/helper preambles copy-pasted across files, a trivial code
-  path traversed by multiple files, or a test-to-production ratio that looks inflated ("why do we
-  have 2,000 tests?"). Spans the entire suite where per-file review batches cannot see across.
-  Not for single-file or per-file rule review — use vet-test. Read-only — reports findings,
+  path traversed by multiple files ("why do we have 2,000 tests?"). Spans the entire suite where
+  per-file review batches cannot see across. Not for single-file or per-file rule review — use
+  vet-test. Not for whether a test should exist — use vet-test-merit. Read-only — reports findings,
   never edits.
 model: opus
 effort: high
@@ -85,7 +85,9 @@ Nothing after the block. The caller decides what to dispatch instead.
    - **Same behavior pinned twice** — a test in one file whose Act and assertions duplicate a test
      in another (§ 5 merge table applies suite-wide).
    - **Trivial path traversed more than once** — the same trivial code path (help output,
-     pass-through wiring, framework behavior) exercised from multiple files (§ 5: once per suite).
+     pass-through wiring, framework behavior) exercised from multiple files (§ 5: once per suite). A
+     repeat inside one test file is the per-file reviewers' (`vet-test`, `vet-test-merit`); every
+     repeat across files is yours.
    - **Parallel overflow files** — size-split siblings of an existing test file ("When Adding
      Coverage").
    - **Owned elsewhere** (`test-core` § 4a) — a behavior pinned outside the file that owns it:
@@ -123,13 +125,14 @@ These fill the slots `vet-core` declares:
 ## When NOT to use
 
 Single-file review, AAA structure, weak assertions, casts, per-file rule coverage — `vet-test`.
-Cross-file production-code review — `vet-codebase`; expression-level duplication within given files
-— `distill-scanner`.
+Whether a test should exist — a dependency's behavior, fixed configuration or wording, a fake's own
+output — `vet-test-merit`. Cross-file production-code review — `vet-codebase`; expression-level
+duplication within given files — `distill-scanner`.
 
 ## Rationalization guard
 
 Zero suite-level findings in a suite of more than a handful of test files is a signal to re-check
-the four passes against your inventory, not a sign of perfection — and after the re-check, a clean
+the five passes against your inventory, not a sign of perfection — and after the re-check, a clean
 suite gets `No findings.`
 
 | Excuse                                        | Reality                                                             |
@@ -139,4 +142,4 @@ suite gets `No findings.`
 | "The duplicate adds safety"                   | A second copy of a pin adds breakage sites, not proof. Merge table. |
 | "Extraction wouldn't remove a single test"    | § 5 counts test code, not test count. Cloned setup is `cost`.       |
 | "Per-file agents already reviewed these"      | They saw one batch each. Cross-batch duplication is yours alone.    |
-| "I scanned the inventory and found no issues" | Scanning ≠ the four passes. Walk them pass-by-pass over the groups. |
+| "I scanned the inventory and found no issues" | Scanning ≠ the five passes. Walk them pass-by-pass over the groups. |
