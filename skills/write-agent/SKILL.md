@@ -271,9 +271,11 @@ Load `Skill(write-skill)` and apply its RED → GREEN → REFACTOR loop. Agent a
 skill — the baseline test is **spawn an isolated agent, give it the Claude Code agent docs, and ask
 it to author your target agent**. Observe the failures, then draft the agent to address them.
 
-**Agent files hot-reload.** Claude Code watches `.claude/agents/` and `~/.claude/agents/`; an edit
-applies to the next dispatch within seconds, no restart. Restart only after creating a scope's first
-file in a brand-new `agents/` directory.
+**Agent definitions can be cached for the session.** An edited agent file may not reach the next
+dispatch: a run 13 s after an edit, and later probes, used the old text until the session restarted.
+A renamed or new agent type registers only on restart. Before measuring an edit, dispatch a probe
+that asks the agent to quote, without tools, a line only the new version contains. Old text or
+`NONE` → restart the session, then probe again.
 
 **Application tests for the finished agent:**
 
