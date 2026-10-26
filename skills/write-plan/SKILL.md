@@ -224,8 +224,8 @@ Create the plan at `.planning/plan-<slug>.md` **as the working file from the fir
 review, and revise there (`<slug>` kebab-cased from the feature). When ready, present it in
 conversation and wait for explicit approval before implementation. Approval happens in conversation,
 not via `ExitPlanMode`: ask explicitly ("Approve this plan?") and wait — silence, a tangent, or a
-question is not approval. On approval, load `Skill(execute-plan)` — approval covers every task, and
-that skill runs them to the Final Task without further check-ins.
+question is not approval. Approval covers every task: execute them to the Final Task without further
+check-ins. `/execute-plan` is user-invoked only — never load it or ask the user to run it.
 
 The fold is disclosed at approval, never left to be read off the tasks. The Checkpoint message
 quotes the plan's `## Folds` section verbatim, ahead of the question; a plan with folds opens with
