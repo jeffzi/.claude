@@ -10,10 +10,11 @@ user-invocable: false
 
 # Testing Polars Code
 
-**This skill extends `Skill(test-core)` via `Skill(test-py)`.** Universal principles (AAA,
-behavior-vs-implementation, merge rules, parametrize-over-loops, mocking anti-patterns) live in
-`test-core`; pytest syntax, fixtures, and plugins live in `test-py`. This file adds Polars-specific
-assertion APIs, schema handling, null/NaN semantics, and pipeline testing patterns.
+**This skill extends `Skill(test-core)` via `Skill(test-py)`.** Universal principles (test what the
+project computes, one test per distinct branch, test through the public API, test first only for
+logic, test shape) live in `Skill(test-core)`; pytest syntax, fixtures, and plugins live in
+`test-py`. This file adds Polars-specific assertion APIs, schema handling, null/NaN semantics, and
+pipeline testing patterns.
 
 **Also apply:** `code-py` rules. Exception: test functions don't need `-> None` annotations.
 

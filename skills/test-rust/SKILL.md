@@ -36,7 +36,7 @@ No overlays yet.
 
 ## Mandatory Rules
 
-### 1. Private Items: A Narrow Exception to `test-core` Rule 3
+### 1. Private Items: A Narrow Exception to `Skill(test-core)` › Test Through the Public API
 
 Rust's privacy unit is the module, so `mod tests` sees every private item in its file. That access
 is a deliberate Rust-specific exception, bounded three ways:

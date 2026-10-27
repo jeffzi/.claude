@@ -44,8 +44,9 @@ A finder reports a _claim_, not a finding. Before it enters the plan: re-read th
 line level and build a repro. Classify per the Finding Classification table in SKILL.md. False
 claims are appended to the ledger, never silently dropped.
 
-An **Overtest** claim's repro is the rule plus a coverage check: name the `test-core` § 4, § 4a or §
-5 rule, then find whether any other test reaches the project logic the deleted test reaches. When
+An **Overtest** claim's repro is the rule plus a coverage check: load `Skill(test-core)` and name
+the principle that removes the test (Test What the Project Computes or One Test per Distinct
+Branch), then find whether any other test reaches the project logic the deleted test reaches. When
 none does, the claim stays an Overtest and its task moves that coverage to a direct test at the
 owning module before deleting.
 

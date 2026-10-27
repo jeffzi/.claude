@@ -46,8 +46,8 @@ Before fixing anything, bucket the target files: a file matching the test-file p
 session context) is a test file; anything else is code. Load `Skill(code-core)` when the list has
 code files and `Skill(test-core)` when it has test files — each hub dispatches the matching language
 leaf itself. No dispatch row for an extension → proceed with the hub alone. Fixes must conform to
-the loaded rules: test-file fixes follow test-core's rules (behavior-not-implementation, AAA), code
-fixes follow code-core's.
+the loaded rules: test-file fixes follow test-core's principles (Test What the Project Computes,
+Shape), code fixes follow code-core's.
 
 **Resolve the mode first.** Read the `Behavior:` line; an absent line is `preserve`. Open the report
 with `Mode: preserve` or `Mode: may-change` — written before the first Edit, never inferred after.

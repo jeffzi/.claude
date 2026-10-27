@@ -55,8 +55,8 @@ Nothing after the block. The caller decides what to dispatch instead.
 1. **Load `Skill(vet-core)`** — the reviewer contract: verdicts, Impact, output grammar. A report
    produced without this load is malformed. Your slot declarations are in Contract slots below.
 
-2. **Load `Skill(test-core)`** — § 4a "What Deserves a Test", § 5 "Minimum Tests, Maximum Coverage"
-   (merge table, trivial paths once per suite), "When Adding Coverage" (no parallel overflow files),
+2. **Load `Skill(test-core)`** — Test What the Project Computes, One Test per Distinct Branch
+   (merging, trivial paths once per suite), Shape (new tests extend the feature's existing file),
    and `references/anti-patterns.md` ("When Mocks Become Too Complex") are your primary rule
    sources.
 
@@ -83,14 +83,15 @@ Nothing after the block. The caller decides what to dispatch instead.
      mocks a file's tests never exercise. One finding per cloned pattern; every sibling file in
      Reasoning; the fix names the shared fixture module to extract into.
    - **Same behavior pinned twice** — a test in one file whose Act and assertions duplicate a test
-     in another (§ 5 merge table applies suite-wide).
+     in another (One Test per Distinct Branch applies suite-wide).
    - **Trivial path traversed more than once** — the same trivial code path (help output,
-     pass-through wiring, framework behavior) exercised from multiple files (§ 5: once per suite). A
-     repeat inside one test file is the per-file reviewers' (`vet-test`, `vet-test-merit`); every
-     repeat across files is yours.
-   - **Parallel overflow files** — size-split siblings of an existing test file ("When Adding
-     Coverage").
-   - **Owned elsewhere** (`test-core` § 4a) — a behavior pinned outside the file that owns it:
+     pass-through wiring, framework behavior) exercised from multiple files (One Test per Distinct
+     Branch: once per suite). A repeat inside one test file is the per-file reviewers' (`vet-test`,
+     `vet-test-merit`); every repeat across files is yours.
+   - **Parallel overflow files** — size-split siblings of an existing test file (`test-core` ›
+     Shape).
+   - **Owned elsewhere** (`test-core` › Test What the Project Computes) — a behavior pinned outside
+     the file that owns it:
      - a shared helper's outcome (a missing setting, a client that cannot be built, hidden input)
        asserted from a caller's test file when the helper's own test file already pins it — the Acts
        differ, so the duplicate pass misses it; match on the helper the caller's code calls;
@@ -125,9 +126,9 @@ These fill the slots `vet-core` declares:
 ## When NOT to use
 
 Single-file review, AAA structure, weak assertions, casts, per-file rule coverage — `vet-test`.
-Whether a test should exist — a dependency's behavior, fixed configuration or wording, a fake's own
-output — `vet-test-merit`. Cross-file production-code review — `vet-codebase`; expression-level
-duplication within given files — `distill-scanner`.
+Whether a test should exist (`test-core` › Test What the Project Computes) — `vet-test-merit`.
+Cross-file production-code review — `vet-codebase`; expression-level duplication within given files
+— `distill-scanner`.
 
 ## Rationalization guard
 
@@ -135,11 +136,11 @@ Zero suite-level findings in a suite of more than a handful of test files is a s
 the five passes against your inventory, not a sign of perfection — and after the re-check, a clean
 suite gets `No findings.`
 
-| Excuse                                        | Reality                                                             |
-| --------------------------------------------- | ------------------------------------------------------------------- |
-| "Each file needs its own mock setup"          | Isolation is runtime state, not source. Copies are one finding.     |
-| "Reading every file is more thorough"         | It is how suite review dies at scale. Inventory first, read groups. |
-| "The duplicate adds safety"                   | A second copy of a pin adds breakage sites, not proof. Merge table. |
-| "Extraction wouldn't remove a single test"    | § 5 counts test code, not test count. Cloned setup is `cost`.       |
-| "Per-file agents already reviewed these"      | They saw one batch each. Cross-batch duplication is yours alone.    |
-| "I scanned the inventory and found no issues" | Scanning ≠ the five passes. Walk them pass-by-pass over the groups. |
+| Excuse                                        | Reality                                                                                |
+| --------------------------------------------- | -------------------------------------------------------------------------------------- |
+| "Each file needs its own mock setup"          | Isolation is runtime state, not source. Copies are one finding.                        |
+| "Reading every file is more thorough"         | It is how suite review dies at scale. Inventory first, read groups.                    |
+| "The duplicate adds safety"                   | A second copy of a pin adds breakage sites, not proof. Merge table.                    |
+| "Extraction wouldn't remove a single test"    | One Test per Distinct Branch counts test code, not test count. Cloned setup is `cost`. |
+| "Per-file agents already reviewed these"      | They saw one batch each. Cross-batch duplication is yours alone.                       |
+| "I scanned the inventory and found no issues" | Scanning ≠ the five passes. Walk them pass-by-pass over the groups.                    |

@@ -5,20 +5,21 @@ in the same session. Plan mode context is erased on approval; never mark a skill
 loaded". When a skill, command, or rule prescribes an agent instead of a load, dispatch it — see
 "Agent dispatch is pre-approved" below.
 
-| Action                                    | Skill to load first                                                                                           |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| EnterPlanMode or writing a plan           | `Skill(write-plan)`                                                                                           |
-| Executing an approved plan                | `/execute-plan` — user-invoked only; never suggest or ask the user to run it                                  |
-| Writing code                              | `Skill(code-core)` (hub — loads the language skill via Language Dispatch below)                               |
-| Writing tests                             | `Skill(test-core)` (hub — loads the language skill via Language Dispatch below)                               |
-| Running TDD cycle                         | `Skill(tdd)` (hub load + RED-GREEN orchestration)                                                             |
-| Reviewing code or tests                   | Dispatch `subagent_type: vet-code` / `vet-test` + `vet-test-merit`, or run `/revise-*` to also fix            |
-| Asking whether a test should exist        | Dispatch `subagent_type: vet-test-merit` — "is this suite over-tested?", "are we testing what we don't own?"  |
-| Reviewing a whole test suite              | Dispatch `subagent_type: vet-test-suite`; `/revise-test` with a directory also dispatches it                  |
-| Reviewing a whole codebase cross-file     | Dispatch `subagent_type: vet-codebase` — reimplemented helpers, idiom drift, overflow modules, bypassed seams |
-| User explicitly asks to commit            | `Skill(write-commit)`                                                                                         |
-| Bug or regression with unknown root cause | `/fix` command — investigates, then TDD                                                                       |
-| New feature in a project with tests       | `Skill(tdd)` — its Choose the Path table picks direct edit, inline test-first, or the agent loop              |
+| Action                                       | Skill to load first                                                                                           |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| EnterPlanMode or writing a plan              | `Skill(write-plan)`                                                                                           |
+| Executing an approved plan                   | `/execute-plan` — user-invoked only; never suggest or ask the user to run it                                  |
+| Writing code                                 | `Skill(code-core)` (hub — loads the language skill via Language Dispatch below)                               |
+| Writing tests                                | `Skill(test-core)` (hub — loads the language skill via Language Dispatch below)                               |
+| Judging what is tested, or a plan's tests    | `Skill(test-core)` — "do we have tests for X?", coverage gaps, a plan behavior's `Test:` line                 |
+| Running TDD cycle                            | `Skill(tdd)` (hub load + RED-GREEN orchestration)                                                             |
+| Reviewing code or tests                      | Dispatch `subagent_type: vet-code` / `vet-test` + `vet-test-merit`, or run `/revise-*` to also fix            |
+| Asking whether a test should exist           | Dispatch `subagent_type: vet-test-merit` — "is this suite over-tested?", "are we testing what we don't own?"  |
+| Reviewing a whole test suite                 | Dispatch `subagent_type: vet-test-suite`; `/revise-test` with a directory also dispatches it                  |
+| Reviewing a whole codebase cross-file        | Dispatch `subagent_type: vet-codebase` — reimplemented helpers, idiom drift, overflow modules, bypassed seams |
+| User explicitly asks to commit               | `Skill(write-commit)`                                                                                         |
+| Bug or regression with unknown root cause    | `/fix` command — investigates, then TDD                                                                       |
+| Adding or changing logic, project with tests | `Skill(tdd)` — no logic (`Skill(test-core)` › Test What the Project Computes) → edit directly, no new test    |
 
 If no matching skill exists for a language or framework, note that explicitly in the plan rather
 than silently skipping the step.

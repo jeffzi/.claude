@@ -19,9 +19,10 @@ No overlays yet. Add a detection table here when the first library overlay is in
 
 ## Mandatory Rules
 
-<!-- Language/runner-specific rules only. Do not restate: AAA, test-behavior-not-implementation,
-     isolation/determinism, merge rules, parametrize-over-loops, never-test-private. Those live
-     in test-core. -->
+<!-- Language/runner-specific rules only. Do not restate test-core's principles: test what the
+     project computes, one test per distinct branch (merging, parametrize over loops, isolation and
+     determinism), test through the public API (never test private functions), test first only for
+     logic, and test shape (AAA, naming). -->
 
 ## Verification
 

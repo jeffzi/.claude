@@ -30,7 +30,8 @@ No overlays yet.
 
 Every `_test.go` file is `package foo_test`. Go's `_test` suffix exists so tests consume the package
 the way callers do; a `package foo` test file couples the suite to struct layout and lets coverage
-come from restating internals. `test-core` Rule 3 applies in full, with one Go-specific mechanism:
+come from restating internals. `Skill(test-core)`'s rule against testing private functions (Test
+Through the Public API) applies in full, with one Go-specific mechanism:
 
 - **An internal that the public API genuinely cannot pin down** (a parser's exact output, a
   state-machine transition) is re-exported from an in-package `export_test.go` — `var ParseTTL =

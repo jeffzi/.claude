@@ -5,6 +5,7 @@
 ## Table of Contents
 
 - [Entry Point](#entry-point)
+- [Agent Loop Rules](#agent-loop-rules)
 - [RED-GREEN-REFACTOR Loop](#red-green-refactor-loop)
 - [Phase Data Contracts](#phase-data-contracts)
 
@@ -18,7 +19,7 @@ When `/tdd` is invoked, determine the entry point before doing anything else:
   dispatch agents until the plan is approved and you're executing a specific task.
 - **Executing a plan task whose Implementation line says `/tdd`, or several behavior groups** --
   Proceed to the RED-GREEN-REFACTOR loop below.
-- **Anything else** -- SKILL.md § Choose the Path: a direct edit, or inline test-first in the main
+- **Anything else** -- SKILL.md › Choose the Path: a direct edit, or inline test-first in the main
   loop. No agent is dispatched.
 
 When the project has a test suite, plans describe **behaviors to implement** plus the files they
@@ -26,10 +27,112 @@ touch -- implementation details compromise the agents' context isolation; file p
 orchestrator hands `tdd-cycle` the test file paths anyway). When the project has no test suite,
 plans describe implementation directly -- TDD constraints don't apply.
 
+## Agent Loop Rules
+
+These rules govern only the agent loop, the path SKILL.md › Choose the Path picks for a plan task
+whose Implementation line says `/tdd`, or for several behavior groups.
+
+| Excuse                                                         | Reality                                                                                                                                                                                                                                                                                                        |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "I'll orchestrate RED-GREEN-REFACTOR myself"                   | Context isolation is the entire point. Invoke `/tdd`.                                                                                                                                                                                                                                                          |
+| "Plan already has RED/GREEN steps" / "Plan shows inline code"  | Plans describe behaviors, not test/impl details. Use `/tdd` for implementation.                                                                                                                                                                                                                                |
+| "Each test needs its own cycle" / "I'll batch later"           | Cohesive batches belong in one cycle. Different modules = separate cycles. See Batching.                                                                                                                                                                                                                       |
+| "Let me read the source first" / "I'll write test inline"      | RED agent reads what it needs. Context isolation exists for a reason.                                                                                                                                                                                                                                          |
+| "Just one quick cycle, no plan needed"                         | Multi-behavior tasks need a plan. Plans describe behaviors; agents figure out how.                                                                                                                                                                                                                             |
+| "I'll dispatch `tdd-cycle` directly, skip the orchestrator"    | No phase verification, no circuit breaker, no data contracts. Always go through `/tdd`.                                                                                                                                                                                                                        |
+| "The workflow prescribes committing, so it's pre-approved"     | The skill prescribes _when_; the user authorizes _that_. Ad hoc → ask first.                                                                                                                                                                                                                                   |
+| "I'll present the message and commit in the same turn"         | Present-and-proceed is committing without approval. Stop the turn; wait for the user.                                                                                                                                                                                                                          |
+| "write-commit handles approval, so the TDD gate is redundant"  | The TDD gate is the orchestrator's own rule. Loading write-commit does not replace it.                                                                                                                                                                                                                         |
+| "Plan task → proceed, so I commit and list the findings after" | The grant covers verified work, not unseen findings. SURFACE gate first: findings, end turn, then commit. Only an unattended enclosing workflow (its marker holds this session's id, or the request named the plan's tasks) lifts this — then findings go to the list the caller named and the loop continues. |
+
+| Red flag — STOP, delete the code, start over with TDD                                        |
+| -------------------------------------------------------------------------------------------- |
+| Code before test / test passes immediately / can't explain why the test failed               |
+| Dispatching `tdd-cycle` without invoking `/tdd` first                                        |
+| Agent loop, before REFACTOR: orchestrator reading implementation source or writing test code |
+| Dispatching agents without a plan for multi-behavior tasks                                   |
+| Dispatching agents from plan mode instead of writing plan tasks                              |
+| Plan contains implementation details or inline RED/GREEN test/impl code                      |
+
+### Architecture
+
+Context isolation prevents the LLM from designing tests around planned implementation. It applies to
+the agent loop; the other paths in SKILL.md › Choose the Path have no orchestrator.
+
+| Phase     | Agent                                 | Can see (Phase 1 / Phase 2)                      | Cannot see/modify                          |
+| --------- | ------------------------------------- | ------------------------------------------------ | ------------------------------------------ |
+| RED-GREEN | `tdd-cycle`                           | Phase 1: tests, stubs, public API / Phase 2: all | Phase 1: impl source / Phase 2: test files |
+| REFACTOR  | code-distiller → vet-comments → fixes | Everything                                       | N/A                                        |
+
+**NEVER dispatch `tdd-cycle` directly** — this skill is the orchestrator.
+
+### Dispatch First
+
+On the agent loop, the `tdd-cycle` dispatch is each cycle's first tool call — nothing to read, run,
+or check between the task's behavior list and the Agent call: no Read, no Bash, no Glob, no Grep.
+
+| Excuse                                            | Reality                                                                          |
+| ------------------------------------------------- | -------------------------------------------------------------------------------- |
+| "Checking TSTL markers is routing, not reading"   | You pass paths, never a language. tdd-cycle's hubs route in its own context.     |
+| "A green baseline confirms the suite works first" | tdd-cycle resolves and runs the commands in RED. Your first run is Verify GREEN. |
+| "I said I'd dispatch — these reads are just prep" | The announcement is not the dispatch. Any prep before the Agent call is drift.   |
+
+**Until REFACTOR, the orchestrator routes; it never reads target files.** Prompts carry behavior
+descriptions and file paths; `tdd-cycle` loads the test/code hubs and resolves TEST_COMMAND and
+FULL_SUITE_COMMAND in RED; the orchestrator loads no testing or coding skills.
+
+### Batching
+
+Each cycle covers a **behavior group** — behaviors sharing one implementation area; under-batching
+is the expensive failure: every dispatch re-pays fixed startup cost.
+
+| Batch together (one cycle)                                                                                     | Keep separate (distinct cycles)                         |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Behaviors landing in the same module or file set — even when their tests fail for different structural reasons | Behaviors touching different modules or subsystems      |
+| Edge cases and variants of the same behavior                                                                   | A GREEN diff too large to reason about as one           |
+| Validation rules for the same field or data type                                                               | Behaviors with different fold targets (see Commit last) |
+
+**Rule of thumb:** group by where the implementation lands, not by why the tests fail. "Different
+failure modes" or "could ship independently" are never reasons to split behaviors that live in the
+same files.
+
+### Parallel Waves
+
+Independent groups — neither consumes anything the other introduces; test files and implementation
+areas disjoint — form one wave: one `tdd-cycle` per group in a single parallel message; dependent
+groups wait for later waves. Independence is judged from the plan's behavior list alone — never by
+reading files (unsure → serialize). Serializing independent groups wastes wall-clock time;
+parallelizing dependent ones hands an agent a GREEN phase missing its prerequisites.
+
+### The Loop
+
+Run the RED-GREEN-REFACTOR loop below. Non-negotiables:
+
+- **Verify RED — MANDATORY, never skip.** Inspect FAILURE_OUTPUT: expected failure, feature missing,
+  not typos.
+- **Verify GREEN — MANDATORY.** Run TEST_COMMAND and FULL_SUITE_COMMAND yourself — never rely solely
+  on the agent's report. Test fails → fix code, not test.
+- **REFACTOR once**, after all cycles, before any commit: < 50 insertions → skip; ≥ 50 →
+  distill-and-mend (steps 10–12).
+- **Surface before commit.** Any open item — unconfirmed finding, flaky test, "unrelated" issue — is
+  shown to the user and the turn ends before any commit (the SURFACE step below). Under an
+  unattended enclosing workflow (`<git-dir>/execute-plan-unattended` holds this session's id) the
+  items go to the list the caller named — a plan's Findings section — and the turn continues. A
+  request that names tasks of a plan file to implement is such a workflow with no marker: the plan
+  is the approval and its `### Findings` section is the list.
+- **Commit last.** Plan task or autocommit → proceed; plan task invoked with "no-commit plan
+  execution" → skip, report file lists; ad hoc → list each cycle's files and stop for explicit
+  approval. Then one commit per cycle, tests and implementation together; agents never commit. A
+  behavior group whose invocation carries `fixup target: <sha>` for it (one target per group when
+  the invocation batches several tasks or findings) commits each of its cycles with `git commit
+  --fixup=<sha>` — no `Skill(write-commit)` message; the generated `fixup! <subject>` subject passes
+  the commit-message guard and the conventional-commit hook. A group without a target gets a
+  `Skill(write-commit)` message. Cycles with different targets never share a commit.
+
 ## RED-GREEN-REFACTOR Loop
 
-Wave partitioning is defined in SKILL.md § Parallel Waves. A wave of one is the ordinary serial
-case; the loop below is identical for it.
+Wave partitioning is defined in Agent Loop Rules › Parallel Waves. A wave of one is the ordinary
+serial case; the loop below is identical for it.
 
 ```text
 LOOP (one wave per iteration; a wave = one or more independent behavior groups):
@@ -69,7 +172,7 @@ LOOP (one wave per iteration; a wave = one or more independent behavior groups):
        (while tdd-cycle-active exists, a hook blocks all git add/commit -- including
        yours; the tdd-red-phase.<agent_id> files are per-agent read guards)
     3. Handle non-PASSED statuses, per agent:
-       - NO_TEST_WARRANTED -> the behavior is exempt per test-core § 4a; apply the
+       - NO_TEST_WARRANTED -> the behavior has no logic (test-core › Test What the Project Computes); apply the
          change directly (no RED), verify it by running the tool once, and record
          `no test: <REASON>` -- never ask, never manufacture a test.
        - PASSED_UNEXPECTEDLY -> behavior already exists; report to user;
@@ -177,7 +280,7 @@ contains the cleaned-up code; there is no separate refactor commit):
   13. When an enclosing workflow defines a pre-commit verification step (e.g. a
       plan task's Verify block dispatching claim-reviewer), run it NOW and resolve
       its findings -- verification always precedes the commit, never follows it.
-  14. Approval gate -- see SKILL.md § The Loop, the "Commit last" bullet. Plan task
+  14. Approval gate -- see Agent Loop Rules › The Loop, the "Commit last" bullet. Plan task
       or autocommit -> proceed; plan task whose invocation says "no-commit plan
       execution" -> skip COMMIT, report each cycle's file list to the caller;
       ad hoc -> STOP and wait for explicit approval. This gate is the TDD

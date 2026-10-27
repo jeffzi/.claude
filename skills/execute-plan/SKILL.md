@@ -102,25 +102,25 @@ Two `/tdd` invocations never run concurrently.
    A **gap** is one thing the reviewer named as wrong or unpinned: the reason behind a `Refuted` /
    `Unsubstantiated` verdict, or a note in a `Verified` claim's Reasoning (a behavior no test pins,
    a branch of project logic no input reaches). A test-strength note is a gap only when its behavior
-   passes `test-core` § 4a What Deserves a Test and § 5's case rule; a note on fixed configuration,
-   a dependency's behavior, prose, a helper-owned behavior, a message's fixed wording, or another
-   input of a class a test already covers is not a gap — even when the note says a stated outcome
-   depends on it — record `Task N — <the note> — no test: <the § 4a rule>` under Deviations and move
-   on. Append each gap to the plan file's `## Gaps` section the moment the reviewer names it: `Task
-   N — <the reviewer's wording> — refuted: 0`. A gap is identified by the behavior it says is wrong
-   or unpinned, not by the reviewer's wording: the same behavior named again in other words is the
-   same entry, and its count carries on.
+   passes `Skill(test-core)` › Test What the Project Computes and › One Test per Distinct Branch.
+   Any other note is not a gap, even when it says a stated outcome depends on it: record `Task N —
+   <the note> — no test: <case>` under Deviations and move on. Append each gap to the plan file's
+   `## Gaps` section the moment the reviewer names it: `Task N — <the reviewer's wording> — refuted:
+   0`. A gap is identified by the behavior it says is wrong or unpinned, not by the reviewer's
+   wording: the same behavior named again in other words is the same entry, and its count carries
+   on.
 
    For every open gap, in this order:
 
    1. **Fix it**, test first.
    2. **Prove a test-strength gap by mutation.** When the gap says a test would not catch a
       regression, apply the regression the reviewer named — that one, not an easier one, and only an
-      accidental edit to logic per § 4a (an edited value or a flipped flag is not a mutant) — to the
-      production code with Edit, run the test, and see it fail on the assertion the gap is about.
-      Undo the mutation with the reverse Edit, never with git, and run the test again to see it
-      pass. A test that still passes under the mutation means the fix did not work: rework it and
-      mutate again. Reworks before a dispatch do not touch the count.
+      accidental edit to logic per `Skill(test-core)` › Test What the Project Computes (an edited
+      value or a flipped flag is not a mutant) — to the production code with Edit, run the test, and
+      see it fail on the assertion the gap is about. Undo the mutation with the reverse Edit, never
+      with git, and run the test again to see it pass. A test that still passes under the mutation
+      means the fix did not work: rework it and mutate again. Reworks before a dispatch do not touch
+      the count.
    3. **Re-dispatch `claim-reviewer`** once all open gaps are fixed, with one claim per gap and
       nothing else: `Gap closed: <the reviewer's wording of the gap>. Change: <file:line>. Mutation:
       <the regression applied> → <the test that failed and its failure line>.` Do not restate the
@@ -324,9 +324,8 @@ both; the trunk path never raises it.
 | "The target sha is right there in the plan"                          | The plan names a subject. The sha is looked up when the task is about to commit, after any fold that happened since.                                        |
 | "The verdict is Verified; the note is only Reasoning"                | A gap the reviewer names is a refutation with the wrong label. Fix, re-dispatch that claim.                                                                 |
 | "I fixed the main gap; the others are minor"                         | Every gap the reviewer named stays open until its own claim is Verified. Fix all of them before re-dispatching.                                             |
-| "Writing a test the plan never named is unrequested work"            | Every plan behavior § 4a admits comes with its test. One with no test is the cycle unfinished, not new scope.                                               |
-| "The reviewer named it, so it needs a test"                          | The reviewer names; `test-core` § 4a decides. A fixed-configuration or dependency note goes to Deviations as `no test`.                                     |
-| "The note says a stated outcome breaks without it"                   | An outcome resting on fixed configuration breaks only by a deliberate edit. Still `no test`.                                                                |
+| "Writing a test the plan never named is unrequested work"            | Every plan behavior with logic comes with its test. One with no test is the cycle unfinished, not new scope.                                                |
+| "The reviewer named it" / "a stated outcome breaks without it"       | The reviewer names; `test-core` › Test What the Project Computes decides. A note it gives no test goes to Deviations as `no test`.                          |
 | "`/tdd` tasks: take its verdicts, never re-dispatch"                 | Its Verified verdicts. A claim it refuted and you fixed is open until the reviewer closes it.                                                               |
 | "Mark it `unverified`; the Final Task re-checks it"                  | `unverified` is for findings you could not read. A claim you fixed is re-verified now, in its task.                                                         |
 | "The Behavior's listed cases are examples; this one fits its intent" | The user approved the cases the Behavior names. A re-verify note about a case it does not name is a finding.                                                |

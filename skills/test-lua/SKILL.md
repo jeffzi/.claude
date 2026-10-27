@@ -15,9 +15,9 @@ loaded by `test-core` based on the rules-file dispatch table.
 **Load `Skill(code-lua)` and apply its rules.** Exception: test helper functions don't need full
 LuaLS annotations.
 
-Universal testing principles (behavior vs. implementation, AAA structure, mocking at boundaries,
-test independence) live in `test-core`; this skill adds busted-specific syntax, assertions, spies,
-and pitfalls.
+Universal testing principles (test what the project computes, one test per distinct branch, test
+through the public API, test first only for logic, test shape) live in `Skill(test-core)`; this
+skill adds busted-specific syntax, assertions, spies, and pitfalls.
 
 ## Mandatory Rules
 

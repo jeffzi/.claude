@@ -10,9 +10,9 @@ user-invocable: false
 
 # TypeScript Testing with Vitest
 
-**This skill extends `Skill(test-core)`.** Universal principles (AAA, behavior-vs-implementation,
-merge rules, parametrization, mocking anti-patterns) live in `test-core`. This file adds Vitest- and
-TypeScript-specific syntax, pitfalls, and APIs.
+**This skill extends `Skill(test-core)`.** Universal principles (test what the project computes, one
+test per distinct branch, test through the public API, test first only for logic, test shape) live
+in `Skill(test-core)`. This file adds Vitest- and TypeScript-specific syntax, pitfalls, and APIs.
 
 **Default to the strictest API** — loosen only when you have a reason.
 
@@ -172,7 +172,7 @@ expect(result.result).toStrictEqual({ nested: { value: 42 } });
 
 ### 7. Parametrize with `it.each` / `test.for`
 
-Per `test-core` § 6 (parametrize over loops), in Vitest:
+Per `Skill(test-core)` › One Test per Distinct Branch (parametrize, never loop), in Vitest:
 
 ```typescript
 it.each([

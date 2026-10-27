@@ -90,7 +90,8 @@ result if nothing changes).
      ├── test-lua         ← leaf: busted, spies, parametrized tests
      └── test-swift       ← leaf: Swift Testing, XCTest, concurrency
 
- tdd            ─first-step→  Skill(test-core)  (hub does the rest)
+ tdd (inline)   ─first-step→  Skill(test-core)  (hub does the rest)
+ tdd (agent loop) → tdd-cycle agent loads Skill(test-core)   (orchestrator loads none)
  vet-test agent ─first-step→  Skill(vet-core) → Skill(test-core)   (loaded inside the agent)
                      └─also→  rules dispatch → Skill(code-{lang})  (code-side review)
  vet-test-merit   ─first-step→  Skill(vet-core) → Skill(test-core)   (loaded inside the agent)
@@ -150,17 +151,15 @@ sections.
 
 ### `test-core`
 
-The hub. Owns all universal principles inline:
+The hub. Owns all universal principles inline, each under a named heading:
 
-- Core principle: test behavior, not implementation
-- Arrange-Act-Assert (one canonical definition)
-- Isolation and determinism
-- Fragile vs. Resilient table
-- Merge rules — Minimum Tests, Maximum Coverage
-- Never test private functions directly
-- False coverage detection
-- Parametrize over loops (language-agnostic formulation)
-- Universal rationalizations and red flags
+- Test What the Project Computes: whether a test should exist, which changes get no test, and how
+  large a fake may be
+- One Test per Distinct Branch: merging cases, parametrize over loops, isolation and determinism
+- Test Through the Public API: assert outcomes, never internals; mock only at boundaries
+- Test First Only for Logic
+- Shape: Arrange-Act-Assert, naming, where new tests go
+- Rationalizations, condensed from every past excuse
 - Dispatch block: read extension → rules-file table → `Skill(test-{lang})`
 
 Lazy reference: `@references/anti-patterns.md` — loaded when writing or reviewing code that uses
@@ -205,23 +204,23 @@ No `Skill(test-core)` call. The leaf does not pull its parent.
 
 TDD orchestrator. Owns:
 
-- The Iron Law: no production code without a failing test first
-- RED-GREEN-REFACTOR orchestration via `tdd-cycle` subagents
-- Plans → agents → verification flow
-- Batching rules (cohesive vs. unrelated behaviors)
-- TDD-specific rationalizations ("I'll test after", "plan has inline impl") — inlined in the
-  SKILL.md body
-- TDD-specific red flags (code before test, orchestrator reading source, dispatching `tdd-cycle`
-  directly) — inlined in the SKILL.md body
+- The Iron Law: no logic without a failing test first; a change with no logic is outside it
+- Choose the Path: inline test-first in conversation, or the `tdd-cycle` agent loop for plan tasks
+- RED-GREEN-REFACTOR orchestration via `tdd-cycle` subagents, with batching and parallel waves, in
+  `references/orchestration-flow.md`
+- Path-choice rationalizations and red flags in the SKILL.md body; agent-loop rationalizations and
+  red flags (orchestrator reading source, dispatching `tdd-cycle` directly) in
+  `references/orchestration-flow.md` › Agent Loop Rules
 
 Cross-language testing principles (the "what makes a good test" content) live in `test-core`.
 
-First step before the first RED-GREEN cycle: `Skill(test-core)`.
+On the inline path, the first step before the first RED-GREEN cycle is `Skill(test-core)`. On the
+agent loop the orchestrator loads no testing skill; each `tdd-cycle` agent loads `test-core` itself.
 
 ### `tdd/references/orchestration-flow.md`
 
-The RED-GREEN-REFACTOR loop pseudocode, entry-point logic, and phase data contracts. Pure
-orchestration, no philosophy.
+The RED-GREEN-REFACTOR loop pseudocode, entry-point logic, and phase data contracts, plus the Agent
+Loop Rules: dispatch, batching, parallel waves, and the agent loop's rationalizations and red flags.
 
 The tdd-cycle output contract (STATUS values and per-status fields) is owned by
 `agents/tdd-cycle.md` § Output Format — the single source of truth. It is deliberately not restated
@@ -244,22 +243,21 @@ The agent has no `Edit`, `Write`, or `Bash` tools: it reports, and the caller fi
 is the interactive entry point that dispatches it and then applies the findings.
 
 `vet-test` does not contain inline testing principles. The checklist is `test-core` principles plus
-language-skill rules plus code idioms. It skips `test-core` § 4 and § 4a, which `vet-test-merit`
-owns.
+language-skill rules plus code idioms. It skips `test-core` › Test What the Project Computes, which
+`vet-test-merit` owns.
 
 ### `vet-test-merit` agent
 
 Read-only review agent (`agents/vet-test-merit.md`), dispatched as `subagent_type: vet-test-merit`.
-It asks one question of every test in its bucket: should this test exist? It owns `test-core` § 4
-"False Coverage" and § 4a "What Deserves a Test": tests of a dependency's behavior, fixed
-configuration or wording, a fake's own output, a shared helper re-checked through a caller, and
-fakes heavier than the logic they reach. It reads the production modules the tests reach, because it
-names the project line that decides each assertion.
+It asks one question of every test in its bucket: should this test exist? It owns `test-core` › Test
+What the Project Computes: tests of anything that principle says gets no test, and fakes heavier
+than the logic they reach. It reads the production modules the tests reach, because it names the
+project line that decides each assertion.
 
 It makes two passes:
 
-1. **Ledger** — one line per test: the project line that decides it, or `none` plus the § rule, and
-   a decision (`keep`, `delete`, `narrow`, `move first`).
+1. **Ledger** — one line per test: the project line that decides it, or `none` plus the case, and a
+   decision (`keep`, `delete`, `narrow`, `move first`).
 2. **Proportion** — per production module, the test-side lines against the logic lines. A module
    where at least a third of its ledger lines are not `keep` gets one module-level finding.
 

@@ -108,8 +108,8 @@ per-step mechanics before running a round.
 
 2. **Verify claim.** A finder reports a _claim_, not a finding — re-read the mechanism, build a
    repro, classify per the table below. Claims are independent: verify them in parallel via forks,
-   grouped by target module (`references/round-lifecycle.md` § 2), never one by one when more than
-   one group exists. False claims are appended to the ledger.
+   grouped by target module (`references/round-lifecycle.md` › Verify claim), never one by one when
+   more than one group exists. False claims are appended to the ledger.
 
 3. **Write plan.** Load `Skill(write-plan)`; author the plan **once**, directly to
    `<repo-root>/.planning/hardening-wip.md`, **before entering plan mode**; verify it with
@@ -124,17 +124,17 @@ per-step mechanics before running a round.
 
 ## Finding Classification
 
-| Class             | Definition                                                                                                       | Plan disposition                                                                                                                                            |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Bug**           | Wrong output or crash; mechanism verified at line level, repro shape known                                       | Own task, `/tdd`                                                                                                                                            |
-| **Landmine**      | Two sources that must agree disagree; unreachable today by convention only                                       | Own task; derive one source from the other — no comparator test (see below). Sources that must stay separate: comparator test first, failing before the fix |
-| **Overtest**      | A test or case that `test-core` § 4, § 4a or § 5 says should not exist                                           | Deletion task, no new tests, gated by unchanged production coverage (see below)                                                                             |
-| **Smell**         | Same class as a past bug, harmless today                                                                         | Surface with a fix-vs-document recommendation — the user decides; silent status quo is not an option                                                        |
-| **DRY**           | Verified duplication across files                                                                                | No-new-tests task, verified by the per-task gate                                                                                                            |
-| **Docs drift**    | Docs disagree with source                                                                                        | `docs:` task; verify signatures against source, never from memory                                                                                           |
-| **Audited clean** | Checked and sound                                                                                                | Record in the round's Context ("record only") — within-round coverage tracking, **not** cross-round memory; never read it in a later round                  |
-| **Refuted**       | Claim is false                                                                                                   | Append to the ledger — this stops round N+1 re-chasing it while the disproof holds                                                                          |
-| **Declined**      | Change is _possible_ but unwise (order-sensitive, intentionally divergent, theoretical-only risk vs. real churn) | Record in Context as "reviewed, declined" with the reason — do not implement                                                                                |
+| Class             | Definition                                                                                                               | Plan disposition                                                                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Bug**           | Wrong output or crash; mechanism verified at line level, repro shape known                                               | Own task, `/tdd`                                                                                                                                            |
+| **Landmine**      | Two sources that must agree disagree; unreachable today by convention only                                               | Own task; derive one source from the other — no comparator test (see below). Sources that must stay separate: comparator test first, failing before the fix |
+| **Overtest**      | A test or case that `test-core` › Test What the Project Computes or › One Test per Distinct Branch says should not exist | Deletion task, no new tests, gated by unchanged production coverage (see below)                                                                             |
+| **Smell**         | Same class as a past bug, harmless today                                                                                 | Surface with a fix-vs-document recommendation — the user decides; silent status quo is not an option                                                        |
+| **DRY**           | Verified duplication across files                                                                                        | No-new-tests task, verified by the per-task gate                                                                                                            |
+| **Docs drift**    | Docs disagree with source                                                                                                | `docs:` task; verify signatures against source, never from memory                                                                                           |
+| **Audited clean** | Checked and sound                                                                                                        | Record in the round's Context ("record only") — within-round coverage tracking, **not** cross-round memory; never read it in a later round                  |
+| **Refuted**       | Claim is false                                                                                                           | Append to the ledger — this stops round N+1 re-chasing it while the disproof holds                                                                          |
+| **Declined**      | Change is _possible_ but unwise (order-sensitive, intentionally divergent, theoretical-only risk vs. real churn)         | Record in Context as "reviewed, declined" with the reason — do not implement                                                                                |
 
 A confirmed simplification finding routes by the diff its fix produces, not by which lens or tag
 reported it: a fix that leaves output byte-identical (dead-code deletion, duplication merge) is a
@@ -143,16 +143,17 @@ platform feature, removing a speculative abstraction) is a **deliberate-output-c
 confined to the named call sites.
 
 A **Landmine** fixed by deriving one source from the other needs no comparator test: with one
-source, the test fails only when someone deliberately reintroduces a second one (`test-core` § 4a).
-Keep the comparator test only when the two sources must stay separate — another language, a file the
-build cannot share.
+source, the test fails only when someone deliberately reintroduces a second one (`test-core` › Test
+What the Project Computes). Keep the comparator test only when the two sources must stay separate —
+another language, a file the build cannot share.
 
 An **Overtest** deletion is gated by production coverage: record line and branch coverage before the
 task (the harness's **Coverage** block, or in standalone mode the project's own coverage command),
 and after it the coverage must be identical. A drop means the deleted test was the last test of that
 logic: the task fails until it first adds a direct test at the module that owns the logic, one case
-per branch, then deletes (`test-core` § 4a). A project with no coverage tool names, per deleted
-test, its § 4, § 4a or § 5 rule or the surviving test that takes the same branch.
+per branch, then deletes (`test-core` › Test What the Project Computes). A project with no coverage
+tool names, per deleted test, the `test-core` principle that removes it or the surviving test that
+takes the same branch.
 
 Refuted ≠ Declined: a refuted finding is _false_; a declined one is true but not worth the cost. A
 refactor that cannot reach an empty diff is **declined** (or surfaced), never "refuted."

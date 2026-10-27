@@ -41,8 +41,9 @@ git ls-files --others --exclude-standard 2>/dev/null || true
 
 2. **Dispatch the reviewers.**
    - Dispatch `subagent_type: vet-test` and `subagent_type: vet-test-merit` per bucket, following
-     the revise-core bucketing rule. `vet-test-merit` owns test-core § 4 and § 4a; `vet-test` the
-     rest. Both report § 5 repeats, and revise-core's Merge stage joins them.
+     the revise-core bucketing rule. `vet-test-merit` owns `test-core` › Test What the Project
+     Computes; `vet-test` the rest. Both report One Test per Distinct Branch repeats, and
+     revise-core's Merge stage joins them.
    - The suite agent is `subagent_type: vet-test-suite`; revise-core step 2 sets where it runs and
      how many times. `STATUS: WRONG_INPUT` → discard it; the per-file agents still run.
 
@@ -60,9 +61,8 @@ git ls-files --others --exclude-standard 2>/dev/null || true
 
    Deleting a redundant test is a fix; deleting a test because it fails is not. If a finding would
    reduce what the suite covers (not how many times it covers it), surface it instead of applying. A
-   test `test-core` § 4a exempts — fixed configuration, a dependency's behavior, prose, a message's
-   fixed wording, a shared helper re-checked through a caller, a fake's own output — covers nothing
-   the project owns: deleting it reduces nothing, so the finding is applied, never surfaced.
+   test `test-core` › Test What the Project Computes says gets no test covers nothing the project
+   owns: deleting it reduces nothing, so the finding is applied, never surfaced.
 
    **Apply suite-agent findings first**, before per-file fixes touch the same files — extraction and
    merges reshape the preambles per-file fixes would otherwise edit twice. They are this skill's
@@ -82,8 +82,8 @@ git ls-files --others --exclude-standard 2>/dev/null || true
 5. **Verify.** Before applying any fix, record test file count, test count, and test LOC. After all
    fixes: run the test suite — every test passes, and the test count differs from the recorded count
    only by the tests the fix queue merged or deleted, each accounted for by a named surviving pin —
-   or, for a § 4a deletion, by the § 4a rule that exempts it. A failing suite → isolate and revert
-   the culprit fixes per revise-core step 5.
+   or, for a deletion of a test that should not exist, by the case that removes it. A failing suite
+   → isolate and revert the culprit fixes per revise-core step 5.
 
 6. **Report** (template below).
 

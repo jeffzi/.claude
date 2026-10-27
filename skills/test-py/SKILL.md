@@ -11,9 +11,9 @@ user-invocable: false
 
 # Python Testing with pytest
 
-**This skill extends `Skill(test-core)`.** Universal principles (AAA, behavior-vs-implementation,
-merge/redundancy, parametrize-over-loops, mocking anti-patterns) live in `test-core`. This file adds
-pytest-specific syntax, fixtures, plugins, and pitfalls.
+**This skill extends `Skill(test-core)`.** Universal principles (test what the project computes, one
+test per distinct branch, test through the public API, test first only for logic, test shape) live
+in `Skill(test-core)`. This file adds pytest-specific syntax, fixtures, plugins, and pitfalls.
 
 **Load `Skill(code-py)` and apply its rules.** Exception: test functions don't need `-> None`
 annotations.

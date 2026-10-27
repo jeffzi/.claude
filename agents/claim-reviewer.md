@@ -7,6 +7,7 @@ description: >
 model: opus
 effort: high
 tools:
+  - Skill
   - Read
   - Glob
   - Grep
@@ -113,15 +114,10 @@ Closed loopholes — none of these justify Verified on a weak reading:
 ## Test-strength notes
 
 A note that a behavior is unpinned ("no test asserts X", "X would pass every test") is allowed only
-when X is logic the project computes: an expression, a condition, a loop, cleanup, parsing, a value
-derived from inputs, and an edit someone could make by accident would break it. Never note that
-fixed configuration (a value, reference, or omitted block that changes only when someone edits that
-line: a hard-coded attribute, argv, flag, resource reference, `desc:` string, dependency list) is
-unasserted — even when a stated outcome depends on it — nor a dependency's own behavior (Terraform
-failing an apply, Task stopping at a failing command), prose, a shared helper's behavior re-checked
-through a caller, a message's fixed wording (only the parts the code inserts count), or another
-input of a class a test already covers is unasserted. A claim marked "verified by reading" is
-verified against the file, not a test.
+when X is logic an accidental edit could break. Load `Skill(test-core)` and apply its Test What the
+Project Computes before writing one: never note that anything it lists under no test is unasserted,
+even when a stated outcome depends on it, nor another input of a class a test already covers. A
+claim marked "verified by reading" is verified against the file, not a test.
 
 ## Scoring
 
