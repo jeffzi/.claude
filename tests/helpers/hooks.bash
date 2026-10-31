@@ -319,50 +319,6 @@ assert_stdout_includes() {
 	}
 }
 
-assert_stdout_excludes() {
-	local pattern="$1"
-	[[ "$RUN_STDOUT" != *"$pattern"* ]] || {
-		printf 'unexpected "%s" in stdout: %s\n' "$pattern" "$RUN_STDOUT" >&2
-		return 1
-	}
-}
-
-assert_stderr_includes() {
-	local pattern="$1"
-	[[ "$RUN_STDERR" == *"$pattern"* ]] || {
-		printf 'missing "%s" in stderr: %s\n' "$pattern" "$RUN_STDERR" >&2
-		return 1
-	}
-}
-
-assert_stderr_excludes() {
-	local pattern="$1"
-	[[ "$RUN_STDERR" != *"$pattern"* ]] || {
-		printf 'unexpected "%s" in stderr: %s\n' "$pattern" "$RUN_STDERR" >&2
-		return 1
-	}
-}
-
-assert_ref_at() {
-	local bare="$1" ref="$2" want="$3"
-	local got
-	got=$(git -C "$bare" rev-parse "refs/heads/$ref" 2>/dev/null) || got="<missing>"
-	[[ "$got" == "$want" ]] || {
-		printf 'refs/heads/%s is %s, expected %s\n' "$ref" "$got" "$want" >&2
-		return 1
-	}
-}
-
-# Revision expression $2 in repo $1 resolves to $3.
-assert_rev_at() {
-	local repo="$1" rev="$2" want="$3" got
-	got=$(git -C "$repo" rev-parse "$rev" 2>/dev/null) || got="<missing>"
-	[[ "$got" == "$want" ]] || {
-		printf '%s is %s, expected %s\n' "$rev" "$got" "$want" >&2
-		return 1
-	}
-}
-
 assert_ref_present() {
 	local repo="$1" ref="$2"
 	git -C "$repo" show-ref --quiet --verify "refs/heads/$ref" || {
@@ -375,36 +331,6 @@ assert_ref_absent() {
 	local repo="$1" ref="$2"
 	! git -C "$repo" show-ref --quiet --verify "refs/heads/$ref" || {
 		printf 'refs/heads/%s present in %s\n' "$ref" "$repo" >&2
-		return 1
-	}
-}
-
-# The run printed exactly the usage line on stdout, nothing on stderr, and exited 0.
-# Relies on $USAGE_LINE, which each spec file defines for its own script.
-assert_help_printed() {
-	((RUN_EXIT == 0)) && [[ "$RUN_STDOUT" == "$USAGE_LINE" && -z "$RUN_STDERR" ]] || {
-		printf 'expected exit 0 with only the usage line on stdout\nexit: %d\nstdout: %s\nstderr: %s\n' \
-			"$RUN_EXIT" "$RUN_STDOUT" "$RUN_STDERR" >&2
-		return 1
-	}
-}
-
-assert_on_branch() {
-	local got
-	got=$(git -C "$1" symbolic-ref --short HEAD)
-	[[ "$got" == "$2" ]] || {
-		printf 'on branch %s, expected %s\n' "$got" "$2" >&2
-		return 1
-	}
-}
-
-# Repo $1 still matches the repo_state() snapshot $2. Relies on repo_state,
-# which each spec file defines to cover what its own script could change.
-assert_repo_state() {
-	local repo="$1" want="$2" got
-	got=$(repo_state "$repo")
-	[[ "$got" == "$want" ]] || {
-		printf 'repo state changed:\n%s\nexpected:\n%s\n' "$got" "$want" >&2
 		return 1
 	}
 }
@@ -435,14 +361,6 @@ commit_readme() {
 	touch "$dir/README"
 	git -C "$dir" add README
 	git -C "$dir" -c commit.gpgsign=false commit -q -m "init"
-}
-
-# Commit file $2 with content and message $3 in the repo at $1.
-commit_file() {
-	local repo="$1" name="$2" text="$3"
-	printf '%s\n' "$text" >"$repo/$name"
-	git -C "$repo" add "$name"
-	git -C "$repo" -c commit.gpgsign=false commit -q -m "$text"
 }
 
 # Repo on main with one commit; prints the repo dir.
@@ -516,8 +434,8 @@ seed_origin() {
 }
 
 # ── Markers ──────────────────────────────────────────────────────────────────
-# Both flows gate on a marker file in the git dir that marker_fresh
-# judges by mtime; the two trios below differ only in the file name.
+# The fix-ci flow gates on a marker file in the git dir that marker_fresh
+# judges by mtime.
 
 raise_marker() {
 	touch "$(git -C "$1" rev-parse --absolute-git-dir)/fix-ci-active"
@@ -545,21 +463,4 @@ setup_marked_pair() {
 	work=$(setup_pair "$1")
 	raise_marker "$work"
 	printf '%s' "$work"
-}
-
-# Clone $1's origin into a sibling "other" checkout, commit a foreign file on
-# branch $2 there, and push it — advances the remote branch independently of
-# the caller's own work tree.
-advance_origin_branch() {
-	local work="$1" branch="$2" other
-	other="$(dirname "$work")/other"
-	git clone -q "$(bare_of "$work")" "$other"
-	init_git_identity "$other"
-	git -C "$other" switch -q "$branch"
-	commit_file "$other" THEIRS "theirs"
-	git -C "$other" push -q origin "$branch"
-}
-
-advance_origin_main() {
-	advance_origin_branch "$1" main
 }
