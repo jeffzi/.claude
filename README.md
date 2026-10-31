@@ -294,14 +294,14 @@ bats tests/
 
 ### Hooks
 
-| Hook                                               | Description                                                                           |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh)   | Blocks proceeding when a Bash command fails                                           |
-| [`git-commit-guard.sh`](hooks/git-commit-guard.sh) | Blocks commit messages containing internal tooling references                         |
-| [`git-guard.sh`](hooks/git-guard.sh)               | Blocks auto-push, destructive ops, commits on a protected `main`, unsanctioned merges |
-| [`git-lock-guard.sh`](hooks/git-lock-guard.sh)     | Absorbs `.git/index.lock` races from parallel agents/sessions                         |
-| [`tdd-red-guard.sh`](hooks/tdd-red-guard.sh)       | Blocks reading implementation source during TDD RED phase                             |
-| [`worktree-guard.sh`](hooks/worktree-guard.sh)     | Blocks exiting worktrees with uncommitted changes                                     |
+| Hook                                               | Description                                                      |
+| -------------------------------------------------- | ---------------------------------------------------------------- |
+| [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh)   | Blocks proceeding when a Bash command fails                      |
+| [`git-commit-guard.sh`](hooks/git-commit-guard.sh) | Blocks commit messages containing internal tooling references    |
+| [`git-guard.sh`](hooks/git-guard.sh)               | Blocks auto-push, destructive ops, commits on a protected `main` |
+| [`git-lock-guard.sh`](hooks/git-lock-guard.sh)     | Absorbs `.git/index.lock` races from parallel agents/sessions    |
+| [`tdd-red-guard.sh`](hooks/tdd-red-guard.sh)       | Blocks reading implementation source during TDD RED phase        |
+| [`worktree-guard.sh`](hooks/worktree-guard.sh)     | Blocks exiting worktrees with uncommitted changes                |
 
 ## Configuration Notes
 
