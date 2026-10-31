@@ -12,9 +12,8 @@ target with an open pull request against the trunk lands through `ils push` (see
 wrapper itself refuses to run without a fresh marker, accepts only `-u`/`--set-upstream`/`--delete`,
 and rejects every force form and any deletion outside the assistant's own namespaces, `fix-ci/*` and
 `plan/*`. The guard additionally allows `git branch -D` in those two namespaces while the marker
-exists, and still blocks `--amend` and `--no-verify`. This loop still deletes only its own
-`fix-ci/*` branches — `plan/*` is in the namespace for `execute-plan`'s ship phase, never for this
-loop to delete.
+exists, and still blocks `--amend` and `--no-verify`. This loop deletes only its own `fix-ci/*`
+branches.
 
 ## Marker TTL
 
@@ -44,17 +43,16 @@ trunk=$(git ls-remote --symref origin HEAD | awk '/^ref:/ { sub("refs/heads/", "
 ```
 
 A non-empty list takes the "open pull request against the trunk" row. That covers a feature branch
-with a pull request, and a plan branch whose pull request against the trunk `execute-plan`'s ship
-phase opened. An empty `$trunk` is a failed trunk read: `gh pr list --base ""` would match a pull
-request against any base. A failed trunk read, an empty list, or a `main`/`master` target uses one
-of the other rows.
+with a pull request, and every pushed plan branch: `ils push` opened its pull request against the
+trunk. An empty `$trunk` is a failed trunk read: `gh pr list --base ""` would match a pull request
+against any base. A failed trunk read, an empty list, or a `main`/`master` target uses one of the
+other rows.
 
-| Target branch                       | How                                                                                                                                                                                                                                                                                                                                                                           |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| open pull request against the trunk | `git switch <branch>` → `git merge --squash fix-ci/<slug>` → commit → `ils push`, handled per [`ils push` exit codes](#ils-push-exit-codes). Never `gh pr merge`: the merge is the user's.                                                                                                                                                                                    |
-| main/master                         | `gh pr merge --squash --delete-branch` — server-side, no local push of main needed                                                                                                                                                                                                                                                                                            |
-| a feature branch                    | `git switch <branch>` → `git merge --squash fix-ci/<slug>` → commit → `~/.claude/scripts/fix-ci-push.sh origin <branch>` → `git branch -D fix-ci/<slug>` → `~/.claude/scripts/fix-ci-push.sh origin --delete fix-ci/<slug>`                                                                                                                                                   |
-| `plan/<slug>`, no open pull request | Same as a feature branch: `git switch plan/<slug>` → `git merge --squash fix-ci/<slug>` → commit → `~/.claude/scripts/fix-ci-push.sh origin plan/<slug>` → `git branch -D fix-ci/<slug>` → `~/.claude/scripts/fix-ci-push.sh origin --delete fix-ci/<slug>`. Never its base: the plan branch reaches the branch it was created from only through the user's `/release merge`. |
+| Target branch                       | How                                                                                                                                                                                                                                      |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| open pull request against the trunk | `git switch <branch>` → `git merge --squash fix-ci/<slug>` → commit → `ils push`, handled per [`ils push` exit codes](#ils-push-exit-codes). Never `gh pr merge`: the merge is the user's, through `ils merge`, and the report names it. |
+| main/master                         | `gh pr merge --squash --delete-branch` — server-side, no local push of main needed                                                                                                                                                       |
+| a feature branch                    | `git switch <branch>` → `git merge --squash fix-ci/<slug>` → commit → `~/.claude/scripts/fix-ci-push.sh origin <branch>` → `git branch -D fix-ci/<slug>` → `~/.claude/scripts/fix-ci-push.sh origin --delete fix-ci/<slug>`              |
 
 After a squash-back through any other row, locate the run for the target branch's new tip with `gh
 run list --commit $(git rev-parse HEAD)`, never `.[0]` of an unfiltered list. Watch it, then pass

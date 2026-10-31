@@ -51,7 +51,8 @@ warm up signing → locate run → wait if running → read failing logs → tri
 Two green gates pass on output in your context (see "The green gate"). The fix branch's `gh run
 view` gates the squash. The squashed target tip gates the final report: `gh run view` on its run, or
 `ils push` exit 0 when the target has an open PR against the trunk. Nothing is "green" between them
-— the squash push creates a new SHA that has no run yet.
+— the squash push creates a new SHA that has no run yet. A target with an open PR against the trunk
+is merged with `ils merge`, on the user's word: the report names it and never runs it.
 
 **Scope of approval.** A read-only ask — "why is CI red?", "check CI", "what's failing?" — gets
 locate/read/triage and a report with the proposed fix described: no marker, no edits, no commits
@@ -106,20 +107,17 @@ failed.
 
 Attempts are plain commits; the squash erases them, so retries never amend or force. If pushing the
 branch triggers no workflow, open the PR early (`gh pr create --fill --base <original>`) to fire
-`pull_request` workflows — except for a `plan/*` target, which never gets one from the fix branch. A
-plan branch with no open PR lands through `/release merge`. A plan branch with an open PR against
-the trunk already fires `pull_request` workflows on the plan tip, not on `fix-ci/<slug>`. A fix
-branch whose push fires nothing is the "No CI coverage on a `fix-ci/*` branch" stop condition (see
-"Stop conditions" below).
+`pull_request` workflows. A target with an open PR against the trunk — every pushed plan branch has
+one, opened by `ils push` — already fires `pull_request` workflows on its own tip, not on
+`fix-ci/<slug>`. A fix branch whose push fires nothing is the "No CI coverage on a `fix-ci/*`
+branch" stop condition (see "Stop conditions" below).
 
 **No CI coverage on the branch → hard stop.** Check `.github/workflows/*` triggers on the
 checked-out target branch, before `git switch -c fix-ci/*`: nothing fires on branch pushes or
 `pull_request` → investigate and report only, noting `workflow_dispatch` when offered. Never use the
-target branch itself as the CI test bed. A `plan/*` target with no open PR and no run for its pushed
-tip is this stop with a known diagnosis: the workflow's `on.push.branches` lacks `plan/**`. A `vX.Y`
-release branch with no run is the same stop; its `on.push.branches` lacks `"v[0-9]*"`. Report that
-line as the fix, never push `main` to get a run. A `plan/*` target with an open PR against the trunk
-gets runs from `pull_request` workflows, so a missing `plan/**` push trigger alone is not this stop.
+target branch itself as the CI test bed, and never push `main` to get a run. A target with an open
+PR against the trunk gets runs from `pull_request` workflows, so a missing push trigger alone is not
+this stop.
 
 **Squash back when the branch's run is green** — procedure in `references/push-protocol.md`.
 
@@ -134,14 +132,12 @@ gh run list --commit <sha> --json databaseId,workflowName,event,status,conclusio
 Always key runs off the head SHA, never "latest run" — every push rotates the SHA, and older runs
 are stale. The `event` field distinguishes `push`- from `pull_request`-triggered runs.
 
-| Given (\$0 or context)                   | Entry point                                            |
-| ---------------------------------------- | ------------------------------------------------------ |
-| PR number                                | `gh pr checks $0` / `gh pr view $0 --json headRefOid`  |
-| Run id                                   | `gh run view $0`                                       |
-| Commit SHA                               | `gh run list --commit $0`                              |
-| Nothing, no PR (bare branch)             | `gh run list --commit $(git rev-parse HEAD)`           |
-| A `plan/<slug>` branch, open PR to trunk | PR-number path: `gh pr view <branch> --json number`    |
-| A `plan/<slug>` branch, no open PR       | Bare-branch path: no PR exists; key off the branch tip |
+| Given (\$0 or context)       | Entry point                                           |
+| ---------------------------- | ----------------------------------------------------- |
+| PR number                    | `gh pr checks $0` / `gh pr view $0 --json headRefOid` |
+| Run id                       | `gh run view $0`                                      |
+| Commit SHA                   | `gh run list --commit $0`                             |
+| Nothing, no PR (bare branch) | `gh run list --commit $(git rev-parse HEAD)`          |
 
 Run still in progress → never analyze the previous run's failures as current. Wait:
 
