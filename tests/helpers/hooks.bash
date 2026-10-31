@@ -12,12 +12,6 @@ readonly GIT_COMMIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-commit-guard.sh"
 readonly TDD_RED_GUARD_HOOK="$PROJECT_DIR/hooks/tdd-red-guard.sh"
 readonly BASH_EXIT_GUARD_HOOK="$PROJECT_DIR/hooks/bash-exit-guard.sh"
 readonly FIX_CI_PUSH_WRAPPER="$PROJECT_DIR/scripts/fix-ci-push.sh"
-# shellcheck disable=SC2034 # consumed by test_plan_branch.bats, which loads this file
-readonly PLAN_BRANCH_SCRIPT="$PROJECT_DIR/scripts/plan-branch.sh"
-# shellcheck disable=SC2034 # consumed by test_plan_branch.bats, which loads this file
-readonly BRANCH_POLICY_LIB="$PROJECT_DIR/scripts/branch-policy.sh"
-# shellcheck disable=SC2034 # consumed by the test_release_*.bats suites, which load this file
-readonly RELEASE_SCRIPT="$PROJECT_DIR/scripts/release.sh"
 BASH_BIN=$(command -v bash)
 readonly BASH_BIN
 
@@ -542,20 +536,6 @@ readonly FUTURE_OFFSET_MINUTES
 
 backdate_marker() {
 	touch -t "$(date_offset_minutes "$2" +%Y%m%d%H%M)" "$(marker_path "$1")"
-}
-
-# The marker /release raises to sanction a run, in the repo at $1.
-release_marker_path() {
-	printf '%s/release-active' "$(git -C "$1" rev-parse --absolute-git-dir)"
-}
-
-raise_release_marker() {
-	touch "$(release_marker_path "$1")"
-}
-
-# Move the release marker's mtime by $2 minutes, out of the shared freshness window.
-backdate_release_marker() {
-	touch -t "$(date_offset_minutes "$2" +%Y%m%d%H%M)" "$(release_marker_path "$1")"
 }
 
 # setup_pair "$1" with a fresh fix-ci marker raised immediately after; prints

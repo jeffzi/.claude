@@ -1,15 +1,13 @@
 # shellcheck shell=bash
 #
 # Policy for the branches the assistant owns, shared by the fix-ci push wrapper
-# (scripts/fix-ci-push.sh), the plan branch scripts (scripts/plan-branch.sh and
-# scripts/release.sh), and the git guard hook (hooks/git-guard.sh). They gate
-# on the same facts — is a fix-ci loop or a /release run live in this repo,
-# is the worktree clean enough to move a branch, and does this push delete
-# anything outside the assistant's own branches — so the answers are defined
-# once, here.
+# (scripts/fix-ci-push.sh) and the git guard hook (hooks/git-guard.sh). They
+# gate on the same facts — is a fix-ci loop live in this repo, and does this
+# push delete anything outside the assistant's own branches — so the answers
+# are defined once, here.
 #
 # What each caller does with an answer stays with the caller: the hook sweeps a
-# dead marker and falls back to its normal blocks, the scripts exit 2 with a
+# dead marker and falls back to its normal blocks, the wrapper exits 2 with a
 # reason. So does each caller's own argv dialect — which spellings of --delete
 # it recognises, which flags it lets through.
 #
@@ -21,49 +19,17 @@
 # shellcheck source=SCRIPTDIR/sh-common.sh
 . "${BASH_SOURCE[0]%/*}/sh-common.sh"
 
-# Marker files in the git dir. The fix-ci and release skills raise and drop them
-# by these same names.
-# shellcheck disable=SC2034 # read by the sourcing scripts and hook, not here
+# The marker file in the git dir. The fix-ci skill raises and drops it by this
+# same name.
+# shellcheck disable=SC2034 # read by the sourcing script and hook, not here
 readonly FIX_CI_MARKER=fix-ci-active
 
-# The release flow is named once: `release` is the branch config key that marks
-# a release branch (`branch.<name>.release <version>`), `/release` the command
-# the user runs, and `release-active` the marker that command raises in the git
-# dir for the length of a run. Keep the marker spelled from the key so the two
-# can never drift apart.
-# shellcheck disable=SC2034 # read by the sourcing scripts and hook, not here
-readonly RELEASE_KEY=release
-# shellcheck disable=SC2034 # read by the sourcing scripts and hook, not here
-readonly RELEASE_MARKER="$RELEASE_KEY-active"
-
-# A live loop refreshes its marker's mtime each iteration, and /release raises
-# its marker right before the run, so only a marker abandoned by an interrupted
-# session ages out. Both markers share the window.
+# A live loop refreshes its marker's mtime each iteration, so only a marker
+# abandoned by an interrupted session ages out.
 readonly MARKER_TTL_SECONDS=1800
 
-# The branch a plan run works and ships on is plan/<slug>.
+# A namespace of the assistant's own branches, alongside fix-ci/*.
 readonly PLAN_BRANCH_PREFIX=plan/
-
-# The key under `branch.<name>` holding the branch a plan branch was started
-# from: `git config branch.plan/<slug>.planBase`. The plan branch script writes
-# it, the squash reads it to land the plan back where it came from.
-# shellcheck disable=SC2034 # read by the sourcing scripts, not here
-readonly PLAN_BASE_CONFIG_KEY=planBase
-
-# Exits 0 on `-h`/`--help` in argv, printing the caller's USAGE; a no-op
-# otherwise. Help is a successful request, answered before anything else is
-# consulted, so it works anywhere and whatever else argv holds.
-exit_if_help_requested() {
-	local arg
-	for arg in "$@"; do
-		case "$arg" in
-		-h | --help)
-			printf '%s\n' "$USAGE"
-			exit 0
-			;;
-		esac
-	done
-}
 
 # Dies naming stat when marker_fresh's status $1 says no stat dialect answered;
 # returns otherwise. Exit 1: a broken tool, not a refusal of the run.
@@ -79,18 +45,6 @@ die_if_stat_unusable() {
 policy_git_dir() {
 	command -v git >/dev/null || die "git is not installed."
 	git rev-parse --absolute-git-dir || die "not inside a usable git repository."
-}
-
-# Dies unless the caller's worktree holds no change git would carry onto another
-# branch. Untracked files are left out: switching branches keeps them where they
-# are, and a plan run's scratch files are exactly that.
-require_clean_worktree() {
-	local dirty
-	dirty=$(sh_git_dirty .) || return 0
-	case "$dirty" in
-	unstaged) die "the working tree has unstaged changes; commit or set them aside first." ;;
-	*) die "the index has staged changes; commit or set them aside first." ;;
-	esac
 }
 
 # True when the marker at $1 proves a run is live right now. Only a regular file
