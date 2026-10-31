@@ -32,36 +32,27 @@ plan once.
 
 ## Flags
 
-| Flag                     | Effect                                                                                                                                                                                                                                                                                                                                             |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--commit` (default)     | Load `Skill(autocommit)` **once, before Task 1** — its signing warm-up runs while the user is still at the keyboard. Each task commits on the plan branch when its Verify block passes. Never reload per task.                                                                                                                                     |
-| `--no-commit`            | Nothing is committed — every `/tdd` invocation carries `no-commit plan execution` so its COMMIT phase returns file lists instead. The final report says `Nothing committed` in one line.                                                                                                                                                           |
-| `--unattended` (default) | Findings are recorded, never paused on (see Findings). Raise the marker before Task 1; remove it as the last step of the final report **or of a halt report**. Mechanics: `references/unattended.md`.                                                                                                                                              |
-| `--attended`             | Findings pause the loop at the SURFACE gate as `tdd` prescribes (see Pauses and Halts). No marker.                                                                                                                                                                                                                                                 |
-| `--no-push`              | Skip the ship phase (no push, no CI watch, no pull request). The user passes it; you never infer it — a repo that looks to have no CI still gets the ship phase, which records `no branch CI` or `no CI configured` by observation. The squash message is still written. Implied by `--no-commit` only: an uncommitted branch has nothing to push. |
+| Flag                     | Effect                                                                                                                                                                                                                                                                                                              |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--commit` (default)     | Load `Skill(autocommit)` **once, before Task 1** — its signing warm-up runs while the user is still at the keyboard. Each task commits on the run's branch when its Verify block passes. Never reload per task.                                                                                                     |
+| `--no-commit`            | Nothing is committed — every `/tdd` invocation carries `no-commit plan execution` so its COMMIT phase returns file lists instead. The final report says `Nothing committed` in one line.                                                                                                                            |
+| `--unattended` (default) | Findings are recorded, never paused on (see Findings). Raise the marker before Task 1; remove it as the last step of the final report **or of a halt report**. Mechanics: `references/unattended.md`.                                                                                                               |
+| `--attended`             | Findings pause the loop at the SURFACE gate as `tdd` prescribes (see Pauses and Halts). No marker.                                                                                                                                                                                                                  |
+| `--no-push`              | Skip the ship phase (no push, no pull request). The user passes it; you never infer it — a repo that looks to have no CI still gets the ship phase, which records `no CI configured` by observation. The squash message is still written. Implied by `--no-commit` only: an uncommitted branch has nothing to push. |
 
 ## The Branch
 
-Every run works on `plan/<slug>`, never on the branch it started from. The prologue's entry gate
-creates it from any clean branch — `main` by default, a feature branch when you are on one — records
-that base in git config, or halts (condition 4); a run resumed on its own `plan/<slug>` continues
-there. Task commits, finding fixes, and CI fixes all land on the plan branch.
+Every run works on its own branch, never on the trunk. The trunk is origin's default branch as `git
+ls-remote --symref origin HEAD` reports it, whatever its name; when that read fails, the entry gate
+halts (condition 4) and never guesses it. Started on the trunk, the entry gate cuts `<slug>` with
+`ils branch <slug>`. Started on any other branch, the run works there — a resumed run included. That
+branch is **the run's branch**: task commits, finding fixes, and CI fixes all land on it.
 
-The recorded base picks how the branch lands. The **trunk path** applies when the base equals
-origin's default branch as `git ls-remote --symref origin HEAD` reports it, whatever its name. When
-that read fails, the entry gate halts (condition 4); it never guesses the trunk. The ship phase runs
-`ils push`, which pushes the branch, opens its pull request, and waits for checks; the user merges
-the pull request with `ils merge`, run by them or by you when they ask for it. Any other base takes
-the **release path**: the user lands the branch on the base by invoking `/release merge`. On either
-path this skill never commits on the base, never merges the plan branch into the base unasked — no
-`ils merge` the user did not ask for, no `gh pr merge`, no `--auto` — and never raises `/release`'s
-marker or runs its script. Mechanics: `references/branch-flow.md`.
-
-A task whose **Folds into** line names a release commit subject is committed as a fixup of that
-commit (`git commit --fixup=<sha>`, sha resolved per `references/branch-flow.md` § Fold target), so
-the plan branch itself carries the mapping `/release merge` folds by; a `none` task commits with a
-composed message as before. The plan's `## Folds` section says whether the run ends in a rewriting
-merge; on the release path the Ship section's Folds line says so too. The trunk path never folds.
+The ship phase runs `ils push`, which pushes the run's branch, opens its pull request against the
+trunk, and waits for checks; the user merges the pull request with `ils merge`, run by them or by
+you when they ask for it. This skill never commits on the trunk and never merges the run's branch
+unasked — no `ils merge` the user did not ask for, no `gh pr merge`, no `--auto`. Every task and
+every findings-fix cycle commits with a composed message. Mechanics: `references/branch-flow.md`.
 
 ## The Loop
 
@@ -73,26 +64,22 @@ unblocked at once and touch disjoint files, merge them into **one** `/tdd` invoc
 task's behavior list — its wave rule parallelizes the cycles — and step 4 lists each task's hashes.
 Two `/tdd` invocations never run concurrently.
 
-0. **Prologue** — entry gate first (`references/branch-flow.md`): read the trunk from origin and
-   choose the path. On the trunk path, check the local trunk against `origin/<trunk>`. A failed read
-   or fetch, or local trunk commits origin lacks → halt 4, before any switch. Then on a clean branch
-   that is not another plan's → `~/.claude/scripts/plan-branch.sh create <slug>`, which switches and
-   records the base. Already on `plan/<slug>` → resume, the unfinished task's own uncommitted files
-   included. Anything else → halt 4. Then, unless `--attended`: write the marker (see
-   `references/unattended.md`). Unless `--no-commit`: load `Skill(autocommit)` once. Then Task 1.
-1. **Implement** per the task's **Implementation** line: `/tdd` for TDD tasks — the invocation
-   carries `fixup target: <sha>` when the task's **Folds into** is a subject, resolved first per
-   `references/branch-flow.md` § Fold target; `Skill(test-core)` for test-only tasks;
-   `Skill(code-core)` for tasks the plan implements directly. Final Task: no implementation —
-   dispatch the plan's `claim-reviewer` call as written (do not set `model`), with every
-   `unverified` entry from the running Findings list appended as claims; `Confirmed` → the entry
-   loses its mark, anything else → it keeps it. Then read `references/branch-flow.md` again — the
-   prologue's read is hours and compactions old — and run, in order: the **findings-fix phase**
-   (each finding's fold target derived and recorded on its ledger entry), then the **ship phase** of
-   the run's path. Then write the **squash message**: a file on the release path or when nothing was
-   pushed, the pull request's title and body after a trunk push that exits 0, and neither after a
-   pushed trunk run that ends `not green`. Then post the Final Report. Steps 2–3 do not apply to the
-   Final Task.
+0. **Prologue** — entry gate first (`references/branch-flow.md`): read the trunk from origin. On the
+   trunk, check the local trunk against `origin/<trunk>`, then run `ils branch <slug>`. A failed
+   read or fetch, local trunk commits origin lacks, or an `ils branch` refusal → halt 4. On any
+   other branch → work there, resuming at the unfinished task with its own uncommitted files
+   included. A dirty or staged path no task names → halt 4 on every branch. Then, unless
+   `--attended`: write the marker (see `references/unattended.md`). Unless `--no-commit`: load
+   `Skill(autocommit)` once. Then Task 1.
+1. **Implement** per the task's **Implementation** line: `/tdd` for TDD tasks; `Skill(test-core)`
+   for test-only tasks; `Skill(code-core)` for tasks the plan implements directly. Final Task: no
+   implementation — dispatch the plan's `claim-reviewer` call as written (do not set `model`), with
+   every `unverified` entry from the running Findings list appended as claims; `Confirmed` → the
+   entry loses its mark, anything else → it keeps it. Then read `references/branch-flow.md` again —
+   the prologue's read is hours and compactions old — and run, in order: the **findings-fix phase**,
+   then the **ship phase**. Then write the **squash message**: a file when nothing was pushed, the
+   pull request's title and body after an `ils push` that exits 0, and neither after a pushed run
+   that ends `not green`. Then post the Final Report. Steps 2–3 do not apply to the Final Task.
 2. **Verify** per the task's **Verify** block. Directly implemented tasks: run the task's mechanical
    checks (suite, build, lint as the Verify block names them) — red → halt 1; then dispatch
    `claim-reviewer` with the task's behavioral claims. `/tdd` tasks: `/tdd` dispatched the reviewer
@@ -150,9 +137,8 @@ Two `/tdd` invocations never run concurrently.
    committed); edits made after `/tdd` returned — gap fixes, step 2 — are still the task's and
    commit as a directly implemented task's do, their hash added to the note. Never leave them for
    the next task's commit. Directly implemented tasks: stage by explicit path — the task's files
-   only — then, for a task with a fold target, `git commit --fixup=<sha>` and no composed message;
-   for a `none` task, load `Skill(write-commit)` and compose one. The autocommit grant pre-satisfies
-   approval.
+   only — then load `Skill(write-commit)` and compose the message. The autocommit grant
+   pre-satisfies approval.
 4. **Progress note** — one line, then the next tool call: `Task N done — <hashes>` or `Task N done —
    uncommitted: <files>`.
 
@@ -172,12 +158,12 @@ exception: a fix that would change behavior something depends on (searched, not 
 finding — one the user dismisses stays on the list, marked dismissed.
 
 **In scope** means the finding's file is one this plan's tasks created or modified — it appears in
-`git diff --name-only <base>...HEAD` before the findings-fix phase. Everything else is out of scope,
-however close to the plan's topic, and however much it got in your way: a broken task runner the
-Verify block used, a model that crashed a check you ran, a wrapper with a wrong default. An
-out-of-scope finding is never fixed by this run and never becomes a question. It stays `Confirmed`
-and goes in the report as one line; how you worked around it during the run is a deviation line. The
-user decides later whether it becomes work.
+`git diff --name-only origin/<trunk>...HEAD` before the findings-fix phase. Everything else is out
+of scope, however close to the plan's topic, and however much it got in your way: a broken task
+runner the Verify block used, a model that crashed a check you ran, a wrapper with a wrong default.
+An out-of-scope finding is never fixed by this run and never becomes a question. It stays
+`Confirmed` and goes in the report as one line; how you worked around it during the run is a
+deviation line. The user decides later whether it becomes work.
 
 For an in-scope finding, `needs decision` names its dependent: a caller, a test, or a consumer of an
 output or format that relies on the current behavior, read at `file:line`. No dependent you can name
@@ -210,8 +196,8 @@ answering; a number or a done/not-done status recalled from memory is wrong ofte
 flag. After the final report, "what do we need to fix" is a fix request for the `needs decision`
 entries: list them from the ledger with the one durable fix each implies, never a
 cheap-versus-proper pair; the user's answer approves each fix, which then runs through `/tdd` on the
-plan branch like the findings-fix batch did. An approved fix covers its fallout — no second question
-about a file the fix had to touch.
+run's branch like the findings-fix batch did. An approved fix covers its fallout — no second
+question about a file the fix had to touch.
 
 A **deviation** is anything you did that the plan did not say: a step skipped, a test the cycle
 wrote that you deleted, an edit outside the task's files, a `PASSED_UNEXPECTEDLY` behavior you
@@ -240,16 +226,14 @@ the findings or the cycle, never about whether to continue.
 2. A task needs a behavior change something depends on that the plan did not state
    (`rules/decision-policy.md` exception 1). A finding whose fix would be one is not a halt — it is
    marked `needs decision` (see Findings).
-3. An unchanged boundary: cross-repo edit, a push other than the ship phase's push of `plan/<slug>`
-   (through `ils push` on the trunk path, through the wrapper on the release path), or a destructive
-   op the plan did not prescribe. File deletions the plan explicitly names are covered by approval —
-   no halt, no ask.
-4. The entry gate fails when any of these holds. You are on another plan's `plan/*` branch. The
-   index or working tree is dirty — on a resumed run, dirty with a path its unfinished task does not
-   name. The plan's `## Folds` section names a release branch other than the one you are on.
-   Origin's default branch cannot be read. On the trunk path, `git fetch origin <trunk>` fails. The
-   local trunk carries commits `origin/<trunk>` does not. Name the branch, those paths or commits,
-   the failed read or fetch with its output, and the release the plan expects.
+3. An unchanged boundary: cross-repo edit, a push other than the ship phase's `ils push` of the
+   run's branch, or a destructive op the plan did not prescribe. File deletions the plan explicitly
+   names are covered by approval — no halt, no ask.
+4. The entry gate fails when any of these holds. Origin's default branch cannot be read. On the
+   trunk, `git fetch origin <trunk>` fails. The local trunk carries commits `origin/<trunk>` does
+   not. The index or working tree is dirty with a path no task names. `ils branch <slug>` exits
+   non-zero. Name the failed read or fetch with its output, those commits or paths, or `ils`'s
+   output.
 
 A halt is a report — tasks done, the blocked task and why, findings so far, marker removed — then
 the turn ends. It names the condition from this list. It is never a question: a report that asks the
@@ -267,13 +251,11 @@ nothing else:
 2. **Deviations** — every entry, `Task N — plan said — did — why`. None → no heading.
 3. **State** — the hashes, one line (`--no-commit` → `Nothing committed`). Each verification command
    as `command → result`, one line.
-4. **Ship** — the branch, the CI result, the one merge line, and the optional `/preflight` line, in
-   the shape `references/branch-flow.md` gives for the run's path. Trunk path: the pull request,
-   whether its title and body were written, and the merge line for the result. That line is `Merge:
-   ils merge, on your word` after exit 0; when nothing was pushed or the result is `not green`, it
-   takes the forms `branch-flow.md` gives. Release path: `/release merge [--force]`, whether a
-   squash message was written, and the folds. List each target subject with the tasks and findings
-   that fold into it, since the findings' folds were not on the plan the user approved.
+4. **Ship** — the run's branch, the CI result, the pull request, whether its title and body were
+   written, the one merge line, and the optional `/preflight` line, in the shape
+   `references/branch-flow.md` gives. The merge line is `Merge: ils merge, on your word` after exit
+   0; when nothing was pushed or the result is `not green`, it takes the forms `branch-flow.md`
+   gives.
 
 Never in the report: per-task file lists, what each task built, which skill ran which step, how you
 found a finding, what you fixed on the way (a deviation or nothing), a plan choice you followed. A
@@ -283,92 +265,84 @@ Pushback on the report's length or count removes nothing confirmed. Re-rank, res
 one line, keep the count — a confirmed defect the user has not yet acted on is exactly what they pay
 the report for.
 
-Unless `--attended` → remove the unattended marker as the last step. On the release path the
-`fix-ci-active` marker was already removed when the ship phase ended, and a halt report removes
-both; the trunk path never raises it.
+Unless `--attended` → remove the unattended marker as the last step, in a halt report too.
 
 ## Rationalizations
 
-| Excuse                                                               | Reality                                                                                                                                                     |
-| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| "Task N is the big one — better check in first"                      | It was in the plan the user read. Approval covers it.                                                                                                       |
-| "A progress update is polite"                                        | One line, no question mark, next tool call in the same turn.                                                                                                |
-| "Tasks 5 and 6 could run in parallel — the user should pick"         | `tdd`'s wave rule picks. Execute it.                                                                                                                        |
-| "My rules say confirm decisions with alternatives"                   | Decisions the plan made are not open. Unattended, the plan is the confirmation.                                                                             |
-| "The reviewer refuted the task again — that's refuted: 2"            | Counts are per gap, in `## Gaps`. A new reason is a new gap at 0; a verdict on a restated claim counts for nothing.                                         |
-| "The SURFACE gate says END THE TURN"                                 | See Pauses and Halts — a pause attended, a recorded finding unattended.                                                                                     |
-| "`/tdd` finished the cycle, now I commit the task"                   | `/tdd` already committed it. Take its hashes.                                                                                                               |
-| "They'd want to see this before more commits stack up"               | That is what Findings at the top of the final report is for.                                                                                                |
-| "The plan implies this file should go"                               | Implied ≠ named. Only files the plan explicitly lists are pre-approved for deletion.                                                                        |
-| "Convenience is not a permission grant"                              | Unattended **is** the permission grant, and the default. Only `--attended` withdraws it.                                                                    |
-| "I'll ask, they might be back by now"                                | If they are, they will interrupt. Asking costs the plan; not asking costs nothing.                                                                          |
-| "The plan task is a grant, so `/tdd` may commit"                     | Under `--no-commit` the invocation says so and `/tdd` returns file lists. The flag is the user's word.                                                      |
-| "Every finding goes on the list, so every entry goes in the report"  | The list is your working set. The report carries confirmed defects and deviations; the rest stays on the list.                                              |
-| "I fixed it, so it's worth reporting as a finding"                   | Work is a deviation when the plan did not say it, and nothing otherwise. A finding is a defect that is still there.                                         |
-| "Listing everything lets the user decide what matters"               | Ranking is the job. The user approved a plan so they would not have to sift.                                                                                |
-| "The plan prescribed it, so I note that I followed it"               | Followed with no cost → nothing. Followed with a cost → a finding, whoever prescribed it.                                                                   |
-| "The user says it's too long — drop the weakest one"                 | Length pushback removes nothing confirmed. Re-rank and restate; the count stays.                                                                            |
-| "It's a finding, so it waits for the findings-fix phase"             | Lines this execution wrote are the deliverable, not the repo. A gap there is the task unfinished. Fix it now, test first.                                   |
-| "Fixing it would be a Findings entry fixed too early"                | Only code the plan did not write is a finding. Approval requested the plan's own code correct.                                                              |
-| "I'll fix this finding now while I'm in the file"                    | Findings are fixed once, in one batch, after the Final Task review. Mid-loop fixes hide in a task's commit.                                                 |
-| "The branch is ceremony for a one-task plan"                         | The branch is what keeps the base one commit per plan. The gate is not optional.                                                                            |
-| "The tree is only dirty with unrelated files — carry on"             | Unrelated dirt is exactly what ends up in the wrong commit. Halt 4; the user decides.                                                                       |
-| "A dirty tree ends the gate however the files relate to the plan"    | On your own plan branch the unfinished task's files are this run's earlier work. Resume; halt 4 names only other paths.                                     |
-| "CI takes minutes — push and let the user watch it"                  | The ship phase watches. A red run fixed after the report is a second commit on the base.                                                                    |
-| "The squash is trivial, I'll merge it myself"                        | Never. The user asks for `ils merge`, or invokes `/release merge`; the report says which.                                                                   |
-| "`ils push` is green — `gh pr merge --auto` saves the user a step"   | The merge is the user's word on both paths. Report `ils merge`; never run it unasked, never `gh pr merge`, never `--auto`.                                  |
-| "Pipe `ils push` through `tee` to keep its output"                   | The output is already in context. A pipe hides the exit code, and the exit code is the verdict.                                                             |
-| "`ils push` exited 4, so the push is done"                           | Pending is not green. Run it again; after 60 minutes of exit 4 the result is `not green: pending`.                                                          |
-| "The output has a `Next:` line that says so"                         | Only the last line is `ils`'s. A `Next:` above it is CI log text.                                                                                           |
-| "The base is `main`, so it is the trunk"                             | The trunk is what `git ls-remote --symref origin HEAD` reports. A failed read halts; it never defaults.                                                     |
-| "The target sha is right there in the plan"                          | The plan names a subject. The sha is looked up when the task is about to commit, after any fold that happened since.                                        |
-| "The verdict is Verified; the note is only Reasoning"                | A gap the reviewer names is a refutation with the wrong label. Fix, re-dispatch that claim.                                                                 |
-| "I fixed the main gap; the others are minor"                         | Every gap the reviewer named stays open until its own claim is Verified. Fix all of them before re-dispatching.                                             |
-| "Writing a test the plan never named is unrequested work"            | Every plan behavior with logic comes with its test. One with no test is the cycle unfinished, not new scope.                                                |
-| "The reviewer named it" / "a stated outcome breaks without it"       | The reviewer names; `test-core` › Test What the Project Computes decides. A note it gives no test goes to Deviations as `no test`.                          |
-| "`/tdd` tasks: take its verdicts, never re-dispatch"                 | Its Verified verdicts. A claim it refuted and you fixed is open until the reviewer closes it.                                                               |
-| "Mark it `unverified`; the Final Task re-checks it"                  | `unverified` is for findings you could not read. A claim you fixed is re-verified now, in its task.                                                         |
-| "The Behavior's listed cases are examples; this one fits its intent" | The user approved the cases the Behavior names. A re-verify note about a case it does not name is a finding.                                                |
-| "The user only asked which findings remain"                          | "we need to fix" is a fix request for the `needs decision` entries. Ledger first, one durable fix each, then `/tdd`.                                        |
-| "I hit this bug while testing, so fixing it serves the plan"         | Its file is not in the plan's diff. Report it in one line; the workaround you used is a deviation.                                                          |
-| "In-scope and broken, but I'll let the user pick the fix"            | No dependent at `file:line` → fix it in the batch. Asking hands back work the approval already granted.                                                     |
-| "Out of scope, so I'll ask whether to fix it"                        | Out of scope is reported, never asked about. One line in Findings; the user starts the work if they want it.                                                |
-| "Answering from memory is faster than reading the ledger"            | Memory gave 3, then 6, then 7. One Read of the ledger is the answer.                                                                                        |
-| "The repo has no CI, so `--no-push` is implied"                      | Only the user passes `--no-push`. Push and record what you observe: `no CI configured` from `ils`, or `no branch CI`.                                       |
-| "I remember the ship phase well enough to run it"                    | A paraphrase drops the marker, the two-poll rule, the `--force` rule, the last-line `Next:`. Read `branch-flow.md` first.                                   |
-| "The watch exited 0, so CI is green"                                 | Green is `ils push` exit 0 with no 'no CI configured' notice (trunk path), or `gh run view` showing `conclusion: success` on the pushed tip (release path). |
+| Excuse                                                               | Reality                                                                                                                                                   |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Task N is the big one — better check in first"                      | It was in the plan the user read. Approval covers it.                                                                                                     |
+| "A progress update is polite"                                        | One line, no question mark, next tool call in the same turn.                                                                                              |
+| "Tasks 5 and 6 could run in parallel — the user should pick"         | `tdd`'s wave rule picks. Execute it.                                                                                                                      |
+| "My rules say confirm decisions with alternatives"                   | Decisions the plan made are not open. Unattended, the plan is the confirmation.                                                                           |
+| "The reviewer refuted the task again — that's refuted: 2"            | Counts are per gap, in `## Gaps`. A new reason is a new gap at 0; a verdict on a restated claim counts for nothing.                                       |
+| "The SURFACE gate says END THE TURN"                                 | See Pauses and Halts — a pause attended, a recorded finding unattended.                                                                                   |
+| "`/tdd` finished the cycle, now I commit the task"                   | `/tdd` already committed it. Take its hashes.                                                                                                             |
+| "They'd want to see this before more commits stack up"               | That is what Findings at the top of the final report is for.                                                                                              |
+| "The plan implies this file should go"                               | Implied ≠ named. Only files the plan explicitly lists are pre-approved for deletion.                                                                      |
+| "Convenience is not a permission grant"                              | Unattended **is** the permission grant, and the default. Only `--attended` withdraws it.                                                                  |
+| "I'll ask, they might be back by now"                                | If they are, they will interrupt. Asking costs the plan; not asking costs nothing.                                                                        |
+| "The plan task is a grant, so `/tdd` may commit"                     | Under `--no-commit` the invocation says so and `/tdd` returns file lists. The flag is the user's word.                                                    |
+| "Every finding goes on the list, so every entry goes in the report"  | The list is your working set. The report carries confirmed defects and deviations; the rest stays on the list.                                            |
+| "I fixed it, so it's worth reporting as a finding"                   | Work is a deviation when the plan did not say it, and nothing otherwise. A finding is a defect that is still there.                                       |
+| "Listing everything lets the user decide what matters"               | Ranking is the job. The user approved a plan so they would not have to sift.                                                                              |
+| "The plan prescribed it, so I note that I followed it"               | Followed with no cost → nothing. Followed with a cost → a finding, whoever prescribed it.                                                                 |
+| "The user says it's too long — drop the weakest one"                 | Length pushback removes nothing confirmed. Re-rank and restate; the count stays.                                                                          |
+| "It's a finding, so it waits for the findings-fix phase"             | Lines this execution wrote are the deliverable, not the repo. A gap there is the task unfinished. Fix it now, test first.                                 |
+| "Fixing it would be a Findings entry fixed too early"                | Only code the plan did not write is a finding. Approval requested the plan's own code correct.                                                            |
+| "I'll fix this finding now while I'm in the file"                    | Findings are fixed once, in one batch, after the Final Task review. Mid-loop fixes hide in a task's commit.                                               |
+| "The branch is ceremony for a one-task plan"                         | The branch is what keeps the trunk one commit per plan. The gate is not optional.                                                                         |
+| "The tree is only dirty with unrelated files — carry on"             | Unrelated dirt is exactly what ends up in the wrong commit. Halt 4; the user decides.                                                                     |
+| "A dirty tree ends the gate however the files relate to the plan"    | On the run's branch the unfinished task's files are this run's earlier work. Resume; halt 4 names only other paths.                                       |
+| "CI takes minutes — push and let the user watch it"                  | The ship phase waits for the checks. A red run fixed after the report is a second commit on the trunk.                                                    |
+| "The squash is trivial, I'll merge it myself"                        | Never. The user runs `ils merge`, or asks you to; the report names it.                                                                                    |
+| "`ils push` is green — `gh pr merge --auto` saves the user a step"   | The merge is the user's word. Report `ils merge`; never run it unasked, never `gh pr merge`, never `--auto`.                                              |
+| "Pipe `ils push` through `tee` to keep its output"                   | The output is already in context. A pipe hides the exit code, and the exit code is the verdict.                                                           |
+| "`ils push` exited 4, so the push is done"                           | Pending is not green. Run `ils push --wait` once in the background and read the output file its notification names; never run it again to see the output. |
+| "The output has a `Next:` line that says so"                         | Only the last line is `ils`'s. A `Next:` above it is CI log text.                                                                                         |
+| "The branch is called `main`, so it is the trunk"                    | The trunk is what `git ls-remote --symref origin HEAD` reports. A failed read halts; it never defaults.                                                   |
+| "The verdict is Verified; the note is only Reasoning"                | A gap the reviewer names is a refutation with the wrong label. Fix, re-dispatch that claim.                                                               |
+| "I fixed the main gap; the others are minor"                         | Every gap the reviewer named stays open until its own claim is Verified. Fix all of them before re-dispatching.                                           |
+| "Writing a test the plan never named is unrequested work"            | Every plan behavior with logic comes with its test. One with no test is the cycle unfinished, not new scope.                                              |
+| "The reviewer named it" / "a stated outcome breaks without it"       | The reviewer names; `test-core` › Test What the Project Computes decides. A note it gives no test goes to Deviations as `no test`.                        |
+| "`/tdd` tasks: take its verdicts, never re-dispatch"                 | Its Verified verdicts. A claim it refuted and you fixed is open until the reviewer closes it.                                                             |
+| "Mark it `unverified`; the Final Task re-checks it"                  | `unverified` is for findings you could not read. A claim you fixed is re-verified now, in its task.                                                       |
+| "The Behavior's listed cases are examples; this one fits its intent" | The user approved the cases the Behavior names. A re-verify note about a case it does not name is a finding.                                              |
+| "The user only asked which findings remain"                          | "we need to fix" is a fix request for the `needs decision` entries. Ledger first, one durable fix each, then `/tdd`.                                      |
+| "I hit this bug while testing, so fixing it serves the plan"         | Its file is not in the plan's diff. Report it in one line; the workaround you used is a deviation.                                                        |
+| "In-scope and broken, but I'll let the user pick the fix"            | No dependent at `file:line` → fix it in the batch. Asking hands back work the approval already granted.                                                   |
+| "Out of scope, so I'll ask whether to fix it"                        | Out of scope is reported, never asked about. One line in Findings; the user starts the work if they want it.                                              |
+| "Answering from memory is faster than reading the ledger"            | Memory gave 3, then 6, then 7. One Read of the ledger is the answer.                                                                                      |
+| "The repo has no CI, so `--no-push` is implied"                      | Only the user passes `--no-push`. Push and record what you observe: `no CI configured` from `ils`.                                                        |
+| "I remember the ship phase well enough to run it"                    | A paraphrase drops the bare-call rule, the background wait, the last-line `Next:`. Read `branch-flow.md` first.                                           |
+| "A background run exited 0, so CI is green"                          | Green is `ils push` exit 0 in its output, with no 'no CI configured' notice. Read the output file; the exit code alone is not the output.                 |
 
 ## Red Flags — Stop and Re-read Approval Is the Grant
 
 - A message mid-plan that ends with a question mark that `tdd` did not prescribe
 - A turn ending before the Final Task that is neither a pause nor a named halt
 - `Skill(autocommit)` loaded a second time
-- Either marker still present after the final report or a halt report, or `fix-ci-active` still
-  present after the ship phase
+- The unattended marker still present after the final report or a halt report
 - A Findings entry fixed before the findings-fix phase, or a `needs decision` entry fixed before the
   user approves that fix
 - A findings-fix commit touching a file absent from the plan's diff before the findings-fix phase
 - A question about an out-of-scope finding, or about an in-scope one with no dependent at
   `file:line`
-- A commit or merge on the base branch, an `ils merge` the user did not ask for, a `gh pr merge` run
-  or `--auto` passed, a `release.sh` invocation or `release-active` marker raised by this loop, or a
-  push by this loop of anything but `plan/<slug>` (the dispatched `fix-ci` agent pushes its own
-  `fix-ci/*` branch under its own rules)
+- A commit or merge on the trunk, an `ils merge` the user did not ask for, a `gh pr merge` run or
+  `--auto` passed, or a push by this loop other than the ship phase's `ils push` of the run's branch
+  (the dispatched `fix-ci` agent pushes its own `fix-ci/*` branch under its own rules)
 - The trunk taken from a branch name instead of `git ls-remote --symref origin HEAD`
-- `ils push` piped, `tee`d, backgrounded, or behind `cd`, or a `Next:` acted on that was not the
-  output's last line
-- `.git/plan-squash/<slug>.msg` written on the trunk path after a push, or a trunk-path report that
-  names `/release merge`
-- A task with a fold target committed with a composed message, or a `none` task committed as a fixup
+- `ils push` piped, `tee`d, behind `&` or `cd`, or run in the background other than as the one `ils
+  push --wait` an exit 4 calls for; or a `Next:` acted on that was not the output's last line
+- `<git-dir>/plan-squash/<slug>.msg` written after a push
+- A task or finding committed with anything but a composed message
 - A report with no Ship section, or a Ship section with no merge line, or one whose merge line is
-  not the form `branch-flow.md` gives for the run's path and result
+  not the form `branch-flow.md` gives for the result
 - A Ship line saying `CI green` without, in context, `ils push`'s exit 0 output and no 'no CI
-  configured' notice (trunk path) or `gh run view … conclusion: success` for the pushed tip (release
-  path), or one written from a watch's exit code
-- A ship phase skipped without `--no-push` on the invocation, or a release-path merge line whose
-  `--force` does not match the CI result (`CI green` → none; anything else → `--force`)
-- A Ship section with raw git commands (`git switch`, `git merge --squash`) instead of its path's
-  merge line, or one silent about a finding that folds into a release commit
+  configured' notice, or one written from a background run's exit code alone
+- A ship phase skipped without `--no-push` on the invocation
+- A Ship section with raw git commands (`git switch`, `git merge --squash`) instead of its merge
+  line
 - A report entry with no `what it costs`, or one that begins with "I" (I fixed, I deleted, I left)
 - A per-task file list, or a task described by what it built
 - A confirmed finding gone from a reply after a "too long" complaint
