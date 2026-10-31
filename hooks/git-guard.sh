@@ -41,9 +41,8 @@ is_git_subcmd() {
 }
 
 # Prints the git dir the current $command targets; fails when it does not
-# resolve. Shared by fix_ci_active, main_is_protected, and release_active.
-# Uses global $command, set by whichever caller is active — a sub-command in
-# the main loop, or a fragment in check_release_invocation.
+# resolve. Shared by fix_ci_active and main_is_protected.
+# Uses global $command (set per sub-command in the main loop).
 current_target_git_dir() {
 	local git_dir
 	git_dir=$(git_target_dir "$command") || return 1
@@ -102,9 +101,8 @@ check_tdd_cycle_marker() {
 # ╰────────────────────────────────────────────────────────────╯
 
 # While `$GIT_DIR/fix-ci-active` exists, the marker sanctions branch work the
-# assistant drives itself: a fix-ci loop on throwaway `fix-ci/*` branches, and an
-# execute-plan run shipping its `plan/*` branch to CI. Both shapes are the same —
-# plain commits on a branch that is squash-merged back and then deleted — so two
+# assistant drives itself: a fix-ci loop on throwaway `fix-ci/*` branches, plain
+# commits on a branch that is squash-merged back and then deleted. Two
 # relaxations follow:
 #
 #   - The loop only ever appends commits, so a plain push is allowed on any
@@ -126,7 +124,7 @@ check_tdd_cycle_marker() {
 # The marker expires so an interrupted session cannot leave a repo relaxed
 # forever. Outside the freshness window the marker counts as absent and gets
 # swept; the window itself is defined in scripts/branch-policy.sh, alongside the
-# namespace rule, and shared with the wrapper that fronts both loops' pushes.
+# namespace rule, and shared with the wrapper that fronts the loop's pushes.
 
 # Uses global $command (set per sub-command in the main loop).
 fix_ci_active() {
@@ -245,9 +243,9 @@ fix_ci_allows_branch_delete() {
 # ╰────────────────────────────────────────────────────────────╯
 
 # `git config claude.protectMain true` marks a repo whose trunk the assistant
-# never writes to: work happens on a `plan/*` branch, and it reaches main as one
-# squash commit the user makes through /release. Every subcommand that
-# can add a commit to the checked-out branch is therefore blocked while HEAD is
+# never writes to: work happens on a branch started with `ils branch <name>`,
+# and it reaches main through the pull request the user merges. Every subcommand
+# that can add a commit to the checked-out branch is therefore blocked while HEAD is
 # main or master — a fast-forward `pull` is the exception, since it only moves
 # the branch to commits the remote already has.
 #
@@ -273,146 +271,7 @@ check_protected_main() {
 	[[ "$subcmd" == pull && "$command" =~ [[:space:]]--ff-only([[:space:]]|$) ]] && return 0
 	main_is_protected || return 0
 	block_destructive "git $subcmd" \
-		"main is protected in this repo (claude.protectMain). Commit on a plan/* branch; plan work lands on main through /release, which the user runs."
-}
-
-# scripts/release.sh lands a plan branch on main and pushes it. It is the user's
-# step, and its inner git commands run where no subcommand parser can see them —
-# so the invocation is blocked here, whatever path spells it and whether or not
-# the fragment names a git subcommand at all. The one door is the `/release`
-# skill, which raises a `$GIT_DIR/release-active` marker for the run; while that
-# marker is fresh the invocation goes through.
-#
-# This rule reads the raw command itself rather than the sanitized fragments the
-# other rules parse: a quoted path (`bash "scripts/release.sh"`) collapses to
-# the placeholder there and would hide the invocation. Only the command-position
-# word counts, so a commit message that merely names the script parses as `git`.
-
-# Words that may stand between the fragment's start and the script without
-# hiding it: interpreters, and the wrappers that run a command under a modified
-# environment or process. Matched on basename, so `/bin/bash` and
-# `/usr/bin/env bash` are prefixes too.
-release_prefix_word() {
-	case "${1##*/}" in
-	bash | sh | zsh | dash | ksh | env | command | exec | time | nohup | nice | sudo | source | .) return 0 ;;
-	esac
-	return 1
-}
-
-# The subcommands that act on the repo, and so make the word before them an
-# invocation wherever it sits. `status` is absent on purpose: it only reports.
-release_acting_subcommand() {
-	case "$1" in
-	start | merge | finish) return 0 ;;
-	esac
-	return 1
-}
-
-# True when fragment $1 invokes the release script in a way that needs the
-# marker. The word the fragment runs decides:
-#
-#   - the script itself in that slot is an invocation unless its first argument
-#     is `status`, which covers a run that names no subcommand at all. `status`
-#     is exempt in that one position only — the one the script itself reads a
-#     subcommand from — never further down the argument list;
-#   - any other word there may still be a runner no prefix list knows
-#     (`timeout 5 …`, `uv run …`, `xargs …`), so the script followed by a
-#     subcommand that acts on the repo counts wherever it sits in the fragment.
-#
-# Unless that word only reads what follows it: `git commit -m "docs: explain
-# release.sh merge"` hands the script name to git as text, as do `cat`, `grep`,
-# and the rest of only_reads_input. There the script is an argument, never a run.
-release_fragment_invokes() {
-	local word prefix_seen=false next=0 cmd="" after=""
-	local -a words=()
-	# read -ra splits on whitespace without letting a word glob.
-	read -ra words <<<"$1"
-	for word in ${words[@]+"${words[@]}"}; do
-		next=$((next + 1))
-		if release_prefix_word "$word"; then
-			prefix_seen=true
-			continue
-		fi
-		# Assignments run ahead of the command word, as `FOO=1 cmd` and as
-		# `env FOO=1 cmd`; options belong to a prefix already seen.
-		if [[ "$word" == [[:alpha:]_]*=* ]]; then
-			continue
-		fi
-		if $prefix_seen && [[ "$word" == -* ]]; then
-			continue
-		fi
-		cmd="$word"
-		after="${words[next]-}"
-		break
-	done
-
-	if [[ "${cmd##*/}" == release.sh ]]; then
-		[[ "$after" == status ]] && return 1
-		return 0
-	fi
-	only_reads_input "$cmd" && return 1
-
-	next=0
-	for word in ${words[@]+"${words[@]}"}; do
-		next=$((next + 1))
-		if [[ "${word##*/}" == release.sh ]] && release_acting_subcommand "${words[next]-}"; then
-			return 0
-		fi
-	done
-	return 1
-}
-
-# True when /release sanctions a run in the repo the fragment targets. The
-# marker shares the fix-ci freshness window, so one left behind by an interrupted
-# skill ages out instead of standing the door open.
-# Uses global $command (set per fragment by check_release_invocation).
-release_active() {
-	local git_dir
-	git_dir=$(current_target_git_dir) || return 1
-	marker_fresh "$git_dir/$RELEASE_MARKER"
-}
-
-# Uses global $scannable.
-check_release_invocation() {
-	local reading fragment
-	# One pass walks the quoted regions, so a newline means what the shell
-	# means by it: inside a region it is data and folds to a space, keeping a
-	# commit message that names the script at the start of a line out of
-	# command position; outside one it separates fragments like `;`, so an
-	# invocation on its own line is seen.
-	#
-	# Quote characters and backslashes are deleted outright rather than
-	# collapsed, so the script stays visible however its path is spelled. That
-	# merges quoted text into the surrounding words and splits on separators
-	# that were really data — harmless, since a stray split only yields one
-	# more fragment whose command-position word gets checked.
-	reading=$(printf '%s' "$scannable" | awk -v q="'" '
-		{ buf = buf $0 "\n" }
-		END {
-			gsub(/\\/, "", buf)
-			region_re = "\"[^\"]*\"|" q "[^" q "]*" q
-			while (match(buf, region_re)) {
-				region = substr(buf, RSTART + 1, RLENGTH - 2)
-				gsub(/\n/, " ", region)
-				out = out substr(buf, 1, RSTART - 1) region
-				buf = substr(buf, RSTART + RLENGTH)
-			}
-			out = out buf
-			gsub(/&&|\|\||[|;]/, "\n", out)
-			printf "%s", out
-		}')
-	while IFS= read -r fragment; do
-		release_fragment_invokes "$fragment" || continue
-		# git_target_dir reads the fragment's own -C / --git-dir, the same way
-		# the fix-ci marker is scoped to the repo a command aims at.
-		command="$fragment"
-		# Outside any repo there is no marker to consult and no plan branch to
-		# land, so the run is left to fail on its own.
-		git_target_dir "$command" >/dev/null || continue
-		release_active && continue
-		block_destructive "release.sh" \
-			"This script runs only through /release, which raises the marker it needs. Report the branch as ready to ship instead."
-	done <<<"$reading"
+		"main is protected in this repo (claude.protectMain). Start a work branch with 'ils branch <name>' and commit there."
 }
 
 # ╭────────────────────────────────────────────────────────────╮
@@ -667,21 +526,14 @@ check_single_command() {
 # A heredoc body is an argument, not a script: `git commit -F - <<'EOF'` hands
 # its lines to git, which only reads them. Both splitters would otherwise take
 # each body line for a fragment and block a commit message that names a guarded
-# command or the release script. So the body is dropped when the reader's output
-# goes nowhere that could run it, and kept — scanned line by line, as any other
-# fragment is — for everything else (`bash`, `eval`, a word this list does not
-# know, a reader piped into one of them), which is the closed side of the door.
+# command. So the body is dropped when the reader's output goes nowhere that
+# could run it, and kept — scanned line by line, as any other fragment is — for
+# everything else (`bash`, `eval`, a word this list does not know, a reader
+# piped into one of them), which is the closed side of the door.
 #
 # The line carrying the operator is always scanned: `git push --force <<EOF` is
 # a push whatever it is fed.
 readonly HEREDOC_READERS=" git cat tee head tail grep sort wc gh jq "
-
-# True when command $1 only reads what it is handed. Shared with the release
-# scan, which draws the same line between a script named in a commit message and
-# one the fragment runs.
-only_reads_input() {
-	[[ "$HEREDOC_READERS" == *" ${1##*/} "* ]]
-}
 
 # Dropping runs to the terminator line, and only when that line is really there:
 # without one the `<<` is prose inside a message far more often than a heredoc,
@@ -815,8 +667,6 @@ sanitized=$(printf '%s' "$scannable" | awk -v q="'" -v ph="$QUOTED_PLACEHOLDER" 
 		gsub(/&&|\|\||[|;]/, "\n", buf)
 		printf "%s", buf
 	}')
-
-check_release_invocation
 
 while IFS= read -r fragment; do
 	fragment="${fragment#"${fragment%%[![:space:]]*}"}"

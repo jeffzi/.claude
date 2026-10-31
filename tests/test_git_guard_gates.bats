@@ -239,7 +239,7 @@ teardown_file() {
 
 # ── Protected main (claude.protectMain) ──────────────────────────────────────
 
-@test "protect main: every commit-creating subcommand on main is blocked naming the protection and /release" {
+@test "protect main: every commit-creating subcommand on main is blocked naming the protection" {
 	local cmd
 	for cmd in \
 		"git commit -m 'msg'" \
@@ -251,7 +251,7 @@ teardown_file() {
 		"git pull"; do
 		run_guard "$PROTECTED_MAIN_REPO" "$cmd"
 
-		if ! assert_blocked || ! assert_guard_output_includes "protected" || ! assert_guard_output_includes "/release"; then
+		if ! assert_blocked || ! assert_guard_output_includes "protected"; then
 			printf 'command: %s\n' "$cmd" >&2
 			return 1
 		fi

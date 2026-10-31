@@ -306,7 +306,7 @@ CMD
 @test "heredoc: a body fed to a consumer that only reads it is not scanned" {
 	each_allowed_in "$REPO" \
 		"git commit -F - <<'EOF'
-release.sh merge lands the branch
+git push --force lands the branch
 EOF" \
 		"git commit -F - <<EOF
 then git reset --hard is forbidden
@@ -318,7 +318,7 @@ EOF" \
 git push --force is never run here
 EOF" \
 		"tee notes.txt <<-EOF
-release.sh merge
+git reset --hard
 EOF"
 }
 
@@ -328,7 +328,7 @@ EOF"
 git push --force
 EOF" \
 		"sh <<EOF
-release.sh merge
+git reset --hard
 EOF" \
 		"myrunner <<EOF
 git push --force
@@ -337,7 +337,7 @@ EOF"
 
 @test "heredoc: the fragment carrying the operator is scanned" {
 	run_guard "$REPO" "git push --force <<EOF
-release notes
+notes
 EOF"
 
 	assert_blocked
@@ -345,7 +345,7 @@ EOF"
 
 @test "heredoc: fragments after the terminator are scanned" {
 	run_guard "$REPO" "git commit -F - <<'EOF'
-release.sh merge lands the branch
+git push --force lands the branch
 EOF
 git reset --hard"
 
@@ -370,13 +370,13 @@ EOF"
 @test "heredoc: a body read inside a substitution an interpreter runs is scanned" {
 	run_guard_heredoc <<'CMD'
 bash -c "$(cat <<'EOF'
-scripts/release.sh merge
+git reset --hard
 EOF
 )"
 CMD
 
 	assert_blocked
-	assert_guard_output_includes "only through /release"
+	assert_guard_output_includes "Resets HEAD"
 }
 
 # ── Quoted option values (subcommand must stay visible) ──────────────────────
