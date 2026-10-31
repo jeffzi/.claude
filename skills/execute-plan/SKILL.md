@@ -68,9 +68,10 @@ Two `/tdd` invocations never run concurrently.
    trunk, check the local trunk against `origin/<trunk>`, then run `ils branch <slug>`. A failed
    read or fetch, local trunk commits origin lacks, or an `ils branch` refusal → halt 4. On any
    other branch → work there, resuming at the unfinished task with its own uncommitted files
-   included. A dirty or staged path no task names → halt 4 on every branch. Then, unless
-   `--attended`: write the marker (see `references/unattended.md`). Unless `--no-commit`: load
-   `Skill(autocommit)` once. Then Task 1.
+   included. On either, record the run's start point in the plan file, or keep the one a resumed run
+   recorded (`references/branch-flow.md` § The start point). A dirty or staged path no task names →
+   halt 4 on every branch. Then, unless `--attended`: write the marker (see
+   `references/unattended.md`). Unless `--no-commit`: load `Skill(autocommit)` once. Then Task 1.
 1. **Implement** per the task's **Implementation** line: `/tdd` for TDD tasks; `Skill(test-core)`
    for test-only tasks; `Skill(code-core)` for tasks the plan implements directly. Final Task: no
    implementation — dispatch the plan's `claim-reviewer` call as written (do not set `model`), with
@@ -158,12 +159,12 @@ exception: a fix that would change behavior something depends on (searched, not 
 finding — one the user dismisses stays on the list, marked dismissed.
 
 **In scope** means the finding's file is one this plan's tasks created or modified — it appears in
-`git diff --name-only origin/<trunk>...HEAD` before the findings-fix phase. Everything else is out
-of scope, however close to the plan's topic, and however much it got in your way: a broken task
-runner the Verify block used, a model that crashed a check you ran, a wrapper with a wrong default.
-An out-of-scope finding is never fixed by this run and never becomes a question. It stays
-`Confirmed` and goes in the report as one line; how you worked around it during the run is a
-deviation line. The user decides later whether it becomes work.
+the run's files (`references/branch-flow.md` § The start point) before the findings-fix phase.
+Everything else is out of scope, however close to the plan's topic, and however much it got in your
+way: a broken task runner the Verify block used, a model that crashed a check you ran, a wrapper
+with a wrong default. An out-of-scope finding is never fixed by this run and never becomes a
+question. It stays `Confirmed` and goes in the report as one line; how you worked around it during
+the run is a deviation line. The user decides later whether it becomes work.
 
 For an in-scope finding, `needs decision` names its dependent: a caller, a test, or a consumer of an
 output or format that relies on the current behavior, read at `file:line`. No dependent you can name
@@ -232,8 +233,8 @@ the findings or the cycle, never about whether to continue.
 4. The entry gate fails when any of these holds. Origin's default branch cannot be read. On the
    trunk, `git fetch origin <trunk>` fails. The local trunk carries commits `origin/<trunk>` does
    not. The index or working tree is dirty with a path no task names. `ils branch <slug>` exits
-   non-zero. Name the failed read or fetch with its output, those commits or paths, or `ils`'s
-   output.
+   non-zero. A resumed run's recorded start point is not an ancestor of `HEAD`. Name the failed read
+   or fetch with its output, those commits or paths, `ils`'s output, or the start sha.
 
 A halt is a report — tasks done, the blocked task and why, findings so far, marker removed — then
 the turn ends. It names the condition from this list. It is never a question: a report that asks the
@@ -309,7 +310,7 @@ Unless `--attended` → remove the unattended marker as the last step, in a halt
 | "Mark it `unverified`; the Final Task re-checks it"                  | `unverified` is for findings you could not read. A claim you fixed is re-verified now, in its task.                                                       |
 | "The Behavior's listed cases are examples; this one fits its intent" | The user approved the cases the Behavior names. A re-verify note about a case it does not name is a finding.                                              |
 | "The user only asked which findings remain"                          | "we need to fix" is a fix request for the `needs decision` entries. Ledger first, one durable fix each, then `/tdd`.                                      |
-| "I hit this bug while testing, so fixing it serves the plan"         | Its file is not in the plan's diff. Report it in one line; the workaround you used is a deviation.                                                        |
+| "I hit this bug while testing, so fixing it serves the plan"         | Its file is not among the run's files. Report it in one line; the workaround you used is a deviation.                                                     |
 | "In-scope and broken, but I'll let the user pick the fix"            | No dependent at `file:line` → fix it in the batch. Asking hands back work the approval already granted.                                                   |
 | "Out of scope, so I'll ask whether to fix it"                        | Out of scope is reported, never asked about. One line in Findings; the user starts the work if they want it.                                              |
 | "Answering from memory is faster than reading the ledger"            | Memory gave 3, then 6, then 7. One Read of the ledger is the answer.                                                                                      |
@@ -325,7 +326,7 @@ Unless `--attended` → remove the unattended marker as the last step, in a halt
 - The unattended marker still present after the final report or a halt report
 - A Findings entry fixed before the findings-fix phase, or a `needs decision` entry fixed before the
   user approves that fix
-- A findings-fix commit touching a file absent from the plan's diff before the findings-fix phase
+- A findings-fix commit touching a file absent from the run's files before the findings-fix phase
 - A question about an out-of-scope finding, or about an in-scope one with no dependent at
   `file:line`
 - A commit or merge on the trunk, an `ils merge` the user did not ask for, a `gh pr merge` run or

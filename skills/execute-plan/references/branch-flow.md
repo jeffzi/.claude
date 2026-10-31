@@ -48,20 +48,38 @@ creating anything, so the user is still on the trunk.
 `<slug>` is the plan file's slug (`plan-<slug>.md`). The branch name is the only place the slug
 appears in git; task commit messages never carry it.
 
-The unfinished task is the first one with no commit in `origin/<trunk>..HEAD` — the one a halt or a
-dead session left mid-way. Match each commit `git log --name-only origin/<trunk>..HEAD` prints to
-the task whose **Files** it touches. Its own uncommitted files are not dirt: a halt inside a task
-always leaves them, and the re-run exists to finish them. A path no task names is dirt on any
-branch; the halt report names those paths and leaves the task's files as they are.
+### The start point
+
+The run's own work is what it committed after it started, not everything since the trunk: a branch
+the run started on can already carry the user's commits. Before Task 1, read the plan file's `##
+Run` section:
+
+| `## Run` section                                                                     | Action                                                                                                                                                   |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No `Start:` line, and no commit in `origin/<trunk>..HEAD` touches a task's **Files** | `git rev-parse HEAD` — after `ils branch` on the trunk, before any task on any other branch — and write it as `Start: <sha>` with the Write or Edit tool |
+| No `Start:` line, but a commit in `origin/<trunk>..HEAD` touches a task's **Files**  | A run from before start points existed: write `Start: $(git merge-base origin/<trunk> HEAD)` and record a deviation naming it — that run's own reading   |
+| `Start: <sha>` present (a resumed run)                                               | Keep it. `git merge-base --is-ancestor <sha> HEAD` fails → halt 4 naming the sha: the branch no longer holds the run's start                             |
+
+Wherever this file or SKILL.md says `<start>`, read that line; never retype the sha from memory. The
+plan file is never committed, so the start point survives a resumed session without entering git.
+
+The run's commits are `git log --first-parent --no-merges <start>..HEAD`, and the run's files are
+`git log --first-parent --no-merges --name-only --format= <start>..HEAD | sort -u`. `--first-parent`
+walks only the branch's own line, so the trunk commits a ship-phase merge brings in stay out of
+both, and `--no-merges` drops the merge commit itself.
+
+The unfinished task is the first one with no commit in `<start>..HEAD` — the one a halt or a dead
+session left mid-way. Match each commit `git log --first-parent --no-merges --name-only
+<start>..HEAD` prints to the task whose **Files** it touches. Its own uncommitted files are not
+dirt: a halt inside a task always leaves them, and the re-run exists to finish them. A path no task
+names is dirt on any branch; the halt report names those paths and leaves the task's files as they
+are.
 
 ## Findings-fix phase (after the Final Task's `claim-reviewer` run)
 
-1. Read the ledger. Take every entry marked `Confirmed` that is not `dismissed`, and list the plan's
-   files: `git fetch origin <trunk>`, then `git diff --name-only origin/<trunk>...HEAD`. An entry
-   whose file is not in that list is out of scope (SKILL.md § Findings): it stays `Confirmed`,
-   unfixed, for the report — no question. A failed fetch is no halt: `origin/<trunk>` keeps what the
-   last successful fetch left, so diff against it and record a deviation naming the failure and its
-   output.
+1. Read the ledger. Take every entry marked `Confirmed` that is not `dismissed`, and list the run's
+   files (§ The start point). An entry whose file is not in that list is out of scope (SKILL.md §
+   Findings): it stays `Confirmed`, unfixed, for the report — no question.
 2. For each in-scope entry, decide once: would the fix change behavior something depends on (search
    call sites and tests, `rules/decision-policy.md` exception 1)? Yes → mark the entry `needs
    decision`, with the dependent's `file:line`, and leave it. No → it goes into the batch.
