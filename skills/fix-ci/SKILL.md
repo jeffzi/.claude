@@ -8,6 +8,7 @@ allowed-tools:
   - Bash(git *)
   - Bash(~/.claude/scripts/fix-ci-push.sh *)
   - Bash(ils push)
+  - Bash(ils push --wait)
   - Bash(tee *)
   - Bash(tail *)
   - Bash(grep *)
@@ -247,8 +248,8 @@ squash an unproven fix into the target.
 - Typing raw `git push`: the wrapper is the push path, and `ils push` is the push path only for the
   squash-back onto a target with an open PR against the trunk
 - `--force` in any form, `--amend`, or `--no-verify` anywhere in this loop
-- Piping, `tee`ing, or backgrounding `ils push`, or running it on any target but one with an open PR
-  against the trunk
+- Piping, `tee`ing, or backgrounding `ils push` other than the one `ils push --wait` an exit 4 calls
+  for, or running it on any target but one with an open PR against the trunk
 - About to edit permission settings because a push was denied — never; surface it instead
 - The marker file still exists and you're about to report results
 - About to write "green" or "fix complete" without `gh run view … conclusion` output in context, or,
