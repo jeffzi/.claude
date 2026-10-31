@@ -13,7 +13,8 @@ set -euo pipefail
 #     `--force-with-lease`, the `-fu`/`-uf` clusters, `--mirror` — is refused by
 #     construction rather than by enumeration.
 #   - Deletions stay inside the assistant's own branch namespaces, `fix-ci/*`
-#     (a CI-fix loop's throwaway branches) and `plan/*` (a plan run's branch).
+#     (a CI-fix loop's throwaway branches) and `plan/*` (branches older plan
+#     runs left behind, kept so they can still be cleaned up).
 #   - Every ref it touches is named in the argv. A push that names no refspec
 #     lets git fall back to `remote.<name>.push` and `push.default` — repo
 #     config the wrapper never vetted, which can carry a '+' force prefix or a
