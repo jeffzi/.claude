@@ -221,9 +221,9 @@ the findings or the cycle, never about whether to continue.
 
 1. A gap at `refuted: 2`, or a `halted` gap refuted again (step 2), or a task's mechanical checks
    red — a `tdd-cycle` `STUCK` or `TEST_FLAWED` status is this condition, and so is a `fix-ci`
-   handback in the ship phase, the ship phase's `ils push` refused, broke, or did not run (exit 1,
-   2, 127, or any code but 0, 4, 5), or a trunk merge whose conflict does not resolve with the suite
-   green (the merge is left in progress).
+   handback in the ship phase, the ship phase's `ils push` refused, broke, or did not run (exit 1
+   other than the one rerun the ship table allows, 2, 127, or any code but 0, 4, 5), or a trunk
+   merge whose conflict does not resolve with the suite green (the merge is left in progress).
 2. A task needs a behavior change something depends on that the plan did not state
    (`rules/decision-policy.md` exception 1). A finding whose fix would be one is not a halt — it is
    marked `needs decision` (see Findings).
