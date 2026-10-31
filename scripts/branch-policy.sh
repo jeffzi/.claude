@@ -81,8 +81,8 @@ push_deleted_refs() {
 
 # True when a ref belongs to a namespace whose branches are the assistant's own
 # and disposable — the only refs it may delete, locally or on a remote.
-# `fix-ci/*` holds a CI-fix loop's throwaway branches; `plan/*` holds the branch
-# a plan run works and ships on, which is squash-merged and then cleaned up.
+# `fix-ci/*` holds a CI-fix loop's throwaway branches; `plan/*` is kept for
+# branches that older plan runs left behind, so they can still be cleaned up.
 ref_in_own_namespace() {
 	local ref="${1#refs/heads/}"
 	[[ "$ref" == fix-ci/* || "$ref" == "$PLAN_BRANCH_PREFIX"* ]]
