@@ -38,7 +38,7 @@ Keep the `revise-<leaf>-*` entries — never Glob for more. Act on the first mat
 | No entry for this leaf                              | Step 1                                                                                                                                                          |
 | Path argument; its slug matches an entry            | Resume: `pending` findings → step 4; none → step 5. Verify against the header's baseline. Never re-review, never rewrite it. Name any other entry for this leaf |
 | No argument; `revise-<leaf>-changed.md` is an entry | Ask: resume, or start fresh — the changed-file set may have moved since. Name any other entry for this leaf                                                     |
-| Any other entry                                     | Ask: resume it, or start fresh on the new scope. Never silently ignore it                                                                                       |
+| Any other entry                                     | Ask: resume it, or start fresh on the new scope. Never silently ignore it. Start fresh → set its header to `status: abandoned` before step 1                    |
 
 **Step 1 — Resolve targets.**
 
