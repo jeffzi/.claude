@@ -5,10 +5,11 @@ description: >
   drift, weak assertions, and tests that should not exist (a dependency's behavior, fixed
   configuration or wording, a fake's own output), and the violations fixed in place. Also use when a test suite needs
   cross-file fixes — extracting shared fixtures, merging duplicate tests across files, deleting
-  duplicate traversals. Not for review without fixes — dispatch vet-test, vet-test-merit, or
+  duplicate traversals. Also use with `--merit-only` to prune only the tests that should not exist,
+  skipping the full review. Not for review without fixes — dispatch vet-test, vet-test-merit, or
   vet-test-suite for a whole suite. Not for
   writing new tests — use tdd. Not for failing tests with unknown root cause — use /fix.
-argument-hint: "[test file or directory]"
+argument-hint: "[--merit-only] [test file or directory]"
 model: opus
 effort: high
 ---
@@ -22,6 +23,24 @@ ordering, review-only handling, report rules) that every step below follows.
 
 Review test files with the `vet-test` and `vet-test-merit` agents (and `vet-test-suite` for
 directory targets), then apply the fixes here. The agents find; you fix.
+
+## Merit-only mode
+
+`--merit-only` in the target line selects this mode. Strip it before step 1; the rest of the line is
+the target. In this mode:
+
+- Step 2 dispatches only `vet-test-merit` per bucket — no `vet-test`, no `vet-test-suite`, whatever
+  the target.
+- The checkpoint slug gains a `-merit` suffix (`revise-test-tests-merit.md`,
+  `revise-test-changed-merit.md`) and the header gains `mode: merit-only`. Step 0 matches a
+  checkpoint only within the same mode: a full run never resumes a merit-only checkpoint, nor the
+  reverse — the other mode's entry routes to revise-core's "Any other entry" row. Name both modes in
+  that question: resuming runs the checkpoint's mode, not the one this invocation asked for.
+- The report heading reads `## Test revision (merit-only): [N files]`, so no reader takes it for a
+  full review.
+
+Every other step runs unchanged — the step-3 deletion branch still sends each deletion to
+adjudication.
 
 ## Changed files (no-argument path)
 
@@ -128,9 +147,11 @@ Fixtures created: [list or "none"]
   deletion
 - Treating `clarity` or `cost` as skippable — the verdict gates the queue; impact only orders it
 - Reporting fixes without re-running the suite
-- Skipping the `vet-test-suite` dispatch on a directory target
+- Skipping the `vet-test-suite` dispatch on a directory target outside merit-only mode
 - Dispatching `vet-test` without `vet-test-merit` on a bucket — nobody else asks whether a test
   should exist
+- Dispatching `vet-test` or `vet-test-suite` in merit-only mode, or passing `--merit-only` into the
+  target path
 - Deferring `confirmed` suite-agent findings to a "separate dedicated pass" — cross-file extraction
   and merges are step 4 work, this run
 - Dispatching `vet-test-suite` per bucket
