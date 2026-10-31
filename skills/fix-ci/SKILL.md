@@ -53,7 +53,8 @@ Two green gates pass on output in your context (see "The green gate"). The fix b
 view` gates the squash. The squashed target tip gates the final report: `gh run view` on its run, or
 `ils push` exit 0 when the target has an open PR against the trunk. Nothing is "green" between them
 — the squash push creates a new SHA that has no run yet. A target with an open PR against the trunk
-is merged with `ils merge`, on the user's word: the report names it and never runs it.
+is merged with `ils merge`, on the user's word: the loop writes the pull request's title and body,
+and the report shows them and names `ils merge`, never running it.
 
 **Scope of approval.** A read-only ask — "why is CI red?", "check CI", "what's failing?" — gets
 locate/read/triage and a report with the proposed fix described: no marker, no edits, no commits
