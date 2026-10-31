@@ -45,7 +45,9 @@
       "Bash(swiftformat *)",
       "Bash(swiftlint *)",
       "Bash(~/.claude/scripts/fix-ci-push.sh *)",
-      "Bash(ils push)"
+      "Bash(ils push)",
+      "Bash(ils push --wait)",
+      "Bash(ils branch *)"
     ],
     "deny": [
       "Bash(git checkout *)",

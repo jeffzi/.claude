@@ -3,7 +3,7 @@ name: preflight
 description: >
   Gated pre-commit review pipeline: entry gate, parallel review lenses, one verified fix pass,
   exit gate.
-argument-hint: Optional path or commit ref (defaults to changes since last push, or the whole plan on a plan/* branch)
+argument-hint: Optional path or commit ref (defaults to the whole branch since it left origin's trunk, or changes since last push on the trunk)
 disable-model-invocation: true
 # Slash-only (disable-model-invocation), so both declarations are live:
 model: opus # orchestrates a multi-agent pipeline with snapshot/restore decisions
@@ -44,16 +44,21 @@ context stolen from triage and the report — the steps only you can do.
 
 - Argument: $ARGUMENTS
 - Uncommitted changes: !`git status --porcelain`
-- Commits under review (the whole plan on a `plan/*` branch, else since last push):
+- Commits under review (off the trunk: everything since the branch left origin's trunk; on the
+  trunk: since last push):
 
 ```!
+trunk=$(git ls-remote --symref origin HEAD 2>/dev/null | sed -n 's|^ref: refs/heads/\(.*\)[[:space:]]HEAD$|\1|p')
 branch=$(git branch --show-current 2>/dev/null)
-case "$branch" in
-plan/*)
- base=$(~/.claude/scripts/plan-branch.sh base 2>/dev/null || true)
- git log "${base:-main}..HEAD" --oneline 2>/dev/null || git log master..HEAD --oneline 2>/dev/null ;;
-*) git log @{u}..HEAD --oneline 2>/dev/null || echo "(no upstream or up to date)" ;;
-esac
+fork=""
+if [ -n "$trunk" ] && [ "$branch" != "$trunk" ]; then
+ fork=$(git merge-base "origin/$trunk" HEAD 2>/dev/null || true)
+fi
+if [ -n "$fork" ]; then
+ git log "$fork..HEAD" --oneline
+else
+ git log @{u}..HEAD --oneline 2>/dev/null || echo "(no upstream or up to date)"
+fi
 ```
 
 > **Note:** Context above is orientation only. Step 1's file collection is the authoritative source
@@ -137,11 +142,12 @@ on them), run task 7, and report the stop status.
 
 **No-argument file collection** — always run all four, combine and deduplicate:
 
-1. Committed work: on a `plan/*` branch, `git diff --name-only --diff-filter=d "$(git merge-base
-   "$base" HEAD)" HEAD` where `base` is what `~/.claude/scripts/plan-branch.sh base` prints, falling
-   back to `main`, else `master`, when it refuses — the whole plan, whether or not the branch was
-   pushed; on any other branch, `git diff --name-only --diff-filter=d @{push}` — committed but not
-   yet pushed (skip if `@{push}` fails — no upstream)
+1. Committed work: on any branch other than the trunk — origin's default branch, as `git ls-remote
+   --symref origin HEAD` names it, with a detached HEAD counting as off the trunk — `git diff
+   --name-only --diff-filter=d "$(git merge-base "origin/<trunk>" HEAD)" HEAD`: everything since the
+   branch left origin's trunk, whether or not it was pushed. On the trunk, or when the trunk read or
+   the merge base fails (`origin/<trunk>` never fetched, a shallow clone), `git diff --name-only
+   --diff-filter=d @{push}` — committed but not yet pushed (skip if `@{push}` fails — no upstream)
 2. `git diff --name-only --diff-filter=d` — unstaged working-tree changes
 3. `git diff --cached --name-only --diff-filter=d` — staged changes
 4. `git ls-files --others --exclude-standard` — untracked, non-gitignored files

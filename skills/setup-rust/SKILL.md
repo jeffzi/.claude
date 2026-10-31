@@ -3,7 +3,7 @@ name: setup-rust
 description: Scaffolds or reconciles the house Rust tooling config (init | update).
 argument-hint: init | update
 disable-model-invocation: true
-allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion, Bash(cp:*), Bash(ls:*), Bash(mkdir:*), Bash(ln:*), Bash(diff:*), Bash(git config claude.protectMain *), Bash(cargo check *)
+allowed-tools: Read, Write, Edit, Glob, Grep, AskUserQuestion, Bash(cp:*), Bash(ls:*), Bash(mkdir:*), Bash(ln:*), Bash(diff:*), Bash(cargo check *)
 # Quality floor: the update reconcile is a key-by-key judgment pass (stale default vs deliberate override); the cheap tier batch-accepts.
 model: sonnet
 effort: medium
@@ -90,11 +90,8 @@ Seed templates into a project that has none (or is missing some).
 2. For each tooling template, check if the destination exists.
    - **Missing** -> copy it verbatim from `${CLAUDE_SKILL_DIR}/references/<template>`.
    - **Exists** -> skip it, note it. Never overwrite in `init`; that is `update`'s job.
-3. Protect `main`: run `git config claude.protectMain true` in the project. Idempotent; the git
-   guard then blocks the assistant from committing on `main`, so plan work lands through plan
-   branches. Report it like a template copy (`set` or `already set`).
-4. Run `cargo check` to verify the scaffolded project compiles.
-5. Report what was created vs skipped. Include a **Prerequisites** note listing the cargo
+3. Run `cargo check` to verify the scaffolded project compiles.
+4. Report what was created vs skipped. Include a **Prerequisites** note listing the cargo
    subcommands the seeded config requires but does not install:
    - `cargo-nextest` — <https://nexte.st/>
    - `cargo-llvm-cov` — <https://github.com/taiki-e/cargo-llvm-cov>
@@ -142,10 +139,9 @@ Apply the chosen edits with `Edit`/`Write`, preserving comments and key order. T
 comparison detail lives in `${CLAUDE_SKILL_DIR}/references/reconcile-rules.md`; consult it during
 the per-file pass.
 
-After configs are reconciled, run `git config claude.protectMain true` (idempotent, reported as
-`set` or `already set`), then run `cargo check` to verify.
+After configs are reconciled, run `cargo check` to verify.
 
-Finish by reporting: files changed, keys added/updated/removed, and the `claude.protectMain` state.
+Finish by reporting: files changed and keys added/updated/removed.
 
 ## Common mistakes
 

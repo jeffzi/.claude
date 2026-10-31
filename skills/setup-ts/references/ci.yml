@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, fix-ci/**, plan/**, "v[0-9]*"]
+    branches: [main, fix-ci/**]
     paths-ignore:
       - "**.md"
       - LICENSE
@@ -13,8 +13,8 @@ on:
   workflow_call:
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions: {}
 

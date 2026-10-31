@@ -93,8 +93,7 @@ own subtree, so cross-directory duplicates go unfixed.
 | ---------------------------------------------- | ------------------------------------------------------------------------------ |
 | [`autocommit`](skills/autocommit/SKILL.md)     | Standing commit approval — auto-commit verified work, no pushes                |
 | [`build`](skills/build/SKILL.md)               | Feature design pipeline: discuss → plan; produces an approved plan file        |
-| [`execute-plan`](skills/execute-plan/SKILL.md) | Run an approved plan on a `plan/*` branch, push it, watch CI — no check-ins    |
-| [`release`](skills/release/SKILL.md)           | Cut a release branch, land plan branches on it, ship it (user-invoked only)    |
+| [`execute-plan`](skills/execute-plan/SKILL.md) | Run an approved plan on its own branch, push it, watch CI — no check-ins       |
 | [`fix`](skills/fix/SKILL.md)                   | Root cause investigation then TDD-driven fix                                   |
 | [`fix-ci`](skills/fix-ci/SKILL.md)             | Diagnose and fix failing GitHub Actions CI                                     |
 | [`harden`](skills/harden/SKILL.md)             | Bug-hunting audit + Don't Repeat Yourself (DRY) pass with diff-gated execution |
@@ -183,57 +182,39 @@ See the [Process](#process) skills table for additional workflows (`/harden`, `/
 
 ### Plan Flow
 
-One plan is one commit on the branch it started from, `main` by default. The assistant never commits
-on that base; every plan runs on its own branch and lands as a single squash. How it lands depends
-on that base. A plan cut from `main` (origin's default branch) ships as a pull request through `ils
-push` and you merge it with `ils merge`. A plan cut from a release or feature branch lands through
-`/release merge`.
+One plan is one pull request against `main`. The assistant never commits on `main`: every plan runs
+on its own branch and lands as a single squash commit when you merge its pull request.
 
-Requirement: plans cut from `main` need [`ils`](https://github.com/jeffzi/ils) 0.2.x on your `PATH`
-and its skill installed; this repository does not install it.
+Requirement: [`ils`](https://github.com/jeffzi/ils) 0.5.x on your `PATH` and its skill installed;
+this repository installs neither. [`docs/release-flow.md`](docs/release-flow.md) walks through the
+whole flow.
 
-A release groups several plans: `/release start X.Y.Z` cuts `vX.Y` from `main`, plans land on it,
-and `/release finish` ships it onto `main` with a tag.
-[`docs/release-flow.md`](docs/release-flow.md) walks through the whole flow, including how fixes
-fold back into the commits they correct.
-
-1. `/write-plan` writes the plan; you approve it. On a release branch it also decides, per task,
-   which earlier release commit the task corrects (its **Folds into** target), and says so.
-2. `/execute-plan` creates `plan/<slug>` from the clean branch you are on, records that base,
-   commits once per task (as a `fixup!` of the target when one was named), and fixes confirmed
-   findings. Cut from `main`, it runs `ils push`, which pushes the branch, opens its pull request,
-   and waits for CI (dispatching `/fix-ci` on red). It then writes the pull request's title and
-   body. Cut from a release or feature branch, it pushes the branch once, watches CI (dispatching
-   `/fix-ci` on red), and writes the squash commit message. Its report ends with the one command
-   left for you.
+1. `/write-plan` writes the plan; you approve it.
+2. `/execute-plan` starts `<slug>` with `ils branch <slug>` when you are on `main`, or works on the
+   branch you are on. It commits once per task and fixes confirmed findings. It then runs `ils
+   push`, which pushes the branch, opens its pull request, and waits for CI (dispatching `/fix-ci`
+   on red), and writes the pull request's title and body. Its report ends with the one command left
+   for you.
 3. Optionally, `/preflight` on the branch.
-4. Cut from `main`: merge the pull request with `ils merge`, or ask the assistant to run it. Cut
-   from a release or feature branch: `/release merge` folds the branch's `fixup!` commits into the
-   release commits they name. It squashes the rest onto the base with that message, pushes, and
-   deletes the branch.
-5. `/release finish` runs the release commit and tag, pushes, watches CI, fast-forwards `main`, and
-   deletes the release branch. `/release status` shows where the release stands at any point.
+4. Merge the pull request with `ils merge`, or ask the assistant to run it.
+
+A release is a release commit and a tag. `write-release` commits `chore: release vX.Y.Z` on its own
+branch and lands it through `ils push`; you merge it with `ils merge`, then run `ils release
+<X.Y.Z>` to tag it and publish the GitHub release.
 
 What enforces it:
 
-- `git config claude.protectMain true` (set per repo by `/setup-ts` and `/setup-py`) makes
-  [`git-guard.sh`](hooks/git-guard.sh) block every commit-creating command on `main`. A feature
-  branch used as a base has no guard of its own; the skill's rule that all work goes on `plan/*` is
-  what protects it.
-- [`release.sh`](scripts/release.sh) runs only while a fresh marker `/release` raises exists, one
-  raised in the last thirty minutes; an older marker, or one dated ahead by a skewed clock, reads as
-  absent and the script refuses. Both the guard and the script check it, so every release write —
-  the cut, the squash or fold, the fast-forward of `main` — happens only when you invoke the skill.
-  Its force-push is confined to release branches, under a lease, and only when a fold rewrote one.
-- `ils push` pushes a plan branch cut from `main` and opens its pull request; the assistant never
-  merges that pull request. `ils push` also lands `/fix-ci`'s squashed fix onto any branch with an
-  open pull request against `main`. Outside `release.sh`, the assistant pushes through
-  [`fix-ci-push.sh`](scripts/fix-ci-push.sh): `fix-ci/*` branches, plan branches cut from a release
-  or feature branch, and squash-backs onto branches without a pull request. The wrapper is
-  append-only, refuses force pushes, and deletes only `fix-ci/*` and `plan/*` branches.
-- CI templates trigger on pushes to `main`, `fix-ci/**`, `plan/**`, and `v[0-9]*`, so a plan branch
-  is green before its pull request is merged or it reaches its base through `/release merge`. A
-  release branch also gets a run for `/release finish` to gate on.
+- `git config claude.protectMain true`, set by hand per repo, makes
+  [`git-guard.sh`](hooks/git-guard.sh) block every commit-creating command on `main` and point at
+  `ils branch <name>` instead.
+- `ils push` pushes the branch and opens its pull request; `ils merge` and `ils release` ask for
+  your approval, and the assistant never runs either unasked. `ils push` also lands `/fix-ci`'s
+  squashed fix onto any branch with an open pull request against `main`. Outside `ils`, the
+  assistant pushes through [`fix-ci-push.sh`](scripts/fix-ci-push.sh): `fix-ci/*` branches, and
+  squash-backs onto branches without a pull request. The wrapper is append-only, refuses force
+  pushes, and deletes only `fix-ci/*` and `plan/*` branches.
+- CI templates trigger on pushes to `main` and `fix-ci/**`, and on pull requests, so a plan branch
+  is green before its pull request is merged.
 
 ## Tooling
 
@@ -305,23 +286,22 @@ bats tests/
 | Script                                               | Description                                                                                 |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | [`cleanup-sessions.sh`](scripts/cleanup-sessions.sh) | Remove stale session data older than a configurable age                                     |
-| [`branch-policy.sh`](scripts/branch-policy.sh)       | Marker and branch policy shared by `fix-ci`, `plan-branch`, `release`, `git-guard`          |
-| [`fix-ci-push.sh`](scripts/fix-ci-push.sh)           | Sanctioned push wrapper for `fix-ci` and plan branches cut from a release or feature branch |
-| [`release.sh`](scripts/release.sh)                   | Cut, inspect, land plans on, and finish a release branch; run by `/release`                 |
+| [`branch-policy.sh`](scripts/branch-policy.sh)       | Marker and branch policy shared by `fix-ci-push.sh` and `git-guard`                         |
+| [`fix-ci-push.sh`](scripts/fix-ci-push.sh)           | Sanctioned push wrapper for `fix-ci/*` branches and squash-backs onto branches without a PR |
 | [`sh-common.sh`](scripts/sh-common.sh)               | Sourced helpers shared by the scripts and hooks: `die`, portable `stat`                     |
 | [`statusline.sh`](scripts/statusline.sh)             | Custom status line: model, context gauge, rate limit pacing                                 |
 | [`sync-skills.sh`](scripts/sync-skills.sh)           | Sync selected skills from external repositories via `npx skills`                            |
 
 ### Hooks
 
-| Hook                                               | Description                                                                           |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh)   | Blocks proceeding when a Bash command fails                                           |
-| [`git-commit-guard.sh`](hooks/git-commit-guard.sh) | Blocks commit messages containing internal tooling references                         |
-| [`git-guard.sh`](hooks/git-guard.sh)               | Blocks auto-push, destructive ops, commits on a protected `main`, unsanctioned merges |
-| [`git-lock-guard.sh`](hooks/git-lock-guard.sh)     | Absorbs `.git/index.lock` races from parallel agents/sessions                         |
-| [`tdd-red-guard.sh`](hooks/tdd-red-guard.sh)       | Blocks reading implementation source during TDD RED phase                             |
-| [`worktree-guard.sh`](hooks/worktree-guard.sh)     | Blocks exiting worktrees with uncommitted changes                                     |
+| Hook                                               | Description                                                      |
+| -------------------------------------------------- | ---------------------------------------------------------------- |
+| [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh)   | Blocks proceeding when a Bash command fails                      |
+| [`git-commit-guard.sh`](hooks/git-commit-guard.sh) | Blocks commit messages containing internal tooling references    |
+| [`git-guard.sh`](hooks/git-guard.sh)               | Blocks auto-push, destructive ops, commits on a protected `main` |
+| [`git-lock-guard.sh`](hooks/git-lock-guard.sh)     | Absorbs `.git/index.lock` races from parallel agents/sessions    |
+| [`tdd-red-guard.sh`](hooks/tdd-red-guard.sh)       | Blocks reading implementation source during TDD RED phase        |
+| [`worktree-guard.sh`](hooks/worktree-guard.sh)     | Blocks exiting worktrees with uncommitted changes                |
 
 ## Configuration Notes
 

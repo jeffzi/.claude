@@ -2,7 +2,7 @@ name: Tests
 
 on:
   push:
-    branches: [main, fix-ci/**, plan/**, "v[0-9]*"]
+    branches: [main, fix-ci/**]
   pull_request:
     branches: [main]
   workflow_call:
@@ -22,8 +22,8 @@ permissions:
 # `workflow_call`, `github.workflow` is the caller's name, and a called workflow
 # sharing its caller's group cancels the caller.
 concurrency:
-  group: tests-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: tests-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   PYTEST_ADDOPTS: "--color=yes"

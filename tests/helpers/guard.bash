@@ -17,14 +17,6 @@ add_untracked_plan() {
 	printf 'plan content\n' >"$1/.claude/plans/phase.md"
 }
 
-# Repo with a fresh release marker raised; prints the repo dir.
-setup_release_marked_repo() {
-	local dir
-	dir=$(setup_repo "$1")
-	raise_release_marker "$dir"
-	printf '%s' "$dir"
-}
-
 # Every command in the list is blocked in repo $1; a failure names the command.
 each_blocked_in() {
 	local dir="$1"
