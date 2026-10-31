@@ -47,16 +47,6 @@
       "Bash(~/.claude/scripts/fix-ci-push.sh *)",
       "Bash(ils push)"
     ],
-    "ask": [
-      "Bash(ils merge)",
-      "Bash(ils merge *)",
-      "Bash(ils release)",
-      "Bash(ils release *)",
-      "Bash(gh pr merge)",
-      "Bash(gh pr merge *)",
-      "Bash(gh release create)",
-      "Bash(gh release create *)"
-    ],
     "deny": [
       "Bash(git checkout *)",
       "Bash(git checkout)",
@@ -70,9 +60,19 @@
       "Bash(git stash)",
       "NotebookEdit"
     ],
+    "ask": [
+      "Bash(ils merge)",
+      "Bash(ils merge *)",
+      "Bash(ils release)",
+      "Bash(ils release *)",
+      "Bash(gh pr merge)",
+      "Bash(gh pr merge *)",
+      "Bash(gh release create)",
+      "Bash(gh release create *)"
+    ],
     "defaultMode": "auto"
   },
-  "model": "fable",
+  "model": "sonnet",
   "disableBundledSkills": true,
   "hooks": {
     "PreToolUse": [
@@ -175,13 +175,13 @@
       "effortLevel": "high"
     },
     "claude-fable-5-1": {
-      "effortLevel": "xhigh"
+      "effortLevel": "medium"
     },
     "claude-opus-5": {
       "effortLevel": "high"
     },
     "claude-opus-5-5": {
-      "effortLevel": "xhigh"
+      "effortLevel": "high"
     },
     "claude-sonnet-5-5": {
       "effortLevel": "medium"
