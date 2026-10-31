@@ -130,8 +130,9 @@ Otherwise load `Skill(write-commit)` and compose one conventional message for th
 - Body ends with an `Also fixes:` list naming the findings the findings-fix phase fixed — one line
   per finding, `path — what was wrong`, no hashes.
 - No plan slug, no `.planning/` path, no task numbers, no process words (plan, task, cycle, review
-  pass, agent, skill). GitHub squashes with the pull request's title and body, and no guard reads
-  them, so the no-internal-words rule holds here by discipline, not by hook.
+  pass, agent, skill). GitHub squashes with the pull request's title and body. `git-commit-guard.sh`
+  scans them on `gh pr edit` and blocks internal references; no hook reads the message file written
+  when nothing was pushed, so that file holds the rule by discipline.
 
 When nothing was pushed:
 
