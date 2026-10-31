@@ -20,6 +20,8 @@ main() {
 	npx --yes skills add blader/humanizer "${common[@]}"
 
 	npx --yes skills add fallow-rs/fallow-skills "${common[@]}" --skill fallow
+
+	npx --yes skills add jeffzi/ils "${common[@]}" --skill write-release
 }
 
 main "$@"

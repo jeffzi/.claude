@@ -62,7 +62,7 @@ script's `add` commands are the source map.
 | [`write-skill`](skills/write-skill/SKILL.md)                           | Author SKILL.md files (review via `revise-skill`)                  |
 | [`write-plan`](skills/write-plan/SKILL.md)                             | Multi-step implementation plans                                    |
 | [`write-changelog`](skills/write-changelog/SKILL.md)                   | Keep a Changelog standard for CHANGELOG.md                         |
-| [`write-release`](skills/write-release/SKILL.md)                       | Version bump, tag, and GitHub release workflow                     |
+| [`write-release`](skills/write-release/SKILL.md)                       | Version bump and release commit; `ils release` tags                |
 | [`humanizer`](skills/humanizer/SKILL.md)                               | Remove AI writing patterns from prose                              |
 | [`markdown-mermaid-writing`](skills/markdown-mermaid-writing/SKILL.md) | Markdown and Mermaid style guides, templates, and 24 diagram types |
 | [`paper-lookup`](skills/paper-lookup/SKILL.md)                         | Search 11 academic databases by keyword, DOI, or author            |

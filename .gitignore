@@ -35,6 +35,7 @@ skills/scikit-survival/
 skills/statistical-analysis/
 skills/humanizer/
 skills/fallow/
+skills/write-release/
 
 # Symlinked from a local clone of its own repository (no trailing slash: a
 # directory pattern does not match a symlink)
