@@ -90,11 +90,17 @@ run_lock_guard() {
 	run_hook_for_command "$GIT_LOCK_GUARD_HOOK" "$1" "$2"
 }
 
-# Run git-commit-guard hook with command $1; sets GUARD_EXIT and GUARD_OUTPUT.
+# Run git-commit-guard on command $1 from cwd $2 (default the test's own temp
+# dir), with PATH $3 (default the current PATH) for the hook alone; sets
+# GUARD_EXIT and GUARD_OUTPUT (stdout and stderr together). The command comes
+# first so for_each_case can append it as the case.
 run_commit_guard() {
-	local cmd="$1"
+	local cmd="$1" dir="${2:-$BATS_TEST_TMPDIR}" path="${3:-$PATH}" input
+	require_fixture_dir "$dir" "$GIT_COMMIT_GUARD_HOOK" || return 1
+	input=$(jq -n --arg cmd "$cmd" --arg cwd "$dir" \
+		'{"tool_name":"Bash","tool_input":{"command":$cmd},"cwd":$cwd}')
 	GUARD_EXIT=0
-	GUARD_OUTPUT=$(hook_input "$cmd" | bash "$GIT_COMMIT_GUARD_HOOK" 2>&1) || GUARD_EXIT=$?
+	GUARD_OUTPUT=$(cd "$dir" && env "PATH=$path" "$BASH_BIN" "$GIT_COMMIT_GUARD_HOOK" <<<"$input" 2>&1) || GUARD_EXIT=$?
 }
 
 # Run hook script $1 from cwd $2 on command $3, with PATH $4 (default the

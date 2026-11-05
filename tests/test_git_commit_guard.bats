@@ -180,3 +180,93 @@ write_planning_msg_file() {
 		'gh issue create --title "feat(05-01): add layout" --body "Tracks the layout."' \
 		'gh pr comment 12 --body "See .planning/notes.md"'
 }
+
+# ── Which invocations are scanned ────────────────────────────────────────────
+
+@test "invocation: a commit behind -C or after cd, and a pull request after cd, are scanned" {
+	local dir="$BATS_TEST_TMPDIR/sub"
+	mkdir -p "$dir"
+
+	each_blocked "internal phase ID" \
+		"git -C $dir commit -m 'feat(05-01): add layout'" \
+		"cd $dir && git commit -m 'feat(05-01): add layout'" \
+		"cd $dir && gh pr create --title 'feat(05-01): add layout' --body 'Adds the layout.'"
+}
+
+@test "mention: a command that only mentions git commit or gh pr create is not scanned" {
+	each_allowed \
+		"echo \"git commit -m 'docs: see .planning/notes.md'\"" \
+		"rg 'gh pr create' .planning/"
+}
+
+@test "both: a commit and a pull request in one command each have their message file scanned" {
+	local planning clean="$BATS_TEST_TMPDIR/clean.txt"
+	planning=$(write_planning_msg_file)
+	printf 'feat(auth): add login flow\n' >"$clean"
+
+	each_blocked "internal .planning/ path" \
+		"git commit -F $planning && gh pr create --title 'Add layout' -F $clean" \
+		"git commit -F $clean && gh pr create --title 'Add layout' --body-file $planning"
+}
+
+# ── Message file resolution ──────────────────────────────────────────────────
+
+@test "message file: a relative path resolves against the directory the invocation runs in" {
+	local dir="$BATS_TEST_TMPDIR/sub"
+	mkdir -p "$dir"
+	printf 'docs: update notes\n\nSee .planning/plan-x.md for the rollout.\n' >"$dir/msg.txt"
+
+	each_blocked "internal .planning/ path" \
+		"cd $dir && git commit -F msg.txt" \
+		"cd $dir && gh pr create --title 'Add layout' --body-file msg.txt"
+}
+
+@test "message file: a file named - in the cwd is never read for -F -" {
+	printf 'docs: update notes\n\nSee .planning/plan-x.md for the rollout.\n' >"$BATS_TEST_TMPDIR/-"
+
+	each_allowed \
+		'git commit -F -' \
+		'gh pr create --title "Add layout" -F -'
+}
+
+@test "message file: a non-literal path is not read, and the next literal word is not taken for it" {
+	printf 'See .planning/plan-x.md for the rollout.\n' >"$BATS_TEST_TMPDIR/notes.md"
+
+	# shellcheck disable=SC2016 # the literal expansion is the command text under test
+	run_commit_guard 'git commit -F "$f" notes.md'
+
+	assert_allowed
+}
+
+@test "message file: an unreadable path is skipped" {
+	local msg
+	msg=$(write_planning_msg_file)
+	chmod 000 "$msg"
+
+	run_commit_guard "git commit -F $msg"
+
+	assert_allowed
+}
+
+# ── Parse and helper failures ────────────────────────────────────────────────
+
+@test "unparseable: a command that does not parse is allowed" {
+	run_commit_guard 'git commit -m "feat(05-01): unterminated'
+
+	assert_allowed
+}
+
+@test "helper failure: an ils parse failure blocks with its reason, even for a command with no git word" {
+	local bin
+	bin=$(failing_ils_bin "$BATS_TEST_TMPDIR/broken_ils" 42)
+
+	run_commit_guard "echo hi" "$BATS_TEST_TMPDIR" "$bin:$PATH"
+
+	assert_blocked_with_reason "42"
+}
+
+@test "helper failure: jq missing from PATH blocks naming jq" {
+	run_commit_guard "echo hi" "$BATS_TEST_TMPDIR" "$(path_without jq)"
+
+	assert_blocked_with_reason "jq"
+}

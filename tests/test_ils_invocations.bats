@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
 
-# Records read as `tool|git dir|subcommand|argument count|argument|…|`, one
-# `|` per NUL field terminator (see run_ils_invocations).
+# Records read as `tool|git dir|subcommand|dir|word count|word|…|`, one `|`
+# per NUL field terminator (see run_ils_invocations); a literal word reads
+# `=<text>`, a non-literal one `?`.
 
 load helpers/hooks
 
@@ -29,29 +30,29 @@ teardown_file() {
 	run_ils_invocations "$OUTSIDE_DIR" "$cmd"
 
 	assert_run_ok
-	[[ "$RUN_STDOUT" == "git|$REPO_GIT_DIR|commit|2|-m|first line|git|$REPO_GIT_DIR|rev-parse|1|HEAD|git|$REPO_GIT_DIR|status|1|--short|git|$REPO_GIT_DIR|add|1|my notes.md|" ]]
+	[[ "$RUN_STDOUT" == "git|$REPO_GIT_DIR|commit|$REPO|2|=-m|=first line|git|$REPO_GIT_DIR|rev-parse|$REPO|1|=HEAD|git|$REPO_GIT_DIR|status|$REPO|1|=--short|git|$REPO_GIT_DIR|add|$OUTSIDE_DIR|1|=my notes.md|" ]]
 }
 
 @test "git: an empty literal argument is yielded and counted" {
 	run_ils_invocations "$REPO" "git commit -m ''"
 
 	assert_run_ok
-	[[ "$RUN_STDOUT" == "git|$REPO_GIT_DIR|commit|2|-m||" ]]
+	[[ "$RUN_STDOUT" == "git|$REPO_GIT_DIR|commit|$REPO|2|=-m|=|" ]]
 }
 
 @test "gh: yields one record per gh invocation with its literal words" {
 	run_ils_invocations "$REPO" "gh pr create --title 'a b' && gh pr edit 12"
 
 	assert_run_ok
-	[[ "$RUN_STDOUT" == "gh|||5|gh|pr|create|--title|a b|gh|||4|gh|pr|edit|12|" ]]
+	[[ "$RUN_STDOUT" == "gh|||$REPO|5|=gh|=pr|=create|=--title|=a b|gh|||$REPO|4|=gh|=pr|=edit|=12|" ]]
 }
 
-@test "non-literal words are left out of git arguments and gh words" {
+@test "non-literal words are marked, never yielded as text, in git arguments and gh words" {
 	# shellcheck disable=SC2016 # the literal expansions are the command text under test
 	run_ils_invocations "$REPO" 'git add "$f" README && gh pr edit "$(cat n)" --add-label x'
 
 	assert_run_ok
-	[[ "$RUN_STDOUT" == "git|$REPO_GIT_DIR|add|1|README|gh|||5|gh|pr|edit|--add-label|x|" ]]
+	[[ "$RUN_STDOUT" == "git|$REPO_GIT_DIR|add|$REPO|2|?|=README|gh|||$REPO|6|=gh|=pr|=edit|?|=--add-label|=x|" ]]
 }
 
 @test "git: a non-literal or missing subcommand yields an empty subcommand" {
@@ -59,14 +60,14 @@ teardown_file() {
 	run_ils_invocations "$REPO" 'git com"$sub" README; git'
 
 	assert_run_ok
-	[[ "$RUN_STDOUT" == "git|$REPO_GIT_DIR||1|README|git|$REPO_GIT_DIR||0|" ]]
+	[[ "$RUN_STDOUT" == "git|$REPO_GIT_DIR||$REPO|1|=README|git|$REPO_GIT_DIR||$REPO|0|" ]]
 }
 
 @test "git dir: an invocation outside any repository yields an empty git dir" {
 	run_ils_invocations "$OUTSIDE_DIR" "git status"
 
 	assert_run_ok
-	[[ "$RUN_STDOUT" == "git||status|0|" ]]
+	[[ "$RUN_STDOUT" == "git||status|$OUTSIDE_DIR|0|" ]]
 }
 
 @test "git dir: an invocation whose git dir is unknown yields an empty git dir" {
@@ -74,7 +75,7 @@ teardown_file() {
 	run_ils_invocations "$REPO" 'git -C "$d" status'
 
 	assert_run_ok
-	[[ "$RUN_STDOUT" == "git||status|0|" ]]
+	[[ "$RUN_STDOUT" == "git||status|$REPO|0|" ]]
 }
 
 @test "a command that does not parse yields nothing and succeeds" {
