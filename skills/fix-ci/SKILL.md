@@ -64,7 +64,7 @@ never block on AskUserQuestion. The only stops are the Stop conditions below.
 
 ## Marker protocol — sanctioned pushes
 
-The git-guard hook blocks all pushes; this loop's sanctioned path:
+The `ils` guard refuses every raw `git push`; this loop's sanctioned path:
 
 ```bash
 touch "$(git rev-parse --git-dir)/fix-ci-active"    # after triage, once a fix request is confirmed — never for read-only asks
