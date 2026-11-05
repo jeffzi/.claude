@@ -75,7 +75,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "sonnet",
+  "model": "opus",
   "disableBundledSkills": true,
   "hooks": {
     "PreToolUse": [
@@ -87,22 +87,19 @@
           },
           {
             "type": "command",
-            "command": "$HOME/.claude/hooks/git-guard.sh"
+            "command": "$HOME/.claude/skills/ils/hook.sh"
           },
           {
             "type": "command",
-            "command": "$HOME/.claude/hooks/git-commit-guard.sh",
-            "if": "Bash(git commit*)"
+            "command": "$HOME/.claude/hooks/plan-file-guard.sh"
           },
           {
             "type": "command",
-            "command": "$HOME/.claude/hooks/git-commit-guard.sh",
-            "if": "Bash(gh pr create*)"
+            "command": "$HOME/.claude/hooks/tdd-cycle-guard.sh"
           },
           {
             "type": "command",
-            "command": "$HOME/.claude/hooks/git-commit-guard.sh",
-            "if": "Bash(gh pr edit*)"
+            "command": "$HOME/.claude/hooks/git-commit-guard.sh"
           }
         ]
       },
@@ -184,7 +181,7 @@
       "effortLevel": "high"
     },
     "claude-opus-5-5": {
-      "effortLevel": "high"
+      "effortLevel": "medium"
     },
     "claude-sonnet-5-5": {
       "effortLevel": "medium"

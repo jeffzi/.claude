@@ -6,7 +6,6 @@ readonly HELPERS_DIR
 PROJECT_DIR=$(cd "$HELPERS_DIR/../.." && pwd)
 readonly PROJECT_DIR
 
-readonly GIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-guard.sh"
 readonly GIT_LOCK_GUARD_HOOK="$PROJECT_DIR/hooks/git-lock-guard.sh"
 readonly GIT_COMMIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-commit-guard.sh"
 readonly TDD_RED_GUARD_HOOK="$PROJECT_DIR/hooks/tdd-red-guard.sh"
@@ -20,8 +19,7 @@ readonly BASH_BIN
 
 # Every git call a suite makes — fixture builders and the hooks under test
 # alike — sees repo-local config only, so a developer's own ~/.gitconfig
-# (claude.protectMain, init.defaultBranch, commit.gpgsign) cannot change a
-# verdict.
+# (init.defaultBranch, commit.gpgsign) cannot change a verdict.
 export GIT_CONFIG_GLOBAL=/dev/null
 export GIT_CONFIG_SYSTEM=/dev/null
 
@@ -67,23 +65,6 @@ run_capture() {
 }
 
 # ── Hook invocation ──────────────────────────────────────────────────────────
-
-hook_input() {
-	jq -n --arg cmd "$1" '{"tool_name":"Bash","tool_input":{"command":$cmd}}'
-}
-
-# Run hook script $1 in $2 with command $3; sets GUARD_EXIT and GUARD_OUTPUT.
-run_hook_for_command() {
-	local hook="$1" dir="${2:-}" cmd="$3"
-	require_fixture_dir "$dir" "$hook" || return 1
-	GUARD_EXIT=0
-	GUARD_OUTPUT=$(cd "$dir" && hook_input "$cmd" | bash "$hook" 2>&1 1>/dev/null) || GUARD_EXIT=$?
-}
-
-# Run git-guard hook in $1 with command $2; sets GUARD_EXIT and GUARD_OUTPUT.
-run_guard() {
-	run_hook_for_command "$GIT_GUARD_HOOK" "$1" "$2"
-}
 
 # Run git-lock-guard from cwd $1 on command $2, with optional PATH $3; sets
 # GUARD_EXIT and GUARD_OUTPUT.
@@ -200,14 +181,6 @@ assert_blocked() {
 assert_allowed() {
 	((GUARD_EXIT == 0)) || {
 		printf 'expected exit 0 (allowed), got %d\noutput: %s\n' "$GUARD_EXIT" "$GUARD_OUTPUT" >&2
-		return 1
-	}
-}
-
-assert_absent() {
-	local path="$1"
-	[[ ! -e "$path" ]] || {
-		printf 'still present: %s\n' "$path" >&2
 		return 1
 	}
 }
@@ -466,32 +439,6 @@ setup_repo() {
 	printf '%s' "$dir"
 }
 
-# Add worktree $2 under $1/.claude/worktrees; prints the worktree path.
-add_worktree() {
-	local repo="$1" name="$2"
-	local path="$repo/.claude/worktrees/$name"
-	git -C "$repo" worktree add -q -b "wt-$name" "$path"
-	printf '%s' "$path"
-}
-
-setup_fix_ci_repo() {
-	local dir
-	dir=$(setup_repo "$1")
-	git -C "$dir" branch -M "$2"
-	git -C "$dir" branch plan/x
-	raise_marker "$dir"
-	printf '%s' "$dir"
-}
-
-# Repo on branch $2 with claude.protectMain enabled; prints the repo dir.
-setup_protected_repo() {
-	local dir
-	dir=$(setup_repo "$1")
-	git -C "$dir" branch -M "$2"
-	git -C "$dir" config claude.protectMain true
-	printf '%s' "$dir"
-}
-
 # Create branch $2 in the repo at $1 without switching to it.
 add_branch() {
 	git -C "$1" branch "$2"
@@ -548,7 +495,7 @@ marker_path() {
 }
 
 # One minute past the marker's 30-minute freshness TTL, and 60 minutes ahead
-# for clock-skew coverage (see branch-policy.sh's MARKER_TTL_SECONDS).
+# for clock-skew coverage (see MARKER_TTL_SECONDS in scripts/fix-ci-push.sh).
 export STALE_OFFSET_MINUTES=-31
 readonly STALE_OFFSET_MINUTES
 export FUTURE_OFFSET_MINUTES=+60

@@ -27,17 +27,82 @@ set -euo pipefail
 # Anything refused exits 2 with a reason on stderr and pushes nothing. A local
 # branch that is checked out cannot be deleted; the remote deletion stands, the
 # branch is kept, and the wrapper exits 2 naming it.
-#
-# The marker and namespace rules are shared with hooks/git-guard.sh, which
-# guards the same loop from the other side.
 
-# Sibling file. The wrapper never changes directory, so $BASH_SOURCE resolves
-# the same way the invocation did. Trimmed with an expansion rather than
-# `dirname` so that a PATH without git in it still reaches the check below and
-# gets told what is missing, instead of dying on a missing `dirname`.
-# shellcheck source=SCRIPTDIR/branch-policy.sh
-. "${BASH_SOURCE[0]%/*}/branch-policy.sh"
+# `die` and portable stat access, from a sibling file. The wrapper never
+# changes directory, so $BASH_SOURCE resolves the same way the invocation did.
+# Trimmed with an expansion rather than `dirname` so that a PATH without git in
+# it still reaches the check below and gets told what is missing, instead of
+# dying on a missing `dirname`.
+# shellcheck source=SCRIPTDIR/sh-common.sh
+. "${BASH_SOURCE[0]%/*}/sh-common.sh"
 PROG=fix-ci-push
+
+# The marker file in the git dir. The fix-ci skill raises and drops it by this
+# same name.
+readonly FIX_CI_MARKER=fix-ci-active
+
+# A live loop refreshes its marker's mtime each iteration, so only a marker
+# abandoned by an interrupted session ages out.
+readonly MARKER_TTL_SECONDS=1800
+
+# A namespace of the assistant's own branches, alongside fix-ci/*.
+readonly PLAN_BRANCH_PREFIX=plan/
+
+# Dies naming stat when marker_fresh's status $1 says no stat dialect answered;
+# returns otherwise. Exit 1: a broken tool, not a refusal of the run.
+die_if_stat_unusable() {
+	(($1 != SH_STAT_UNUSABLE)) ||
+		die "stat answers neither BSD nor GNU format flags; marker age cannot be read." 1
+}
+
+# Prints the absolute git dir of the repo the caller runs in, or dies. git's own
+# stderr is left visible on purpose: a safe.directory refusal and a corrupt repo
+# both surface as this failure and need telling apart.
+policy_git_dir() {
+	command -v git >/dev/null || die "git is not installed."
+	git rev-parse --absolute-git-dir || die "not inside a usable git repository."
+}
+
+# True when the marker at $1 proves a run is live right now. Only a regular file
+# counts. The window is bounded on both sides: a marker aged past the TTL, dated
+# ahead of now by a skewed clock or by hand, or whose mtime cannot be read proves
+# nothing either way, and every one of those reads as absent (exit 1). A stat
+# that answers no dialect at all exits SH_STAT_UNUSABLE instead: the marker may
+# be perfectly live, so a caller must neither sweep it nor report it stale.
+marker_fresh() {
+	local marker="$1" mtime now status=0
+	[[ -f "$marker" ]] || return 1
+	mtime=$(sh_file_attr mtime "$marker") || status=$?
+	((status == SH_STAT_UNUSABLE)) && return "$status"
+	((status == 0)) || return 1
+	now=$(date +%s)
+	((now >= mtime && now - mtime <= MARKER_TTL_SECONDS))
+}
+
+# Refs a push actually deletes, one per line. Under --delete every refspec is a
+# deletion; without it, only a leading-colon refspec such as ':main' deletes on
+# its own. Recognising --delete is the caller's job — pass its verdict as $1.
+push_deleted_refs() {
+	local delete_mode="$1"
+	shift
+	local ref
+	for ref in "$@"; do
+		if [[ "$delete_mode" == true ]]; then
+			printf '%s\n' "$ref"
+		elif [[ "$ref" == :* ]]; then
+			printf '%s\n' "${ref#:}"
+		fi
+	done
+}
+
+# True when a ref belongs to a namespace whose branches are the assistant's own
+# and disposable — the only refs it may delete, locally or on a remote.
+# `fix-ci/*` holds a CI-fix loop's throwaway branches; `plan/*` is kept for
+# branches that older plan runs left behind, so they can still be cleaned up.
+ref_in_own_namespace() {
+	local ref="${1#refs/heads/}"
+	[[ "$ref" == fix-ci/* || "$ref" == "$PLAN_BRANCH_PREFIX"* ]]
+}
 
 # The refs this push deletes, filled by require_allowed_args once each one has
 # passed the namespace check. The local cleanup reads nothing else, so it can
