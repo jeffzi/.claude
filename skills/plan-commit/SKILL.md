@@ -40,8 +40,8 @@ plan or commit them.
 ## Context
 
 - All changes (staged, unstaged, untracked): !`git status --porcelain 2>/dev/null`
-- Current git diff (staged and unstaged): !`git diff HEAD 2>/dev/null`
-- Recent commits (for style reference): !`git log --oneline -10 2>/dev/null`
+- Current git diff (staged and unstaged): !`git diff HEAD 2>/dev/null || git diff --cached`
+- Recent commits (for style reference): !`git log --oneline -10 2>/dev/null || true`
 - Current branch: !`git branch --show-current 2>/dev/null`
 
 ## Your task

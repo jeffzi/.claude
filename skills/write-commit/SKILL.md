@@ -21,7 +21,7 @@ git status --short 2>/dev/null
 ```
 
 ```!
-git log --oneline -10 2>/dev/null
+git log --oneline -10 2>/dev/null || true
 ```
 
 The diff shows what code changed. The commit message adds what the diff can't: the subject names the
