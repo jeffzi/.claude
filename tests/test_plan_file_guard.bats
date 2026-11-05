@@ -124,6 +124,50 @@ each_allowed_in() {
 		"git add --all"
 }
 
+# ── Add of tracked files ─────────────────────────────────────────────────────
+
+@test "add update: every -u spelling is blocked when a tracked plan file is modified" {
+	each_blocked_for_in "docs/plans/" "$MODIFIED_PLAN_REPO" \
+		"git add -u" \
+		"git add --update"
+}
+
+@test "add update: git add -u is allowed when no tracked plan file is modified, even with one untracked" {
+	each_allowed_in "$REPO" "git add -u" "git add --update"
+	each_allowed_in "$UNTRACKED_PLAN_REPO" "git add -u" "git add --update"
+}
+
+# ── Add of a directory ───────────────────────────────────────────────────────
+
+@test "add dir: a directory holding .claude/plans/ is blocked when a plan file under it is untracked" {
+	each_blocked_for_in ".claude/plans/" "$UNTRACKED_PLAN_REPO" \
+		"git add .claude" \
+		"git add .claude/" \
+		"git add ./.claude" \
+		"git add .claude/plans" \
+		"git add ./.claude/plans/"
+}
+
+@test "add dir: a directory holding docs/plans/ is blocked when a plan file under it is modified" {
+	each_blocked_for_in "docs/plans/" "$MODIFIED_PLAN_REPO" \
+		"git add docs" \
+		"git add ./docs" \
+		"git add ./docs/plans"
+}
+
+@test "add dir: a directory holding a plan directory is allowed when no plan file under it is pending" {
+	each_allowed_in "$REPO" \
+		"git add docs" \
+		"git add .claude"
+	each_allowed_in "$UNTRACKED_PLAN_REPO" "git add docs"
+}
+
+@test "add dir: a pathspec that cannot hold a plan path is allowed beside pending plan files" {
+	each_allowed_in "$UNTRACKED_PLAN_REPO" \
+		"git add src" \
+		"git add README.md"
+}
+
 # ── Commit ───────────────────────────────────────────────────────────────────
 
 @test "commit: git commit with a plan file staged is blocked naming its pattern" {
@@ -135,6 +179,27 @@ each_allowed_in() {
 @test "commit: git commit with no plan file staged is allowed, even with one untracked" {
 	each_allowed_in "$REPO" "git commit -m 'msg'"
 	each_allowed_in "$UNTRACKED_PLAN_REPO" "git commit -m 'msg'"
+}
+
+@test "commit all: every -a spelling is blocked when a tracked plan file is modified" {
+	each_blocked_for_in "docs/plans/" "$MODIFIED_PLAN_REPO" \
+		"git commit -a -m 'msg'" \
+		"git commit --all -m 'msg'" \
+		"git commit -am 'msg'" \
+		"git commit -sam 'msg'"
+}
+
+@test "commit all: git commit -a is allowed when no tracked plan file is modified, even with one untracked" {
+	each_allowed_in "$REPO" "git commit -a -m 'msg'"
+	each_allowed_in "$UNTRACKED_PLAN_REPO" "git commit -am 'msg'"
+}
+
+@test "commit all: a commit without -a keeps the staged-file rule beside a modified plan file" {
+	each_allowed_in "$MODIFIED_PLAN_REPO" \
+		"git commit -m 'msg'" \
+		"git commit -ma" \
+		"git commit -sm 'msg'" \
+		"git commit --amend -m 'msg'"
 }
 
 # ── Targeted repository ──────────────────────────────────────────────────────
@@ -156,6 +221,20 @@ each_allowed_in() {
 	each_allowed_in "$STAGED_PLAN_REPO" \
 		"git -C $REPO commit -m 'msg'" \
 		"git --git-dir=$REPO/.git commit -m 'msg'"
+}
+
+@test "named repo: add -u, add of a directory and commit -a read the repo they target from a clean cwd" {
+	each_blocked_for_in "plans/" "$REPO" \
+		"git -C $MODIFIED_PLAN_REPO add -u" \
+		"git -C $UNTRACKED_PLAN_REPO add .claude" \
+		"cd $MODIFIED_PLAN_REPO && git commit -am 'msg'"
+}
+
+@test "named repo: add -u, add of a directory and commit -a aimed at a clean repo from a planned cwd are allowed" {
+	each_allowed_in "$MODIFIED_PLAN_REPO" \
+		"git -C $REPO add -u" \
+		"git -C $REPO add docs" \
+		"git -C $REPO commit -am 'msg'"
 }
 
 @test "work tree: git add . in a linked worktree reads that worktree, not its main repository" {

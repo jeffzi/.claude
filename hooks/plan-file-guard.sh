@@ -7,7 +7,14 @@ set -euo pipefail
 # - `git add` naming a plan path is blocked.
 # - `git add .`, `-A` and `--all` are blocked while the target repository has
 #   an untracked or modified plan file they would stage.
-# - `git commit` is blocked while the target repository has a plan file staged.
+# - `git add <dir>`, for a directory that holds a plan directory (`docs`,
+#   `.claude`, `./docs/plans`), is blocked while the target repository has an
+#   untracked or modified plan file under it.
+# - `git add -u` and `--update` are blocked while the target repository has a
+#   modified tracked plan file.
+# - `git commit` is blocked while the target repository has a plan file staged,
+#   and `git commit -a` (`--all`, `-am`) also while it has a modified tracked
+#   plan file.
 #
 # Every rule reads the repository the invocation targets, as
 # scripts/ils-invocations.sh resolves it — never the hook's cwd. An invocation
@@ -67,41 +74,105 @@ work_tree_of() {
 	fi
 }
 
+# Blocks when `git ls-files` with options $2.., run in the work tree of git dir
+# $1, lists a plan file. A bare repository has no work tree and nothing to list.
+block_listed_plan_files() {
+	local git_dir="$1" work_tree listed
+	shift
+	work_tree=$(work_tree_of "$git_dir") ||
+		die "cannot find the work tree of the repository at $git_dir"
+	[[ -n "$work_tree" ]] || return 0
+	# --no-optional-locks keeps the read from taking index.lock out from
+	# under the git command it guards.
+	listed=$(git --no-optional-locks -C "$work_tree" ls-files "$@") ||
+		die "cannot read the pending files of the repository at $work_tree"
+	[[ -n "$listed" ]] || return 0
+	local -a listed_files
+	mapfile -t listed_files <<<"$listed"
+	block_plan_paths stage/commit "${listed_files[@]}"
+}
+
+# Prints pathspec $1 as a directory relative to the work tree root — leading
+# `./` and trailing `/` dropped — when it names a directory holding a
+# PLAN_PATTERNS directory, or fails when it cannot hold one.
+plan_holding_dir() {
+	local dir="$1" pattern
+	while [[ "$dir" == ./* ]]; do
+		dir="${dir#./}"
+	done
+	while [[ "$dir" == */ ]]; do
+		dir="${dir%/}"
+	done
+	[[ -n "$dir" ]] || return 1
+	for pattern in "${PLAN_PATTERNS[@]}"; do
+		if [[ "$pattern" == "$dir/"* ]]; then
+			printf '%s' "$dir"
+			return 0
+		fi
+	done
+	return 1
+}
+
 # Blocks `git add` with arguments $2.. in the repository at git dir $1.
 check_add() {
-	local git_dir="$1" word work_tree pending
+	local git_dir="$1" word dir
 	shift
 	block_plan_paths stage "$@"
 
 	for word in "$@"; do
 		case "$word" in
-		. | -A | --all) ;;
-		*) continue ;;
+		. | -A | --all)
+			block_listed_plan_files "$git_dir" --others --modified --exclude-standard
+			return 0
+			;;
+		-u | --update)
+			block_listed_plan_files "$git_dir" --modified
+			return 0
+			;;
 		esac
-		work_tree=$(work_tree_of "$git_dir") ||
-			die "cannot find the work tree of the repository at $git_dir"
-		[[ -n "$work_tree" ]] || return 0
-		# --no-optional-locks keeps the read from taking index.lock out from
-		# under the git command it guards.
-		pending=$(git --no-optional-locks -C "$work_tree" ls-files --others --modified --exclude-standard) ||
-			die "cannot read the pending files of the repository at $work_tree"
-		[[ -n "$pending" ]] || return 0
-		local -a pending_files
-		mapfile -t pending_files <<<"$pending"
-		block_plan_paths stage/commit "${pending_files[@]}"
-		return 0
+		if dir=$(plan_holding_dir "$word"); then
+			block_listed_plan_files "$git_dir" --others --modified --exclude-standard -- "$dir"
+		fi
 	done
 }
 
-# Blocks `git commit` in the repository at git dir $1.
+# Succeeds when `git commit` arguments $@ hold -a or --all, alone or inside a
+# short-option cluster. A cluster ends at the first option that takes an
+# argument, since the rest of the word is that argument (`-ma` is the message
+# "a").
+commit_stages_all() {
+	local word i
+	for word in "$@"; do
+		case "$word" in
+		--) return 1 ;;
+		--all) return 0 ;;
+		-[!-]*) ;;
+		*) continue ;;
+		esac
+		for ((i = 1; i < ${#word}; i++)); do
+			case "${word:i:1}" in
+			a) return 0 ;;
+			[CcmFtuS]) break ;;
+			esac
+		done
+	done
+	return 1
+}
+
+# Blocks `git commit` with arguments $2.. in the repository at git dir $1.
 check_commit() {
 	local git_dir="$1" staged
+	shift
 	staged=$(git --no-optional-locks --git-dir="$git_dir" diff --cached --name-only) ||
 		die "cannot read the staged files of the repository at $git_dir"
-	[[ -n "$staged" ]] || return 0
-	local -a staged_files
-	mapfile -t staged_files <<<"$staged"
-	block_plan_paths stage/commit "${staged_files[@]}"
+	if [[ -n "$staged" ]]; then
+		local -a staged_files
+		mapfile -t staged_files <<<"$staged"
+		block_plan_paths stage/commit "${staged_files[@]}"
+	fi
+	if commit_stages_all "$@"; then
+		block_listed_plan_files "$git_dir" --modified
+	fi
 }
 
 # Applies the rule for git subcommand $2 with arguments $3.. to the repository
@@ -111,7 +182,7 @@ check_invocation() {
 	shift 2
 	case "$subcommand" in
 	add) check_add "$git_dir" "$@" ;;
-	commit) check_commit "$git_dir" ;;
+	commit) check_commit "$git_dir" "$@" ;;
 	esac
 }
 
