@@ -73,13 +73,13 @@ A release is a release commit and a tag:
 
 ## What enforces it
 
-- `git config claude.protectMain true`, set by hand per repo, makes
-  [`git-guard.sh`](../hooks/git-guard.sh) block every commit-creating command on `main` and point at
-  `ils branch <name>` instead.
+- The `ils` guard, wired as a Bash hook through `skills/ils/hook.sh` (the `ils` skill, linked in
+  from the `ils` clone), refuses every commit-creating command on a checked-out trunk, in every
+  repository with an `origin` and with no opt-in, and points at `ils branch <name>` instead.
 - `ils push` pushes the branch and opens its pull request. `ils merge` and `ils release` ask for
   your approval in [`settings.json`](../settings.json), and the skills never run either unasked; no
   hook blocks them.
-- Raw `git push` is denied. Outside `ils`, the assistant pushes through
+- The `ils` guard refuses raw `git push`. Outside `ils`, the assistant pushes through
   [`fix-ci-push.sh`](../scripts/fix-ci-push.sh), and only while a `fix-ci-active` marker raised in
   the last thirty minutes exists: `/fix-ci`'s `fix-ci/*` branches, and squash-backs onto branches
   without a pull request. The wrapper is append-only, never forces, and deletes only `fix-ci/*` and

@@ -7,49 +7,55 @@ set -euo pipefail
 # Absorbs short races on .git/index.lock caused by parallel
 # agents/sessions touching the same repo.
 #
-# Input: JSON on stdin with .tool_input.command
+# Every index-mutating git invocation in the command waits on the lock of the
+# repository it targets, as scripts/ils-invocations.sh resolves it — never the
+# hook's cwd. An invocation with no known repository has no lock to wait on and
+# is allowed. A command whose git invocations cannot be read blocks: the guard
+# cannot vouch for what it did not see.
+#
+# Input: PreToolUse JSON on stdin (.tool_input.command, .cwd)
 # Output: stderr on timeout with diagnostic info
 # Exit: 0 to allow, 2 to block
 
-command -v jq >/dev/null || exit 0
-
-# Read JSON input
-input=$(cat)
-full_command=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
-
-[[ -z "$full_command" ]] && exit 0
-
-[[ "$full_command" =~ ^[[:space:]]*git([[:space:]]|$) ]] || exit 0
-
-# git command parsing, shared with hooks/git-guard.sh. The hook's cwd may be any
-# directory, so this is resolved from the script's own location — never
-# relative to cwd or $HOME.
-HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=SCRIPTDIR/../scripts/git-parse.sh
-. "$HOOK_DIR/../scripts/git-parse.sh"
+HOOK_DIR=$(cd "${BASH_SOURCE[0]%/*}" && pwd)
 # Portable stat access, for the lock file's age.
 # shellcheck source=SCRIPTDIR/../scripts/sh-common.sh
 . "$HOOK_DIR/../scripts/sh-common.sh"
+# shellcheck source=SCRIPTDIR/../scripts/ils-invocations.sh
+. "$HOOK_DIR/../scripts/ils-invocations.sh"
+PROG=git-lock-guard
 
 # ╭────────────────────────────────────────────────────────────╮
 # │          Index-Mutating Subcommands Check                  │
 # ╰────────────────────────────────────────────────────────────╯
 
+# True when `git <subcommand $1> <args $2…>` writes the index.
 is_mutating() {
-	local subcmd="$1"
-	local cmd="$2"
+	local subcmd="$1" arg
+	shift
 
 	case "$subcmd" in
-	# Index-mutating subcommands
 	add | commit | rm | mv | merge | cherry-pick | revert | am | pull | update-index | commit-tree)
 		return 0
 		;;
-	# restore is only mutating with --staged
 	restore)
-		[[ "$cmd" =~ --staged ]] && return 0
+		# --staged, or -S alone or in a short-option cluster (-SW). An `s` in a
+		# cluster takes the rest of it as its tree (-sSTABLE), and `--` ends the
+		# options, so neither is read as -S.
+		for arg; do
+			case "$arg" in
+			--) return 1 ;;
+			--staged) return 0 ;;
+			--*) ;;
+			-*)
+				arg="${arg#-}"
+				arg="${arg%%s*}"
+				[[ "$arg" == *S* ]] && return 0
+				;;
+			esac
+		done
 		return 1
 		;;
-	# Everything else is read-only
 	*)
 		return 1
 		;;
@@ -112,29 +118,17 @@ print_diagnostic() {
 # │                  Main Logic                                │
 # ╰────────────────────────────────────────────────────────────╯
 
-subcmd=$(get_git_subcmd "$full_command") || exit 0
-
-# If not a mutating command, allow immediately
-if ! is_mutating "$subcmd" "$full_command"; then
-	exit 0
-fi
-
-# The lock that matters is the one in the repo the command names, which need
-# not be the cwd's. A repo that does not resolve has no lock to wait on.
-git_dir=$(git_target_dir "$full_command") || exit 0
-lock_path="$git_dir/index.lock"
-
-# If lock file doesn't exist, allow immediately
-if [[ ! -f "$lock_path" ]]; then
-	exit 0
-fi
-
-# Lock exists and this is a mutating command — wait for it
-if ! wait_for_lock "$lock_path"; then
-	# Timeout occurred
+# ils_each_git_invocation callback: waits on the index lock in git dir $1 when
+# `git <subcommand $2> <args $3…>` writes the index, and blocks when it persists.
+wait_on_index_lock() {
+	local git_dir="$1" lock_path
+	shift
+	is_mutating "$@" || return 0
+	lock_path="$git_dir/index.lock"
+	[[ -f "$lock_path" ]] || return 0
+	wait_for_lock "$lock_path" && return 0
 	print_diagnostic "$lock_path"
 	exit 2
-fi
+}
 
-# Lock cleared — allow
-exit 0
+ils_each_git_invocation wait_on_index_lock

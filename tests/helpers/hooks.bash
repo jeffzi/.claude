@@ -6,19 +6,20 @@ readonly HELPERS_DIR
 PROJECT_DIR=$(cd "$HELPERS_DIR/../.." && pwd)
 readonly PROJECT_DIR
 
-readonly GIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-guard.sh"
 readonly GIT_LOCK_GUARD_HOOK="$PROJECT_DIR/hooks/git-lock-guard.sh"
 readonly GIT_COMMIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-commit-guard.sh"
 readonly TDD_RED_GUARD_HOOK="$PROJECT_DIR/hooks/tdd-red-guard.sh"
 readonly BASH_EXIT_GUARD_HOOK="$PROJECT_DIR/hooks/bash-exit-guard.sh"
+readonly PLAN_FILE_GUARD_HOOK="$PROJECT_DIR/hooks/plan-file-guard.sh"
+readonly TDD_CYCLE_GUARD_HOOK="$PROJECT_DIR/hooks/tdd-cycle-guard.sh"
 readonly FIX_CI_PUSH_WRAPPER="$PROJECT_DIR/scripts/fix-ci-push.sh"
+readonly ILS_INVOCATIONS_SCRIPT="$PROJECT_DIR/scripts/ils-invocations.sh"
 BASH_BIN=$(command -v bash)
 readonly BASH_BIN
 
 # Every git call a suite makes — fixture builders and the hooks under test
 # alike — sees repo-local config only, so a developer's own ~/.gitconfig
-# (claude.protectMain, init.defaultBranch, commit.gpgsign) cannot change a
-# verdict.
+# (init.defaultBranch, commit.gpgsign) cannot change a verdict.
 export GIT_CONFIG_GLOBAL=/dev/null
 export GIT_CONFIG_SYSTEM=/dev/null
 
@@ -65,33 +66,48 @@ run_capture() {
 
 # ── Hook invocation ──────────────────────────────────────────────────────────
 
-hook_input() {
-	jq -n --arg cmd "$1" '{"tool_name":"Bash","tool_input":{"command":$cmd}}'
-}
-
-# Run hook script $1 in $2 with command $3; sets GUARD_EXIT and GUARD_OUTPUT.
-run_hook_for_command() {
-	local hook="$1" dir="${2:-}" cmd="$3"
-	require_fixture_dir "$dir" "$hook" || return 1
-	GUARD_EXIT=0
-	GUARD_OUTPUT=$(cd "$dir" && hook_input "$cmd" | bash "$hook" 2>&1 1>/dev/null) || GUARD_EXIT=$?
-}
-
-# Run git-guard hook in $1 with command $2; sets GUARD_EXIT and GUARD_OUTPUT.
-run_guard() {
-	run_hook_for_command "$GIT_GUARD_HOOK" "$1" "$2"
-}
-
-# Run git-lock-guard hook in $1 with command $2; sets GUARD_EXIT and GUARD_OUTPUT.
+# Run git-lock-guard from cwd $1 on command $2, with optional PATH $3; sets
+# GUARD_EXIT and GUARD_OUTPUT.
 run_lock_guard() {
-	run_hook_for_command "$GIT_LOCK_GUARD_HOOK" "$1" "$2"
+	run_cwd_hook "$GIT_LOCK_GUARD_HOOK" "${1:-}" "$2" "${3:-}"
 }
 
-# Run git-commit-guard hook with command $1; sets GUARD_EXIT and GUARD_OUTPUT.
+# Run git-commit-guard on command $1 from cwd $2 (default the test's own temp
+# dir), with PATH $3 (default the current PATH) for the hook alone; sets
+# GUARD_EXIT and GUARD_OUTPUT (stdout and stderr together). The command comes
+# first so for_each_case can append it as the case.
 run_commit_guard() {
-	local cmd="$1"
+	local cmd="$1" dir="${2:-$BATS_TEST_TMPDIR}" path="${3:-$PATH}" input
+	require_fixture_dir "$dir" "$GIT_COMMIT_GUARD_HOOK" || return 1
+	input=$(jq -n --arg cmd "$cmd" --arg cwd "$dir" \
+		'{"tool_name":"Bash","tool_input":{"command":$cmd},"cwd":$cwd}')
 	GUARD_EXIT=0
-	GUARD_OUTPUT=$(hook_input "$cmd" | bash "$GIT_COMMIT_GUARD_HOOK" 2>&1) || GUARD_EXIT=$?
+	GUARD_OUTPUT=$(cd "$dir" && env "PATH=$path" "$BASH_BIN" "$GIT_COMMIT_GUARD_HOOK" <<<"$input" 2>&1) || GUARD_EXIT=$?
+}
+
+# Run hook script $1 from cwd $2 on command $3, with PATH $4 (default the
+# current PATH) for the hook alone — the payload is built first, on the current
+# PATH, so a PATH missing jq still delivers it. Sets GUARD_EXIT and
+# GUARD_OUTPUT (the hook's stderr).
+run_cwd_hook() {
+	local hook="$1" dir="${2:-}" cmd="$3" path="${4:-$PATH}" input
+	require_fixture_dir "$dir" "$hook" || return 1
+	input=$(jq -n --arg cmd "$cmd" --arg cwd "$dir" \
+		'{"tool_name":"Bash","tool_input":{"command":$cmd},"cwd":$cwd}')
+	GUARD_EXIT=0
+	GUARD_OUTPUT=$(cd "$dir" && env "PATH=$path" "$BASH_BIN" "$hook" <<<"$input" 2>&1 1>/dev/null) || GUARD_EXIT=$?
+}
+
+# Run plan-file-guard from cwd $1 on command $2, with optional PATH $3; sets
+# GUARD_EXIT and GUARD_OUTPUT.
+run_plan_guard() {
+	run_cwd_hook "$PLAN_FILE_GUARD_HOOK" "${1:-}" "$2" "${3:-}"
+}
+
+# Run tdd-cycle-guard from cwd $1 on command $2, with optional PATH $3; sets
+# GUARD_EXIT and GUARD_OUTPUT.
+run_tdd_cycle_guard() {
+	run_cwd_hook "$TDD_CYCLE_GUARD_HOOK" "${1:-}" "$2" "${3:-}"
 }
 
 # Agent id every run_tdd_guard call carries; fixes the per-instance marker path.
@@ -165,14 +181,6 @@ assert_blocked() {
 assert_allowed() {
 	((GUARD_EXIT == 0)) || {
 		printf 'expected exit 0 (allowed), got %d\noutput: %s\n' "$GUARD_EXIT" "$GUARD_OUTPUT" >&2
-		return 1
-	}
-}
-
-assert_absent() {
-	local path="$1"
-	[[ ! -e "$path" ]] || {
-		printf 'still present: %s\n' "$path" >&2
 		return 1
 	}
 }
@@ -260,6 +268,45 @@ run_wrapper() {
 	run_script "$dir" "$FIX_CI_PUSH_WRAPPER" "$@"
 }
 
+# Run ils_invocations from scripts/ils-invocations.sh — sourced into a fresh
+# bash — for cwd $1 and command $2, with PATH $3 (default the current PATH);
+# sets RUN_EXIT, RUN_STDOUT, RUN_STDERR. Command substitution drops NUL bytes,
+# so RUN_STDOUT shows each NUL field terminator as `|`.
+run_ils_invocations() {
+	local dir="${1:-}" cmd="$2" path="${3:-$PATH}" out
+	require_fixture_dir "$dir" "$ILS_INVOCATIONS_SCRIPT" || return 1
+	out=$(mktemp)
+	# shellcheck disable=SC2016 # the child bash expands its own positional args
+	run_capture "$dir" env "PATH=$path" "$BASH_BIN" -c \
+		'source "$1" && ils_invocations "$2" "$3" >"$4"' \
+		_ "$ILS_INVOCATIONS_SCRIPT" "$dir" "$cmd" "$out"
+	RUN_STDOUT=$(tr '\0' '|' <"$out")
+	rm -f "$out"
+}
+
+# Prints the current PATH without every directory holding an executable $1, so
+# a child run on it cannot find that program.
+path_without() {
+	local program="$1" dir kept=""
+	local -a dirs
+	IFS=: read -ra dirs <<<"$PATH"
+	for dir in "${dirs[@]}"; do
+		[[ -x "$dir/$program" ]] && continue
+		kept+="${kept:+:}$dir"
+	done
+	printf '%s' "$kept"
+}
+
+# Writes an `ils` under $1/bin that exits $2, and prints that bin dir for
+# prepending to PATH.
+failing_ils_bin() {
+	local bin="$1/bin" code="$2"
+	mkdir -p "$bin"
+	printf '#!/usr/bin/env bash\nexit %d\n' "$code" >"$bin/ils"
+	chmod +x "$bin/ils"
+	printf '%s' "$bin"
+}
+
 # Writes a `stat` under $1/bin that answers neither the BSD nor the GNU dialect,
 # and prints that bin dir for prepending to PATH.
 failing_stat_bin() {
@@ -302,11 +349,30 @@ assert_run_failed() {
 	}
 }
 
+assert_run_nonzero() {
+	((RUN_EXIT != 0)) || {
+		printf 'expected a non-zero exit, got 0\nstdout: %s\nstderr: %s\n' "$RUN_STDOUT" "$RUN_STDERR" >&2
+		return 1
+	}
+}
+
 assert_reason() {
 	local pattern="$1"
 	((RUN_EXIT != 0)) && [[ "$RUN_STDERR" == *"$pattern"* ]] || {
 		printf 'expected non-zero exit with "%s" in stderr\nexit: %d\nstderr: %s\n' \
 			"$pattern" "$RUN_EXIT" "$RUN_STDERR" >&2
+		return 1
+	}
+}
+
+# The run failed with stderr naming program $1 as a word of its own, not as
+# part of a path or file name such as scripts/ils-invocations.sh.
+assert_reason_names_program() {
+	local program="$1"
+	local word="(^|[^-[:alnum:]_/])${program}([^-[:alnum:]_/]|$)"
+	((RUN_EXIT != 0)) && [[ "$RUN_STDERR" =~ $word ]] || {
+		printf 'expected non-zero exit with program "%s" named in stderr\nexit: %d\nstderr: %s\n' \
+			"$program" "$RUN_EXIT" "$RUN_STDERR" >&2
 		return 1
 	}
 }
@@ -373,35 +439,18 @@ setup_repo() {
 	printf '%s' "$dir"
 }
 
-# Add worktree $2 under $1/.claude/worktrees; prints the worktree path.
-add_worktree() {
-	local repo="$1" name="$2"
-	local path="$repo/.claude/worktrees/$name"
-	git -C "$repo" worktree add -q -b "wt-$name" "$path"
-	printf '%s' "$path"
-}
-
-setup_fix_ci_repo() {
-	local dir
-	dir=$(setup_repo "$1")
-	git -C "$dir" branch -M "$2"
-	git -C "$dir" branch plan/x
-	raise_marker "$dir"
-	printf '%s' "$dir"
-}
-
-# Repo on branch $2 with claude.protectMain enabled; prints the repo dir.
-setup_protected_repo() {
-	local dir
-	dir=$(setup_repo "$1")
-	git -C "$dir" branch -M "$2"
-	git -C "$dir" config claude.protectMain true
-	printf '%s' "$dir"
-}
-
 # Create branch $2 in the repo at $1 without switching to it.
 add_branch() {
 	git -C "$1" branch "$2"
+}
+
+# Create branch $2 in the repo at $1 one commit ahead of HEAD, without switching
+# to it — the shape a squash-merged branch leaves behind: its tip is no ancestor
+# of HEAD, so `git branch -d` refuses it.
+add_unmerged_branch() {
+	local repo="$1" name="$2" commit
+	commit=$(git -C "$repo" commit-tree -p HEAD -m "squashed work" "HEAD^{tree}")
+	git -C "$repo" update-ref "refs/heads/$name" "$commit"
 }
 
 # Work repo on trunk $2 (default main) with a local fix-ci/lint branch, wired
@@ -446,7 +495,7 @@ marker_path() {
 }
 
 # One minute past the marker's 30-minute freshness TTL, and 60 minutes ahead
-# for clock-skew coverage (see branch-policy.sh's MARKER_TTL_SECONDS).
+# for clock-skew coverage (see MARKER_TTL_SECONDS in scripts/fix-ci-push.sh).
 export STALE_OFFSET_MINUTES=-31
 readonly STALE_OFFSET_MINUTES
 export FUTURE_OFFSET_MINUTES=+60

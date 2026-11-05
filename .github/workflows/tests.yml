@@ -27,6 +27,17 @@ jobs:
             echo "$HOME/go/bin" >> "$GITHUB_PATH"
           fi
         shell: bash
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+          cache: false
+      - name: Install ils
+        # The hooks read shell commands through `ils parse`, which no tagged ils
+        # release ships yet: pin the main-branch commit that has it.
+        run: |
+          go install github.com/jeffzi/ils@a16597797147a0c866b5cfdf816854edb1758134
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+        shell: bash
       - name: Lint
         run: shellcheck scripts/statusline.sh tests/helpers/statusline.bash tests/helpers/hooks.bash
       - name: Format

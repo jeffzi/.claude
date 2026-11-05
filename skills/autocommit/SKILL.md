@@ -41,8 +41,8 @@ never block a commit on it.
   noted".
 - **Stage by explicit path** — only files this task touched. Never `git add -A` / `git add .`, never
   sweep the user's pre-existing dirty files or plan artifacts into a commit.
-- **Commits only.** No push, no amend, no history rewriting — git-guard stays authoritative, and
-  this mode is never cited as push permission.
+- **Commits only.** No push, no amend, no history rewriting — the `ils` guard stays authoritative,
+  and this mode is never cited as push permission.
 - **Not scope license.** Read-only asks stay read-only; `no-unrequested-edits.md` still governs what
   may be edited. This mode governs committing requested work, nothing more.
 - One commit per task (`write-commit` granularity), conventional message, no "wip" commits.
