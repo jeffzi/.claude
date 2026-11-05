@@ -87,8 +87,12 @@ block_listed_plan_files() {
 	listed=$(git --no-optional-locks -C "$work_tree" ls-files "$@") ||
 		die "cannot read the pending files of the repository at $work_tree"
 	[[ -n "$listed" ]] || return 0
-	local -a listed_files
-	mapfile -t listed_files <<<"$listed"
+	# A read loop, not mapfile: macOS ships bash 3.2, which has no mapfile.
+	local -a listed_files=()
+	local path
+	while IFS= read -r path; do
+		listed_files+=("$path")
+	done <<<"$listed"
 	block_plan_paths stage/commit "${listed_files[@]}"
 }
 
@@ -166,8 +170,12 @@ check_commit() {
 	staged=$(git --no-optional-locks --git-dir="$git_dir" diff --cached --name-only) ||
 		die "cannot read the staged files of the repository at $git_dir"
 	if [[ -n "$staged" ]]; then
-		local -a staged_files
-		mapfile -t staged_files <<<"$staged"
+		# A read loop, not mapfile: macOS ships bash 3.2, which has no mapfile.
+		local -a staged_files=()
+		local path
+		while IFS= read -r path; do
+			staged_files+=("$path")
+		done <<<"$staged"
 		block_plan_paths stage/commit "${staged_files[@]}"
 	fi
 	if commit_stages_all "$@"; then
