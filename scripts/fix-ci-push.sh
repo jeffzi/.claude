@@ -19,8 +19,14 @@ set -euo pipefail
 #     lets git fall back to `remote.<name>.push` and `push.default` — repo
 #     config the wrapper never vetted, which can carry a '+' force prefix or a
 #     deleting ':main' — so it is refused rather than guessed at.
+#   - A deletion that lands on the remote also deletes the local branch of the
+#     same name, force-deleted because a squash-merged branch shares no
+#     ancestry with HEAD. Only the refs the namespace check vetted are touched,
+#     and only once the push has succeeded: a failed remote delete keeps them.
 #
-# Anything refused exits 2 with a reason on stderr and pushes nothing.
+# Anything refused exits 2 with a reason on stderr and pushes nothing. A local
+# branch that is checked out cannot be deleted; the remote deletion stands, the
+# branch is kept, and the wrapper exits 2 naming it.
 #
 # The marker and namespace rules are shared with hooks/git-guard.sh, which
 # guards the same loop from the other side.
@@ -32,6 +38,11 @@ set -euo pipefail
 # shellcheck source=SCRIPTDIR/branch-policy.sh
 . "${BASH_SOURCE[0]%/*}/branch-policy.sh"
 PROG=fix-ci-push
+
+# The refs this push deletes, filled by require_allowed_args once each one has
+# passed the namespace check. The local cleanup reads nothing else, so it can
+# never reach a ref the check did not see.
+DELETED_REFS=()
 
 # Refuse unless the current repo has a marker touched within the TTL
 require_active_marker() {
@@ -81,13 +92,35 @@ require_allowed_args() {
 	while IFS= read -r ref; do
 		ref_in_own_namespace "$ref" ||
 			die "'$ref' is outside fix-ci/* and plan/*; only the assistant's own branches may be deleted."
+		DELETED_REFS+=("$ref")
 	done < <(push_deleted_refs "$delete_mode" "${refs[@]}")
+}
+
+# Delete the local branch behind every ref in DELETED_REFS, skipping any that
+# does not exist here. The branch checked out in this worktree is kept — git
+# refuses to delete it — and named, so the caller knows what to switch away
+# from.
+delete_local_branches() {
+	local ref name current kept=""
+	current=$(git symbolic-ref --quiet --short HEAD) || current=""
+	for ref in ${DELETED_REFS[@]+"${DELETED_REFS[@]}"}; do
+		name="${ref#refs/heads/}"
+		git show-ref --quiet --verify "refs/heads/$name" || continue
+		if [[ "$name" == "$current" ]]; then
+			kept="$name"
+			continue
+		fi
+		git branch --quiet -D "$name"
+	done
+	[[ -z "$kept" ]] ||
+		die "'$kept' was deleted from the remote but is checked out here, so the local branch is kept; switch away from '$kept', then delete it."
 }
 
 main() {
 	require_active_marker
 	require_allowed_args "$@"
-	exec git push "$@"
+	git push "$@"
+	delete_local_branches
 }
 
 main "$@"

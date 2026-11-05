@@ -302,6 +302,13 @@ assert_run_failed() {
 	}
 }
 
+assert_run_nonzero() {
+	((RUN_EXIT != 0)) || {
+		printf 'expected a non-zero exit, got 0\nstdout: %s\nstderr: %s\n' "$RUN_STDOUT" "$RUN_STDERR" >&2
+		return 1
+	}
+}
+
 assert_reason() {
 	local pattern="$1"
 	((RUN_EXIT != 0)) && [[ "$RUN_STDERR" == *"$pattern"* ]] || {
@@ -402,6 +409,15 @@ setup_protected_repo() {
 # Create branch $2 in the repo at $1 without switching to it.
 add_branch() {
 	git -C "$1" branch "$2"
+}
+
+# Create branch $2 in the repo at $1 one commit ahead of HEAD, without switching
+# to it — the shape a squash-merged branch leaves behind: its tip is no ancestor
+# of HEAD, so `git branch -d` refuses it.
+add_unmerged_branch() {
+	local repo="$1" name="$2" commit
+	commit=$(git -C "$repo" commit-tree -p HEAD -m "squashed work" "HEAD^{tree}")
+	git -C "$repo" update-ref "refs/heads/$name" "$commit"
 }
 
 # Work repo on trunk $2 (default main) with a local fix-ci/lint branch, wired
