@@ -12,6 +12,7 @@ readonly GIT_COMMIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-commit-guard.sh"
 readonly TDD_RED_GUARD_HOOK="$PROJECT_DIR/hooks/tdd-red-guard.sh"
 readonly BASH_EXIT_GUARD_HOOK="$PROJECT_DIR/hooks/bash-exit-guard.sh"
 readonly FIX_CI_PUSH_WRAPPER="$PROJECT_DIR/scripts/fix-ci-push.sh"
+readonly ILS_INVOCATIONS_SCRIPT="$PROJECT_DIR/scripts/ils-invocations.sh"
 BASH_BIN=$(command -v bash)
 readonly BASH_BIN
 
@@ -260,6 +261,45 @@ run_wrapper() {
 	run_script "$dir" "$FIX_CI_PUSH_WRAPPER" "$@"
 }
 
+# Run ils_invocations from scripts/ils-invocations.sh — sourced into a fresh
+# bash — for cwd $1 and command $2, with PATH $3 (default the current PATH);
+# sets RUN_EXIT, RUN_STDOUT, RUN_STDERR. Command substitution drops NUL bytes,
+# so RUN_STDOUT shows each NUL field terminator as `|`.
+run_ils_invocations() {
+	local dir="${1:-}" cmd="$2" path="${3:-$PATH}" out
+	require_fixture_dir "$dir" "$ILS_INVOCATIONS_SCRIPT" || return 1
+	out=$(mktemp)
+	# shellcheck disable=SC2016 # the child bash expands its own positional args
+	run_capture "$dir" env "PATH=$path" "$BASH_BIN" -c \
+		'source "$1" && ils_invocations "$2" "$3" >"$4"' \
+		_ "$ILS_INVOCATIONS_SCRIPT" "$dir" "$cmd" "$out"
+	RUN_STDOUT=$(tr '\0' '|' <"$out")
+	rm -f "$out"
+}
+
+# Prints the current PATH without every directory holding an executable $1, so
+# a child run on it cannot find that program.
+path_without() {
+	local program="$1" dir kept=""
+	local -a dirs
+	IFS=: read -ra dirs <<<"$PATH"
+	for dir in "${dirs[@]}"; do
+		[[ -x "$dir/$program" ]] && continue
+		kept+="${kept:+:}$dir"
+	done
+	printf '%s' "$kept"
+}
+
+# Writes an `ils` under $1/bin that exits $2, and prints that bin dir for
+# prepending to PATH.
+failing_ils_bin() {
+	local bin="$1/bin" code="$2"
+	mkdir -p "$bin"
+	printf '#!/usr/bin/env bash\nexit %d\n' "$code" >"$bin/ils"
+	chmod +x "$bin/ils"
+	printf '%s' "$bin"
+}
+
 # Writes a `stat` under $1/bin that answers neither the BSD nor the GNU dialect,
 # and prints that bin dir for prepending to PATH.
 failing_stat_bin() {
@@ -314,6 +354,18 @@ assert_reason() {
 	((RUN_EXIT != 0)) && [[ "$RUN_STDERR" == *"$pattern"* ]] || {
 		printf 'expected non-zero exit with "%s" in stderr\nexit: %d\nstderr: %s\n' \
 			"$pattern" "$RUN_EXIT" "$RUN_STDERR" >&2
+		return 1
+	}
+}
+
+# The run failed with stderr naming program $1 as a word of its own, not as
+# part of a path or file name such as scripts/ils-invocations.sh.
+assert_reason_names_program() {
+	local program="$1"
+	local word="(^|[^-[:alnum:]_/])${program}([^-[:alnum:]_/]|$)"
+	((RUN_EXIT != 0)) && [[ "$RUN_STDERR" =~ $word ]] || {
+		printf 'expected non-zero exit with program "%s" named in stderr\nexit: %d\nstderr: %s\n' \
+			"$program" "$RUN_EXIT" "$RUN_STDERR" >&2
 		return 1
 	}
 }
