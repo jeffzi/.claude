@@ -11,6 +11,8 @@ readonly GIT_LOCK_GUARD_HOOK="$PROJECT_DIR/hooks/git-lock-guard.sh"
 readonly GIT_COMMIT_GUARD_HOOK="$PROJECT_DIR/hooks/git-commit-guard.sh"
 readonly TDD_RED_GUARD_HOOK="$PROJECT_DIR/hooks/tdd-red-guard.sh"
 readonly BASH_EXIT_GUARD_HOOK="$PROJECT_DIR/hooks/bash-exit-guard.sh"
+readonly PLAN_FILE_GUARD_HOOK="$PROJECT_DIR/hooks/plan-file-guard.sh"
+readonly TDD_CYCLE_GUARD_HOOK="$PROJECT_DIR/hooks/tdd-cycle-guard.sh"
 readonly FIX_CI_PUSH_WRAPPER="$PROJECT_DIR/scripts/fix-ci-push.sh"
 readonly ILS_INVOCATIONS_SCRIPT="$PROJECT_DIR/scripts/ils-invocations.sh"
 BASH_BIN=$(command -v bash)
@@ -93,6 +95,31 @@ run_commit_guard() {
 	local cmd="$1"
 	GUARD_EXIT=0
 	GUARD_OUTPUT=$(hook_input "$cmd" | bash "$GIT_COMMIT_GUARD_HOOK" 2>&1) || GUARD_EXIT=$?
+}
+
+# Run hook script $1 from cwd $2 on command $3, with PATH $4 (default the
+# current PATH) for the hook alone — the payload is built first, on the current
+# PATH, so a PATH missing jq still delivers it. Sets GUARD_EXIT and
+# GUARD_OUTPUT (the hook's stderr).
+run_cwd_hook() {
+	local hook="$1" dir="${2:-}" cmd="$3" path="${4:-$PATH}" input
+	require_fixture_dir "$dir" "$hook" || return 1
+	input=$(jq -n --arg cmd "$cmd" --arg cwd "$dir" \
+		'{"tool_name":"Bash","tool_input":{"command":$cmd},"cwd":$cwd}')
+	GUARD_EXIT=0
+	GUARD_OUTPUT=$(cd "$dir" && env "PATH=$path" "$BASH_BIN" "$hook" <<<"$input" 2>&1 1>/dev/null) || GUARD_EXIT=$?
+}
+
+# Run plan-file-guard from cwd $1 on command $2, with optional PATH $3; sets
+# GUARD_EXIT and GUARD_OUTPUT.
+run_plan_guard() {
+	run_cwd_hook "$PLAN_FILE_GUARD_HOOK" "${1:-}" "$2" "${3:-}"
+}
+
+# Run tdd-cycle-guard from cwd $1 on command $2, with optional PATH $3; sets
+# GUARD_EXIT and GUARD_OUTPUT.
+run_tdd_cycle_guard() {
+	run_cwd_hook "$TDD_CYCLE_GUARD_HOOK" "${1:-}" "$2" "${3:-}"
 }
 
 # Agent id every run_tdd_guard call carries; fixes the per-instance marker path.

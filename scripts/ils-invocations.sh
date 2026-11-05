@@ -92,3 +92,43 @@ ils_invocations() {
 		return 1
 	}
 }
+
+# The loop every PreToolUse Bash hook shares. Reads the hook payload
+# (.tool_input.command, .cwd) from stdin and calls "$1" once for each git
+# invocation whose git dir is known, in the calling shell, so the callback may
+# `exit` to block:
+#
+#   "$1" git-dir subcommand [word…]
+#
+# Returns 0 without calling anything when the payload holds no command. Dies
+# (exit 2) when jq is missing or the git invocations of the command cannot be
+# read.
+#
+# Needs `die` from sh-common.sh, which the caller sources. Installs an EXIT trap
+# that removes the temporary record file.
+ils_each_git_invocation() {
+	local callback="$1" input command cwd records
+	local tool git_dir subcommand count word i
+	local -a words
+	input=$(</dev/stdin)
+	command -v jq >/dev/null || die "jq is not on PATH; cannot read the hook input"
+	command=$(jq -r '.tool_input.command // empty' <<<"$input")
+	cwd=$(jq -r '.cwd // empty' <<<"$input")
+	[[ -n "$command" ]] || return 0
+
+	records=$(mktemp)
+	# shellcheck disable=SC2064 # the path is fixed now, on purpose
+	trap "rm -f '$records'" EXIT
+	ils_invocations "${cwd:-$PWD}" "$command" >"$records" ||
+		die "cannot read the git invocations of the command"
+
+	while IFS= read -r -d '' tool && IFS= read -r -d '' git_dir &&
+		IFS= read -r -d '' subcommand && IFS= read -r -d '' count; do
+		words=()
+		for ((i = 0; i < count; i++)); do
+			IFS= read -r -d '' word && words+=("$word")
+		done
+		[[ "$tool" == git && -n "$git_dir" ]] || continue
+		"$callback" "$git_dir" "$subcommand" ${words[@]+"${words[@]}"}
+	done <"$records"
+}
