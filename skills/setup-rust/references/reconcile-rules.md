@@ -15,9 +15,8 @@ each file, see `project-owned-keys.md`.
   in the project is an _add_; a project-dropped hook is a _removal candidate_. Owned keys per
   `project-owned-keys.md`.
 - `AGENTS.md` reconciles at the section level, not by leaf path: reconcile only the house sections
-  `## Commands`, `## Git hygiene`, `## Linter and type-checker configuration`, `## Doc comments`,
-  and `## Spelling (cspell)` against the template; leave every other section untouched and never
-  surface it as drift.
+  `## Commands`, `## Linter and type-checker configuration`, `## Doc comments`, and `## Spelling
+  (cspell)` against the template; leave every other section untouched and never surface it as drift.
 - `Taskfile.yml` and the `.github/workflows/*.yml` files are house-owned but routinely extended:
   ensure the template's tasks/jobs/steps are present. If a template task/job differs, offer
   replace-or-keep for that entry. Owned keys per `project-owned-keys.md`.

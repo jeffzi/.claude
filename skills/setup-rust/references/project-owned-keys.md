@@ -14,7 +14,7 @@ Never surface as drift.
 | `.markdownlint-cli2.jsonc` | project-added rule entries                                                                                                                                           |
 | `dprint.json`              | `excludes`, project-added `includes` entries                                                                                                                         |
 | `cspell.json`              | `words`, project-added `ignorePaths` entries                                                                                                                         |
-| `AGENTS.md`                | Every section except `## Commands`, `## Git hygiene`, `## Linter and type-checker configuration`, `## Doc comments`, `## Spelling (cspell)`                          |
+| `AGENTS.md`                | Every section except `## Commands`, `## Linter and type-checker configuration`, `## Doc comments`, `## Spelling (cspell)`                                            |
 | `Taskfile.yml`             | project-added tasks; house tasks are reconciled, project additions kept without surfacing as drift                                                                   |
 | `.github/workflows/*.yml`  | project-added jobs, steps, and matrix entries; house jobs/steps reconciled, project additions kept                                                                   |
 | `LICENSE`                  | entirely project-owned once present (bootstrap-only, never reconciled)                                                                                               |

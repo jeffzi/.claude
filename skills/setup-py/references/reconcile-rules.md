@@ -13,13 +13,11 @@ Apply the chosen edits with `Edit`/`Write`, preserving comments and key order.
   is owned and never surfaced as drift; `rev` values are never a conflict — they belong to
   `/upgrade-py`.
 - `AGENTS.md` reconciles at the section level, not by leaf path. Reconcile only these house sections
-  against the template: `## Commands`, `## Git hygiene`, `## Linter and type-checker configuration`,
-  `## Module layout`, `## Docstrings`, and `## Spelling (cspell)`. Leave every other section
-  untouched and never surface it as drift (see project-owned-keys.md).
+  against the template: `## Commands`, `## Linter and type-checker configuration`, `## Module
+  layout`, `## Docstrings`, and `## Spelling (cspell)`. Leave every other section untouched and
+  never surface it as drift (see project-owned-keys.md).
   - `## Module size` is the former heading of `## Module layout`: a project section under the old
     heading is that house section (offer replace-or-keep), never a removal candidate plus an add.
-  - Within `## Module layout`, the `### Project facts` subsection is project-owned: reconcile only
-    that it exists with the template's six bullets, never their values.
 - `Taskfile.yml` and the `.github/workflows/*.yml` files are house-owned but routinely extended:
   ensure the template's tasks/jobs/steps are present, and keep project-added tasks, jobs, matrix
   entries, and steps without surfacing them as drift. If a template task/job differs, offer

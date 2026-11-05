@@ -3,7 +3,7 @@
 ## Local overrides
 
 If `AGENTS.local.md` exists at the repo root, read it and let its instructions take precedence over
-this file. It is gitignored for personal, machine-specific preferences and never committed.
+this file.
 
 ## Commands
 
@@ -11,20 +11,13 @@ this file. It is gitignored for personal, machine-specific preferences and never
 entrypoints; never bypass them by calling `cargo` directly for tasks that `task` covers -- the tasks
 manage flags and tool chains.
 
-- `task fmt` -- format all Rust source files.
+- `task install` -- install the prek hooks.
 - `task test` -- run the test suite via cargo-nextest plus doctests (append args after `--`).
 - `task cov` -- run tests with coverage via cargo-llvm-cov.
-- `task check` -- run every check (fmt, clippy, test, doc, audit, machete).
+- `task check` -- run every prek hook over all tracked and untracked files. Hooks that can fix
+  (dprint, markdownlint) rewrite files in place. Run before committing. Tests run at pre-push, not
+  here -- use `task test`.
 - `task clean` -- remove build artifacts.
-
-## Git hygiene
-
-- Never run `git commit --no-verify`, `git commit -n`, or anything else that skips the prek hooks --
-  the hooks are the gate, not an obstacle.
-- Fix a failing check at its source. Never weaken a test to make it pass; never widen a lint ignore
-  to silence a real finding. A test whose assertion is right but whose input is wrong (a sample
-  value that collides with a fixture, a typo, a bad import) is a test bug: fix the input and say
-  so in one line.
 
 ## Linter and type-checker configuration
 
@@ -41,9 +34,11 @@ it to the user and wait for explicit approval; never promote a suppression into 
 Rust doc comments (`///` for items, `//!` for modules). None required on private functions. A
 one-line doc comment is complete on its own when the signature says the rest. When a function needs
 more than one line (a side effect, an invariant, a precondition, behavior the name does not convey),
-use a multi-line doc comment with `# Arguments`, `# Returns`, `# Errors`, `# Panics` sections as
-appropriate. A function you edit gets its doc comment brought to this shape even if you did not write
-it. Tests: no doc comments on test functions; the name carries the intent.
+use a multi-line doc comment with every section that applies: `# Arguments`, `# Returns`, `#
+Errors`, `# Panics`. A public function that returns `Result` has `# Errors`, and one that can panic
+has `# Panics`, even when the rest fits one line; clippy enforces both. A function you edit gets its
+doc comment brought to this shape even if you did not write it. Tests: no doc comments on test
+functions; the name carries the intent.
 
 ## Spelling (cspell)
 

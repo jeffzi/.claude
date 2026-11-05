@@ -14,6 +14,7 @@ dev = [
   "diff-cover>=10.5,<11",
   "hypothesis>=6.165,<7",
   "prek>=0.5,<0.6",
+  "pymaxlines>=0.7,<0.8",
   "pyrefly>=1.2,<2",
   "pytest>=9.1,<10",
   "pytest-cov>=7.1,<8",

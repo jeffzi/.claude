@@ -4,23 +4,23 @@ Keys the template ships with a default value but the project may freely override
 reconcile bucket — read them (so they aren't miscounted as removals) but keep their value as-is.
 Never surface as drift.
 
-| File                       | Owned keys                                                                                                                                                                                                              |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pyproject.toml`           | All of `[project]`, `[project.scripts]`, `[project.urls]`, `[project.optional-dependencies]`                                                                                                                            |
-| `pyproject.toml`           | `requires-python`, `[tool.pyrefly] python-version`                                                                                                                                                                      |
-| `pyproject.toml`           | `[tool.coverage.report] fail_under` (project may raise the floor)                                                                                                                                                       |
-| `pyproject.toml`           | `[tool.pytest.ini_options] faulthandler_timeout` (tuned to the project's slowest test)                                                                                                                                  |
-| `pyproject.toml`           | project-added `[tool.ruff.lint] per-file-ignores` globs and codes, `allowed-confusables`                                                                                                                                |
-| `pyproject.toml`           | project-added `[tool.pytest.ini_options] asyncio_mode` (async test suites)                                                                                                                                              |
-| `.pre-commit-config.yaml`  | every `rev:` value (upgrade-py owns hook pins)                                                                                                                                                                          |
-| `.pre-commit-config.yaml`  | project-added hooks (a `repo: local` drift check, a generator)                                                                                                                                                          |
-| `.markdownlint-cli2.jsonc` | project-added rule entries                                                                                                                                                                                              |
-| `cspell.json`              | `words`, project-added `ignorePaths` entries                                                                                                                                                                            |
-| `dprint.json`              | `excludes`, project-added `includes` entries                                                                                                                                                                            |
-| `AGENTS.md`                | Every section except `## Commands`, `## Git hygiene`, `## Linter and type-checker configuration`, `## Module layout`, `## Docstrings`, `## Spelling (cspell)`; the `### Project facts` values inside `## Module layout` |
-| `Taskfile.yml`             | project-added tasks                                                                                                                                                                                                     |
-| `.github/workflows/*.yml`  | project-added jobs, steps, and matrix entries                                                                                                                                                                           |
-| `LICENSE`, `README.md`     | entirely project-owned once present (bootstrap-only, never reconciled)                                                                                                                                                  |
+| File                       | Owned keys                                                                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pyproject.toml`           | All of `[project]`, `[project.scripts]`, `[project.urls]`, `[project.optional-dependencies]`                                                |
+| `pyproject.toml`           | `requires-python`, `[tool.pyrefly] python-version`                                                                                          |
+| `pyproject.toml`           | `[tool.coverage.report] fail_under` (project may raise the floor)                                                                           |
+| `pyproject.toml`           | `[tool.pytest.ini_options] faulthandler_timeout` (tuned to the project's slowest test)                                                      |
+| `pyproject.toml`           | project-added `[tool.ruff.lint] per-file-ignores` globs and codes, `allowed-confusables`                                                    |
+| `pyproject.toml`           | project-added `[tool.pytest.ini_options] asyncio_mode` (async test suites)                                                                  |
+| `.pre-commit-config.yaml`  | every `rev:` value (upgrade-py owns hook pins)                                                                                              |
+| `.pre-commit-config.yaml`  | project-added hooks (a `repo: local` drift check, a generator)                                                                              |
+| `.markdownlint-cli2.jsonc` | project-added rule entries                                                                                                                  |
+| `cspell.json`              | `words`, project-added `ignorePaths` entries                                                                                                |
+| `dprint.json`              | `excludes`, project-added `includes` entries                                                                                                |
+| `AGENTS.md`                | Every section except `## Commands`, `## Linter and type-checker configuration`, `## Module layout`, `## Docstrings`, `## Spelling (cspell)` |
+| `Taskfile.yml`             | project-added tasks                                                                                                                         |
+| `.github/workflows/*.yml`  | project-added jobs, steps, and matrix entries                                                                                               |
+| `LICENSE`, `README.md`     | entirely project-owned once present (bootstrap-only, never reconciled)                                                                      |
 
 `pyproject.toml` `[project]` is entirely project-owned (name, version, description, `dependencies`,
 readme). The Python version keys (`requires-python`, pyrefly `python-version`) travel with the

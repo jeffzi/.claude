@@ -19,13 +19,9 @@ each file, see `project-owned-keys.md`.
   in the project is an _add_; a project-dropped hook is a _removal candidate_. `rev` values are
   never a conflict — they belong to update-tools.
 - `AGENTS.md` reconciles at the section level, not by leaf path: reconcile only the house sections
-  `## Commands`, `## Git hygiene`, `## Linter and type-checker configuration`, `## Project layout`,
-  `## Package and file layout`, `## Doc comments`, and `## Spelling (cspell)` against the template;
-  leave every other section untouched and never surface it as drift.
-  - Within `## Package and file layout`, the `### Project facts` subsection is project-owned:
-    reconcile only that it is present, never its values. Its caps must match the lint config: the
-    `funlen` settings and the `file-length-limit` `max` in `.golangci.yml` and
-    `.golangci.tests.yml`. Surface a mismatch between the facts and the config as a conflict.
+  `## Commands`, `## Linter and type-checker configuration`, `## Project layout`, `## Package and
+  file layout`, `## Doc comments`, and `## Spelling (cspell)` against the template; leave every
+  other section untouched and never surface it as drift.
 - `Taskfile.yml` and the `.github/workflows/*.yml` files are house-owned but routinely extended:
   ensure the template's tasks/jobs/steps are present. If a template task/job differs, offer
   replace-or-keep for that entry. Owned keys per `project-owned-keys.md`.
