@@ -85,9 +85,10 @@ run_guard() {
 	run_hook_for_command "$GIT_GUARD_HOOK" "$1" "$2"
 }
 
-# Run git-lock-guard hook in $1 with command $2; sets GUARD_EXIT and GUARD_OUTPUT.
+# Run git-lock-guard from cwd $1 on command $2, with optional PATH $3; sets
+# GUARD_EXIT and GUARD_OUTPUT.
 run_lock_guard() {
-	run_hook_for_command "$GIT_LOCK_GUARD_HOOK" "$1" "$2"
+	run_cwd_hook "$GIT_LOCK_GUARD_HOOK" "${1:-}" "$2" "${3:-}"
 }
 
 # Run git-commit-guard on command $1 from cwd $2 (default the test's own temp
