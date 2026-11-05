@@ -63,6 +63,17 @@ setup_file() {
 	seed_origin "$CHECKED_OUT" fix-ci/lint
 	git -C "$CHECKED_OUT" switch -q fix-ci/lint
 
+	export FULL_REF
+	FULL_REF=$(setup_marked_pair full_ref)
+	seed_origin "$FULL_REF" fix-ci/lint
+
+	# fix-ci/lint is checked out; plan/x is not.
+	export CHECKED_OUT_MIXED
+	CHECKED_OUT_MIXED=$(setup_marked_pair checked_out_mixed)
+	add_branch "$CHECKED_OUT_MIXED" plan/x
+	seed_origin "$CHECKED_OUT_MIXED" fix-ci/lint plan/x
+	git -C "$CHECKED_OUT_MIXED" switch -q fix-ci/lint
+
 	export NOT_A_REPO
 	NOT_A_REPO="$TMPDIR_ROOT/not_a_repo"
 	mkdir -p "$NOT_A_REPO"
@@ -215,12 +226,14 @@ teardown_file() {
 	assert_ref_absent "$DELETE_FLAG" plan/x
 }
 
-@test "delete scope: delete refspecs for a fix-ci and a plan branch remove both from origin" {
+@test "delete scope: delete refspecs for a fix-ci and a plan branch remove both from origin and locally" {
 	run_wrapper "$DELETE_COLON" origin :fix-ci/lint :plan/x
 
 	assert_run_ok
 	assert_ref_absent "$(bare_of "$DELETE_COLON")" fix-ci/lint
 	assert_ref_absent "$(bare_of "$DELETE_COLON")" plan/x
+	assert_ref_absent "$DELETE_COLON" fix-ci/lint
+	assert_ref_absent "$DELETE_COLON" plan/x
 }
 
 # ── Local cleanup after a remote delete ──────────────────────────────────────
@@ -254,6 +267,23 @@ teardown_file() {
 	assert_reason "switch away from 'fix-ci/lint'"
 	assert_ref_absent "$(bare_of "$CHECKED_OUT")" fix-ci/lint
 	assert_ref_present "$CHECKED_OUT" fix-ci/lint
+}
+
+@test "local cleanup: --delete of a full refs/heads/ name removes the local branch too" {
+	run_wrapper "$FULL_REF" origin --delete refs/heads/fix-ci/lint
+
+	assert_run_ok
+	assert_ref_absent "$(bare_of "$FULL_REF")" fix-ci/lint
+	assert_ref_absent "$FULL_REF" fix-ci/lint
+}
+
+@test "local cleanup: a checked-out branch among several keeps only that one locally" {
+	run_wrapper "$CHECKED_OUT_MIXED" origin --delete fix-ci/lint plan/x
+
+	assert_run_failed 2
+	assert_reason "switch away from 'fix-ci/lint'"
+	assert_ref_present "$CHECKED_OUT_MIXED" fix-ci/lint
+	assert_ref_absent "$CHECKED_OUT_MIXED" plan/x
 }
 
 # ── Diagnostics ──────────────────────────────────────────────────────────────
