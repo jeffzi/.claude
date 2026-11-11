@@ -104,27 +104,6 @@ backdate_seconds() {
 	}
 }
 
-# Prints a PATH with no lsof on it but every other program the current PATH
-# offers: each directory holding an lsof is swapped for a bin of links to its
-# other programs, so dropping lsof never drops git or jq beside it.
-path_without_lsof() {
-	local bin="$BATS_TEST_TMPDIR/no_lsof/bin" dir entry kept=""
-	local -a dirs
-	mkdir -p "$bin"
-	IFS=: read -ra dirs <<<"$PATH"
-	for dir in "${dirs[@]}"; do
-		if [[ -x "$dir/lsof" ]]; then
-			for entry in "$dir"/*; do
-				[[ "${entry##*/}" == lsof || -e "$bin/${entry##*/}" ]] && continue
-				ln -s "$entry" "$bin/${entry##*/}"
-			done
-			continue
-		fi
-		kept+="${kept:+:}$dir"
-	done
-	printf '%s:%s' "$bin" "$kept"
-}
-
 @test "timeout: a lock that persists lists the holders the lsof on PATH reports" {
 	local bin="$BATS_TEST_TMPDIR/holder/bin"
 	mkdir -p "$bin"
@@ -138,7 +117,7 @@ path_without_lsof() {
 }
 
 @test "timeout: a lock that persists with no lsof on PATH says lsof is unavailable" {
-	run_lock_guard "$LOCKED_REPO" "git commit -m 'msg'" "$(path_without_lsof)"
+	run_lock_guard "$LOCKED_REPO" "git commit -m 'msg'" "$(path_without lsof)"
 
 	assert_blocked
 	assert_guard_output_includes "unavailable"

@@ -300,14 +300,28 @@ run_ils_invocations() {
 	rm -f "$out"
 }
 
-# Prints the current PATH without every directory holding an executable $1, so
-# a child run on it cannot find that program.
+# Prints a PATH with no executable $1 on it but every other program the current
+# PATH offers, so a child run on it cannot find that program and nothing else.
+#
+# Each directory holding $1 is swapped for one bin of links to its other
+# programs, placed where the first such directory stood. Dropping the whole
+# directory would also drop what shares it: on Linux, jq sits in /usr/bin beside
+# cat and git.
 path_without() {
-	local program="$1" dir kept=""
+	local program="$1" bin="$BATS_TEST_TMPDIR/without_$1/bin" dir entry kept="" placed=0
 	local -a dirs
+	mkdir -p "$bin"
 	IFS=: read -ra dirs <<<"$PATH"
 	for dir in "${dirs[@]}"; do
-		[[ -x "$dir/$program" ]] && continue
+		if [[ -x "$dir/$program" ]]; then
+			((placed)) || kept+="${kept:+:}$bin"
+			placed=1
+			for entry in "$dir"/*; do
+				[[ "${entry##*/}" == "$program" || -e "$bin/${entry##*/}" ]] && continue
+				ln -s "$entry" "$bin/${entry##*/}"
+			done
+			continue
+		fi
 		kept+="${kept:+:}$dir"
 	done
 	printf '%s' "$kept"
