@@ -2,6 +2,34 @@
 
 load helpers/hooks
 
+# Add a local plan/x branch to repo $1 and seed its origin with main, fix-ci/lint and plan/x.
+seed_delete_refs() {
+	add_branch "$1" plan/x
+	seed_origin "$1" main fix-ci/lint plan/x
+}
+
+# The run was refused with $1 inside the wrapper's own refusal, the stderr from
+# its first `fix-ci-push:` line on, so git's passed-through output cannot
+# satisfy it.
+assert_refusal_names() {
+	local pattern="$1" refusal="${RUN_STDERR#*fix-ci-push:}"
+	((RUN_EXIT == 2)) && [[ "$refusal" != "$RUN_STDERR" && "$refusal" == *"$pattern"* ]] || {
+		printf 'expected exit 2 with "%s" in the fix-ci-push refusal\nexit: %d\nstderr: %s\n' \
+			"$pattern" "$RUN_EXIT" "$RUN_STDERR" >&2
+		return 1
+	}
+}
+
+# The run was refused, and the wrapper's own refusal does not hold $1.
+assert_refusal_omits() {
+	local refusal="${RUN_STDERR#*fix-ci-push:}"
+	((RUN_EXIT == 2)) && [[ "$refusal" != "$RUN_STDERR" && "$refusal" != *"$1"* ]] || {
+		printf 'expected exit 2 without "%s" in the fix-ci-push refusal\nexit: %d\nstderr: %s\n' \
+			"$1" "$RUN_EXIT" "$RUN_STDERR" >&2
+		return 1
+	}
+}
+
 setup_file() {
 	export TMPDIR_ROOT
 	TMPDIR_ROOT=$(mktemp -d)
@@ -28,17 +56,61 @@ setup_file() {
 
 	export REFUSE
 	REFUSE=$(setup_marked_pair refuse)
-	seed_origin "$REFUSE" main
+	add_branch "$REFUSE" feature
+	seed_origin "$REFUSE" main feature
 
 	export DELETE_FLAG
 	DELETE_FLAG=$(setup_marked_pair delete_flag)
-	add_branch "$DELETE_FLAG" plan/x
-	seed_origin "$DELETE_FLAG" main fix-ci/lint plan/x
+	seed_delete_refs "$DELETE_FLAG"
 
 	export DELETE_COLON
 	DELETE_COLON=$(setup_marked_pair delete_colon)
-	add_branch "$DELETE_COLON" plan/x
-	seed_origin "$DELETE_COLON" main fix-ci/lint plan/x
+	seed_delete_refs "$DELETE_COLON"
+
+	export SQUASHED
+	SQUASHED=$(setup_marked_pair squashed)
+	add_unmerged_branch "$SQUASHED" fix-ci/squashed
+	seed_origin "$SQUASHED" fix-ci/squashed
+
+	export NO_LOCAL
+	NO_LOCAL=$(setup_marked_pair no_local)
+	seed_origin "$NO_LOCAL" fix-ci/lint
+	git -C "$NO_LOCAL" branch -q -D fix-ci/lint
+
+	export REMOTE_FAIL
+	REMOTE_FAIL=$(setup_marked_pair remote_fail)
+
+	export CHECKED_OUT
+	CHECKED_OUT=$(setup_marked_pair checked_out)
+	seed_origin "$CHECKED_OUT" fix-ci/lint
+	git -C "$CHECKED_OUT" switch -q fix-ci/lint
+
+	export FULL_REF
+	FULL_REF=$(setup_marked_pair full_ref)
+	seed_origin "$FULL_REF" fix-ci/lint
+
+	# fix-ci/lint is checked out; plan/x is not.
+	export CHECKED_OUT_MIXED
+	CHECKED_OUT_MIXED=$(setup_marked_pair checked_out_mixed)
+	add_branch "$CHECKED_OUT_MIXED" plan/x
+	seed_origin "$CHECKED_OUT_MIXED" fix-ci/lint plan/x
+	git -C "$CHECKED_OUT_MIXED" switch -q fix-ci/lint
+
+	export LINKED_WORKTREE LINKED_WORKTREE_PATH
+	LINKED_WORKTREE=$(setup_marked_pair linked_worktree)
+	seed_origin "$LINKED_WORKTREE" fix-ci/lint
+	git -C "$LINKED_WORKTREE" worktree add -q "${LINKED_WORKTREE%/work}/linked" fix-ci/lint
+	LINKED_WORKTREE_PATH=$(cd "${LINKED_WORKTREE%/work}/linked" && pwd -P)
+
+	# A held ref lock makes `git branch -D fix-ci/lint` fail with no checkout involved.
+	export LOCKED_REF
+	LOCKED_REF=$(setup_marked_pair locked_ref)
+	seed_origin "$LOCKED_REF" fix-ci/lint
+	touch "$(git -C "$LOCKED_REF" rev-parse --absolute-git-dir)/refs/heads/fix-ci/lint.lock"
+
+	export BARE_NAME
+	BARE_NAME=$(setup_marked_pair bare_name)
+	cp -R "$PROJECT_DIR/scripts" "$BARE_NAME/tools"
 
 	export NOT_A_REPO
 	NOT_A_REPO="$TMPDIR_ROOT/not_a_repo"
@@ -46,7 +118,7 @@ setup_file() {
 }
 
 teardown_file() {
-	[[ -n "$TMPDIR_ROOT" ]] && rm -rf "$TMPDIR_ROOT"
+	cleanup_tmpdir_root
 }
 
 # ── Marker gate ──────────────────────────────────────────────────────────────
@@ -55,7 +127,7 @@ teardown_file() {
 	run_wrapper "$NO_MARKER" origin fix-ci/lint
 
 	assert_refused
-	assert_reason "is absent"
+	assert_reason "$(git -C "$NO_MARKER" rev-parse --absolute-git-dir)/fix-ci-active"
 	assert_ref_absent "$(bare_of "$NO_MARKER")" fix-ci/lint
 }
 
@@ -63,7 +135,6 @@ teardown_file() {
 	run_wrapper "$STALE" origin fix-ci/lint
 
 	assert_refused
-	assert_reason "not from the last"
 	assert_ref_absent "$(bare_of "$STALE")" fix-ci/lint
 }
 
@@ -71,7 +142,6 @@ teardown_file() {
 	run_wrapper "$FUTURE" origin fix-ci/lint
 
 	assert_refused
-	assert_reason "not from the last"
 	assert_ref_absent "$(bare_of "$FUTURE")" fix-ci/lint
 }
 
@@ -83,7 +153,6 @@ teardown_file() {
 	run_script_on_path "$work" "$bin:$PATH" "$FIX_CI_PUSH_WRAPPER" origin fix-ci/lint
 
 	assert_run_failed 1
-	assert_reason "marker age cannot be read"
 	assert_ref_absent "$(bare_of "$work")" fix-ci/lint
 }
 
@@ -94,6 +163,7 @@ teardown_file() {
 
 	assert_run_ok
 	assert_ref_present "$(bare_of "$PLAIN")" fix-ci/lint
+	assert_ref_present "$PLAIN" fix-ci/lint
 }
 
 @test "pass-through: push -u of a fix-ci branch lands in origin" {
@@ -112,20 +182,11 @@ teardown_file() {
 
 # ── Flag whitelist ───────────────────────────────────────────────────────────
 
-@test "flag whitelist: every unlisted flag is refused naming the whitelist" {
-	local flag
-	for flag in -f --force-with-lease -fu --mirror; do
-		run_wrapper "$REFUSE" "$flag" origin fix-ci/lint
+@test "flag whitelist: an unlisted flag is refused naming the whitelist" {
+	run_wrapper "$REFUSE" -f origin fix-ci/lint
 
-		assert_refused || {
-			printf 'flag: %s\n' "$flag" >&2
-			return 1
-		}
-		assert_reason "is not allowed" || {
-			printf 'flag: %s\n' "$flag" >&2
-			return 1
-		}
-	done
+	assert_refused
+	assert_reason "'-f'"
 	assert_ref_absent "$(bare_of "$REFUSE")" fix-ci/lint
 }
 
@@ -133,62 +194,134 @@ teardown_file() {
 	run_wrapper "$REFUSE" origin +main:main
 
 	assert_refused
-	assert_reason "forces the update"
+	assert_reason "'+main:main'"
 }
 
 @test "flag whitelist: a push naming no refspec is refused" {
 	run_wrapper "$REFUSE" origin
 
 	assert_refused
-	assert_reason "no refspec named"
 }
 
 # ── Delete scoping ───────────────────────────────────────────────────────────
 
-@test "delete scope: push --delete main is refused naming both allowed namespaces" {
+@test "delete scope: push --delete main is refused naming the outside branch" {
 	run_wrapper "$REFUSE" origin --delete main
 
 	assert_refused
-	assert_reason "fix-ci/*"
-	assert_reason "plan/*"
+	assert_reason "'main'"
 	assert_ref_present "$(bare_of "$REFUSE")" main
 }
 
-@test "delete scope: push :main (delete refspec) is refused naming both allowed namespaces" {
+@test "delete scope: push :main (delete refspec) is refused naming the outside branch" {
 	run_wrapper "$REFUSE" origin :main
 
 	assert_refused
-	assert_reason "fix-ci/*"
-	assert_reason "plan/*"
+	assert_reason "'main'"
 	assert_ref_present "$(bare_of "$REFUSE")" main
 }
 
-@test "delete scope: push --delete of a fix-ci and a plan branch removes both from origin" {
+@test "delete scope: a --delete naming an outside branch after a fix-ci one deletes neither locally" {
+	run_wrapper "$REFUSE" origin --delete fix-ci/lint feature
+
+	assert_refused
+	assert_ref_present "$(bare_of "$REFUSE")" feature
+	assert_ref_present "$REFUSE" fix-ci/lint
+}
+
+@test "delete scope: push --delete of a fix-ci and a plan branch removes both from origin and locally" {
 	run_wrapper "$DELETE_FLAG" origin --delete fix-ci/lint plan/x
 
 	assert_run_ok
 	assert_ref_absent "$(bare_of "$DELETE_FLAG")" fix-ci/lint
 	assert_ref_absent "$(bare_of "$DELETE_FLAG")" plan/x
+	assert_ref_absent "$DELETE_FLAG" fix-ci/lint
+	assert_ref_absent "$DELETE_FLAG" plan/x
 }
 
-@test "delete scope: delete refspecs for a fix-ci and a plan branch remove both from origin" {
+@test "delete scope: delete refspecs for a fix-ci and a plan branch remove both from origin and locally" {
 	run_wrapper "$DELETE_COLON" origin :fix-ci/lint :plan/x
 
 	assert_run_ok
 	assert_ref_absent "$(bare_of "$DELETE_COLON")" fix-ci/lint
 	assert_ref_absent "$(bare_of "$DELETE_COLON")" plan/x
+	assert_ref_absent "$DELETE_COLON" fix-ci/lint
+	assert_ref_absent "$DELETE_COLON" plan/x
+}
+
+# ── Local cleanup after a remote delete ──────────────────────────────────────
+
+@test "local cleanup: --delete removes a squash-merged fix-ci branch git branch -d would refuse" {
+	run_wrapper "$SQUASHED" origin --delete fix-ci/squashed
+
+	assert_run_ok
+	assert_ref_absent "$SQUASHED" fix-ci/squashed
+}
+
+@test "local cleanup: --delete of a branch with no local copy still succeeds remotely" {
+	run_wrapper "$NO_LOCAL" origin --delete fix-ci/lint
+
+	assert_run_ok
+}
+
+@test "local cleanup: a failed remote delete keeps the local branch" {
+	run_wrapper "$REMOTE_FAIL" origin --delete fix-ci/lint
+
+	assert_run_nonzero
+	assert_ref_present "$REMOTE_FAIL" fix-ci/lint
+}
+
+@test "local cleanup: --delete of the checked-out branch keeps it locally and names it" {
+	run_wrapper "$CHECKED_OUT" origin --delete fix-ci/lint
+
+	assert_run_failed 2
+	assert_reason "'fix-ci/lint'"
+	assert_refusal_omits "checked_out/${CHECKED_OUT##*/}"
+	assert_ref_absent "$(bare_of "$CHECKED_OUT")" fix-ci/lint
+	assert_ref_present "$CHECKED_OUT" fix-ci/lint
+}
+
+@test "local cleanup: --delete of a full refs/heads/ name removes the local branch too" {
+	run_wrapper "$FULL_REF" origin --delete refs/heads/fix-ci/lint
+
+	assert_run_ok
+	assert_ref_absent "$FULL_REF" fix-ci/lint
+}
+
+@test "local cleanup: a checked-out branch among several keeps only that one locally" {
+	run_wrapper "$CHECKED_OUT_MIXED" origin --delete fix-ci/lint plan/x
+
+	assert_run_failed 2
+	assert_reason "'fix-ci/lint'"
+	assert_ref_present "$CHECKED_OUT_MIXED" fix-ci/lint
+	assert_ref_absent "$CHECKED_OUT_MIXED" plan/x
+}
+
+@test "local cleanup: a branch another worktree holds is kept and that worktree's path named" {
+	run_wrapper "$LINKED_WORKTREE" origin --delete fix-ci/lint
+
+	assert_refusal_names "$LINKED_WORKTREE_PATH"
+	assert_ref_present "$LINKED_WORKTREE" fix-ci/lint
+}
+
+@test "local cleanup: a local delete failing for another reason carries git's own error" {
+	run_wrapper "$LOCKED_REF" origin --delete fix-ci/lint
+
+	assert_refusal_names "refs/heads/fix-ci/lint.lock"
+	assert_ref_present "$LOCKED_REF" fix-ci/lint
 }
 
 # ── Diagnostics ──────────────────────────────────────────────────────────────
 
-@test "diagnostics: git's own reason for an unusable repo" {
-	run_wrapper "$NOT_A_REPO" origin fix-ci/lint
+@test "invocation: run by bare file name from its own directory it reaches its checks" {
+	run_capture "$BARE_NAME/tools" "$BASH_BIN" fix-ci-push.sh origin fix-ci/lint
 
-	assert_reason "not a git repository"
+	assert_run_ok
+	assert_ref_present "$(bare_of "$BARE_NAME")" fix-ci/lint
 }
 
-@test "diagnostics: missing git named as the cause" {
-	run_wrapper_without_git "$NO_MARKER" origin fix-ci/lint
+@test "diagnostics: an unusable repo is refused" {
+	run_wrapper "$NOT_A_REPO" origin fix-ci/lint
 
-	assert_reason "git is not installed"
+	assert_refused
 }

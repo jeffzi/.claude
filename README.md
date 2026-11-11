@@ -204,9 +204,11 @@ branch and lands it through `ils push`; you merge it with `ils merge`, then run 
 
 What enforces it:
 
-- `git config claude.protectMain true`, set by hand per repo, makes
-  [`git-guard.sh`](hooks/git-guard.sh) block every commit-creating command on `main` and point at
-  `ils branch <name>` instead.
+- The `ils` guard, wired as a Bash hook through `skills/ils/hook.sh` (the `ils` skill, linked in
+  from the `ils` clone), refuses every commit-creating command on a checked-out trunk, in every
+  repository with an `origin` and with no opt-in, and points at `ils branch <name>` instead. It owns
+  the other git, `gh` and `ils` safety rules too: raw pushes, force pushes, `branch -D`, and history
+  rewrites.
 - `ils push` pushes the branch and opens its pull request; `ils merge` and `ils release` ask for
   your approval, and the assistant never runs either unasked. `ils push` also lands `/fix-ci`'s
   squashed fix onto any branch with an open pull request against `main`. Outside `ils`, the
@@ -286,22 +288,24 @@ bats tests/
 | Script                                               | Description                                                                                 |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | [`cleanup-sessions.sh`](scripts/cleanup-sessions.sh) | Remove stale session data older than a configurable age                                     |
-| [`branch-policy.sh`](scripts/branch-policy.sh)       | Marker and branch policy shared by `fix-ci-push.sh` and `git-guard`                         |
 | [`fix-ci-push.sh`](scripts/fix-ci-push.sh)           | Sanctioned push wrapper for `fix-ci/*` branches and squash-backs onto branches without a PR |
+| [`ils-invocations.sh`](scripts/ils-invocations.sh)   | The git and `gh` invocations of a Bash command, read from `ils parse`, for the hooks        |
 | [`sh-common.sh`](scripts/sh-common.sh)               | Sourced helpers shared by the scripts and hooks: `die`, portable `stat`                     |
 | [`statusline.sh`](scripts/statusline.sh)             | Custom status line: model, context gauge, rate limit pacing                                 |
 | [`sync-skills.sh`](scripts/sync-skills.sh)           | Sync selected skills from external repositories via `npx skills`                            |
 
 ### Hooks
 
-| Hook                                               | Description                                                      |
-| -------------------------------------------------- | ---------------------------------------------------------------- |
-| [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh)   | Blocks proceeding when a Bash command fails                      |
-| [`git-commit-guard.sh`](hooks/git-commit-guard.sh) | Blocks commit messages containing internal tooling references    |
-| [`git-guard.sh`](hooks/git-guard.sh)               | Blocks auto-push, destructive ops, commits on a protected `main` |
-| [`git-lock-guard.sh`](hooks/git-lock-guard.sh)     | Absorbs `.git/index.lock` races from parallel agents/sessions    |
-| [`tdd-red-guard.sh`](hooks/tdd-red-guard.sh)       | Blocks reading implementation source during TDD RED phase        |
-| [`worktree-guard.sh`](hooks/worktree-guard.sh)     | Blocks exiting worktrees with uncommitted changes                |
+| Hook                                               | Description                                                                         |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [`bash-exit-guard.sh`](hooks/bash-exit-guard.sh)   | Blocks proceeding when a Bash command fails                                         |
+| [`git-commit-guard.sh`](hooks/git-commit-guard.sh) | Blocks internal tooling references in commit and PR text, also behind `cd` and `-C` |
+| [`git-lock-guard.sh`](hooks/git-lock-guard.sh)     | Absorbs `.git/index.lock` races, also for git commands behind `cd` and `-C`         |
+| `skills/ils/hook.sh` (`ils` skill)                 | Runs the `ils` guard: pushes, destructive git ops, commits on the trunk             |
+| [`plan-file-guard.sh`](hooks/plan-file-guard.sh)   | Blocks staging or committing plan files                                             |
+| [`tdd-cycle-guard.sh`](hooks/tdd-cycle-guard.sh)   | Blocks `git add` and `git commit` while a TDD cycle agent runs                      |
+| [`tdd-red-guard.sh`](hooks/tdd-red-guard.sh)       | Blocks reading implementation source during TDD RED phase                           |
+| [`worktree-guard.sh`](hooks/worktree-guard.sh)     | Blocks exiting worktrees with uncommitted changes                                   |
 
 ## Configuration Notes
 

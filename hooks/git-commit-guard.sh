@@ -1,36 +1,41 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# git-commit-guard.sh — PreToolUse hook: blocks git commit messages that
+# git-commit-guard.sh — PreToolUse Bash hook: blocks git commit messages that
 # contain internal tooling references (plan IDs, TDD process labels, internal paths).
 # The title and body of `gh pr create` and `gh pr edit` get the same scan: a
 # squash merge turns them into the commit message.
+#
+# Which invocations are commits or pull requests, and which words they carry,
+# comes from scripts/ils-invocations.sh — wherever the invocation hides in the
+# command — so a command that only mentions those words is never scanned. A
+# command whose invocations cannot be read blocks: the guard cannot vouch for
+# what it did not see.
+#
+# Input: PreToolUse JSON on stdin (.tool_input.command, .cwd)
+# Exit: 0 to allow, 2 to block
 
-command -v jq >/dev/null || exit 0
-
-input=$(cat)
-cmd=$(printf '%s' "$input" | jq -r '.tool_input.command // empty')
-[[ -n "$cmd" ]] || exit 0
-
-# Each command reads its message from a file under its own flags.
-if [[ "$cmd" =~ git[[:space:]].*commit ]]; then
-	message_file_flags='-F|--file'
-elif [[ "$cmd" =~ gh[[:space:]]+pr[[:space:]]+(create|edit)([[:space:]]|$) ]]; then
-	message_file_flags='-F|--body-file'
-else
-	exit 0
-fi
+# `bash hook.sh` run from inside hooks/ leaves no slash to strip a directory at.
+HOOK_SOURCE=${BASH_SOURCE[0]}
+[[ "$HOOK_SOURCE" == */* ]] || HOOK_SOURCE="./$HOOK_SOURCE"
+HOOK_DIR=$(cd "${HOOK_SOURCE%/*}" && pwd)
+# shellcheck source=SCRIPTDIR/../scripts/sh-common.sh
+. "$HOOK_DIR/../scripts/sh-common.sh"
+# shellcheck source=SCRIPTDIR/../scripts/ils-invocations.sh
+. "$HOOK_DIR/../scripts/ils-invocations.sh"
+PROG=git-commit-guard
+sh_fail_closed
 
 # Each check pairs a grep invocation (flags + pattern) with its block reason.
-check_flags=(-qE -qE -qiE -qE -qE)
-check_patterns=(
+readonly CHECK_FLAGS=(-qE -qE -qiE -qE -qE)
+readonly CHECK_PATTERNS=(
 	'\([0-9]+\.?[0-9]*-[0-9]+\)'
 	'\([0-9]{2,}-[a-z][a-z-]*\)'
 	'(RED-GREEN|TDD RED|TDD GREEN|RED phase|GREEN phase|REFACTOR phase)'
 	'\.planning/'
 	'[0-9]{2,}-[0-9]+-SUMMARY\.md'
 )
-check_reasons=(
+readonly CHECK_REASONS=(
 	"Commit scope contains an internal phase ID (e.g. 05-01). Use a module name instead."
 	"Commit scope contains a phase slug (e.g. 05-layout-transitions). Use a module name instead."
 	"Commit message contains a TDD process label. Describe what was built, not the cycle."
@@ -41,45 +46,101 @@ check_reasons=(
 # Print the reason of the first check matching $1; print nothing when it is clean.
 scan_text() {
 	local text="$1" i
-	for i in "${!check_patterns[@]}"; do
-		if printf '%s' "$text" | grep "${check_flags[$i]}" "${check_patterns[$i]}"; then
-			printf '%s' "${check_reasons[$i]}"
+	for i in "${!CHECK_PATTERNS[@]}"; do
+		if grep "${CHECK_FLAGS[$i]}" -- "${CHECK_PATTERNS[$i]}" <<<"$text"; then
+			printf '%s' "${CHECK_REASONS[$i]}"
 			return 0
 		fi
 	done
 	return 0
 }
 
-# Print the path given in $1 to one of the flags in alternation $2, spelled
-# `<flag> <path>` or `<flag>=<path>`; nothing when no flag is present. The path
-# may be quoted in the command text; the quotes are shell syntax, not part of
-# the path, so a quoted span is matched whole and unwrapped.
-message_file_path() {
-	local text="$1" flags="$2" path
-	local flag_re="(^|[[:space:]])($flags)([[:space:]]+|=)(\"[^\"]*\"|'[^']*'|[^[:space:]]+)"
-	[[ "$text" =~ $flag_re ]] || return 0
-	path="${BASH_REMATCH[4]}"
-	if [[ "$path" == '"'*'"' || "$path" == "'"*"'" ]]; then
-		path="${path:1:${#path}-2}"
-	fi
-	printf '%s' "$path"
+# Prints, one per line, every message file path that words $5.. give to short
+# flag $1 or long flag $2. The long flag is spelled `<flag> <path>` or
+# `<flag>=<path>`. The short flag is spelled `<flag> <path>`, `<flag><path>`,
+# or as the last letter of a cluster of flags that take no value, whose letters
+# are $3 (`-aF <path>`, `-aF<path>`).
+#
+# $4 names the parser that reads `-F=<path>`, which tools disagree on:
+#
+# - `git` reads it as the path `=<path>`.
+# - `pflag` (spf13/pflag, gh's parser) drops the `=` and reads `<path>`.
+#
+# Words are marked as the record format in scripts/ils-invocations.sh marks
+# them: a path that is not a literal word is skipped, and so is the word after
+# it, which is not the path.
+message_file_args() {
+	local short="${1#-}" long="$2" plain_flags="$3" parser="$4" word next value
+	local cluster="^=-[${plain_flags}]*${short}"
+	shift 4
+	while (($#)); do
+		word="$1"
+		shift
+		if [[ "$word" == "=$long="* ]]; then
+			printf '%s\n' "${word#"=$long="}"
+		elif [[ "$word" == "=$long" || "$word" =~ ${cluster}$ ]]; then
+			next="${1-}"
+			(($#)) && shift
+			[[ "$next" == =* ]] && printf '%s\n' "${next:1}"
+		elif [[ "$word" =~ ${cluster}(.+)$ ]]; then
+			value="${BASH_REMATCH[1]}"
+			# pflag keeps a lone `=` as the value: only `=` with text after it is dropped.
+			[[ "$parser" == pflag && "$value" == =?* ]] && value="${value:1}"
+			printf '%s\n' "$value"
+		fi
+	done
 }
 
-# Do not extract only -m "...": heredoc and -F commits would be missed.
-reason=$(scan_text "$cmd")
+has_message_invocation=0
+message_files=()
 
-# A message file keeps the message out of the command text, so scan the file
-# too. "-" is stdin, already covered by the command-text scan of the heredoc.
-if [[ -z "$reason" ]]; then
-	message_file=$(message_file_path "$cmd" "$message_file_flags")
-	if [[ -n "$message_file" && "$message_file" != "-" && -f "$message_file" && -r "$message_file" ]]; then
-		reason=$(scan_text "$(cat -- "$message_file")")
+# ils_each_invocation callback: notes a commit or a pull request create/edit,
+# and collects its message files resolved against the directory $4 it runs in.
+# "-" is stdin, already covered by the command-text scan of the heredoc; a
+# relative path whose directory is unknown cannot be resolved and is skipped.
+collect_message_files() {
+	local tool="$1" subcommand="$3" dir="$4" path
+	shift 4
+	local -a flags
+	if [[ "$tool" == git && "$subcommand" == commit ]]; then
+		flags=(-F --file "$ILS_GIT_COMMIT_PLAIN_SHORTS" git)
+	elif [[ "$tool" == gh && "${1-}" == =gh && "${2-}" == =pr &&
+		("${3-}" == =create || "${3-}" == =edit) ]]; then
+		flags=(-F --body-file defw pflag)
+	else
+		return 0
 	fi
-fi
+	has_message_invocation=1
 
-if [[ -n "$reason" ]]; then
-	jq -n --arg r "BLOCKED: $reason" '{ "decision": "block", "reason": $r }'
-	exit 2
-fi
+	while IFS= read -r path; do
+		[[ -n "$path" && "$path" != - ]] || continue
+		if [[ "$path" != /* ]]; then
+			[[ -n "$dir" ]] || continue
+			path="$dir/$path"
+		fi
+		message_files+=("$path")
+	done < <(message_file_args "${flags[@]}" "$@")
+}
 
-exit 0
+main() {
+	local reason message_file
+
+	ils_each_invocation collect_message_files
+	((has_message_invocation)) || exit 0
+
+	# Do not extract only -m "...": heredoc and -F commits would be missed.
+	reason=$(scan_text "$ils_command")
+
+	# A message file keeps the message out of the command text, so scan each file
+	# too; one that is missing or unreadable leaves the command text to decide.
+	for message_file in ${message_files[@]+"${message_files[@]}"}; do
+		[[ -z "$reason" ]] || break
+		if [[ -f "$message_file" && -r "$message_file" ]]; then
+			reason=$(scan_text "$(<"$message_file")")
+		fi
+	done
+
+	[[ -z "$reason" ]] || die "BLOCKED: $reason"
+}
+
+main "$@"
