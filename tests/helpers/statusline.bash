@@ -4,19 +4,21 @@
 TEST_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 SCRIPT="$TEST_DIR/../scripts/statusline.sh"
 
-# shellcheck source=../../scripts/statusline.sh disable=SC1091
+# shellcheck source=../../scripts/statusline.sh disable=SC1091  # a plain `shellcheck` run does not follow sourced files; only `-x` does
 . "$SCRIPT"
 
 EMPTY="○"
 HALF="◎"
 FILLED="●"
 
-# ---------------------------------------------------------------------------
-# Assertion helpers
-# ---------------------------------------------------------------------------
-#
+readonly POLL_INTERVAL_SECONDS=0.05
+readonly FILE_POLL_TRIES=100
+readonly ATTEMPT_POLL_TRIES=200
+
+# ── Assertion helpers ────────────────────────────────────────────────────────
+
 # Each assert_* prints a diagnostic on failure and returns 1; Bats catches the
-# non-zero exit. No report() function, no PASS/FAIL counters.
+# non-zero exit.
 
 strip_ansi() {
 	sed $'s/\033\\[[0-9;]*m//g'
@@ -33,7 +35,6 @@ assert_glyphs() {
 
 assert_bar() {
 	local pct="$1" pattern="$2" color expected="" sep="" i actual
-	local filled="$FILLED" half="$HALF" empty="$EMPTY"
 	color=$(usage_color "$pct")
 	if [[ -z "$color" ]]; then
 		printf 'usage_color %s emitted no escape; the bar has nothing to wear\n' "$pct" >&2
@@ -41,9 +42,9 @@ assert_bar() {
 	fi
 	for ((i = 0; i < ${#pattern}; i++)); do
 		case "${pattern:i:1}" in
-		F) expected+="${sep}${color}${filled}${RESET}" ;;
-		H) expected+="${sep}${color}${half}${RESET}" ;;
-		E) expected+="${sep}${empty}" ;;
+		F) expected+="${sep}${color}${FILLED}${RESET}" ;;
+		H) expected+="${sep}${color}${HALF}${RESET}" ;;
+		E) expected+="${sep}${EMPTY}" ;;
 		*)
 			printf 'invalid pattern char: %s\n' "${pattern:i:1}" >&2
 			return 1
@@ -184,10 +185,7 @@ assert_unannotated_render() {
 	assert_not_contains "$plain" "→" || return 1
 	assert_not_contains "$plain" "null" || return 1
 	assert_not_contains "$plain" "statusline:" || return 1
-	if ((status != 0)); then
-		printf 'expected exit 0, got %s\n' "$status" >&2
-		return 1
-	fi
+	assert_exit_zero "$status" || return 1
 	err=$(<"$MAIN_CASES/$case_name/stderr")
 	assert_not_contains "$err" "statusline:"
 }
@@ -204,10 +202,21 @@ assert_degraded_render() {
 		printf 'expected line: %q\n  actual: %q\n' "$expected" "$plain" >&2
 		return 1
 	fi
-	if [[ "$status" -ne 0 ]]; then
-		printf 'expected exit 0, got %s\n' "$status" >&2
+	assert_exit_zero "$status"
+}
+
+# Like assert_degraded_render, but pins only what the failure line inserts: the
+# render is a single statusline failure line naming $1, and nothing else printed.
+assert_failure_line_naming() {
+	local value="$1" status=0 out plain
+	shift
+	out=$("$@") || status=$?
+	plain=$(printf '%s' "$out" | strip_ansi)
+	if [[ "$plain" != "statusline: "* || "$plain" == *$'\n'* || "$plain" != *"$value"* ]]; then
+		printf 'expected one failure line naming %q\n  actual: %q\n' "$value" "$plain" >&2
 		return 1
 	fi
+	assert_exit_zero "$status"
 }
 
 assert_reset_uncolored() {
@@ -227,6 +236,14 @@ assert_failed_status() {
 	local status="$1" what="$2"
 	if ((status == 0)); then
 		printf '%s exited 0, expected a failure\n' "$what" >&2
+		return 1
+	fi
+}
+
+assert_exit_zero() {
+	local status="$1"
+	if ((status != 0)); then
+		printf 'expected exit 0, got %s\n' "$status" >&2
 		return 1
 	fi
 }
@@ -298,17 +315,12 @@ assert_family() {
 	mkdir -p "$dir"
 	out=$(transcript_model_family "$path" 2>"$dir/family-stderr") || status=$?
 	assert_exact "$out" "$expected" || return 1
-	if ((status != 0)); then
-		printf 'expected exit 0, got %s\n' "$status" >&2
-		return 1
-	fi
+	assert_exit_zero "$status" || return 1
 	err=$(<"$dir/family-stderr")
 	assert_exact "$err" ""
 }
 
-# ---------------------------------------------------------------------------
-# Domain helpers
-# ---------------------------------------------------------------------------
+# ── Domain helpers ───────────────────────────────────────────────────────────
 
 ref_rgb() {
 	awk -v pct="$1" 'BEGIN {
@@ -414,7 +426,8 @@ missing_dep_render() {
 	) 2>"$dir/stderr"
 }
 
-# Writes a fake `stat` executable with the given body to $dir/stat.
+# The shim shadows the host `stat` when its directory is prepended to PATH.
+# The caller supplies the full script in $2, shebang included.
 make_stat_shim() {
 	local dir="$1" body="$2"
 	mkdir -p "$dir"
@@ -438,44 +451,49 @@ probe_then_mtime() {
 	(
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
 		export PATH="$stat_dir:$PATH"
-		# Re-probe via the function rather than re-sourcing the script: a second
-		# source re-runs the readonly declarations, which is fatal on bash 3.2.
-		detect_stat_fmt
+		# Call the probe directly: sh-common.sh is guarded by SH_COMMON_SOURCED,
+		# so sourcing it again would not re-probe stat under the stubbed PATH.
+		sh_detect_stat
 		file_mtime "$target_path"
 	)
 }
 
-# Scaffolds a fake $dir/bin with a curl shim and (optionally) a security shim, plus an
+# Scaffolds a fake $dir/bin with a curl shim and a security shim, plus an
 # attempts file curl appends to. gate_curl "gate" makes the shim honor $STUB_CURL_EXIT;
 # "nogate" makes it always succeed. security_mode selects the security shim: "ok" (returns
-# a token), "fail" (exits 1), or "absent" (no shim written).
+# a token), "notoken" (succeeds with an entry holding no token) or "fail" (exits 1); any
+# other mode fails.
 make_fallback_bin() {
 	local dir="$1" gate_curl="$2" security_mode="$3"
 	mkdir -p "$dir/bin"
 	: >"$dir/attempts"
+	cat >"$dir/bin/curl" <<-'SHIM'
+		#!/usr/bin/env bash
+		printf 'attempt\n' >>"$STUB_ATTEMPTS"
+		printf '%s\n' "$*" >>"${STUB_ARGS:-/dev/null}"
+	SHIM
 	if [[ "$gate_curl" == gate ]]; then
-		cat >"$dir/bin/curl" <<-'SHIM'
-			#!/usr/bin/env bash
-			printf 'attempt\n' >>"$STUB_ATTEMPTS"
-			printf '%s\n' "$*" >>"${STUB_ARGS:-/dev/null}"
+		cat >>"$dir/bin/curl" <<-'SHIM'
 			code=$(cat "$STUB_CURL_EXIT")
 			((code == 0)) || exit "$code"
-			cat "$STUB_CURL_BODY"
-		SHIM
-	else
-		cat >"$dir/bin/curl" <<-'SHIM'
-			#!/usr/bin/env bash
-			printf 'attempt\n' >>"$STUB_ATTEMPTS"
-			printf '%s\n' "$*" >>"${STUB_ARGS:-/dev/null}"
-			cat "$STUB_CURL_BODY"
 		SHIM
 	fi
+	cat >>"$dir/bin/curl" <<-'SHIM'
+		cat "$STUB_CURL_BODY"
+	SHIM
 	chmod +x "$dir/bin/curl"
 	case "$security_mode" in
 	ok)
 		cat >"$dir/bin/security" <<-'SHIM'
 			#!/usr/bin/env bash
 			printf '%s\n' '{"claudeAiOauth":{"accessToken":"stub-token"}}'
+		SHIM
+		chmod +x "$dir/bin/security"
+		;;
+	notoken)
+		cat >"$dir/bin/security" <<-'SHIM'
+			#!/usr/bin/env bash
+			printf '%s\n' '{"claudeAiOauth":{}}'
 		SHIM
 		chmod +x "$dir/bin/security"
 		;;
@@ -486,18 +504,25 @@ make_fallback_bin() {
 		SHIM
 		chmod +x "$dir/bin/security"
 		;;
-	absent) ;;
+	*)
+		printf 'make_fallback_bin: unknown security mode %q\n' "$security_mode" >&2
+		return 1
+		;;
 	esac
 }
 
 fallback_case() {
-	local dir="$FALLBACK_ROOT/$1"
+	local dir="$FALLBACK_ROOT/$1" security_mode="${2:-ok}"
 	mkdir -p "$dir/tmp"
-	make_fallback_bin "$dir" gate ok
+	make_fallback_bin "$dir" gate "$security_mode"
 }
 
-fallback_fetch() {
-	local dir="$FALLBACK_ROOT/$1" curl_exit="$2" body="$3" now="$4"
+# Runs the rest of the arguments in case $1's sandbox, with curl exiting $2 and
+# printing $3. The case directory is CLAUDE_CONFIG_DIR, so a .credentials.json
+# written there is the credentials file the fetch reads.
+in_fallback_sandbox() {
+	local dir="$FALLBACK_ROOT/$1" curl_exit="$2" body="$3"
+	shift 3
 	printf '%s' "$body" >"$dir/body"
 	printf '%s' "$curl_exit" >"$dir/curl-exit"
 	(
@@ -505,8 +530,38 @@ fallback_fetch() {
 		export PATH="$dir/bin:$PATH" TMPDIR="$dir/tmp" CLAUDE_CONFIG_DIR="$dir"
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
 		export STUB_ATTEMPTS="$dir/attempts" STUB_CURL_BODY="$dir/body" STUB_CURL_EXIT="$dir/curl-exit"
-		fetch_usage_fallback "$now"
+		"$@"
 	)
+}
+
+fallback_fetch() {
+	in_fallback_sandbox "$1" "$2" "$3" fetch_usage_fallback "$4"
+}
+
+render_main_stdin() {
+	printf '%s' "$MAIN_STDIN" | main
+}
+
+# Renders the line through the real usage fetch, unlike main_render, which stubs
+# it. Stderr lands in the case directory.
+fallback_render() {
+	in_fallback_sandbox "$1" "$2" "$3" render_main_stdin 2>"$FALLBACK_ROOT/$1/stderr"
+}
+
+run_script_from() {
+	local workdir="$1" script="$2"
+	cd "$workdir" && printf '%s' "$MAIN_STDIN" | bash "$script"
+}
+
+# Backdates the case's usage marker past every throttle and backoff, so the next
+# render fetches.
+expire_usage_marker() {
+	local cache
+	cache=$(compgen -G "$FALLBACK_ROOT/$1/tmp/claude-statusline-usage-*.json") || {
+		printf 'no usage cache in case %s\n' "$1" >&2
+		return 1
+	}
+	touch -t "$STALE_STAMP" "$cache.attempt"
 }
 
 seed_good_cache() {
@@ -520,13 +575,14 @@ seed_good_cache() {
 # the first still holds the lock. Sets concurrent_cache and concurrent_marker in
 # the caller's scope.
 setup_concurrent_race() {
+	local case_dir="$FALLBACK_ROOT/concurrent"
 	seed_good_cache concurrent
 	# shellcheck disable=SC2034  # used by concurrent_refresh in a subshell
-	concurrent_cache=$(compgen -G "$FALLBACK_ROOT/concurrent/tmp/claude-statusline-usage-*.json")
+	concurrent_cache=$(compgen -G "$case_dir/tmp/claude-statusline-usage-*.json")
 	# shellcheck disable=SC2034  # used by concurrent_refresh in a subshell
 	concurrent_marker="${concurrent_cache}.attempt"
 
-	cat >"$FALLBACK_ROOT/concurrent/bin/curl" <<-'SHIM'
+	cat >"$case_dir/bin/curl" <<-'SHIM'
 		#!/usr/bin/env bash
 		printf 'attempt\n' >>"$RACE_ATTEMPTS"
 		if [[ $(wc -l <"$RACE_ATTEMPTS") -eq 1 ]]; then
@@ -536,21 +592,22 @@ setup_concurrent_race() {
 		((code == 0)) || exit "$code"
 		cat "$RACE_CURL_BODY"
 	SHIM
-	chmod +x "$FALLBACK_ROOT/concurrent/bin/curl"
-	: >"$FALLBACK_ROOT/concurrent/attempts"
-	rm -f "$FALLBACK_ROOT/concurrent/release"
-	printf '%s' "$FRESH_USAGE_BODY" >"$FALLBACK_ROOT/concurrent/body"
-	printf '0' >"$FALLBACK_ROOT/concurrent/curl-exit"
+	chmod +x "$case_dir/bin/curl"
+	: >"$case_dir/attempts"
+	rm -f "$case_dir/release"
+	printf '%s' "$FRESH_USAGE_BODY" >"$case_dir/body"
+	printf '0' >"$case_dir/curl-exit"
 }
 
 concurrent_refresh() {
+	local case_dir="$FALLBACK_ROOT/concurrent"
 	(
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
-		export PATH="$FALLBACK_ROOT/concurrent/bin:$PATH"
+		export PATH="$case_dir/bin:$PATH"
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
-		export RACE_ATTEMPTS="$FALLBACK_ROOT/concurrent/attempts" RACE_CURL_BODY="$FALLBACK_ROOT/concurrent/body" RACE_CURL_EXIT="$FALLBACK_ROOT/concurrent/curl-exit"
+		export RACE_ATTEMPTS="$case_dir/attempts" RACE_CURL_BODY="$case_dir/body" RACE_CURL_EXIT="$case_dir/curl-exit"
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
-		export RACE_RELEASE="$FALLBACK_ROOT/concurrent/release"
+		export RACE_RELEASE="$case_dir/release"
 		# shellcheck disable=SC2154  # set by calling scope
 		refresh_usage_cache concurrent "$concurrent_cache" "$concurrent_marker" "$USAGE_BACKOFF_SECONDS" "$(date +%s)"
 	)
@@ -605,20 +662,21 @@ release_render() {
 	touch "$RECLAIM_DIR/release.$1"
 }
 
-wait_for_file() {
-	local path="$1" tries=0
-	until [[ -s "$path" ]]; do
-		((++tries < 100)) || return 1
-		sleep 0.05
+poll_until() {
+	local max_tries="$1" tries=0
+	shift
+	until "$@"; do
+		((++tries < max_tries)) || return 1
+		sleep "$POLL_INTERVAL_SECONDS"
 	done
 }
 
+wait_for_file() {
+	poll_until "$FILE_POLL_TRIES" test -s "$1"
+}
+
 wait_for_attempt() {
-	local id="$1" tries=0
-	until grep -qx "$id" "$RECLAIM_ATTEMPTS"; do
-		((++tries < 200)) || return 1
-		sleep 0.05
-	done
+	poll_until "$ATTEMPT_POLL_TRIES" grep -qx "$1" "$RECLAIM_ATTEMPTS"
 }
 
 require_stalled_render() {
@@ -638,50 +696,35 @@ make_lock_stale() {
 	find "$lock" -depth -exec touch -t "$STALE_STAMP" {} +
 }
 
-# A credential-file case: security_mode "fail" (security exits 1) or "absent"
-# (no security on PATH — the bin dir then carries the tools the lookup needs,
-# because cred_fetch runs it as the whole PATH). The file holds $token.
+# A credential-file case: the security shim (mode $3, "fail" by default) yields no
+# token, so the lookup falls back to the credentials file, which holds $token.
 cred_fallback_case() {
-	local case_name="$1" security_mode="$2" token="$3" dir tool path
+	local case_name="$1" token="$2" security_mode="${3:-fail}" dir
 	dir="$CRED_ROOT/$case_name"
 	make_fallback_bin "$dir" nogate "$security_mode"
-	if [[ "$security_mode" == absent ]]; then
-		for tool in jq cat bash; do
-			if path=$(command -v "$tool"); then
-				ln -sf "$path" "$dir/bin/$tool"
-			fi
-		done
-	fi
 	printf '{"claudeAiOauth":{"accessToken":"%s"}}' "$token" >"$dir/.credentials.json"
 	printf '%s' "$USAGE_BODY" >"$dir/body"
 }
 
-# Runs the payload lookup for a credential case. An "absent" case gets the bin
-# dir as its entire PATH so the host's own security cannot answer.
 cred_fetch() {
-	local case_name="$1" security_mode="$2" dir
+	local case_name="$1" dir
 	dir="$CRED_ROOT/$case_name"
 	(
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
 		export PATH="$dir/bin:$PATH" CLAUDE_CONFIG_DIR="$dir"
-		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
-		[[ "$security_mode" != absent ]] || export PATH="$dir/bin"
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
 		export STUB_ATTEMPTS="$dir/attempts" STUB_CURL_BODY="$dir/body" STUB_ARGS="$dir/args"
 		fetch_usage_payload default
 	)
 }
 
-# ---------------------------------------------------------------------------
-# Transcript fixtures
-# ---------------------------------------------------------------------------
-#
+# ── Transcript fixtures ──────────────────────────────────────────────────────
+
 # Records carry the fields the model lookup reads (type, isSidechain,
 # message.model); the rest of a real transcript record is irrelevant to it.
 
 assistant_record() {
-	local model="$1"
-	printf '{"isSidechain":false,"type":"assistant","message":{"role":"assistant","model":"%s"}}' "$model"
+	typed_record assistant "$1"
 }
 
 sidechain_record() {

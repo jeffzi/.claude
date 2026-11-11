@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# dirname rather than ${BASH_SOURCE[0]%/*}: run as `bash statusline.sh`, the path has
+# no slash to strip, and the expansion yields the file name itself.
+STATUSLINE_DIR=$(cd "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=SCRIPTDIR/sh-common.sh
+. "$STATUSLINE_DIR/sh-common.sh"
+
 readonly RESET=$'\033[0m'
 readonly GAUGE_SLOTS=5
 readonly QUARTERS_PER_SLOT=4
@@ -18,15 +24,19 @@ readonly COUNTDOWN_URGENT_SECONDS=3600
 # Code's own /usage polling, so spending it here makes /usage fail with a 429.
 # Poll it rarely, and back off further once it starts refusing.
 readonly USAGE_POLL_SECONDS=300
+readonly USAGE_FETCH_TIMEOUT_SECONDS=2
 readonly USAGE_BACKOFF_SECONDS=900
-# file_mtime's exit status for a stat that cannot answer at all, kept distinct from a
-# plain non-zero so callers can tell a broken tool from a file that is simply not there.
-readonly STAT_UNUSABLE_STATUS=3
 # fetch_usage_fallback's exit statuses for a usage cache or attempt marker that cannot be
 # written, and for a cache jq cannot read — each distinct from a plain non-zero ("no
 # data to show"), since both are a broken environment the line has to name.
 readonly USAGE_CACHE_UNWRITABLE_STATUS=4
 readonly USAGE_CACHE_UNREADABLE_STATUS=5
+# fetch_usage_payload's exit status for an account with no OAuth token anywhere: nothing
+# to fetch, which is neither a failure nor a reason to back off.
+readonly USAGE_NO_TOKEN_STATUS=6
+# fetch_usage_fallback's exit status when there is nothing to serve and the last attempt
+# failed, so the line can name the failure instead of reading as "no limits to show".
+readonly USAGE_FETCH_FAILED_STATUS=7
 # How much of the tail of a session transcript transcript_model_family reads. A
 # transcript grows without bound while the newest assistant record sits at its end, and
 # every render pays for whatever jq has to parse. Generous enough that a few large tool
@@ -35,7 +45,7 @@ readonly USAGE_CACHE_UNREADABLE_STATUS=5
 readonly TRANSCRIPT_TAIL_BYTES=262144
 
 # ╭────────────────────────────────────────────────────────────╮
-# │               Portable stat & hash utilities               │
+# │                  Portable hash utility                     │
 # ╰────────────────────────────────────────────────────────────╯
 
 # Portable SHA-256: reads stdin, emits the first 8 hex characters on stdout.
@@ -50,69 +60,65 @@ sha256_hex() {
 	fi
 }
 
-# Discovers whether stat speaks BSD (-f %m) or GNU (-c %Y), testing against the
-# script itself (guaranteed to exist), and sets STAT_FMT to the working flag and
-# format as two array elements — empty when neither form works, in which case
-# file_mtime returns STAT_UNUSABLE_STATUS for every existing file. An array, so
-# the flag and its value reach stat apart whatever IFS the caller runs under. A
-# function rather than inline probing so tests can re-probe under a stubbed PATH
-# without re-sourcing the script — re-sourcing trips the readonly declarations
-# above (fatal on bash 3.2).
-detect_stat_fmt() {
-	if stat -f %m "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
-		STAT_FMT=(-f %m)
-	elif stat -c %Y "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
-		STAT_FMT=(-c %Y)
-	else
-		STAT_FMT=()
-	fi
-}
-
-detect_stat_fmt
-
 # ╭────────────────────────────────────────────────────────────╮
 # │                Usage fetch, lock, and cache                │
 # ╰────────────────────────────────────────────────────────────╯
 
+# The OAuth access token on stdout, from Keychain service $1 or, when the Keychain
+# yields none, from credentials file $2. Exit USAGE_NO_TOKEN_STATUS when neither holds a
+# token, and 1 when the credentials file exists but cannot be read or parsed: that is a
+# broken credential, not an account without one.
+usage_oauth_token() {
+	local service="$1" cred_file="$2" entry token=""
+	if entry=$(security find-generic-password -s "$service" -w 2>/dev/null); then
+		token=$(printf '%s' "$entry" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null) || token=""
+	fi
+	if [[ -z "$token" ]]; then
+		[[ -e "$cred_file" ]] || return "$USAGE_NO_TOKEN_STATUS"
+		token=$(jq -r '.claudeAiOauth.accessToken // empty' "$cred_file" 2>/dev/null) || return 1
+		[[ -n "$token" ]] || return "$USAGE_NO_TOKEN_STATUS"
+	fi
+	printf '%s' "$token"
+}
+
 # Reads the OAuth usage endpoint for the account keyed by $1 and emits the stdin
 # .rate_limits shape on stdout (resets_at as epoch seconds).
 #
-# Emits nothing when the account has no token, the request fails, or the body
-# carries no .five_hour.utilization — the last is what the endpoint answers
-# with when it rate-limits, and mapping it would produce a well-formed payload
-# with null percentages in it. That last case exits zero (jq's `empty`), so
-# callers must check for empty output rather than a non-zero exit.
+# A window the endpoint reports as null — not open, or not part of the plan — is left
+# out, and a body with neither window open maps to `{}`.
+#
+# Exit USAGE_NO_TOKEN_STATUS when the account has no token, and 1 when the token lookup
+# or the request fails, or the body carries neither a five_hour nor a seven_day key.
+# `curl -s` exits 0 on an HTTP error, so the body check is what catches a 401 or a
+# rate-limit refusal; mapping either would serve an error as "no window open".
 fetch_usage_payload() {
-	local suffix="$1" service="Claude Code-credentials" token response
+	local suffix="$1" service="Claude Code-credentials" token response payload
 	[[ "$suffix" != "default" ]] && service="${service}-${suffix}"
-	local cred_file="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json"
-	token=$(security find-generic-password -s "$service" -w 2>/dev/null | jq -r '.claudeAiOauth.accessToken // empty') ||
-		token=$(jq -r '.claudeAiOauth.accessToken // empty' "$cred_file" 2>/dev/null) ||
-		return
-	[[ -n "$token" ]] || return 1
-	response=$(curl -s --max-time 2 \
+	token=$(usage_oauth_token "$service" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json") || return
+	response=$(curl -s --max-time "$USAGE_FETCH_TIMEOUT_SECONDS" \
 		-H "Authorization: Bearer $token" \
 		-H "anthropic-beta: oauth-2025-04-20" \
-		https://api.anthropic.com/api/oauth/usage 2>/dev/null) || return
-	printf '%s' "$response" | jq -c '
+		https://api.anthropic.com/api/oauth/usage 2>/dev/null) || return 1
+	payload=$(printf '%s' "$response" | jq -c '
 		def epoch: if . == null then null else (sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") | fromdateiso8601) end;
-		if .five_hour.utilization == null then empty else {
-			five_hour: {used_percentage: .five_hour.utilization, resets_at: (.five_hour.resets_at | epoch)},
-			seven_day: {used_percentage: .seven_day.utilization, resets_at: (.seven_day.resets_at | epoch)}
-		} end' 2>/dev/null
+		def window($name):
+			if .[$name].utilization == null then {}
+			else {($name): {used_percentage: .[$name].utilization, resets_at: (.[$name].resets_at | epoch)}} end;
+		if type == "object" and (has("five_hour") or has("seven_day"))
+		then window("five_hour") + window("seven_day")
+		else empty end' 2>/dev/null) || return 1
+	[[ -n "$payload" ]] || return 1
+	printf '%s' "$payload"
 }
 
 # The mtime of path $1 in epoch seconds on stdout. Exit 1 when the path is absent, which
 # is an ordinary condition here — an unclaimed lock, a first render with no marker yet —
-# and callers absorb it with a fallback. Exit STAT_UNUSABLE_STATUS when the path is there
-# but the startup probe found no usable stat format (STAT_FMT is empty): a broken
-# environment rather than a missing file, and callers report it instead.
+# and callers absorb it with a fallback. Exit SH_STAT_UNUSABLE when the path is there
+# but stat cannot read it: a broken environment rather than a missing file, and callers
+# report it instead.
 file_mtime() {
 	[[ -e "$1" ]] || return 1
-	if ((${#STAT_FMT[@]})); then
-		stat "${STAT_FMT[@]}" "$1" 2>/dev/null && return 0
-	fi
-	return "$STAT_UNUSABLE_STATUS"
+	sh_file_attr mtime "$1" || return "$SH_STAT_UNUSABLE"
 }
 
 # The path of the claim held inside the lock directory $1, or nothing when the lock
@@ -213,10 +219,24 @@ publish_usage_payload() {
 	# Claim the window pessimistically: a fetch that dies mid-flight must not invite the
 	# next render, a second later, to try again.
 	printf 'failed' 2>/dev/null >"$marker" || return "$USAGE_CACHE_UNWRITABLE_STATUS"
-	payload=$(fetch_usage_payload "$suffix") || payload=""
-	[[ -n "$payload" ]] || return 1
-	printf '%s' "$payload" 2>/dev/null >"$staging" || return "$USAGE_CACHE_UNWRITABLE_STATUS"
-	mv "$staging" "$cache" 2>/dev/null || return "$USAGE_CACHE_UNWRITABLE_STATUS"
+	local fetch_status=0
+	payload=$(fetch_usage_payload "$suffix") || fetch_status=$?
+	if ((fetch_status == USAGE_NO_TOKEN_STATUS)); then
+		# No token is nothing to retry harder: the plain poll interval applies, not the
+		# failure backoff, and the line shows no error.
+		printf 'no-token' 2>/dev/null >"$marker" || return "$USAGE_CACHE_UNWRITABLE_STATUS"
+		return 1
+	fi
+	((fetch_status == 0)) || return 1
+	if [[ "$payload" == "{}" ]]; then
+		# No window open is a successful answer with nothing to serve. Dropping the cache
+		# rather than storing the empty payload keeps an earlier, expired cache from
+		# reading as "no window left" and refetching on every render.
+		rm -f "$cache" 2>/dev/null || return "$USAGE_CACHE_UNWRITABLE_STATUS"
+	else
+		printf '%s' "$payload" 2>/dev/null >"$staging" || return "$USAGE_CACHE_UNWRITABLE_STATUS"
+		mv "$staging" "$cache" 2>/dev/null || return "$USAGE_CACHE_UNWRITABLE_STATUS"
+	fi
 	# The ok verdict is earned only when the payload actually reached the cache — a
 	# failed write must leave the failed claim (and its longer backoff) in place rather
 	# than republish stale data as fresh.
@@ -270,6 +290,13 @@ filter_expired_windows() {
 	' "$cache"
 }
 
+# The verdict recorded in attempt marker $1, or nothing when it is absent. cat rather
+# than $(<): when the marker is absent, bash 5.2 exits the shell on the failed $(<)
+# redirection despite the || fallback (fixed in 5.3, absent in 3.2).
+usage_verdict() {
+	cat "$1" 2>/dev/null || true
+}
+
 # Team-plan sessions never receive the unified rate-limit headers, so stdin lacks
 # .rate_limits entirely even though the data exists server-side
 # (anthropics/claude-code#63659). Fetch it from the OAuth usage endpoint instead,
@@ -289,12 +316,10 @@ fetch_usage_fallback() {
 	marker="${cache}.attempt"
 	last_attempt=$(file_mtime "$marker") || {
 		local mtime_status=$?
-		((mtime_status == STAT_UNUSABLE_STATUS)) && return "$mtime_status"
+		((mtime_status == SH_STAT_UNUSABLE)) && return "$mtime_status"
 		last_attempt=0
 	}
-	# cat rather than $(<): when the marker is absent, bash 5.2 exits the shell on the
-	# failed $(<) redirection despite the || fallback (fixed in 5.3, absent in 3.2).
-	verdict=$(cat "$marker" 2>/dev/null) || verdict=""
+	verdict=$(usage_verdict "$marker")
 	throttle=$USAGE_POLL_SECONDS
 	[[ "$verdict" == "failed" ]] && throttle=$USAGE_BACKOFF_SECONDS
 
@@ -302,28 +327,31 @@ fetch_usage_fallback() {
 	if ((now - last_attempt >= throttle)); then
 		should_refresh=1
 	elif [[ -f "$cache" ]] && [[ "$verdict" != "failed" ]]; then
-		# When every cached window has expired, the poll throttle guards data no
-		# render can use — bypass it to pull a fresh window.  The failure backoff
-		# still applies: a down endpoint stays down regardless of expiry.
-		local all_expired
-		all_expired=$(jq --argjson now "$now" '
-			[.five_hour.resets_at, .seven_day.resets_at]
-			| map(select(. != null))
-			| length > 0 and all(. < $now)
-		' "$cache" 2>/dev/null) || all_expired="false"
-		[[ "$all_expired" == "true" ]] && should_refresh=1
+		# When the cache has no window left to serve, the poll throttle guards data no
+		# render can use — bypass it to pull a fresh window. The failure backoff still
+		# applies: a down endpoint stays down regardless of expiry. A cache jq cannot
+		# read keeps the throttle; the read below reports it.
+		local servable
+		if servable=$(filter_expired_windows "$cache" "$now" 2>/dev/null) && [[ -z "$servable" ]]; then
+			should_refresh=1
+		fi
 	fi
 	if ((should_refresh)); then
 		refresh_usage_cache "$suffix" "$cache" "$marker" "$throttle" "$now" || return $?
+		verdict=$(usage_verdict "$marker")
 	fi
 
-	[[ -f "$cache" ]] || return 1
+	# Nothing to serve: a failed last attempt is named, anything else renders nothing.
+	local nothing_status=1
+	[[ "$verdict" == "failed" ]] && nothing_status=$USAGE_FETCH_FAILED_STATUS
+
+	[[ -f "$cache" ]] || return "$nothing_status"
 
 	# Stale rate-limit data from an earlier window would misrepresent current usage.
 	# When every window is filtered, there is nothing to render.
 	local filtered
 	filtered=$(filter_expired_windows "$cache" "$now" 2>/dev/null) || return "$USAGE_CACHE_UNREADABLE_STATUS"
-	[[ -n "$filtered" ]] || return 1
+	[[ -n "$filtered" ]] || return "$nothing_status"
 	printf '%s' "$filtered"
 }
 
@@ -474,8 +502,8 @@ format_context_bar() {
 	color=$(usage_color "$pct")
 	# Quarter-slots filled across the gauge, capped so a used_percentage that
 	# overflows past 100 still saturates the bar rather than overrunning it.
-	local quarters=$((pct * GAUGE_SLOTS * QUARTERS_PER_SLOT / 100))
-	local max_quarters=$((QUARTERS_PER_SLOT * GAUGE_SLOTS))
+	local max_quarters=$((GAUGE_SLOTS * QUARTERS_PER_SLOT))
+	local quarters=$((pct * max_quarters / 100))
 	((quarters > max_quarters)) && quarters=$max_quarters
 	for ((slot = 0; slot < GAUGE_SLOTS; slot++)); do
 		local q=$((quarters - slot * QUARTERS_PER_SLOT))
@@ -682,7 +710,7 @@ main() {
 		# worth the line rather than a degraded render that looks healthy. A cache that
 		# cannot be written fails the same way: every render would refetch.
 		case "$fallback_status" in
-		"$STAT_UNUSABLE_STATUS")
+		"$SH_STAT_UNUSABLE")
 			render_failure "unusable required tool: stat"
 			return 0
 			;;
@@ -691,6 +719,9 @@ main() {
 			return 0
 			;;
 		"$USAGE_CACHE_UNREADABLE_STATUS") limits_error="cache unreadable" ;;
+		# A stdin payload that would not parse is the primary source's failure; keep
+		# naming it over the fallback's.
+		"$USAGE_FETCH_FAILED_STATUS") limits_error=${limits_error:-fetch failed} ;;
 		esac
 		# The fallback's live data outranks a stdin payload that would not parse.
 		[[ -z "$rate_limits_json" ]] || limits_error=""
