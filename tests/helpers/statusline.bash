@@ -6,6 +6,8 @@ SCRIPT="$TEST_DIR/../scripts/statusline.sh"
 
 # shellcheck source=../../scripts/statusline.sh disable=SC1091  # a plain `shellcheck` run does not follow sourced files; only `-x` does
 . "$SCRIPT"
+# shellcheck source=stat_shim.bash disable=SC1091  # a plain `shellcheck` run does not follow sourced files; only `-x` does
+. "$TEST_DIR/helpers/stat_shim.bash"
 
 EMPTY="○"
 HALF="◎"
@@ -14,6 +16,9 @@ FILLED="●"
 readonly POLL_INTERVAL_SECONDS=0.05
 readonly FILE_POLL_TRIES=100
 readonly ATTEMPT_POLL_TRIES=200
+# How long a race shim holds its fetch before giving up: a test that fails before
+# releasing it must not leave the shim polling for a file nothing will create.
+readonly RACE_HOLD_TRIES=400
 
 # ── Assertion helpers ────────────────────────────────────────────────────────
 
@@ -22,15 +27,6 @@ readonly ATTEMPT_POLL_TRIES=200
 
 strip_ansi() {
 	sed $'s/\033\\[[0-9;]*m//g'
-}
-
-assert_glyphs() {
-	local pct="$1" expected="$2" actual
-	actual=$(format_context_bar "$pct" | strip_ansi)
-	if [[ "$actual" != "$expected" ]]; then
-		printf 'expected: %s\n  actual: %s\n' "$expected" "$actual" >&2
-		return 1
-	fi
 }
 
 assert_bar() {
@@ -179,7 +175,7 @@ assert_whole_line() {
 # that cannot be computed is not a render failure.
 assert_unannotated_render() {
 	local case_name="$1" stdin="$2" status=0 out plain err
-	out=$(main_render "$case_name" "$stdin" "$MAIN_PAYLOAD") || status=$?
+	out=$(main_render "$case_name" "$stdin" "$MAIN_USAGE_BODY") || status=$?
 	plain=$(printf '%s' "$out" | strip_ansi)
 	assert_contains "$plain" "Opus 4.6 (high)" || return 1
 	assert_not_contains "$plain" "→" || return 1
@@ -267,14 +263,14 @@ assert_fallback_json() {
 }
 
 # The curl shim logs its argv per call and appends whatever it reads on stdin; one
-# call, with the expected bearer token on stdin, is what proves the credential was
-# read and its token forwarded.
+# call, with the expected bearer token on stdin and nowhere on argv, is what proves the
+# credential was read and its token forwarded without reaching `ps` or /proc.
 assert_cred_token_sent() {
 	local case_name="$1" token="$2" args sent
 	args=$(<"$CRED_ROOT/$case_name/args")
 	sent=$(cat "$CRED_ROOT/$case_name/stdin" 2>/dev/null || true)
-	if [[ $(printf '%s\n' "$args" | grep -c .) != 1 || "$sent" != *"Authorization: Bearer $token"* ]]; then
-		printf '%s: expected one curl call bearing %q on stdin\n  curl argv: %q\n  curl stdin: %q\n' \
+	if [[ $(printf '%s\n' "$args" | grep -c .) != 1 || "$sent" != *"Authorization: Bearer $token"* || "$args" == *"$token"* ]]; then
+		printf '%s: expected one curl call bearing %q on stdin and off argv\n  curl argv: %q\n  curl stdin: %q\n' \
 			"$case_name" "$token" "$args" "$sent" >&2
 		return 1
 	fi
@@ -389,53 +385,62 @@ stdin_without() {
 	printf '%s' "$stdin" | jq -c "del($filter)"
 }
 
+# Renders the line in case $1's sandbox from stdin $2. The curl shim answers with
+# usage endpoint body $3, or exits 7 when $3 is empty; the security shim supplies a
+# token, so the real usage lookup runs end to end without reaching the network.
 main_render() {
-	local case_name="$1" stdin_json="$2" stub_payload="${3-}" dir
+	local case_name="$1" stdin_json="$2" endpoint_body="${3-}" dir curl_exit=0
 	dir="$MAIN_CASES/$case_name"
-	mkdir -p "$dir"
+	make_fallback_bin "$dir" gate ok
+	[[ -n "$endpoint_body" ]] || curl_exit=7
+	printf '%s' "$endpoint_body" >"$dir/body"
+	printf '%s' "$curl_exit" >"$dir/curl-exit"
 	(
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
-		export TMPDIR="$dir" CLAUDE_CONFIG_DIR="$dir"
-		if [[ -n "$stub_payload" ]]; then
-			# shellcheck disable=SC2329  # stub override for test
-			fetch_usage_payload() { printf '%s' "$stub_payload"; }
-		else
-			# shellcheck disable=SC2329  # stub override for test
-			fetch_usage_payload() { return 1; }
-		fi
+		export PATH="$dir/bin:$PATH" TMPDIR="$dir" CLAUDE_CONFIG_DIR="$dir"
+		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
+		export STUB_ATTEMPTS="$dir/attempts" STUB_CURL_BODY="$dir/body" STUB_CURL_EXIT="$dir/curl-exit"
 		printf '%s' "$stdin_json" | main
 	) 2>"$dir/stderr"
 }
 
 main_line() {
-	main_render happy-path "$MAIN_STDIN" "$MAIN_PAYLOAD"
+	main_render happy-path "$MAIN_STDIN" "$MAIN_USAGE_BODY"
 }
 
+# Renders with PATH holding only the host tools not named in $2. curl is `false`,
+# so a render that got past the dependency check still never reaches the network.
 missing_dep_render() {
 	local case_name="$1" exclude=" $2 " tool path dir
 	dir="$MAIN_CASES/missing-$case_name"
 	mkdir -p "$dir/bin"
-	for tool in jq curl shasum sha256sum date stat; do
+	for tool in jq shasum sha256sum date stat; do
 		if [[ "$exclude" != *" $tool "* ]] && path=$(command -v "$tool"); then
 			ln -sf "$path" "$dir/bin/$tool"
 		fi
 	done
+	ln -sf "$(type -P false)" "$dir/bin/curl"
 	(
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
 		export PATH="$dir/bin" TMPDIR="$dir" CLAUDE_CONFIG_DIR="$dir"
-		# shellcheck disable=SC2329  # stub override for test
-		fetch_usage_payload() { printf '%s' "$MAIN_PAYLOAD"; }
 		printf '%s' "$MAIN_STDIN" | main
 	) 2>"$dir/stderr"
 }
 
-# The shim shadows the host `stat` when its directory is prepended to PATH.
-# The caller supplies the full script in $2, shebang included.
-make_stat_shim() {
-	local dir="$1" body="$2"
+# sha256_hex on a fixed input with PATH holding only hash tool $1 (and the cut it pipes
+# through), so the branch for that tool is the one that runs.
+sha256_hex_with_only() {
+	local tool="$1" dir path
+	path=$(command -v "$tool") || return 1
+	dir="$MAIN_CASES/sha256-only-$tool"
 	mkdir -p "$dir"
-	printf '%s\n' "$body" >"$dir/stat"
-	chmod +x "$dir/stat"
+	ln -sf "$path" "$dir/$tool"
+	ln -sf "$(command -v cut)" "$dir/cut"
+	(
+		# shellcheck disable=SC2030,SC2031  # export scoped to subshell
+		export PATH="$dir"
+		printf 'hello' | sha256_hex
+	)
 }
 
 unusable_stat_render() {
@@ -445,7 +450,7 @@ unusable_stat_render() {
 	(
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
 		export PATH="$dir/bin:$PATH"
-		main_render "$case_name" "$MAIN_STDIN" "$MAIN_PAYLOAD"
+		main_render "$case_name" "$MAIN_STDIN" "$MAIN_USAGE_BODY"
 	)
 }
 
@@ -550,8 +555,7 @@ render_main_stdin() {
 	printf '%s' "$MAIN_STDIN" | main
 }
 
-# Renders the line through the real usage fetch, unlike main_render, which stubs
-# it. Stderr lands in the case directory.
+# Renders the line in a fallback case's sandbox. Stderr lands in the case directory.
 fallback_render() {
 	in_fallback_sandbox "$1" "$2" "$3" render_main_stdin 2>"$FALLBACK_ROOT/$1/stderr"
 }
@@ -559,17 +563,6 @@ fallback_render() {
 run_script_from() {
 	local workdir="$1" script="$2"
 	cd "$workdir" && printf '%s' "$MAIN_STDIN" | bash "$script"
-}
-
-# Backdates the case's usage marker past every throttle and backoff, so the next
-# render fetches.
-expire_usage_marker() {
-	local cache
-	cache=$(compgen -G "$FALLBACK_ROOT/$1/tmp/claude-statusline-usage-*.json") || {
-		printf 'no usage cache in case %s\n' "$1" >&2
-		return 1
-	}
-	touch -t "$STALE_STAMP" "$cache.attempt"
 }
 
 seed_good_cache() {
@@ -595,7 +588,11 @@ setup_concurrent_race() {
 		cat >/dev/null
 		printf 'attempt\n' >>"$RACE_ATTEMPTS"
 		if [[ $(wc -l <"$RACE_ATTEMPTS") -eq 1 ]]; then
-			until [[ -f "$RACE_RELEASE" ]]; do sleep 0.05; done
+			tries=0
+		until [[ -f "$RACE_RELEASE" ]]; do
+			((++tries < RACE_HOLD_TRIES)) || exit 99
+			sleep 0.05
+		done
 		fi
 		code=$(cat "$RACE_CURL_EXIT")
 		((code == 0)) || exit "$code"
@@ -616,14 +613,21 @@ concurrent_refresh() {
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
 		export RACE_ATTEMPTS="$case_dir/attempts" RACE_CURL_BODY="$case_dir/body" RACE_CURL_EXIT="$case_dir/curl-exit"
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
-		export RACE_RELEASE="$case_dir/release"
+		export RACE_RELEASE="$case_dir/release" RACE_HOLD_TRIES
 		# shellcheck disable=SC2154  # set by calling scope
 		refresh_usage_cache concurrent "$concurrent_cache" "$concurrent_marker" "$USAGE_BACKOFF_SECONDS" "$(date +%s)"
 	)
 }
 
+# Seeds reclaim case $1 with a good cache and a curl shim that, given a hold file,
+# blocks until it appears. Points RECLAIM_DIR, RECLAIM_TMP and RECLAIM_ATTEMPTS at
+# the case and sets reclaim_cache and reclaim_marker, all in the caller's scope.
 setup_reclaim_race() {
-	seed_good_cache reclaim
+	local case_name="reclaim-$1"
+	RECLAIM_DIR="$FALLBACK_ROOT/$case_name"
+	RECLAIM_TMP="$RECLAIM_DIR/tmp"
+	RECLAIM_ATTEMPTS="$RECLAIM_DIR/attempts"
+	seed_good_cache "$case_name"
 	# shellcheck disable=SC2034  # used by reclaim_refresh in a subshell
 	reclaim_cache=$(compgen -G "$RECLAIM_TMP/claude-statusline-usage-*.json")
 	# shellcheck disable=SC2034  # used by reclaim_refresh in a subshell
@@ -634,7 +638,11 @@ setup_reclaim_race() {
 		cat >/dev/null
 		printf '%s\n' "$RACE_ID" >>"$RACE_ATTEMPTS"
 		if [[ -n "${RACE_HOLD:-}" ]]; then
-			until [[ -f "$RACE_HOLD" ]]; do sleep 0.05; done
+			tries=0
+			until [[ -f "$RACE_HOLD" ]]; do
+				((++tries < RACE_HOLD_TRIES)) || exit 99
+				sleep 0.05
+			done
 		fi
 		code=$(cat "$RACE_CURL_EXIT")
 		((code == 0)) || exit "$code"
@@ -653,7 +661,7 @@ reclaim_refresh() {
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
 		export PATH="$RECLAIM_DIR/bin:$PATH" TMPDIR="$RECLAIM_TMP"
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
-		export RACE_ID="$id" RACE_ATTEMPTS="$RECLAIM_ATTEMPTS" RACE_CURL_BODY="$RECLAIM_DIR/body" RACE_CURL_EXIT="$RECLAIM_DIR/curl-exit"
+		export RACE_ID="$id" RACE_ATTEMPTS="$RECLAIM_ATTEMPTS" RACE_CURL_BODY="$RECLAIM_DIR/body" RACE_CURL_EXIT="$RECLAIM_DIR/curl-exit" RACE_HOLD_TRIES
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
 		[[ -z "$hold" ]] || export RACE_HOLD="$RECLAIM_DIR/release.$id"
 		# shellcheck disable=SC2154  # set by calling scope
@@ -670,6 +678,22 @@ run_render() {
 
 release_render() {
 	touch "$RECLAIM_DIR/release.$1"
+}
+
+# Leaves reclaim case $1 with a stalled render whose lock went stale and a second
+# render that reclaimed it, both held at their fetch. Sets stalled_pid and
+# reclaimer_pid, plus everything setup_reclaim_race sets, in the caller's scope.
+start_reclaim_race() {
+	setup_reclaim_race "$1"
+	reclaim_refresh stalled hold &
+	# shellcheck disable=SC2034  # waited on by the calling test
+	stalled_pid=$!
+	require_stalled_render stalled
+	make_lock_stale
+	reclaim_refresh reclaimer hold &
+	# shellcheck disable=SC2034  # waited on by the calling test
+	reclaimer_pid=$!
+	require_stalled_render reclaimer
 }
 
 poll_until() {

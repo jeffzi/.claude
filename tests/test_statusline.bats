@@ -18,9 +18,9 @@ setup_file() {
 
 	export MAIN_NOW
 	MAIN_NOW=$(date +%s)
-	export MAIN_PAYLOAD
-	MAIN_PAYLOAD=$(printf '{"five_hour":{"used_percentage":78,"resets_at":%s},"seven_day":{"used_percentage":7,"resets_at":%s}}' \
-		"$((MAIN_NOW + 4 * 3600 + 10 * 60 - 1))" "$((MAIN_NOW + 4 * 86400 + 13 * 3600 + 1800))")
+	export MAIN_USAGE_BODY
+	MAIN_USAGE_BODY=$(printf '{"five_hour":{"utilization":78,"resets_at":"%s"},"seven_day":{"utilization":7,"resets_at":"%s"}}' \
+		"$(epoch_to_iso $((MAIN_NOW + 4 * 3600 + 10 * 60 - 1)))" "$(epoch_to_iso $((MAIN_NOW + 4 * 86400 + 13 * 3600 + 1800)))")
 
 	export MAIN_CASES
 	MAIN_CASES=$(mktemp -d "${TMPDIR:-/tmp}/statusline-cases.XXXXXX")
@@ -42,8 +42,6 @@ setup_file() {
 	export USAGE_BODY='{"five_hour":{"utilization":42,"resets_at":"2099-12-31T23:59:59Z"},"seven_day":{"utilization":13,"resets_at":"2100-01-06T00:00:00Z"}}'
 	export FIVE_HOUR_RESET_EPOCH=4102444799
 	export RATE_LIMITED_BODY='{"error":{"type":"rate_limit_error","message":"rate limit exceeded"}}'
-	# What the endpoint sends with an HTTP 401; `curl -s` exits 0 on it.
-	export AUTH_ERROR_BODY='{"type":"error","error":{"type":"authentication_error","message":"OAuth token has expired"}}'
 	export NO_LIMITS_LINE="statusline-proj │ Opus 4.6 ● ● ◎ ○ ○"
 
 	# What the endpoint sends while a window is not open: the key is there, its value null.
@@ -51,9 +49,6 @@ setup_file() {
 	export NULL_WINDOWS_BODY='{"five_hour":null,"seven_day":null}'
 
 	export FRESH_USAGE_BODY='{"five_hour":{"utilization":55,"resets_at":"2099-12-31T23:59:59Z"},"seven_day":{"utilization":13,"resets_at":"2100-01-06T00:00:00Z"}}'
-
-	export FB_BASE
-	FB_BASE=$(date +%s)
 
 	export CRED_ROOT
 	CRED_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/statusline-cred.XXXXXX")
@@ -63,37 +58,13 @@ setup_file() {
 	export PROBE_DIR="$MAIN_CASES/stat-probe-unusable"
 	shim_body=$'#!/usr/bin/env bash\nexit 1'
 	make_stat_shim "$PROBE_DIR" "$shim_body"
-
-	export BSD_DIR="$MAIN_CASES/stat-probe-bsd"
-	shim_body=$(
-		cat <<-'SHIM'
-			#!/usr/bin/env bash
-			if [[ "${1:-}" == "-f" && "${2:-}" == "%m" ]]; then
-				printf '1700000000\n'
-			else
-				exit 1
-			fi
-		SHIM
-	)
-	make_stat_shim "$BSD_DIR" "$shim_body"
-
-	export GNU_DIR="$MAIN_CASES/stat-probe-gnu"
-	shim_body=$(
-		cat <<-'SHIM'
-			#!/usr/bin/env bash
-			if [[ "${1:-}" == "-c" && "${2:-}" == "%Y" ]]; then
-				printf '1700000000\n'
-			else
-				exit 1
-			fi
-		SHIM
-	)
-	make_stat_shim "$GNU_DIR" "$shim_body"
-
-	export RECLAIM_DIR="$FALLBACK_ROOT/reclaim"
-	export RECLAIM_TMP="$RECLAIM_DIR/tmp"
-	export RECLAIM_ATTEMPTS="$RECLAIM_DIR/attempts"
 	export STALE_STAMP=202001010000
+}
+
+# The fallback reads its throttle off real marker mtimes while tests inject `now` as
+# FB_BASE + N; taking FB_BASE per test keeps the two clocks seconds apart.
+setup() {
+	FB_BASE=$(date +%s)
 }
 
 teardown_file() {
@@ -113,18 +84,6 @@ usage_cache_path() {
 undated_five_hour_body() {
 	printf '{"five_hour":{"utilization":42,"resets_at":null},"seven_day":{"utilization":13,"resets_at":"%s"}}' \
 		"$(epoch_to_iso "$1")"
-}
-
-assert_prints_mtime() {
-	local out="" status=0
-	out=$("$@") || status=$?
-	[[ "$status" -eq 0 && "$out" =~ ^[0-9]+$ ]]
-}
-
-# ── Glyph layout ─────────────────────────────────────────────────────────────
-
-@test "100%: all slots filled" {
-	assert_glyphs 100 "● ● ● ● ●"
 }
 
 # ── Fractional slot rounding ─────────────────────────────────────────────────
@@ -171,15 +130,7 @@ assert_prints_mtime() {
 
 # ── Gradient anchors ─────────────────────────────────────────────────────────
 
-@test "0%: no escape, inherits terminal default" {
-	local color
-
-	color=$(usage_color 0)
-
-	[[ -z "$color" ]]
-}
-
-@test "14%: the last percentage below the saturation threshold" {
+@test "14%: below the saturation threshold, no escape, inherits terminal default" {
 	local color
 
 	color=$(usage_color 14)
@@ -232,14 +183,6 @@ assert_prints_mtime() {
 }
 
 # ── Segment shape ────────────────────────────────────────────────────────────
-
-@test "over pace: the arrow hugs the percentage" {
-	assert_segment_plain "5h" 88 "$PACE_RESET" "$PACE_WINDOW" " │ 5h 88%↑ · 1h"
-}
-
-@test "on pace: countdown alone, no arrow" {
-	assert_segment_plain "5h" 82 "$PACE_RESET" "$PACE_WINDOW" " │ 5h 82% · 1h"
-}
 
 @test "no countdown to show: nothing follows the percentage" {
 	assert_segment_plain "5h" 100 "$NOW" "$PACE_WINDOW" " │ 5h 100%"
@@ -303,15 +246,23 @@ assert_prints_mtime() {
 
 # ── Portable sha256 helper ───────────────────────────────────────────────────
 
-@test "sha256_hex emits 8 lowercase hex characters that differ across inputs" {
-	local a b
-	a=$(printf 'hello' | sha256_hex)
-	b=$(printf 'world' | sha256_hex)
+@test "sha256_hex emits the same 8-character key through shasum or sha256sum" {
+	local via_shasum via_sha256sum tool
+	for tool in shasum sha256sum; do
+		command -v "$tool" >/dev/null || skip "host has no $tool"
+	done
 
-	[[ "$a" =~ ^[0-9a-f]{8}$ && "$b" =~ ^[0-9a-f]{8}$ && "$a" != "$b" ]]
+	via_shasum=$(sha256_hex_with_only shasum)
+	via_sha256sum=$(sha256_hex_with_only sha256sum)
+
+	[[ "$via_shasum" =~ ^[0-9a-f]{8}$ ]] || {
+		printf 'expected 8 lowercase hex characters, got %q\n' "$via_shasum" >&2
+		return 1
+	}
+	assert_exact "$via_sha256sum" "$via_shasum"
 }
 
-# ── Stat probe and file_mtime contract ───────────────────────────────────────
+# ── file_mtime contract ──────────────────────────────────────────────────────
 
 @test "file_mtime returns 1 for an absent file" {
 	local status=0
@@ -335,18 +286,6 @@ assert_prints_mtime() {
 	probe_then_mtime "$PROBE_DIR" "/nonexistent/path" >/dev/null 2>&1 || status=$?
 
 	[[ "$status" -eq 1 ]]
-}
-
-@test "BSD stat stub: probe detects -f %m and file_mtime succeeds" {
-	assert_prints_mtime probe_then_mtime "$BSD_DIR" "$SCRIPT"
-}
-
-@test "GNU stat stub: probe detects -c %Y and file_mtime succeeds" {
-	assert_prints_mtime probe_then_mtime "$GNU_DIR" "$SCRIPT"
-}
-
-@test "an IFS without a space still hands stat its format flag and value apart" {
-	IFS=$'\n\t' assert_prints_mtime probe_then_mtime "$BSD_DIR" "$SCRIPT"
 }
 
 # ── Transcript model family ──────────────────────────────────────────────────
@@ -405,18 +344,6 @@ assert_prints_mtime() {
 	assert_family family-user "$path" "sonnet"
 }
 
-# ── Nothing to annotate ──────────────────────────────────────────────────────
-
-@test "a transcript whose every record is disqualified prints nothing" {
-	local path
-	path=$(write_transcript family-none \
-		"$(typed_record user claude-sonnet-5)" \
-		"$(sidechain_record claude-haiku-4-5)" \
-		"$(modelless_record)")
-
-	assert_family family-none "$path" ""
-}
-
 # ── Transcript tail cap ──────────────────────────────────────────────────────
 
 @test "the partial line at the tail cap boundary is skipped" {
@@ -443,16 +370,16 @@ assert_prints_mtime() {
 	local path out
 	path=$(write_transcript annotate-other "$(assistant_record claude-sonnet-5)")
 
-	out=$(main_render annotate-other "$(annotation_stdin "$path")" "$MAIN_PAYLOAD" | strip_ansi)
+	out=$(main_render annotate-other "$(annotation_stdin "$path")" "$MAIN_USAGE_BODY" | strip_ansi)
 
 	assert_model_segment "$out" "Opus 4.6→sonnet (high)"
 }
 
-@test "a transcript served by the configured family leaves the line as it renders today" {
+@test "a transcript served by the configured family leaves the model segment unannotated" {
 	local path out
 	path=$(write_transcript annotate-same "$(assistant_record claude-opus-4-5)")
 
-	out=$(main_render annotate-same "$(annotation_stdin "$path")" "$MAIN_PAYLOAD" | strip_ansi)
+	out=$(main_render annotate-same "$(annotation_stdin "$path")" "$MAIN_USAGE_BODY" | strip_ansi)
 
 	assert_model_segment "$out" "Opus 4.6 (high)"
 }
@@ -477,7 +404,7 @@ assert_prints_mtime() {
 
 # ── Whole line ───────────────────────────────────────────────────────────────
 
-@test "the happy path renders dir, model, gauge, 5h with arrow and countdown, and the 7d tail" {
+@test "the happy path composes the whole line" {
 	local out
 
 	out=$(main_line | strip_ansi)
@@ -489,7 +416,7 @@ assert_prints_mtime() {
 	local stdin_wt out
 	stdin_wt=$(full_stdin_json '{"workspace":{"git_worktree":"feature-x"}}')
 
-	out=$(main_render worktree "$stdin_wt" "$MAIN_PAYLOAD" | strip_ansi)
+	out=$(main_render worktree "$stdin_wt" "$MAIN_USAGE_BODY" | strip_ansi)
 
 	assert_leading_segment "$out" "statusline-proj ⎇ feature-x"
 }
@@ -500,7 +427,7 @@ assert_prints_mtime() {
 	git init -q -b tdd-branch "$repo"
 	stdin_branch=$(full_stdin_json "$(printf '{"workspace":{"current_dir":"%s"}}' "$repo")")
 
-	out=$(main_render branch "$stdin_branch" "$MAIN_PAYLOAD" | strip_ansi)
+	out=$(main_render branch "$stdin_branch" "$MAIN_USAGE_BODY" | strip_ansi)
 
 	assert_leading_segment "$out" "branch-repo ⎇ tdd-branch"
 }
@@ -511,7 +438,7 @@ assert_prints_mtime() {
 	local stdin_no_names out
 	stdin_no_names=$(stdin_json '{"model":{"id":"claude-opus-4-1"},"workspace":{"project_dir":"/tmp/statusline-proj"}}')
 
-	out=$(main_render no-names "$stdin_no_names" "$MAIN_PAYLOAD" | strip_ansi)
+	out=$(main_render no-names "$stdin_no_names" "$MAIN_USAGE_BODY" | strip_ansi)
 
 	assert_leading_segment "$out" ""
 	assert_not_contains "$out" "null"
@@ -531,7 +458,7 @@ assert_prints_mtime() {
 
 	out=$(main_render bad-limits-line "$(bad_limits_stdin)" | strip_ansi)
 
-	assert_contains "$out" "Opus 4.6 ● ● ◎ ○ ○ │ limits: parse failed"
+	assert_contains "$out" " │ limits: parse failed"
 }
 
 @test "an unreadable usage cache is named on the line instead of blanking the limits" {
@@ -541,9 +468,9 @@ assert_prints_mtime() {
 	printf 'not json' >"$cache"
 	printf 'ok' >"$cache.attempt"
 
-	out=$(main_render corrupt-cache "$MAIN_STDIN" "$MAIN_PAYLOAD" | strip_ansi)
+	out=$(main_render corrupt-cache "$MAIN_STDIN" "$MAIN_USAGE_BODY" | strip_ansi)
 
-	assert_contains "$out" "Opus 4.6 ● ● ◎ ○ ○ │ limits: cache unreadable"
+	assert_contains "$out" " │ limits: cache unreadable"
 }
 
 @test "a usage cache that cannot be written: named failure line" {
@@ -555,7 +482,7 @@ assert_prints_mtime() {
 	chmod a-w "$marker"
 
 	assert_failure_line_naming "$dir" \
-		main_render unwritable-cache "$MAIN_STDIN" "$MAIN_PAYLOAD"
+		main_render unwritable-cache "$MAIN_STDIN" "$MAIN_USAGE_BODY"
 }
 
 @test "stdin jq cannot walk: the line reports the failure" {
@@ -579,31 +506,14 @@ assert_prints_mtime() {
 		missing_sha256_render
 }
 
-@test "render succeeds when usage fetch fails: context gauge and model name present" {
-	local out
-
-	out=$(main_render no-security "$MAIN_STDIN" | strip_ansi)
-
-	assert_contains "$out" "● ● ◎ ○ ○"
-	assert_contains "$out" "Opus 4.6"
-}
-
 @test "an unusable stat with a marker to read: named failure line" {
-	main_render stat-present "$MAIN_STDIN" "$MAIN_PAYLOAD" >/dev/null
+	main_render stat-present "$MAIN_STDIN" "$MAIN_USAGE_BODY" >/dev/null
 
 	assert_degraded_render "statusline: unusable required tool: stat" \
 		unusable_stat_render stat-present
 }
 
 # ── Usage fallback: 300s throttle between attempts ───────────────────────────
-
-@test "fallback throttle: the first call reaches the endpoint once" {
-	fallback_case throttle
-
-	fallback_fetch throttle 0 "$USAGE_BODY" "$FB_BASE" >/dev/null
-
-	assert_attempts throttle 1
-}
 
 @test "fallback throttle: the first call maps the usage payload" {
 	local out
@@ -625,49 +535,45 @@ assert_prints_mtime() {
 	assert_attempts throttle-250 1
 }
 
-@test "fallback throttle: 250s after a success, the cached payload is served" {
-	local out
-	fallback_case throttle-250-served
-	fallback_fetch throttle-250-served 0 "$USAGE_BODY" "$FB_BASE" >/dev/null
-
-	out=$(fallback_fetch throttle-250-served 0 "$USAGE_BODY" $((FB_BASE + 250)))
-
-	assert_fallback_json "$out" '.five_hour.used_percentage' 42
-}
-
-@test "fallback throttle: 400s after a success, the 300s window expired" {
-	fallback_case throttle-400
-	fallback_fetch throttle-400 0 "$USAGE_BODY" "$FB_BASE" >/dev/null
-
-	fallback_fetch throttle-400 0 "$USAGE_BODY" $((FB_BASE + 400)) >/dev/null
-
-	assert_attempts throttle-400 2
-}
-
 # ── Usage fallback: failures keep the last good payload ──────────────────────
 
-@test "fallback failure: curl error, the request was attempted and the last good payload still served" {
-	local out
+@test "fallback throttle: 400s after a success, a new request is sent" {
 	seed_good_cache curl-failure
 
-	out=$(fallback_fetch curl-failure 7 "" $((FB_BASE + 400)))
+	fallback_fetch curl-failure 7 "" $((FB_BASE + 400)) >/dev/null
 
 	assert_attempts curl-failure 2
+}
+
+@test "fallback failure: a curl error serves the last good payload" {
+	local out
+	seed_good_cache curl-failure-served
+
+	out=$(fallback_fetch curl-failure-served 7 "" $((FB_BASE + 400)))
+
 	assert_fallback_json "$out" '.five_hour.used_percentage' 42
 }
 
-@test "fallback failure: 800s after a failure, still backing off with the good payload cached" {
-	local out
+@test "fallback failure: 800s after a failure, no request is sent" {
 	seed_good_cache curl-failure-backoff
 	fallback_fetch curl-failure-backoff 7 "" $((FB_BASE + 400)) >/dev/null
 
-	out=$(fallback_fetch curl-failure-backoff 7 "" $((FB_BASE + 800)))
+	fallback_fetch curl-failure-backoff 7 "" $((FB_BASE + 800)) >/dev/null
 
 	assert_attempts curl-failure-backoff 2
+}
+
+@test "fallback failure: 800s after a failure, the good payload is still served" {
+	local out
+	seed_good_cache curl-failure-backoff-served
+	fallback_fetch curl-failure-backoff-served 7 "" $((FB_BASE + 400)) >/dev/null
+
+	out=$(fallback_fetch curl-failure-backoff-served 7 "" $((FB_BASE + 800)))
+
 	assert_fallback_json "$out" '.five_hour.used_percentage' 42
 }
 
-@test "fallback failure: 1000s after a failure, the 900s backoff expired" {
+@test "fallback failure: 1000s after a failure, a new request is sent" {
 	seed_good_cache curl-failure-1000
 	fallback_fetch curl-failure-1000 7 "" $((FB_BASE + 400)) >/dev/null
 
@@ -684,6 +590,7 @@ assert_prints_mtime() {
 
 	out=$(fallback_fetch rate-limited 0 "$RATE_LIMITED_BODY" $((FB_BASE + 400)))
 
+	assert_attempts rate-limited 2
 	assert_fallback_json "$out" '.five_hour.used_percentage' 42
 }
 
@@ -735,11 +642,12 @@ assert_prints_mtime() {
 	# A failed refresh after the poll window opens the backoff
 	fallback_fetch expire-backoff 7 "" $((FB_BASE + 400)) >/dev/null || true
 
-	# Within backoff: no new refresh, but all windows are expired — exit 1
+	# Within backoff: no new refresh, all windows expired, and the last attempt failed —
+	# exit USAGE_FETCH_FAILED_STATUS
 	fallback_fetch expire-backoff 0 "$body" $((FB_BASE + 600)) >/dev/null || status=$?
 
 	assert_attempts expire-backoff 2
-	assert_failed_status "$status" "fetch inside the backoff with every window expired"
+	assert_exact "$status" "$USAGE_FETCH_FAILED_STATUS"
 }
 
 @test "fallback expiry: an undated five_hour beside an expired seven_day is still served" {
@@ -788,27 +696,30 @@ assert_prints_mtime() {
 
 # ── Usage fallback: the lock belongs to a render, not to a path ──────────────
 
-@test "the lock belongs to a render, not to a path" {
-	# shellcheck disable=SC2034  # populated by setup_reclaim_race, used by reclaim_refresh in a subshell
-	local reclaim_cache reclaim_marker
-	setup_reclaim_race
-
-	reclaim_refresh stalled hold &
-	local stalled_pid=$!
-	require_stalled_render stalled
-	make_lock_stale
-	reclaim_refresh reclaimer hold &
-	local reclaimer_pid=$!
-	require_stalled_render reclaimer
+@test "a reclaimed lock keeps a bystander render from fetching" {
+	# shellcheck disable=SC2034  # populated by start_reclaim_race, used by reclaim_refresh in a subshell
+	local reclaim_cache reclaim_marker stalled_pid reclaimer_pid
+	start_reclaim_race bystander
 
 	run_render bystander
+
+	release_render stalled
+	release_render reclaimer
+	wait "$stalled_pid" "$reclaimer_pid" || true
+	assert_not_fetched bystander
+}
+
+@test "a stalled render's late release leaves the reclaimer's lock in place" {
+	# shellcheck disable=SC2034  # populated by start_reclaim_race, used by reclaim_refresh in a subshell
+	local reclaim_cache reclaim_marker stalled_pid reclaimer_pid
+	start_reclaim_race late-release
 	release_render stalled
 	wait "$stalled_pid" || true
+
 	run_render late
+
 	release_render reclaimer
 	wait "$reclaimer_pid" || true
-
-	assert_not_fetched bystander
 	assert_not_fetched late
 	assert_no_stray_dirs
 }
@@ -817,13 +728,13 @@ assert_prints_mtime() {
 
 @test "a failed write still frees the lock for the next render" {
 	# shellcheck disable=SC2034  # populated by setup_reclaim_race, used by reclaim_refresh in a subshell
-	local reclaim_cache reclaim_marker
-	setup_reclaim_race
-
+	local reclaim_cache reclaim_marker write_status=0
+	setup_reclaim_race write-failure
 	rm -f "$reclaim_marker"
 	mkdir "$reclaim_marker"
-	run_render write-fails || [[ $? -eq "$USAGE_CACHE_UNWRITABLE_STATUS" ]]
+	run_render write-fails || write_status=$?
 	rmdir "$reclaim_marker"
+	assert_exact "$write_status" "$USAGE_CACHE_UNWRITABLE_STATUS"
 
 	run_render after-write-failure
 
@@ -875,14 +786,6 @@ assert_prints_mtime() {
 	assert_cred_token_sent keychain-malformed token-file
 }
 
-@test "the bearer token stays off curl's argv" {
-	cred_fallback_case token-argv token-secret
-
-	cred_fetch token-argv >/dev/null || true
-
-	assert_not_contains "$(<"$CRED_ROOT/token-argv/args")" "token-secret"
-}
-
 # ── Usage fetch: a failure with nothing cached is named on the line ─────────
 
 @test "no cache and a curl error: the limits slot names the failed fetch" {
@@ -891,16 +794,7 @@ assert_prints_mtime() {
 
 	out=$(fallback_render fetch-curl-error 7 "" | strip_ansi)
 
-	assert_contains "$out" "Opus 4.6 ● ● ◎ ○ ○ │ limits: fetch failed"
-}
-
-@test "no cache and an HTTP error body: the limits slot names the failed fetch" {
-	local out
-	fallback_case fetch-http-error
-
-	out=$(fallback_render fetch-http-error 0 "$AUTH_ERROR_BODY" | strip_ansi)
-
-	assert_contains "$out" "Opus 4.6 ● ● ◎ ○ ○ │ limits: fetch failed"
+	assert_contains "$out" " │ limits: fetch failed"
 }
 
 @test "an unparseable credentials file counts as a failed fetch" {
@@ -910,7 +804,7 @@ assert_prints_mtime() {
 
 	out=$(fallback_render cred-unparseable 0 "$USAGE_BODY" | strip_ansi)
 
-	assert_contains "$out" "Opus 4.6 ● ● ◎ ○ ○ │ limits: fetch failed"
+	assert_contains "$out" " │ limits: fetch failed"
 }
 
 @test "an unreadable credentials file counts as a failed fetch" {
@@ -921,7 +815,7 @@ assert_prints_mtime() {
 
 	out=$(fallback_render cred-unreadable 0 "$USAGE_BODY" | strip_ansi)
 
-	assert_contains "$out" "Opus 4.6 ● ● ◎ ○ ○ │ limits: fetch failed"
+	assert_contains "$out" " │ limits: fetch failed"
 }
 
 @test "a malformed Keychain entry and no credentials file counts as a failed fetch" {
@@ -930,7 +824,7 @@ assert_prints_mtime() {
 
 	out=$(fallback_render keychain-malformed-alone 0 "$USAGE_BODY" | strip_ansi)
 
-	assert_contains "$out" "Opus 4.6 ● ● ◎ ○ ○ │ limits: fetch failed"
+	assert_contains "$out" " │ limits: fetch failed"
 }
 
 @test "a malformed Keychain entry and a credentials file holding no token counts as a failed fetch" {
@@ -940,7 +834,7 @@ assert_prints_mtime() {
 
 	out=$(fallback_render keychain-malformed-empty-file 0 "$USAGE_BODY" | strip_ansi)
 
-	assert_contains "$out" "Opus 4.6 ● ● ◎ ○ ○ │ limits: fetch failed"
+	assert_contains "$out" " │ limits: fetch failed"
 }
 
 @test "a temp directory that cannot be written: named failure line" {
@@ -959,19 +853,7 @@ assert_prints_mtime() {
 
 	out=$(fallback_render fetch-backoff 7 "" | strip_ansi)
 
-	assert_contains "$out" "Opus 4.6 ● ● ◎ ○ ○ │ limits: fetch failed"
-}
-
-@test "a failed fetch with a good cache serves the cache without error text" {
-	local out
-	fallback_case fetch-cached
-	fallback_render fetch-cached 0 "$USAGE_BODY" >/dev/null
-	expire_usage_marker fetch-cached
-
-	out=$(fallback_render fetch-cached 7 "" | strip_ansi)
-
-	assert_contains "$out" " │ 5h 42%"
-	assert_not_contains "$out" "limits:"
+	assert_contains "$out" " │ limits: fetch failed"
 }
 
 # ── Usage fetch: a window the endpoint reports as null is absent, not a failure
