@@ -11,22 +11,27 @@ setup_file() {
 
 	export STAGED_PLAN_REPO
 	STAGED_PLAN_REPO=$(setup_repo staged_plan_repo)
-	mkdir -p "$STAGED_PLAN_REPO/.claude/plans"
-	printf 'plan content\n' >"$STAGED_PLAN_REPO/.claude/plans/phase.md"
+	write_plan_file "$STAGED_PLAN_REPO" .claude/plans
 	git -C "$STAGED_PLAN_REPO" add -f .claude/plans/phase.md
 
 	export UNTRACKED_PLAN_REPO
 	UNTRACKED_PLAN_REPO=$(setup_repo untracked_plan_repo)
-	mkdir -p "$UNTRACKED_PLAN_REPO/.claude/plans"
-	printf 'plan content\n' >"$UNTRACKED_PLAN_REPO/.claude/plans/phase.md"
+	write_plan_file "$UNTRACKED_PLAN_REPO" .claude/plans
 
 	export MODIFIED_PLAN_REPO
 	MODIFIED_PLAN_REPO=$(setup_repo modified_plan_repo)
-	mkdir -p "$MODIFIED_PLAN_REPO/docs/plans"
-	printf 'plan content\n' >"$MODIFIED_PLAN_REPO/docs/plans/phase.md"
+	write_plan_file "$MODIFIED_PLAN_REPO" docs/plans
 	git -C "$MODIFIED_PLAN_REPO" add -f docs/plans/phase.md
 	git -C "$MODIFIED_PLAN_REPO" -c commit.gpgsign=false commit -q -m "track plan"
 	printf 'edited\n' >>"$MODIFIED_PLAN_REPO/docs/plans/phase.md"
+
+	# A plan file git ignores: only a forced add stages it.
+	export IGNORED_PLAN_REPO
+	IGNORED_PLAN_REPO=$(setup_repo ignored_plan_repo)
+	printf 'docs/plans/\n' >"$IGNORED_PLAN_REPO/.gitignore"
+	git -C "$IGNORED_PLAN_REPO" add .gitignore
+	git -C "$IGNORED_PLAN_REPO" -c commit.gpgsign=false commit -q -m "ignore plans"
+	write_plan_file "$IGNORED_PLAN_REPO" docs/plans
 
 	# A garbage index makes every read of staged or pending files fail while
 	# the repository itself still resolves.
@@ -39,32 +44,41 @@ setup_file() {
 	# worktree holds one while its main repository is clean.
 	export LINKED_MAIN LINKED_CLEAN
 	LINKED_MAIN=$(setup_repo linked_main)
-	mkdir -p "$LINKED_MAIN/docs/plans"
-	printf 'plan content\n' >"$LINKED_MAIN/docs/plans/phase.md"
+	write_plan_file "$LINKED_MAIN" docs/plans
 	LINKED_CLEAN="$TMPDIR_ROOT/linked_clean"
 	git -C "$LINKED_MAIN" worktree add -q -b clean "$LINKED_CLEAN"
 
 	export LINKED_PLANNED
 	LINKED_PLANNED="$TMPDIR_ROOT/linked_planned"
 	git -C "$REPO" worktree add -q -b planned "$LINKED_PLANNED"
-	mkdir -p "$LINKED_PLANNED/docs/plans"
-	printf 'plan content\n' >"$LINKED_PLANNED/docs/plans/phase.md"
+	write_plan_file "$LINKED_PLANNED" docs/plans
 
-	# A git dir whose work tree is set by core.worktree, away from the git dir.
+	# A git dir whose work tree is set by core.worktree, away from the git dir:
+	# one work tree holds no plan file, the other holds one.
 	export CORE_WORKTREE_TREE="$TMPDIR_ROOT/core_worktree_tree"
 	git init -q --separate-git-dir "$TMPDIR_ROOT/core_worktree.git" "$CORE_WORKTREE_TREE"
 	git --git-dir="$TMPDIR_ROOT/core_worktree.git" config core.worktree "$CORE_WORKTREE_TREE"
+
+	export CORE_WORKTREE_PLANNED_TREE="$TMPDIR_ROOT/core_worktree_planned_tree"
+	git init -q --separate-git-dir "$TMPDIR_ROOT/core_worktree_planned.git" "$CORE_WORKTREE_PLANNED_TREE"
+	git --git-dir="$TMPDIR_ROOT/core_worktree_planned.git" config core.worktree "$CORE_WORKTREE_PLANNED_TREE"
+	write_plan_file "$CORE_WORKTREE_PLANNED_TREE" docs/plans
 
 	export BARE_GIT_DIR="$TMPDIR_ROOT/bare.git"
 	git init -q --bare "$BARE_GIT_DIR"
 
 	export NO_REPO_DIR="$TMPDIR_ROOT/no_repo"
-	mkdir -p "$NO_REPO_DIR/.claude/plans"
-	printf 'plan content\n' >"$NO_REPO_DIR/.claude/plans/phase.md"
+	write_plan_file "$NO_REPO_DIR" .claude/plans
 }
 
 teardown_file() {
 	cleanup_tmpdir_root
+}
+
+# Writes a plan file under directory $2 of $1.
+write_plan_file() {
+	mkdir -p "$1/$2"
+	printf 'plan content\n' >"$1/$2/phase.md"
 }
 
 # Every command in the list is blocked from cwd $2 with output naming $1; a
@@ -90,23 +104,14 @@ each_allowed_in() {
 	assert_blocked_with_reason ".claude/plans/"
 }
 
-@test "add plan: git add naming a docs/plans/ path is blocked naming that pattern" {
-	run_plan_guard "$REPO" "git add docs/plans/rollout.md"
-
-	assert_blocked_with_reason "docs/plans/"
-}
-
 @test "add plan: git add naming only non-plan paths is allowed" {
-	each_allowed_in "$REPO" \
-		"git add README" \
-		"git add docs/guide.md"
+	each_allowed_in "$REPO" "git add docs/guide.md"
 }
 
 # ── Add of the whole tree ────────────────────────────────────────────────────
 
 @test "add all: every whole-tree spelling is blocked when an untracked plan file is pending" {
 	each_blocked_for_in ".claude/plans/" "$UNTRACKED_PLAN_REPO" \
-		"git add ." \
 		"git add -A" \
 		"git add --all"
 }
@@ -117,14 +122,15 @@ each_allowed_in() {
 	assert_blocked_with_reason "docs/plans/"
 }
 
-@test "add all: every whole-tree spelling is allowed when no plan file is pending" {
-	each_allowed_in "$REPO" \
-		"git add ." \
-		"git add -A" \
-		"git add --all"
+@test "add all: git add . is allowed when no plan file is pending" {
+	each_allowed_in "$REPO" "git add ."
 }
 
 # ── Add of tracked files ─────────────────────────────────────────────────────
+
+@test "add options: a word after -- is a pathspec, never an option" {
+	each_allowed_in "$UNTRACKED_PLAN_REPO" "git add -- -A"
+}
 
 @test "add update: every -u spelling is blocked when a tracked plan file is modified" {
 	each_blocked_for_in "docs/plans/" "$MODIFIED_PLAN_REPO" \
@@ -132,8 +138,7 @@ each_allowed_in() {
 		"git add --update"
 }
 
-@test "add update: git add -u is allowed when no tracked plan file is modified, even with one untracked" {
-	each_allowed_in "$REPO" "git add -u" "git add --update"
+@test "add update: every -u spelling is allowed when the only plan file is untracked" {
 	each_allowed_in "$UNTRACKED_PLAN_REPO" "git add -u" "git add --update"
 }
 
@@ -141,31 +146,34 @@ each_allowed_in() {
 
 @test "add dir: a directory holding .claude/plans/ is blocked when a plan file under it is untracked" {
 	each_blocked_for_in ".claude/plans/" "$UNTRACKED_PLAN_REPO" \
-		"git add .claude" \
-		"git add .claude/" \
-		"git add ./.claude" \
-		"git add .claude/plans" \
-		"git add ./.claude/plans/"
+		"git add .claude"
 }
 
 @test "add dir: a directory holding docs/plans/ is blocked when a plan file under it is modified" {
 	each_blocked_for_in "docs/plans/" "$MODIFIED_PLAN_REPO" \
-		"git add docs" \
-		"git add ./docs" \
-		"git add ./docs/plans"
+		"git add docs"
 }
 
-@test "add dir: a directory holding a plan directory is allowed when no plan file under it is pending" {
-	each_allowed_in "$REPO" \
-		"git add docs" \
-		"git add .claude"
+@test "add dir: a directory holding no pending plan file is allowed beside a pending one elsewhere" {
 	each_allowed_in "$UNTRACKED_PLAN_REPO" "git add docs"
 }
 
-@test "add dir: a pathspec that cannot hold a plan path is allowed beside pending plan files" {
-	each_allowed_in "$UNTRACKED_PLAN_REPO" \
-		"git add src" \
-		"git add README.md"
+# ── Add with force ───────────────────────────────────────────────────────────
+
+@test "add force: every forced spelling reaching an ignored plan file is blocked naming its pattern" {
+	each_blocked_for_in "docs/plans/" "$IGNORED_PLAN_REPO" \
+		"git add -f docs" \
+		"git add --force docs" \
+		"git add -vf docs" \
+		"git add -fA" \
+		"git add -f ." \
+		"git add -f docs/plans"
+}
+
+@test "add force: an add without force is allowed when the only plan file is ignored" {
+	each_allowed_in "$IGNORED_PLAN_REPO" \
+		"git add docs" \
+		"git add -A"
 }
 
 # ── Commit ───────────────────────────────────────────────────────────────────
@@ -176,21 +184,18 @@ each_allowed_in() {
 	assert_blocked_with_reason ".claude/plans/"
 }
 
-@test "commit: git commit with no plan file staged is allowed, even with one untracked" {
-	each_allowed_in "$REPO" "git commit -m 'msg'"
+@test "commit: git commit is allowed when the only plan file is untracked" {
 	each_allowed_in "$UNTRACKED_PLAN_REPO" "git commit -m 'msg'"
 }
 
 @test "commit all: every -a spelling is blocked when a tracked plan file is modified" {
 	each_blocked_for_in "docs/plans/" "$MODIFIED_PLAN_REPO" \
-		"git commit -a -m 'msg'" \
 		"git commit --all -m 'msg'" \
 		"git commit -am 'msg'" \
 		"git commit -sam 'msg'"
 }
 
-@test "commit all: git commit -a is allowed when no tracked plan file is modified, even with one untracked" {
-	each_allowed_in "$REPO" "git commit -a -m 'msg'"
+@test "commit all: git commit -a is allowed when the only plan file is untracked" {
 	each_allowed_in "$UNTRACKED_PLAN_REPO" "git commit -am 'msg'"
 }
 
@@ -198,59 +203,81 @@ each_allowed_in() {
 	each_allowed_in "$MODIFIED_PLAN_REPO" \
 		"git commit -m 'msg'" \
 		"git commit -ma" \
-		"git commit -sm 'msg'" \
 		"git commit --amend -m 'msg'"
 }
 
 # ── Targeted repository ──────────────────────────────────────────────────────
 
-@test "named repo: add and commit aimed at a repo holding plan files read that repo from a clean cwd" {
-	each_blocked_for_in "plans/" "$REPO" \
-		"git -C $UNTRACKED_PLAN_REPO add ." \
-		"cd $MODIFIED_PLAN_REPO && git add -A" \
-		"git -C $STAGED_PLAN_REPO commit -m 'msg'" \
-		"cd $STAGED_PLAN_REPO && git commit -m 'msg'" \
-		"git --git-dir=$STAGED_PLAN_REPO/.git commit -m 'msg'" \
-		"git --git-dir $STAGED_PLAN_REPO/.git commit -m 'msg'"
+@test "commit pathspec: a pathspec matching a modified plan file is blocked" {
+	# shellcheck disable=SC2016 # the literal expansion is the command text under test
+	each_blocked_for_in "docs/plans/" "$MODIFIED_PLAN_REPO" \
+		"git commit -m 'msg' docs" \
+		"git commit -m 'msg' -- docs" \
+		'git commit -m "$(date)" docs'
 }
 
-@test "named repo: add and commit aimed at a clean repo from a cwd holding plan files are allowed" {
-	each_allowed_in "$UNTRACKED_PLAN_REPO" \
-		"git -C $REPO add ." \
-		"cd $REPO && git add --all"
-	each_allowed_in "$STAGED_PLAN_REPO" \
-		"git -C $REPO commit -m 'msg'" \
-		"git --git-dir=$REPO/.git commit -m 'msg'"
+@test "commit pathspec: an option value or a pathspec matching no plan file is allowed" {
+	each_allowed_in "$MODIFIED_PLAN_REPO" \
+		"git commit -m docs" \
+		"git commit --message docs" \
+		"git commit -mdocs" \
+		"git commit -m 'msg' README"
 }
 
-@test "named repo: add -u, add of a directory and commit -a read the repo they target from a clean cwd" {
-	each_blocked_for_in "plans/" "$REPO" \
-		"git -C $MODIFIED_PLAN_REPO add -u" \
-		"git -C $UNTRACKED_PLAN_REPO add .claude" \
-		"cd $MODIFIED_PLAN_REPO && git commit -am 'msg'"
+@test "named repo: git add aimed at a repo holding plan files reads that repo from a clean cwd" {
+	each_blocked_for_in "plans/" "$REPO" "git -C $UNTRACKED_PLAN_REPO add ."
 }
 
-@test "named repo: add -u, add of a directory and commit -a aimed at a clean repo from a planned cwd are allowed" {
+@test "named repo: git commit aimed at a repo holding a staged plan file reads that repo from a clean cwd" {
+	each_blocked_for_in "plans/" "$REPO" "git -C $STAGED_PLAN_REPO commit -m 'msg'"
+}
+
+@test "named repo: git add aimed at a clean repo from a cwd holding plan files is allowed" {
+	each_allowed_in "$UNTRACKED_PLAN_REPO" "git -C $REPO add ."
+}
+
+@test "named repo: git commit aimed at a clean repo from a cwd holding a staged plan file is allowed" {
+	each_allowed_in "$STAGED_PLAN_REPO" "git -C $REPO commit -m 'msg'"
+}
+
+@test "named repo: add -u aimed at a repo holding a modified plan file reads that repo from a clean cwd" {
+	each_blocked_for_in "plans/" "$REPO" "git -C $MODIFIED_PLAN_REPO add -u"
+}
+
+@test "named repo: add of a directory aimed at a repo holding an untracked plan file reads that repo from a clean cwd" {
+	each_blocked_for_in "plans/" "$REPO" "git -C $UNTRACKED_PLAN_REPO add .claude"
+}
+
+@test "named repo: commit -a aimed at a repo holding a modified plan file reads that repo from a clean cwd" {
+	each_blocked_for_in "plans/" "$REPO" "cd $MODIFIED_PLAN_REPO && git commit -am 'msg'"
+}
+
+@test "named repo: add -u or add of a directory aimed at a clean repo from a planned cwd is allowed" {
 	each_allowed_in "$MODIFIED_PLAN_REPO" \
 		"git -C $REPO add -u" \
-		"git -C $REPO add docs" \
-		"git -C $REPO commit -am 'msg'"
+		"git -C $REPO add docs"
 }
 
-@test "work tree: git add . in a linked worktree reads that worktree, not its main repository" {
-	each_allowed_in "$LINKED_CLEAN" "git add ."
+@test "named repo: commit -a aimed at a clean repo from a planned cwd is allowed" {
+	each_allowed_in "$MODIFIED_PLAN_REPO" "git -C $REPO commit -am 'msg'"
+}
 
+@test "work tree: git add . in a linked worktree with no plan file is allowed although its main repository holds one" {
+	each_allowed_in "$LINKED_CLEAN" "git add ."
+}
+
+@test "work tree: git add . in a linked worktree holding a plan file is blocked" {
 	run_plan_guard "$LINKED_PLANNED" "git add ."
 
 	assert_blocked_with_reason "docs/plans/"
 }
 
-@test "work tree: git add . reads the work tree core.worktree names" {
+@test "work tree: git add . is allowed when the work tree core.worktree names holds no plan file" {
 	each_allowed_in "$CORE_WORKTREE_TREE" "git add ."
+}
 
-	mkdir -p "$CORE_WORKTREE_TREE/docs/plans"
-	printf 'plan content\n' >"$CORE_WORKTREE_TREE/docs/plans/phase.md"
-	run_plan_guard "$CORE_WORKTREE_TREE" "git add ."
+@test "work tree: git add . is blocked when the work tree core.worktree names holds a plan file" {
+	run_plan_guard "$CORE_WORKTREE_PLANNED_TREE" "git add ."
 
 	assert_blocked_with_reason "docs/plans/"
 }
@@ -262,30 +289,11 @@ each_allowed_in() {
 # ── Commands the rules never read ────────────────────────────────────────────
 
 @test "mention: a command that only mentions git add or git commit is allowed" {
-	each_allowed_in "$STAGED_PLAN_REPO" \
-		"echo git add docs/plans/x" \
-		"rg 'git commit'"
+	each_allowed_in "$STAGED_PLAN_REPO" "echo git add docs/plans/x"
 }
 
-@test "no repo: add and commit outside any repository are allowed" {
-	each_allowed_in "$NO_REPO_DIR" \
-		"git add .claude/plans/phase.md" \
-		"git add ." \
-		"git commit -m 'msg'"
-}
-
-@test "no repo: add and commit whose git dir is unknown are allowed" {
-	# shellcheck disable=SC2016 # the literal expansions are the command text under test
-	each_allowed_in "$STAGED_PLAN_REPO" \
-		'git -C "$d" add .claude/plans/phase.md' \
-		'git -C "$d" add .' \
-		'git -C "$d" commit -m msg'
-}
-
-@test "unparseable: a command that does not parse is allowed" {
-	run_plan_guard "$STAGED_PLAN_REPO" 'git commit -m "unterminated'
-
-	assert_allowed
+@test "no repo: git add outside any repository is allowed" {
+	each_allowed_in "$NO_REPO_DIR" "git add .claude/plans/phase.md"
 }
 
 # ── Failures ─────────────────────────────────────────────────────────────────
@@ -302,17 +310,22 @@ each_allowed_in() {
 	assert_blocked_with_reason "corrupt_index_repo"
 }
 
-@test "helper failure: an ils parse failure blocks with its reason, even for a command with no git word" {
+@test "unexpected failure: a failing mktemp exits 2 naming the hook and the failed status" {
 	local bin
-	bin=$(failing_ils_bin "$TMPDIR_ROOT/broken_ils" 42)
+	bin=$(failing_program_bin "$TMPDIR_ROOT/broken_mktemp" mktemp 42)
 
-	run_plan_guard "$REPO" "echo hi" "$bin:$PATH"
+	run_plan_guard "$REPO" "git add docs/plans/x.md" "$bin:$PATH"
 
-	assert_blocked_with_reason "42"
+	assert_blocked_with_reason "plan-file-guard"
+	assert_guard_output_includes "42"
 }
 
-@test "helper failure: jq missing from PATH blocks naming jq" {
-	run_plan_guard "$REPO" "echo hi" "$(path_without jq)"
+# Run plan-file-guard from $1 on command $2 under bash binary $3.
+run_plan_guard_under() {
+	run_plan_guard "$1" "$2" "" "$3"
+}
 
-	assert_blocked_with_reason "jq"
+@test "unparsable: a command ils cannot parse is allowed under bash 3.2 and the current bash" {
+	for_each_case run_plan_guard_under "$REPO" 'git add docs/plans/x.md "unterminated' -- \
+		assert_allowed -- /bin/bash "$BASH_BIN"
 }

@@ -66,6 +66,12 @@ run_capture() {
 
 # ── Hook invocation ──────────────────────────────────────────────────────────
 
+# Bash payload for the cwd-aware hooks: command $1 run from directory $2.
+bash_hook_input() {
+	jq -n --arg cmd "$1" --arg cwd "$2" \
+		'{"tool_name":"Bash","tool_input":{"command":$cmd},"cwd":$cwd}'
+}
+
 # Run git-lock-guard from cwd $1 on command $2, with optional PATH $3; sets
 # GUARD_EXIT and GUARD_OUTPUT.
 run_lock_guard() {
@@ -79,29 +85,33 @@ run_lock_guard() {
 run_commit_guard() {
 	local cmd="$1" dir="${2:-$BATS_TEST_TMPDIR}" path="${3:-$PATH}" input
 	require_fixture_dir "$dir" "$GIT_COMMIT_GUARD_HOOK" || return 1
-	input=$(jq -n --arg cmd "$cmd" --arg cwd "$dir" \
-		'{"tool_name":"Bash","tool_input":{"command":$cmd},"cwd":$cwd}')
+	input=$(bash_hook_input "$cmd" "$dir")
 	GUARD_EXIT=0
 	GUARD_OUTPUT=$(cd "$dir" && env "PATH=$path" "$BASH_BIN" "$GIT_COMMIT_GUARD_HOOK" <<<"$input" 2>&1) || GUARD_EXIT=$?
 }
 
 # Run hook script $1 from cwd $2 on command $3, with PATH $4 (default the
-# current PATH) for the hook alone — the payload is built first, on the current
-# PATH, so a PATH missing jq still delivers it. Sets GUARD_EXIT and
-# GUARD_OUTPUT (the hook's stderr).
+# current PATH) for the hook alone, under bash binary $5 (default $BASH_BIN) —
+# the payload is built first, on the current PATH, so a PATH missing jq still
+# delivers it. Sets GUARD_EXIT and GUARD_OUTPUT (the hook's stderr).
 run_cwd_hook() {
-	local hook="$1" dir="${2:-}" cmd="$3" path="${4:-$PATH}" input
+	local hook="$1" dir="${2:-}" cmd="$3" path="${4:-$PATH}" bash="${5:-$BASH_BIN}" input
 	require_fixture_dir "$dir" "$hook" || return 1
-	input=$(jq -n --arg cmd "$cmd" --arg cwd "$dir" \
-		'{"tool_name":"Bash","tool_input":{"command":$cmd},"cwd":$cwd}')
+	input=$(bash_hook_input "$cmd" "$dir")
 	GUARD_EXIT=0
-	GUARD_OUTPUT=$(cd "$dir" && env "PATH=$path" "$BASH_BIN" "$hook" <<<"$input" 2>&1 1>/dev/null) || GUARD_EXIT=$?
+	GUARD_OUTPUT=$(cd "$dir" && env "PATH=$path" "$bash" "$hook" <<<"$input" 2>&1 1>/dev/null) || GUARD_EXIT=$?
 }
 
-# Run plan-file-guard from cwd $1 on command $2, with optional PATH $3; sets
-# GUARD_EXIT and GUARD_OUTPUT.
+# Run the hook named $1 as `bash $1` from inside hooks/ — a path with no slash —
+# on payload $2; sets RUN_EXIT, RUN_STDOUT, RUN_STDERR.
+run_hook_by_bare_name() {
+	run_capture "$PROJECT_DIR/hooks" "$BASH_BIN" "$1" <<<"$2"
+}
+
+# Run plan-file-guard from cwd $1 on command $2, with optional PATH $3 and bash
+# binary $4; sets GUARD_EXIT and GUARD_OUTPUT.
 run_plan_guard() {
-	run_cwd_hook "$PLAN_FILE_GUARD_HOOK" "${1:-}" "$2" "${3:-}"
+	run_cwd_hook "$PLAN_FILE_GUARD_HOOK" "${1:-}" "$2" "${3:-}" "${4:-}"
 }
 
 # Run tdd-cycle-guard from cwd $1 on command $2, with optional PATH $3; sets
@@ -130,18 +140,22 @@ tdd_read_hook_input() {
 # Run tdd-red-guard hook in $1 with Bash command $2 from agent type $3 (default
 # tdd-cycle); sets GUARD_EXIT and GUARD_OUTPUT.
 run_tdd_guard() {
-	local dir="${1:-}" cmd="$2" type="${3:-tdd-cycle}"
-	require_fixture_dir "$dir" "$TDD_RED_GUARD_HOOK" || return 1
-	GUARD_EXIT=0
-	GUARD_OUTPUT=$(cd "$dir" && tdd_hook_input "$cmd" "$type" | bash "$TDD_RED_GUARD_HOOK" 2>&1 1>/dev/null) || GUARD_EXIT=$?
+	pipe_tdd_red_guard "${1:-}" tdd_hook_input "$2" "${3:-tdd-cycle}"
 }
 
 # Run tdd-red-guard hook in $1 for a Read of $2; sets GUARD_EXIT and GUARD_OUTPUT.
 run_tdd_guard_read() {
-	local dir="${1:-}" path="$2"
+	pipe_tdd_red_guard "${1:-}" tdd_read_hook_input "$2"
+}
+
+# Run the payload builder $2.. (with its args) in directory $1 and pipe its
+# output into the tdd-red-guard hook; sets GUARD_EXIT and GUARD_OUTPUT.
+pipe_tdd_red_guard() {
+	local dir="${1:-}"
+	shift
 	require_fixture_dir "$dir" "$TDD_RED_GUARD_HOOK" || return 1
 	GUARD_EXIT=0
-	GUARD_OUTPUT=$(cd "$dir" && tdd_read_hook_input "$path" | bash "$TDD_RED_GUARD_HOOK" 2>&1 1>/dev/null) || GUARD_EXIT=$?
+	GUARD_OUTPUT=$(cd "$dir" && "$@" | "$BASH_BIN" "$TDD_RED_GUARD_HOOK" 2>&1 1>/dev/null) || GUARD_EXIT=$?
 }
 
 # Path of the per-instance RED-phase marker the hook gates on, for the repo at $1.
@@ -159,7 +173,7 @@ exit_hook_input() {
 # One-command wrapper so run_capture can run the exit_hook_input | hook pipeline;
 # args are exit_hook_input's.
 pipe_exit_guard() {
-	exit_hook_input "$@" | bash "$BASH_EXIT_GUARD_HOOK"
+	exit_hook_input "$@" | "$BASH_BIN" "$BASH_EXIT_GUARD_HOOK"
 }
 
 # Run bash-exit-guard on command $1 that exited $2, reported by tool $3
@@ -209,7 +223,6 @@ assert_guard_output_excludes() {
 	}
 }
 
-# The guard blocked the command with output naming reason $1.
 assert_blocked_with_reason() {
 	assert_blocked && assert_guard_output_includes "$1"
 }
@@ -219,7 +232,9 @@ assert_blocked_with_reason() {
 # for_each_case <runner> [arg...] -- <assertion> [arg...] -- <case>...
 #
 # For every case, runs `<runner> [arg...] <case>`, then `<assertion> [arg...]
-# <case>`. Stops at the first failing assertion and names its case on stderr.
+# <case>`. Every case runs even after one fails, so a table reports all of its
+# failing cases at once: each is named on stderr, and the call fails when any
+# assertion did.
 for_each_case() {
 	local -a runner=() assertion=()
 	while (($#)) && [[ "$1" != -- ]]; do
@@ -232,14 +247,15 @@ for_each_case() {
 		shift
 	done
 	shift
-	local case
+	local case failed=0
 	for case in "$@"; do
 		"${runner[@]}" "$case"
 		"${assertion[@]}" "$case" || {
 			printf 'case: %s\n' "$case" >&2
-			return 1
+			failed=1
 		}
 	done
+	((failed == 0))
 }
 
 # ── Script invocation ────────────────────────────────────────────────────────
@@ -300,28 +316,22 @@ path_without() {
 # Writes an `ils` under $1/bin that exits $2, and prints that bin dir for
 # prepending to PATH.
 failing_ils_bin() {
-	local bin="$1/bin" code="$2"
-	mkdir -p "$bin"
-	printf '#!/usr/bin/env bash\nexit %d\n' "$code" >"$bin/ils"
-	chmod +x "$bin/ils"
-	printf '%s' "$bin"
+	failing_program_bin "$1" ils "$2"
 }
 
 # Writes a `stat` under $1/bin that answers neither the BSD nor the GNU dialect,
 # and prints that bin dir for prepending to PATH.
 failing_stat_bin() {
-	local bin="$1/bin"
-	mkdir -p "$bin"
-	printf '#!/usr/bin/env bash\nexit 1\n' >"$bin/stat"
-	chmod +x "$bin/stat"
-	printf '%s' "$bin"
+	failing_program_bin "$1" stat 1
 }
 
-# Run fix-ci-push.sh from $1 with an empty PATH, so no git can be found.
-run_wrapper_without_git() {
-	local dir="$1"
-	shift
-	run_script_on_path "$dir" /var/empty "$BASH_BIN" "$FIX_CI_PUSH_WRAPPER" "$@"
+# Writes a `$2` under $1/bin that exits $3, and prints that bin dir.
+failing_program_bin() {
+	local bin="$1/bin" program="$2" code="$3"
+	mkdir -p "$bin"
+	printf '#!/usr/bin/env bash\nexit %d\n' "$code" >"$bin/$program"
+	chmod +x "$bin/$program"
+	printf '%s' "$bin"
 }
 
 # ── Script assertions ────────────────────────────────────────────────────────
@@ -487,7 +497,7 @@ seed_origin() {
 # judges by mtime.
 
 raise_marker() {
-	touch "$(git -C "$1" rev-parse --absolute-git-dir)/fix-ci-active"
+	touch "$(marker_path "$1")"
 }
 
 marker_path() {

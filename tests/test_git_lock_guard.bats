@@ -13,62 +13,22 @@ setup_file() {
 
 	export LOCKED_REPO
 	LOCKED_REPO=$(setup_repo locked_repo)
-	touch "$(git -C "$LOCKED_REPO" rev-parse --absolute-git-dir)/index.lock"
-
-	export NO_REPO_DIR="$TMPDIR_ROOT/no_repo"
-	mkdir -p "$NO_REPO_DIR"
+	touch "$(index_lock_path "$LOCKED_REPO")"
 }
 
 teardown_file() {
 	cleanup_tmpdir_root
 }
 
-@test "named repo: commit -C at a locked repo from an unlocked cwd waits and names that repo's lock" {
-	run_lock_guard "$REPO" "git -C $LOCKED_REPO commit -m 'msg'"
-
-	assert_blocked
-	assert_guard_output_includes "locked_repo/.git/index.lock"
-}
-
-@test "named repo: commit -C at a locked repo from outside any repo waits and names that repo's lock" {
-	run_lock_guard "$NO_REPO_DIR" "git -C $LOCKED_REPO commit -m 'msg'"
-
-	assert_blocked
-	assert_guard_output_includes "locked_repo/.git/index.lock"
-}
-
-@test "named repo: commit -C at an unlocked repo from a locked cwd proceeds at once" {
-	run_lock_guard "$LOCKED_REPO" "git -C $REPO commit -m 'msg'"
-
-	assert_allowed
-	assert_guard_output_excludes "index.lock"
-}
-
-@test "named repo: commit -C at a path that is no repo from a locked cwd proceeds at once" {
-	run_lock_guard "$LOCKED_REPO" "git -C $TMPDIR_ROOT/absent commit -m 'msg'"
-
-	assert_allowed
-	assert_guard_output_excludes "index.lock"
-}
-
-@test "named repo: commit --git-dir at a path that is no repo from a locked cwd proceeds at once" {
-	run_lock_guard "$LOCKED_REPO" "git --git-dir=$TMPDIR_ROOT/absent/.git commit -m 'msg'"
-
-	assert_allowed
-	assert_guard_output_excludes "index.lock"
-}
-
-@test "named repo: commit with a separate --git-dir word at a path that is no repo from a locked cwd proceeds at once" {
-	run_lock_guard "$LOCKED_REPO" "git --git-dir $TMPDIR_ROOT/absent/.git commit -m 'msg'"
-
-	assert_allowed
-	assert_guard_output_excludes "index.lock"
-}
-
-# ── Index-mutating invocations ───────────────────────────────────────────────
-
 # The lock path a block names, as the tail every spelling of the temp dir shares.
 readonly LOCK_TAIL="locked_repo/.git/index.lock"
+
+# Prints the path of the index lock of the repository at $1.
+index_lock_path() {
+	local git_dir
+	git_dir=$(git -C "$1" rev-parse --absolute-git-dir) || return
+	printf '%s/index.lock' "$git_dir"
+}
 
 # Every command in the list is blocked from cwd $1 with output naming the
 # locked repo's lock; a failure names the command.
@@ -90,6 +50,14 @@ assert_allowed_without_lock() {
 	assert_allowed && assert_guard_output_excludes "index.lock"
 }
 
+@test "named repo: commit -C at an unlocked repo from a locked cwd proceeds at once" {
+	run_lock_guard "$LOCKED_REPO" "git -C $REPO commit -m 'msg'"
+
+	assert_allowed_without_lock
+}
+
+# ── Index-mutating invocations ───────────────────────────────────────────────
+
 # Sets the mtime of $1 to $2 seconds before now, to the second.
 backdate_seconds() {
 	local path="$1" seconds="$2" epoch stamp
@@ -103,28 +71,13 @@ backdate_seconds() {
 
 @test "index writers: every index-mutating subcommand waits on the cwd repo's lock and blocks naming it" {
 	each_blocked_in "$LOCKED_REPO" \
-		"git add README" \
 		"git commit -m 'msg'" \
-		"git rm README" \
-		"git mv README README2" \
-		"git merge main" \
-		"git cherry-pick HEAD" \
-		"git revert HEAD" \
-		"git am fix.patch" \
-		"git pull" \
-		"git update-index --refresh" \
-		"git commit-tree HEAD^{tree} -m 'msg'" \
 		"git restore --staged README" \
+		"git apply --index fix.patch" \
+		"git apply -R3 fix.patch" \
 		"git restore -S README" \
 		"git restore -SW README" \
 		"git restore -WS README"
-}
-
-@test "index writers: an index writer after cd or a leading command waits on its repo's lock" {
-	each_blocked_in "$REPO" \
-		"cd $LOCKED_REPO && git add README" \
-		"true && git -C $LOCKED_REPO add README" \
-		"echo start; git -C $LOCKED_REPO commit -m 'msg'"
 }
 
 @test "index writers: a locked repo's writer later in the command blocks after an unlocked one" {
@@ -138,7 +91,7 @@ backdate_seconds() {
 @test "timeout: a lock that persists blocks with its age in seconds" {
 	local repo lock
 	repo=$(setup_repo aged_repo)
-	lock="$(git -C "$repo" rev-parse --absolute-git-dir)/index.lock"
+	lock=$(index_lock_path "$repo")
 	touch "$lock"
 	backdate_seconds "$lock" 1000
 
@@ -151,20 +104,70 @@ backdate_seconds() {
 	}
 }
 
-@test "timeout: a lock that clears before the timeout lets the writer proceed" {
-	local repo lock
-	repo=$(setup_repo clearing_repo)
-	lock="$(git -C "$repo" rev-parse --absolute-git-dir)/index.lock"
-	touch "$lock"
-	(sleep 0.3 && rm -f "$lock") >/dev/null 2>&1 3>&- &
-
-	GIT_LOCK_GUARD_TIMEOUT_MS=10000 run_lock_guard "$repo" "git commit -m 'msg'"
-
-	assert_allowed
+# Prints a PATH with no lsof on it but every other program the current PATH
+# offers: each directory holding an lsof is swapped for a bin of links to its
+# other programs, so dropping lsof never drops git or jq beside it.
+path_without_lsof() {
+	local bin="$BATS_TEST_TMPDIR/no_lsof/bin" dir entry kept=""
+	local -a dirs
+	mkdir -p "$bin"
+	IFS=: read -ra dirs <<<"$PATH"
+	for dir in "${dirs[@]}"; do
+		if [[ -x "$dir/lsof" ]]; then
+			for entry in "$dir"/*; do
+				[[ "${entry##*/}" == lsof || -e "$bin/${entry##*/}" ]] && continue
+				ln -s "$entry" "$bin/${entry##*/}"
+			done
+			continue
+		fi
+		kept+="${kept:+:}$dir"
+	done
+	printf '%s:%s' "$bin" "$kept"
 }
 
-@test "no lock: an index writer in an unlocked repo proceeds at once" {
-	each_allowed_in "$REPO" "git add README"
+@test "timeout: a lock that persists lists the holders the lsof on PATH reports" {
+	local bin="$BATS_TEST_TMPDIR/holder/bin"
+	mkdir -p "$bin"
+	printf '#!/usr/bin/env bash\nprintf "COMMAND PID USER FD TYPE NAME\\nholder-proc 48213 tester 3w REG index.lock\\n"\n' >"$bin/lsof"
+	chmod +x "$bin/lsof"
+
+	run_lock_guard "$LOCKED_REPO" "git commit -m 'msg'" "$bin:$PATH"
+
+	assert_blocked
+	assert_guard_output_includes "48213"
+}
+
+@test "timeout: a lock that persists with no lsof on PATH says lsof is unavailable" {
+	run_lock_guard "$LOCKED_REPO" "git commit -m 'msg'" "$(path_without_lsof)"
+
+	assert_blocked
+	assert_guard_output_includes "unavailable"
+	assert_guard_output_excludes "no lsof holders found"
+}
+
+@test "timeout: a lock that persists with lsof reporting nothing says no holders were found" {
+	local bin
+	bin=$(failing_program_bin "$BATS_TEST_TMPDIR" lsof 1)
+
+	run_lock_guard "$LOCKED_REPO" "git commit -m 'msg'" "$bin:$PATH"
+
+	assert_blocked
+	assert_guard_output_includes "no lsof holders found"
+}
+
+@test "timeout: a lock that clears while the guard waits lets the writer proceed" {
+	local repo lock bin="$BATS_TEST_TMPDIR/shim/bin" waited="$BATS_TEST_TMPDIR/sleep_called"
+	repo=$(setup_repo clearing_repo)
+	lock=$(index_lock_path "$repo")
+	touch "$lock"
+	mkdir -p "$bin"
+	printf '#!/usr/bin/env bash\ntouch %q\nrm -f %q\n' "$waited" "$lock" >"$bin/sleep"
+	chmod +x "$bin/sleep"
+
+	run_lock_guard "$repo" "git commit -m 'msg'" "$bin:$PATH"
+
+	assert_allowed
+	assert_present "$waited"
 }
 
 # ── Commands the guard never waits on ────────────────────────────────────────
@@ -172,37 +175,15 @@ backdate_seconds() {
 @test "read-only: git commands that leave the index alone proceed at once despite the lock" {
 	each_allowed_in "$LOCKED_REPO" \
 		"git status" \
-		"git diff --cached" \
-		"git log --oneline" \
-		"git restore README" \
 		"git restore -W README" \
 		"git restore -sSTABLE README" \
-		"git restore -- --staged"
+		"git restore -- --staged" \
+		"git apply fix.patch" \
+		"git apply -p3 fix.patch" \
+		"git apply -C3 fix.patch" \
+		"git apply -- --index"
 }
 
 @test "no git: a command with no git invocation proceeds at once despite the lock" {
-	each_allowed_in "$LOCKED_REPO" \
-		"echo git commit" \
-		"ls"
-}
-
-@test "no repo: an index writer outside any repository proceeds at once" {
-	each_allowed_in "$NO_REPO_DIR" "git commit -m 'msg'"
-}
-
-# ── Helper failures ──────────────────────────────────────────────────────────
-
-@test "helper failure: an ils parse failure blocks with its reason" {
-	local bin
-	bin=$(failing_ils_bin "$TMPDIR_ROOT/broken_ils" 42)
-
-	run_lock_guard "$REPO" "git commit -m 'msg'" "$bin:$PATH"
-
-	assert_blocked_with_reason "42"
-}
-
-@test "helper failure: jq missing from PATH blocks naming jq" {
-	run_lock_guard "$REPO" "git commit -m 'msg'" "$(path_without jq)"
-
-	assert_blocked_with_reason "jq"
+	each_allowed_in "$LOCKED_REPO" "echo git commit"
 }

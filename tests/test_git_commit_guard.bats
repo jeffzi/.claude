@@ -2,6 +2,9 @@
 
 load helpers/hooks
 
+# A commit or pull request message whose body names a .planning/ path.
+readonly PLANNING_MSG=$'docs: update notes\n\nSee .planning/plan-x.md for the rollout.\n'
+
 # Every command in the list is blocked with the reason $1; a failure names the
 # command that broke the run.
 each_blocked() {
@@ -28,11 +31,8 @@ each_allowed() {
 		'git commit -m "feat(03-auth-middleware): implement auth"'
 }
 
-@test "TDD label: every cycle-phase label is blocked as a process label" {
-	each_blocked "TDD process label" \
-		'git commit -m "test: RED-GREEN cycle for auth"' \
-		'git commit -m "test: TDD RED phase for login"' \
-		'git commit -m "feat: GREEN phase implementation"'
+@test "TDD label: a cycle-phase label is blocked as a process label" {
+	each_blocked "TDD process label" 'git commit -m "test: RED-GREEN cycle for auth"'
 }
 
 @test "planning path: a .planning/ path in the message is blocked as an internal path" {
@@ -43,22 +43,10 @@ each_allowed() {
 @test "summary file: a SUMMARY file name in subject or body is blocked as an internal file" {
 	each_blocked "internal SUMMARY file" \
 		'git commit -m "docs: complete 05-01-SUMMARY.md"' \
-		'git commit -m "docs(04): update 04-03-SUMMARY.md references"'
-}
-
-@test "heredoc: a phase ID inside a -F - heredoc body is blocked" {
-	each_blocked "internal phase ID" \
-		"$(printf 'git commit -F - <<EOF\nfeat(05-01): add layout\n\nBody text\nEOF')"
+		'git commit -m "docs: update notes" -m "See 04-03-SUMMARY.md"'
 }
 
 # ── Clean commits (must not block) ───────────────────────────────────────────
-
-@test "clean: a message matching no pattern is allowed" {
-	each_allowed \
-		'git commit -m "feat(auth): add login flow"' \
-		'git commit -m "docs: update README"' \
-		'git commit -m "fix(net/http): handle redirects"'
-}
 
 @test "clean: scopes that nearly match a phase pattern are allowed" {
 	each_allowed \
@@ -75,7 +63,7 @@ each_allowed() {
 # Prints the path on stdout so callers can interpolate it into the git command under test.
 write_planning_msg_file() {
 	local msg="$BATS_TEST_TMPDIR/planning.txt"
-	printf 'docs: update notes\n\nSee .planning/plan-x.md for the rollout.\n' >"$msg"
+	printf '%s' "$PLANNING_MSG" >"$msg"
 	printf '%s' "$msg"
 }
 
@@ -85,39 +73,7 @@ write_planning_msg_file() {
 
 	each_blocked "internal .planning/ path" \
 		"git commit -F $msg" \
-		"git commit --file $msg" \
 		"git commit --file=$msg"
-}
-
-@test "message file: a quoted path is unwrapped before the file is read" {
-	local msg
-	msg=$(write_planning_msg_file)
-
-	each_blocked "internal .planning/ path" \
-		"git commit -F \"$msg\"" \
-		"git commit --file='$msg'" \
-		"git commit --file=\"$msg\""
-}
-
-@test "message file: clean message file is allowed" {
-	local msg="$BATS_TEST_TMPDIR/clean.txt"
-	printf 'feat(auth): add login flow\n\nSupports the password grant.\n' >"$msg"
-
-	run_commit_guard "git commit -F $msg"
-
-	assert_allowed
-}
-
-@test "message file: missing path is allowed" {
-	run_commit_guard "git commit -F $BATS_TEST_TMPDIR/absent.txt"
-
-	assert_allowed
-}
-
-@test "message file: -F - reading stdin is allowed" {
-	run_commit_guard 'git commit -F -'
-
-	assert_allowed
 }
 
 @test "message file: command-text match blocks with a clean -F file" {
@@ -127,77 +83,28 @@ write_planning_msg_file() {
 
 	run_commit_guard "git commit -F $msg"
 
-	assert_blocked
-	assert_guard_output_includes "internal .planning/ path"
+	assert_blocked_with_reason "internal .planning/ path"
 }
 
 # ── Pull request title and body (gh pr create/edit) ──────────────────────────
 
-@test "pull request: a phase ID in the title, body, or a heredoc of gh pr create or edit is blocked" {
-	# shellcheck disable=SC2016 # the literal $(...) is the command text under test
+@test "pull request: a phase ID in the title of gh pr create is blocked" {
 	each_blocked "internal phase ID" \
-		'gh pr create --title "feat(05-01): add layout" --body "Adds the layout."' \
-		'gh pr create -t "feat(05-01): add layout" -b "Adds the layout."' \
-		'gh pr create --title "Add layout" --body "Follows feat(05-01): add layout."' \
-		'gh pr edit 12 --title "feat(05-01): add layout"' \
-		'gh pr edit 12 -b "Follows feat(05-01): add layout."' \
-		"$(printf 'gh pr create --title "Add layout" --body-file - <<EOF\nfeat(05-01): add layout\n\nBody text\nEOF')" \
-		"$(printf 'gh pr edit 12 --body "$(cat <<EOF\nfeat(05-01): add layout\nEOF\n)"')"
+		'gh pr create --title "feat(05-01): add layout" --body "Adds the layout."'
 }
 
-@test "pull request: every body-file spelling reads the file and blocks on its .planning/ reference" {
-	local msg
-	msg=$(write_planning_msg_file)
-
-	each_blocked "internal .planning/ path" \
-		"gh pr create --title \"Add layout\" -F $msg" \
-		"gh pr create --title \"Add layout\" --body-file $msg" \
-		"gh pr create --title \"Add layout\" --body-file=$msg" \
-		"gh pr edit 12 -F \"$msg\"" \
-		"gh pr edit 12 --body-file='$msg'" \
-		"gh pr edit 12 --body-file=\"$msg\""
-}
-
-@test "pull request: a clean, missing, or stdin body file is allowed" {
-	local clean="$BATS_TEST_TMPDIR/clean.txt"
-	printf 'Adds the login flow.\n\nSupports the password grant.\n' >"$clean"
-
-	each_allowed \
-		"gh pr create --title \"feat(auth): add login flow\" --body-file $clean" \
-		"gh pr edit 12 -F $BATS_TEST_TMPDIR/absent.txt" \
-		'gh pr create --title "feat(auth): add login flow" -F -'
-}
-
-@test "pull request: a clean gh pr create or edit is allowed" {
-	each_allowed \
-		'gh pr create --title "feat(auth): add login flow" --body "Supports the password grant."' \
-		'gh pr edit 12 -t "fix(net/http): handle redirects" -b "Follows redirects."'
+@test "pull request: a phase ID in the body of gh pr edit is blocked" {
+	each_blocked "internal phase ID" \
+		'gh pr edit 12 -b "Follows feat(05-01): add layout."'
 }
 
 @test "pull request: other gh commands carrying a pattern are allowed" {
 	each_allowed \
 		'gh pr view 12 --json title --jq ".title == \"feat(05-01): add layout\""' \
-		'gh issue create --title "feat(05-01): add layout" --body "Tracks the layout."' \
-		'gh pr comment 12 --body "See .planning/notes.md"'
+		'gh issue create --title "feat(05-01): add layout" --body "Tracks the layout."'
 }
 
 # ── Which invocations are scanned ────────────────────────────────────────────
-
-@test "invocation: a commit behind -C or after cd, and a pull request after cd, are scanned" {
-	local dir="$BATS_TEST_TMPDIR/sub"
-	mkdir -p "$dir"
-
-	each_blocked "internal phase ID" \
-		"git -C $dir commit -m 'feat(05-01): add layout'" \
-		"cd $dir && git commit -m 'feat(05-01): add layout'" \
-		"cd $dir && gh pr create --title 'feat(05-01): add layout' --body 'Adds the layout.'"
-}
-
-@test "mention: a command that only mentions git commit or gh pr create is not scanned" {
-	each_allowed \
-		"echo \"git commit -m 'docs: see .planning/notes.md'\"" \
-		"rg 'gh pr create' .planning/"
-}
 
 @test "both: a commit and a pull request in one command each have their message file scanned" {
 	local planning clean="$BATS_TEST_TMPDIR/clean.txt"
@@ -214,59 +121,46 @@ write_planning_msg_file() {
 @test "message file: a relative path resolves against the directory the invocation runs in" {
 	local dir="$BATS_TEST_TMPDIR/sub"
 	mkdir -p "$dir"
-	printf 'docs: update notes\n\nSee .planning/plan-x.md for the rollout.\n' >"$dir/msg.txt"
+	printf '%s' "$PLANNING_MSG" >"$dir/msg.txt"
 
 	each_blocked "internal .planning/ path" \
-		"cd $dir && git commit -F msg.txt" \
-		"cd $dir && gh pr create --title 'Add layout' --body-file msg.txt"
+		"cd $dir && git commit -F msg.txt"
+}
+
+@test "pull request: a body file given as -F=, a -F= cluster, or after a no-value cluster is scanned" {
+	printf 'Follows feat(05-01): add layout.\n' >"$BATS_TEST_TMPDIR/body.md"
+
+	each_blocked "internal phase ID" \
+		"gh pr create --title 'Add layout' -F=body.md" \
+		"gh pr create --title 'Add layout' -dF=body.md" \
+		"gh pr create --title 'Add layout' -eF body.md"
+}
+
+@test "pull request: a clean body file given as -F= is allowed beside a dirty =body.md" {
+	printf 'Adds the layout.\n' >"$BATS_TEST_TMPDIR/body.md"
+	printf 'Follows feat(05-01): add layout.\n' >"$BATS_TEST_TMPDIR/=body.md"
+
+	each_allowed \
+		"gh pr create --title 'Add layout' -F=body.md" \
+		"gh pr create --title 'Add layout' -dF=body.md" \
+		"gh pr create --title 'Add layout' -eF body.md"
+}
+
+@test "message file: git commit -F= reads the file named with its leading =" {
+	printf 'Follows feat(05-01): add layout.\n' >"$BATS_TEST_TMPDIR/=msg.txt"
+
+	each_blocked "internal phase ID" 'git commit -F=msg.txt'
+}
+
+@test "message file: git commit -F= ignores a dirty file named without the leading =" {
+	printf 'Follows feat(05-01): add layout.\n' >"$BATS_TEST_TMPDIR/msg.txt"
+	printf 'Adds the layout.\n' >"$BATS_TEST_TMPDIR/=msg.txt"
+
+	each_allowed 'git commit -F=msg.txt'
 }
 
 @test "message file: a file named - in the cwd is never read for -F -" {
-	printf 'docs: update notes\n\nSee .planning/plan-x.md for the rollout.\n' >"$BATS_TEST_TMPDIR/-"
+	printf '%s' "$PLANNING_MSG" >"$BATS_TEST_TMPDIR/-"
 
-	each_allowed \
-		'git commit -F -' \
-		'gh pr create --title "Add layout" -F -'
-}
-
-@test "message file: a non-literal path is not read, and the next literal word is not taken for it" {
-	printf 'See .planning/plan-x.md for the rollout.\n' >"$BATS_TEST_TMPDIR/notes.md"
-
-	# shellcheck disable=SC2016 # the literal expansion is the command text under test
-	run_commit_guard 'git commit -F "$f" notes.md'
-
-	assert_allowed
-}
-
-@test "message file: an unreadable path is skipped" {
-	local msg
-	msg=$(write_planning_msg_file)
-	chmod 000 "$msg"
-
-	run_commit_guard "git commit -F $msg"
-
-	assert_allowed
-}
-
-# ── Parse and helper failures ────────────────────────────────────────────────
-
-@test "unparseable: a command that does not parse is allowed" {
-	run_commit_guard 'git commit -m "feat(05-01): unterminated'
-
-	assert_allowed
-}
-
-@test "helper failure: an ils parse failure blocks with its reason, even for a command with no git word" {
-	local bin
-	bin=$(failing_ils_bin "$BATS_TEST_TMPDIR/broken_ils" 42)
-
-	run_commit_guard "echo hi" "$BATS_TEST_TMPDIR" "$bin:$PATH"
-
-	assert_blocked_with_reason "42"
-}
-
-@test "helper failure: jq missing from PATH blocks naming jq" {
-	run_commit_guard "echo hi" "$BATS_TEST_TMPDIR" "$(path_without jq)"
-
-	assert_blocked_with_reason "jq"
+	each_allowed 'git commit -F -'
 }

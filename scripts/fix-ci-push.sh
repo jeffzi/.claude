@@ -25,16 +25,20 @@ set -euo pipefail
 #     and only once the push has succeeded: a failed remote delete keeps them.
 #
 # Anything refused exits 2 with a reason on stderr and pushes nothing. A local
-# branch that is checked out cannot be deleted; the remote deletion stands, the
-# branch is kept, and the wrapper exits 2 naming it.
+# branch that cannot be deleted — checked out here or in another worktree, or
+# refused by git for any other reason — is kept while the remote deletion stands,
+# and the wrapper exits 2 naming it and why.
 
 # `die` and portable stat access, from a sibling file. The wrapper never
 # changes directory, so $BASH_SOURCE resolves the same way the invocation did.
 # Trimmed with an expansion rather than `dirname` so that a PATH without git in
 # it still reaches the check below and gets told what is missing, instead of
-# dying on a missing `dirname`.
+# dying on a missing `dirname`. A bare name — `bash fix-ci-push.sh` run from
+# this directory — holds no slash for the expansion to trim, so it gets `./`.
+script_path="${BASH_SOURCE[0]}"
+[[ "$script_path" == */* ]] || script_path="./$script_path"
 # shellcheck source=SCRIPTDIR/sh-common.sh
-. "${BASH_SOURCE[0]%/*}/sh-common.sh"
+. "${script_path%/*}/sh-common.sh"
 PROG=fix-ci-push
 
 # The marker file in the git dir. The fix-ci skill raises and drops it by this
@@ -45,6 +49,8 @@ readonly FIX_CI_MARKER=fix-ci-active
 # abandoned by an interrupted session ages out.
 readonly MARKER_TTL_SECONDS=1800
 
+readonly FIX_CI_BRANCH_PREFIX=fix-ci/
+
 # A namespace of the assistant's own branches, alongside fix-ci/*.
 readonly PLAN_BRANCH_PREFIX=plan/
 
@@ -52,14 +58,14 @@ readonly PLAN_BRANCH_PREFIX=plan/
 # returns otherwise. Exit 1: a broken tool, not a refusal of the run.
 die_if_stat_unusable() {
 	(($1 != SH_STAT_UNUSABLE)) ||
-		die "stat answers neither BSD nor GNU format flags; marker age cannot be read." 1
+		die "$SH_STAT_UNUSABLE_MSG; marker age cannot be read." 1
 }
 
 # Prints the absolute git dir of the repo the caller runs in, or dies. git's own
 # stderr is left visible on purpose: a safe.directory refusal and a corrupt repo
 # both surface as this failure and need telling apart.
 policy_git_dir() {
-	command -v git >/dev/null || die "git is not installed."
+	command -v git >/dev/null || die "git is not installed." 1
 	git rev-parse --absolute-git-dir || die "not inside a usable git repository."
 }
 
@@ -101,15 +107,14 @@ push_deleted_refs() {
 # branches that older plan runs left behind, so they can still be cleaned up.
 ref_in_own_namespace() {
 	local ref="${1#refs/heads/}"
-	[[ "$ref" == fix-ci/* || "$ref" == "$PLAN_BRANCH_PREFIX"* ]]
+	[[ "$ref" == "$FIX_CI_BRANCH_PREFIX"* || "$ref" == "$PLAN_BRANCH_PREFIX"* ]]
 }
 
 # The refs this push deletes, filled by require_allowed_args once each one has
 # passed the namespace check. The local cleanup reads nothing else, so it can
 # never reach a ref the check did not see.
-DELETED_REFS=()
+deleted_refs=()
 
-# Refuse unless the current repo has a marker touched within the TTL
 require_active_marker() {
 	local git_dir marker status=0
 	git_dir=$(policy_git_dir) || exit $?
@@ -157,28 +162,49 @@ require_allowed_args() {
 	while IFS= read -r ref; do
 		ref_in_own_namespace "$ref" ||
 			die "'$ref' is outside fix-ci/* and plan/*; only the assistant's own branches may be deleted."
-		DELETED_REFS+=("$ref")
+		deleted_refs+=("$ref")
 	done < <(push_deleted_refs "$delete_mode" "${refs[@]}")
 }
 
-# Delete the local branch behind every ref in DELETED_REFS, skipping any that
-# does not exist here. The branch checked out in this worktree is kept — git
-# refuses to delete it — and named, so the caller knows what to switch away
-# from.
+# Prints the path of the worktree that has branch $1 checked out; exit 1 when
+# none does.
+worktree_holding() {
+	local name="$1" line path=""
+	while IFS= read -r line; do
+		case "$line" in
+		"worktree "*) path="${line#worktree }" ;;
+		"branch refs/heads/$name")
+			printf '%s' "$path"
+			return 0
+			;;
+		esac
+	done < <(git worktree list --porcelain)
+	return 1
+}
+
+# Deletes the local branch behind every ref in deleted_refs that exists here. A
+# branch git refuses to delete is kept and named with the reason — checked out
+# here, the worktree holding it, or git's own error — so the caller knows what
+# to act on. The loop
+# carries on past it so every other ref is still cleaned up.
 delete_local_branches() {
-	local ref name current kept=""
+	local ref name current err holder kept=""
 	current=$(git symbolic-ref --quiet --short HEAD) || current=""
-	for ref in ${DELETED_REFS[@]+"${DELETED_REFS[@]}"}; do
+	for ref in ${deleted_refs[@]+"${deleted_refs[@]}"}; do
 		name="${ref#refs/heads/}"
 		git show-ref --quiet --verify "refs/heads/$name" || continue
 		if [[ "$name" == "$current" ]]; then
-			kept="$name"
-			continue
+			kept+=$'\n'"  '$name' is checked out here; switch away from it, then delete it."
+		elif ! err=$(git branch --quiet -D "$name" 2>&1); then
+			if holder=$(worktree_holding "$name"); then
+				kept+=$'\n'"  '$name' is checked out in the worktree at '$holder'; switch that worktree away from it, then delete it."
+			else
+				kept+=$'\n'"  '$name' could not be deleted: $err"
+			fi
 		fi
-		git branch --quiet -D "$name"
 	done
 	[[ -z "$kept" ]] ||
-		die "'$kept' was deleted from the remote but is checked out here, so the local branch is kept; switch away from '$kept', then delete it."
+		die "deleted from the remote, but these local branches are kept:$kept"
 }
 
 main() {
