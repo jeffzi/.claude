@@ -39,7 +39,7 @@ jobs:
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
         shell: bash
       - name: Lint
-        run: shellcheck scripts/statusline.sh tests/helpers/statusline.bash tests/helpers/hooks.bash
+        run: shellcheck -x scripts/statusline.sh tests/helpers/statusline.bash tests/helpers/hooks.bash
       - name: Format
         run: shfmt -d scripts/statusline.sh tests/helpers/statusline.bash tests/helpers/hooks.bash
       - name: Run tests
