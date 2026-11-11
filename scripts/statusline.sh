@@ -66,17 +66,24 @@ sha256_hex() {
 
 # The OAuth access token on stdout, from Keychain service $1 or, when the Keychain
 # yields none, from credentials file $2. Exit USAGE_NO_TOKEN_STATUS when neither holds a
-# token, and 1 when the credentials file exists but cannot be read or parsed: that is a
-# broken credential, not an account without one.
+# token, and 1 when either source exists but cannot be read or parsed: that is a broken
+# credential, not an account without one.
+#
+# A Keychain entry that will not parse still falls through to the credentials file, so
+# a valid file token is used regardless; only when the file has no token either does the
+# broken entry decide the status.
 usage_oauth_token() {
-	local service="$1" cred_file="$2" entry token=""
+	local service="$1" cred_file="$2" entry token="" no_token_status=$USAGE_NO_TOKEN_STATUS
 	if entry=$(security find-generic-password -s "$service" -w 2>/dev/null); then
-		token=$(printf '%s' "$entry" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null) || token=""
+		token=$(printf '%s' "$entry" | jq -r '.claudeAiOauth.accessToken // empty' 2>/dev/null) || {
+			token=""
+			no_token_status=1
+		}
 	fi
 	if [[ -z "$token" ]]; then
-		[[ -e "$cred_file" ]] || return "$USAGE_NO_TOKEN_STATUS"
+		[[ -e "$cred_file" ]] || return "$no_token_status"
 		token=$(jq -r '.claudeAiOauth.accessToken // empty' "$cred_file" 2>/dev/null) || return 1
-		[[ -n "$token" ]] || return "$USAGE_NO_TOKEN_STATUS"
+		[[ -n "$token" ]] || return "$no_token_status"
 	fi
 	printf '%s' "$token"
 }
@@ -95,8 +102,11 @@ fetch_usage_payload() {
 	local suffix="$1" service="Claude Code-credentials" token response payload
 	[[ "$suffix" != "default" ]] && service="${service}-${suffix}"
 	token=$(usage_oauth_token "$service" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json") || return
-	response=$(curl -s --max-time "$USAGE_FETCH_TIMEOUT_SECONDS" \
-		-H "Authorization: Bearer $token" \
+	# The bearer header goes in on stdin (-H @-, curl 7.55+) rather than argv, which
+	# other local users can read through ps or /proc while the request runs. printf is
+	# a builtin, so the token never sits on any process's argv.
+	response=$(printf 'Authorization: Bearer %s\n' "$token" | curl -s --max-time "$USAGE_FETCH_TIMEOUT_SECONDS" \
+		-H @- \
 		-H "anthropic-beta: oauth-2025-04-20" \
 		https://api.anthropic.com/api/oauth/usage 2>/dev/null) || return 1
 	payload=$(printf '%s' "$response" | jq -c '
@@ -172,8 +182,14 @@ usage_lock_reclaim() {
 	rmdir "$holder" 2>/dev/null
 }
 
-# Takes the lock $1 for the claim named $2. Non-zero means a live render holds it,
-# which is the caller's signal to skip the fetch entirely.
+# Takes the lock $1 for the claim named $2. Exit 1 means a live render holds it, which
+# is the caller's signal to skip the fetch entirely. Exit USAGE_CACHE_UNWRITABLE_STATUS
+# means the lock could not be created because its directory cannot be written — no
+# render will ever hold it, so treating it as held would blank the line with no reason.
+#
+# That test reads the parent directory, not the lock: a holder can release between the
+# failed mkdir and any check of the lock itself, and an absent lock would then read as
+# an unwritable directory.
 #
 # The throttle check in fetch_usage_fallback is a plain read, not a claim: two renders
 # that overlap can both see the poll window open. mkdir is atomic on POSIX, so only one
@@ -183,8 +199,9 @@ usage_lock_reclaim() {
 # claim is older than the throttle window itself. By then no legitimate holder can still
 # be running, since a live fetch finishes well inside that window.
 usage_lock_acquire() {
-	local lock="$1" owner="$2" throttle="$3" now="$4"
+	local lock="$1" owner="$2" throttle="$3" now="$4" parent="${1%/*}"
 	mkdir "$lock" 2>/dev/null && mkdir "$lock/$owner" && return 0
+	[[ -d "$lock" ]] || [[ -d "$parent" && -w "$parent" ]] || return "$USAGE_CACHE_UNWRITABLE_STATUS"
 	usage_lock_reclaim "$lock" "$throttle" "$now" || return 1
 	mkdir "$lock/$owner" 2>/dev/null
 }
@@ -247,6 +264,9 @@ publish_usage_payload() {
 # atomically publishes it into the cache. Called from fetch_usage_fallback only
 # once its throttle check has decided the poll window is open.
 #
+# Exit USAGE_CACHE_UNWRITABLE_STATUS when the lock, marker, staging file, or cache
+# cannot be written; a lock another render holds is an ordinary skip and exits 0.
+#
 # The lock is released with an explicit call at the end of this function rather than a
 # RETURN trap: a trap set with `trap ... RETURN` fires again when the *caller*
 # (fetch_usage_fallback) returns, at which point this function's local $lock is out of
@@ -258,8 +278,10 @@ refresh_usage_cache() {
 	# a recycled pid from producing the name a killed render's claim already carries.
 	# macOS ships bash 3.2, which has no BASHPID — fall back to $$ there and let
 	# $RANDOM alone separate same-parent subshells.
-	local owner="owner.${BASHPID:-$$}.${RANDOM}"
-	usage_lock_acquire "$lock" "$owner" "$throttle" "$now" || return 0
+	local owner="owner.${BASHPID:-$$}.${RANDOM}" acquire_status=0
+	usage_lock_acquire "$lock" "$owner" "$throttle" "$now" || acquire_status=$?
+	((acquire_status == USAGE_CACHE_UNWRITABLE_STATUS)) && return "$acquire_status"
+	((acquire_status == 0)) || return 0
 	# A killed render (SIGTERM/SIGINT) must not strand the lock for the full throttle
 	# window; EXIT/INT/TERM traps are safe here, unlike RETURN, because $lock and $owner
 	# stay in scope for the duration of this function.

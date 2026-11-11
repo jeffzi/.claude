@@ -867,6 +867,22 @@ assert_prints_mtime() {
 	assert_cred_token_sent keychain-notoken token-file
 }
 
+@test "credential file fallback: a malformed Keychain entry falls through to the file's token" {
+	cred_fallback_case keychain-malformed token-file malformed
+
+	cred_fetch keychain-malformed >/dev/null || true
+
+	assert_cred_token_sent keychain-malformed token-file
+}
+
+@test "the bearer token stays off curl's argv" {
+	cred_fallback_case token-argv token-secret
+
+	cred_fetch token-argv >/dev/null || true
+
+	assert_not_contains "$(<"$CRED_ROOT/token-argv/args")" "token-secret"
+}
+
 # ── Usage fetch: a failure with nothing cached is named on the line ─────────
 
 @test "no cache and a curl error: the limits slot names the failed fetch" {
@@ -906,6 +922,34 @@ assert_prints_mtime() {
 	out=$(fallback_render cred-unreadable 0 "$USAGE_BODY" | strip_ansi)
 
 	assert_contains "$out" "Opus 4.6 ● ● ◎ ○ ○ │ limits: fetch failed"
+}
+
+@test "a malformed Keychain entry and no credentials file counts as a failed fetch" {
+	local out
+	fallback_case keychain-malformed-alone malformed
+
+	out=$(fallback_render keychain-malformed-alone 0 "$USAGE_BODY" | strip_ansi)
+
+	assert_contains "$out" "Opus 4.6 ● ● ◎ ○ ○ │ limits: fetch failed"
+}
+
+@test "a malformed Keychain entry and a credentials file holding no token counts as a failed fetch" {
+	local out
+	fallback_case keychain-malformed-empty-file malformed
+	printf '{"claudeAiOauth":{}}' >"$FALLBACK_ROOT/keychain-malformed-empty-file/.credentials.json"
+
+	out=$(fallback_render keychain-malformed-empty-file 0 "$USAGE_BODY" | strip_ansi)
+
+	assert_contains "$out" "Opus 4.6 ● ● ◎ ○ ○ │ limits: fetch failed"
+}
+
+@test "a temp directory that cannot be written: named failure line" {
+	local tmp="$FALLBACK_ROOT/tmp-unwritable/tmp"
+	fallback_case tmp-unwritable
+	chmod a-w "$tmp"
+
+	assert_failure_line_naming "$tmp" \
+		fallback_render tmp-unwritable 0 "$USAGE_BODY"
 }
 
 @test "inside the failure backoff, a render with no cache still names the failed fetch" {

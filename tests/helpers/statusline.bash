@@ -266,13 +266,16 @@ assert_fallback_json() {
 	fi
 }
 
-# The curl shim logs its argv per call; one call, carrying the expected bearer
-# token, is what proves the credential file was read and its token forwarded.
+# The curl shim logs its argv per call and appends whatever it reads on stdin; one
+# call, with the expected bearer token on stdin, is what proves the credential was
+# read and its token forwarded.
 assert_cred_token_sent() {
-	local case_name="$1" token="$2" args
+	local case_name="$1" token="$2" args sent
 	args=$(<"$CRED_ROOT/$case_name/args")
-	if [[ $(printf '%s\n' "$args" | grep -c .) != 1 || "$args" != *"Authorization: Bearer $token"* ]]; then
-		printf '%s: expected one curl call bearing %q\n  curl argv: %q\n' "$case_name" "$token" "$args" >&2
+	sent=$(cat "$CRED_ROOT/$case_name/stdin" 2>/dev/null || true)
+	if [[ $(printf '%s\n' "$args" | grep -c .) != 1 || "$sent" != *"Authorization: Bearer $token"* ]]; then
+		printf '%s: expected one curl call bearing %q on stdin\n  curl argv: %q\n  curl stdin: %q\n' \
+			"$case_name" "$token" "$args" "$sent" >&2
 		return 1
 	fi
 }
@@ -461,14 +464,15 @@ probe_then_mtime() {
 # Scaffolds a fake $dir/bin with a curl shim and a security shim, plus an
 # attempts file curl appends to. gate_curl "gate" makes the shim honor $STUB_CURL_EXIT;
 # "nogate" makes it always succeed. security_mode selects the security shim: "ok" (returns
-# a token), "notoken" (succeeds with an entry holding no token) or "fail" (exits 1); any
-# other mode fails.
+# a token), "notoken" (succeeds with an entry holding no token), "malformed" (succeeds
+# with an entry that is not JSON) or "fail" (exits 1); any other mode fails.
 make_fallback_bin() {
 	local dir="$1" gate_curl="$2" security_mode="$3"
 	mkdir -p "$dir/bin"
 	: >"$dir/attempts"
 	cat >"$dir/bin/curl" <<-'SHIM'
 		#!/usr/bin/env bash
+		cat >>"${STUB_STDIN:-/dev/null}"
 		printf 'attempt\n' >>"$STUB_ATTEMPTS"
 		printf '%s\n' "$*" >>"${STUB_ARGS:-/dev/null}"
 	SHIM
@@ -488,27 +492,31 @@ make_fallback_bin() {
 			#!/usr/bin/env bash
 			printf '%s\n' '{"claudeAiOauth":{"accessToken":"stub-token"}}'
 		SHIM
-		chmod +x "$dir/bin/security"
 		;;
 	notoken)
 		cat >"$dir/bin/security" <<-'SHIM'
 			#!/usr/bin/env bash
 			printf '%s\n' '{"claudeAiOauth":{}}'
 		SHIM
-		chmod +x "$dir/bin/security"
+		;;
+	malformed)
+		cat >"$dir/bin/security" <<-'SHIM'
+			#!/usr/bin/env bash
+			printf '%s\n' 'not json'
+		SHIM
 		;;
 	fail)
 		cat >"$dir/bin/security" <<-'SHIM'
 			#!/usr/bin/env bash
 			exit 1
 		SHIM
-		chmod +x "$dir/bin/security"
 		;;
 	*)
 		printf 'make_fallback_bin: unknown security mode %q\n' "$security_mode" >&2
 		return 1
 		;;
 	esac
+	chmod +x "$dir/bin/security"
 }
 
 fallback_case() {
@@ -584,6 +592,7 @@ setup_concurrent_race() {
 
 	cat >"$case_dir/bin/curl" <<-'SHIM'
 		#!/usr/bin/env bash
+		cat >/dev/null
 		printf 'attempt\n' >>"$RACE_ATTEMPTS"
 		if [[ $(wc -l <"$RACE_ATTEMPTS") -eq 1 ]]; then
 			until [[ -f "$RACE_RELEASE" ]]; do sleep 0.05; done
@@ -622,6 +631,7 @@ setup_reclaim_race() {
 
 	cat >"$RECLAIM_DIR/bin/curl" <<-'SHIM'
 		#!/usr/bin/env bash
+		cat >/dev/null
 		printf '%s\n' "$RACE_ID" >>"$RACE_ATTEMPTS"
 		if [[ -n "${RACE_HOLD:-}" ]]; then
 			until [[ -f "$RACE_HOLD" ]]; do sleep 0.05; done
@@ -713,7 +723,7 @@ cred_fetch() {
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
 		export PATH="$dir/bin:$PATH" CLAUDE_CONFIG_DIR="$dir"
 		# shellcheck disable=SC2030,SC2031  # exports scoped to subshell
-		export STUB_ATTEMPTS="$dir/attempts" STUB_CURL_BODY="$dir/body" STUB_ARGS="$dir/args"
+		export STUB_ATTEMPTS="$dir/attempts" STUB_CURL_BODY="$dir/body" STUB_ARGS="$dir/args" STUB_STDIN="$dir/stdin"
 		fetch_usage_payload default
 	)
 }
